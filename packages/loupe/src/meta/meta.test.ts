@@ -146,6 +146,10 @@ describe("ts-morph engine on edge shapes", () => {
     expect(prop(component(modules, shapes, name), propName)).toMatchObject({ editable: false, reason });
   });
 
+  it("lets an unreadable config taint only the props it generated", () => {
+    expect(prop(component(modules, shapes, "Extended"), "open")).toMatchObject({ status: "type-only" });
+  });
+
   it("offers number unions and enums, sorted when no config backs them", () => {
     const kitchen = component(modules, shapes, "Kitchen");
     expect(prop(kitchen, "columns")).toMatchObject({ status: "type-only", options: [1, 2, 3] });
@@ -217,6 +221,15 @@ describe("react-docgen-typescript fallback", () => {
     expect(prop(button, "size")).toMatchObject({ status: "verified" });
     expect(prop(button, "children")).toMatchObject({ editable: true, kind: "text" });
     expectWellFormed(modules);
+  });
+
+  it("shares the default rules: a destructure that disagrees with defaultVariants is a conflict", () => {
+    const { modules } = extract(collectSources(edgeShapes, []), "docgen");
+    expect(prop(component(modules, "components/shapes.tsx", "Conflict"), "tone").default).toEqual({
+      source: "conflict",
+      value: "loud",
+      defaultVariants: "calm",
+    });
   });
 
   it("takes over in auto mode when ts-morph cannot read the tsconfig", () => {

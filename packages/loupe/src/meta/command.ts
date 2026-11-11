@@ -9,13 +9,13 @@ import { extractWithTsMorph } from "./ts-morph-engine.js";
 import type { ModuleMeta } from "./types.js";
 import { writeMeta } from "./write.js";
 
-export type Engine = "auto" | "ts-morph" | "docgen";
+type EngineChoice = "auto" | "ts-morph" | "docgen";
 
 export type MetaOptions = {
   tsconfig: string;
   include: string[];
   outDir: string;
-  engine: Engine;
+  engine: EngineChoice;
 };
 
 export type MetaResult = {
@@ -45,7 +45,7 @@ export function runMeta(options: MetaOptions): MetaResult {
   };
 }
 
-export function extract(sources: SourceSet, engine: Engine): { modules: ModuleMeta[]; fallbackReason?: string } {
+export function extract(sources: SourceSet, engine: EngineChoice): { modules: ModuleMeta[]; fallbackReason?: string } {
   let ns: typeof tsm | undefined;
   let failure: string | undefined;
   try {

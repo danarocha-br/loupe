@@ -51,7 +51,7 @@ function literalValue(ns: Ns, node: tsm.Node | undefined): OptionValue | null | 
 }
 
 /** Reads a `cva(base, config)` / `tv(config)` call without executing it. */
-export function readVariantConfig(ns: Ns, call: tsm.CallExpression): VariantConfig | undefined {
+function readVariantConfig(ns: Ns, call: tsm.CallExpression): VariantConfig | undefined {
   const factory = factoryOf(ns, call);
   if (!factory) return undefined;
   const filePath = call.getSourceFile().getFilePath();
@@ -110,7 +110,7 @@ export function readVariantConfig(ns: Ns, call: tsm.CallExpression): VariantConf
 }
 
 /** The variant config a variable declaration holds, if it is `const x = cva(...)`. */
-export function configOfDeclaration(ns: Ns, decl: tsm.Node): VariantConfig | undefined {
+function configOfDeclaration(ns: Ns, decl: tsm.Node): VariantConfig | undefined {
   if (!ns.Node.isVariableDeclaration(decl)) return undefined;
   const init = decl.getInitializer();
   return init && ns.Node.isCallExpression(init) ? readVariantConfig(ns, init) : undefined;

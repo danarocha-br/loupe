@@ -32,7 +32,7 @@ export function Alert({ tone, elevated }: VariantProps<typeof alert> & { childre
   return tone && elevated ? null : null;
 }
 
-export function Extended(props: VariantProps<typeof extended>) {
+export function Extended(props: VariantProps<typeof extended> & { open?: boolean }) {
   return props ? null : null;
 }
 

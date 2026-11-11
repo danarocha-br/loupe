@@ -16,7 +16,7 @@ export type InspectReason =
   | "UNVERIFIED";
 
 /** How far a closed option set can be trusted (PER-80). */
-export type OptionStatus = "verified" | "verified-partial" | "type-only";
+type OptionStatus = "verified" | "verified-partial" | "type-only";
 
 export type OptionValue = string | number | boolean;
 
@@ -44,7 +44,7 @@ export type EditableOptionsProp = PropBase & {
 };
 
 /** `children` that accepts a string: editable where the call site writes one literal (PER-113). */
-export type EditableTextProp = PropBase & { editable: true; kind: "text" };
+type EditableTextProp = PropBase & { editable: true; kind: "text" };
 
 export type InspectOnlyProp = PropBase & {
   editable: false;
