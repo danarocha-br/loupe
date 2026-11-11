@@ -36,8 +36,7 @@ export function productLayerFiles(input: ProductLayerInput): Map<string, string>
   };
   return new Map([
     ["package.json", `${JSON.stringify(pkg, null, 2)}\n`],
-    // Resolved relative to this file, never by the package's own name: a
-    // package without an `exports` map can't require itself (PER-94).
+    // Relative to this file: a package without `exports` can't require itself (PER-94).
     [
       "next.js",
       [

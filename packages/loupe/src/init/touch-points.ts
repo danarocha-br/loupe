@@ -1,9 +1,5 @@
-// The four existing files `init` edits (PER-93). Each edit goes through the AST
-// or a comment-preserving JSON parser; none touches a call site.
-//
-// `find` reads back what Loupe inserted, in the AST-normalised form the ledger
-// hashes. `edit` applies the insertion, or says why the file's shape is not one
-// it can edit safely, in which case `init` prints `snippet` instead.
+// The four files `init` edits (PER-93), through the AST or a comment-preserving
+// JSON parser. `find` reads back Loupe's insertion in the form the ledger hashes.
 
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -59,7 +55,7 @@ export type TouchPointContext = {
   workspaceProtocol: string;
 };
 
-/** In the order `init` applies them; `remove` undoes them in reverse. */
+/** In the order `init` applies them. */
 export function touchPoints(ctx: TouchPointContext): TouchPoint[] {
   const biome = firstExisting(ctx.root, ["biome.jsonc", "biome.json"]);
   return [
@@ -165,7 +161,11 @@ function nextConfig(file: string): TouchPoint {
         outer === call &&
         ts.isCallExpression(outer) &&
         outer.arguments.length === 1;
-      return { canonical: join(sf, imp, call), exact };
+      // Only the wrapper is Loupe's: its argument is the app's config and may change freely.
+      const wrapper = call && ts.isCallExpression(call)
+        ? `withLoupe(${call.arguments.length} argument${call.arguments.length === 1 ? "" : "s"})${call === outer ? ", outermost" : ""}`
+        : "";
+      return { canonical: `${imp ? canonical(imp, sf) : ""}\n${wrapper}`, exact };
     },
     edit(text) {
       if (text === undefined) return { unexpected: `${file} doesn't exist.` };

@@ -18,11 +18,7 @@ export function parse(file: string, text: string): ts.SourceFile {
 
 const printer = ts.createPrinter({ removeComments: true, newLine: ts.NewLineKind.LineFeed });
 
-/**
- * The AST-normalised form of an inserted node: reprinted, without comments,
- * parentheses or the source's quote style. Whitespace and quotes are formatting;
- * anything else that changes this string is a hand edit.
- */
+/** An inserted node reprinted without comments, parentheses or quote style, so only semantic edits change it. */
 export function canonical(node: ts.Node, sf: ts.SourceFile): string {
   const strip: ts.TransformerFactory<ts.Node> = (context) => {
     const visit = (n: ts.Node): ts.Node => {
@@ -71,9 +67,9 @@ function importsName(decl: ts.ImportDeclaration, name: string): boolean {
 }
 
 /**
- * Where a new package import goes: before the first package import whose
- * specifier sorts after it, so a sorted import block stays sorted; otherwise
- * after the last import. Side-effect and relative imports are skipped.
+ * Where a new package import goes: before the first package import that sorts
+ * after it, so a sorted block stays sorted; else after the last import, else
+ * after any directive. Side-effect and relative imports are skipped.
  */
 export function insertImport(text: string, sf: ts.SourceFile, line: string, from: string): string {
   const imports = sf.statements.filter(ts.isImportDeclaration);
@@ -83,12 +79,30 @@ export function insertImport(text: string, sf: ts.SourceFile, line: string, from
     return !spec.startsWith(".") && spec > from;
   });
   if (after) {
-    const at = lineStart(text, after.getStart(sf));
+    // Above the import's own comment lines, which belong to it.
+    const own = lineStart(text, after.getStart(sf));
+    let at = own;
+    while (at > 0) {
+      const previous = lineStart(text, at - 1);
+      if (!/^\s*\/\//.test(text.slice(previous, at))) break;
+      at = previous;
+    }
+    // Comments reaching the top of the file are its header, not the import's.
+    if (at === 0) at = own;
     return `${text.slice(0, at)}${line}\n${text.slice(at)}`;
   }
-  const last = imports.at(-1);
+  const last = imports.at(-1) ?? directives(sf).at(-1);
   if (last) return `${text.slice(0, last.end)}\n${line}${text.slice(last.end)}`;
   return `${line}\n${text}`;
+}
+
+function directives(sf: ts.SourceFile): ts.Statement[] {
+  const found: ts.Statement[] = [];
+  for (const s of sf.statements) {
+    if (!ts.isExpressionStatement(s) || !ts.isStringLiteral(s.expression)) break;
+    found.push(s);
+  }
+  return found;
 }
 
 export function lineStart(text: string, offset: number): number {

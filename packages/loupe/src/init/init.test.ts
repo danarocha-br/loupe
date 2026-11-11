@@ -78,11 +78,15 @@ function commit(root: string): void {
 }
 
 async function init(root: string, ...argv: string[]) {
+  return initAnswering(root, [], ...argv);
+}
+
+async function initAnswering(root: string, answers: string[], ...argv: string[]) {
   const out: string[] = [];
   const code = await run(["init", ...argv], {
     out: (line) => out.push(line),
     err: (line) => out.push(line),
-    ask: async () => "",
+    ask: async () => answers.shift() ?? "",
     cwd: root,
     nodeVersion: "22.22.2",
   });
@@ -253,6 +257,16 @@ describe("the ledger", () => {
 
     const other = gitRepo({ [LEDGER]: { formatVersion: 1, loupe: { package: "@danarocha/loupe", version: "9.9.9" } } });
     expect((await init(other)).text).toContain("was written by Loupe 9.9.9");
+  });
+
+  it("keeps a yes the check records during the same run", async () => {
+    const root = gitRepo({ "apps/web/.babelrc": "{}\n" });
+    const { code, text } = await initAnswering(root, ["yes"]);
+    expect(text).toContain("Recorded your yes");
+    expect(code).toBe(0);
+    const l = JSON.parse(read(root, LEDGER));
+    expect(l.untestedAccepted).toEqual([expect.objectContaining({ app: "apps/web", item: "bundler", seen: ".babelrc" })]);
+    expect(l.touchPoints).toHaveLength(4);
   });
 
   it("keeps the compatibility check's field", async () => {

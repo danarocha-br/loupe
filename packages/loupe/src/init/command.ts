@@ -97,9 +97,8 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   }
 
   const knownApp = options.app ?? ledger.productLayer?.app;
-  // `--adopt` writes only the ledger and generate's output, so uncommitted files can't be harmed.
-  // Otherwise: before the check, so a refusal leaves even its yes unrecorded,
-  // and again once the app is known.
+  // Before the check, so a refusal records nothing, and again once the app is known.
+  // `--adopt` writes only the ledger and generate's output, so it skips this.
   const guard = !options.adopt;
   if (guard && refuseDirty(dirtyPaths(root, git, protectedPaths(root, knownApp, version)), options, io, ledger)) {
     return 1;
@@ -114,8 +113,13 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   });
   if (!check.ok || !check.app) return 1;
   const app = check.app;
+  // The check may have just recorded a yes in the ledger.
+  ledger = readInitLedger(root);
   if (guard && knownApp === undefined) {
-    if (refuseDirty(dirtyPaths(root, git, protectedPaths(root, app, version)), options, io, ledger)) return 1;
+    // The ledger was clean before the check, which may have just written its yes there.
+    const dirty = dirtyPaths(root, git, protectedPaths(root, app, version));
+    dirty.blocking = dirty.blocking.filter((f) => f !== LEDGER_PATH);
+    if (refuseDirty(dirty, options, io, ledger)) return 1;
   }
   if (!check.designSystem) {
     io.err(`Couldn't tell which design system ${app} uses.`);
@@ -157,7 +161,7 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   }
   io.out("");
 
-  // Last, after `--adopt` too: its meta hashes the app's sources, hand-edited touch points included.
+  // Last: its meta hashes the app's sources, the edited touch points included.
   const generated = runGenerate(
     {
       out: PRODUCT_LAYER.path,
@@ -262,9 +266,10 @@ class Run {
     }
 
     if (found) {
-      if (found.exact && !entry) {
-        this.setTouchPoint({ id: tp.id, file: tp.file, mode: "auto", sha256: hash ?? null });
-        line("✓", "already in place, recorded");
+      if (found.exact) {
+        // Exactly what init writes. A pending manual step stays `manual`: a person made it.
+        this.setTouchPoint({ id: tp.id, file: tp.file, mode: entry ? "manual" : "auto", sha256: hash ?? null });
+        line("✓", entry ? "adopted (manual)" : "already in place, recorded");
         return;
       }
       this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: null });
@@ -363,13 +368,13 @@ function dirtyPaths(root: string, git: string, guarded: string[]): Dirty {
     const entry = entries[i] ?? "";
     if (entry.length < 4) continue;
     const status = entry.slice(0, 2);
-    let file = entry.slice(3);
-    if (status.startsWith("R") || status.startsWith("C")) i += 1; // the rename's source follows
-    if (prefix) {
-      if (!file.startsWith(`${prefix}/`)) continue;
-      file = file.slice(prefix.length + 1);
+    const files = [entry.slice(3)];
+    // A rename's source follows as its own entry, and is a change too.
+    if (status.startsWith("R") || status.startsWith("C")) files.push(entries[++i] ?? "");
+    for (const file of files) {
+      if (!prefix) dirty.push(file);
+      else if (file.startsWith(`${prefix}/`)) dirty.push(file.slice(prefix.length + 1));
     }
-    dirty.push(file);
   }
   const blocks = (f: string) => guarded.some((g) => (g.endsWith("/") ? f.startsWith(g) : f === g));
   return { blocking: dirty.filter(blocks), other: dirty.filter((f) => !blocks(f)) };
