@@ -7,6 +7,6 @@ import { installDebug } from "./debug.js";
 export { createAdapter } from "./adapter.js";
 export type { InstanceProps, InstanceRow, LoupeDebug, ServerInstance } from "./debug.js";
 export type { Status } from "./registry.js";
-export type { Props, Resolved, Source } from "./store.js";
+export type { OverrideRecord, Props, Resolved, Scope, ScopeTarget, Source } from "./store.js";
 
 installDebug();

@@ -209,6 +209,96 @@ describe("createAdapter", () => {
     expect(buttons()[0]?.dataset.variant).toBe("destructive");
   });
 
+  describe("group and page scopes", () => {
+    // Two call sites of Button: a repeated row trigger, and a second, single one.
+    const rows = (ids: string[], extra?: ReactElement) =>
+      h(
+        "div",
+        null,
+        ids.map((id) => h("div", { key: id }, h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps))),
+        h(Button, { variant: "ghost", "data-ds-anchor": anchor(2) } as ButtonProps),
+        extra,
+      );
+    const variants = () => buttons().map((button) => button.dataset.variant);
+
+    it("a group Override changes every Instance of its call site and no other; page scope reaches both", () => {
+      render(rows(["m1", "m2", "m3"]));
+      act(() => {
+        loupe.set(`${anchor(1)}#m2`, "variant", "outline", "group");
+      });
+      expect(variants()).toEqual(["outline", "outline", "outline", "ghost"]);
+      expect(loupe.props(`${anchor(1)}#m1`).sources.variant).toBe("group");
+
+      act(() => {
+        loupe.set(anchor(2), "variant", "secondary", "page");
+      });
+      expect(variants()).toEqual(["outline", "outline", "outline", "secondary"]);
+      expect(loupe.props(anchor(2)).sources.variant).toBe("page");
+
+      act(() => {
+        loupe.reset(`${anchor(1)}#m1`, undefined, "group");
+      });
+      expect(variants()).toEqual(["secondary", "secondary", "secondary", "secondary"]);
+    });
+
+    it("an Instance that mounts later joins its group and page on its first frame", () => {
+      render(rows(["m1"]));
+      act(() => {
+        loupe.set(`${anchor(1)}#m1`, "variant", "outline", "group");
+        loupe.set(`${anchor(1)}#m1`, "disabled", true, "page");
+      });
+      render(rows(["m1", "m2"]));
+      expect(variants()).toEqual(["outline", "outline", "ghost"]);
+      expect(buttons().map((button) => button.disabled)).toEqual([true, true, true]);
+    });
+
+    it("an excluded Instance keeps its exclusion through a rerender and a remount", () => {
+      render(rows(["m1", "m2"]));
+      act(() => {
+        loupe.set(`${anchor(1)}#m1`, "variant", "outline", "group");
+        loupe.exclude(`${anchor(1)}#m1`, "group");
+      });
+      expect(variants()).toEqual(["ghost", "outline", "ghost"]);
+
+      render(rows(["m1", "m2"], h("span", null, "rerendered")));
+      expect(variants()).toEqual(["ghost", "outline", "ghost"]);
+
+      render(h("div"));
+      render(rows(["m1", "m2"]));
+      expect(variants()).toEqual(["ghost", "outline", "ghost"]);
+      expect(loupe.records()).toEqual([
+        { target: { scope: "group", anchor: anchor(1) }, values: { variant: "outline" }, excluded: [`${anchor(1)}#m1`] },
+      ]);
+
+      act(() => {
+        loupe.include(`${anchor(1)}#m1`, "group");
+      });
+      expect(variants()).toEqual(["outline", "outline", "ghost"]);
+    });
+
+    it("a page Override stops reaching an Instance that outlives a navigation to another route", () => {
+      history.replaceState(null, "", "/members");
+      render(rows(["m1"]));
+      act(() => {
+        loupe.set(anchor(2), "variant", "secondary", "page");
+      });
+      expect(variants()).toEqual(["secondary", "secondary"]);
+      try {
+        act(() => history.pushState(null, "", "/billing"));
+        expect(variants()).toEqual(["ghost", "ghost"]);
+        act(() => history.back());
+      } finally {
+        history.replaceState(null, "", "/");
+      }
+    });
+
+    it("refuses a group for an Instance with no anchored call site", () => {
+      render(h(Button, { variant: "ghost" }));
+      const [row] = loupe.list();
+      expect(() => loupe.set(row?.id ?? "", "variant", "outline", "group")).toThrow(/no group/);
+    });
+  });
+
   it("names a picked DOM node's Instance", () => {
     render(h("div", { key: "a" }, h(Button, { "data-ds-anchor": anchor(1) } as ButtonProps, h("i", null, "x"))));
     const icon = container.querySelector("i") as Element;

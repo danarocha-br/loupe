@@ -248,7 +248,9 @@ describe("loupe generate on the fixture", () => {
     expect(JSON.parse(after.get("meta/ds/ui/button.tsx.json")?.bytes ?? "{}").source).toBe(
       "fixture/design-system/components/ui/button.tsx",
     );
-    expect(first.lines.join("\n")).toMatch(/Coverage: 14 Adapters · 0 Inspect only · \d+ skipped by shape/);
+    // InvitationRowMenu's one prop, a free-text email, is not Editable.
+    expect(first.lines.join("\n")).toMatch(/Coverage: 14 Adapters · 1 Inspect only · \d+ skipped by shape/);
+    expect(list.modules["fixture/app/components/product/invitation-row-menu.tsx"]).toBeUndefined();
     for (const [file, { bytes }] of after) expect(readHeader(bytes).kind, file).toBe("intact");
   });
 

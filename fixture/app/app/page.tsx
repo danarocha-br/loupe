@@ -1,12 +1,14 @@
 import { Badge } from "@fixture/design-system/components/ui/badge";
 import { Button } from "@fixture/design-system/components/ui/button";
 
+import { InvitationRowMenu } from "@/components/product/invitation-row-menu";
 import { MemberRowMenu } from "@/components/product/member-row-menu";
 
+import { invitations } from "./invitations";
 import { members } from "./members";
 
-// A server component: Badge renders on the server, and MemberRowMenu is one
-// call site rendered once per member.
+// A server component: Badge renders on the server, MemberRowMenu is one call
+// site rendered once per member, and InvitationRowMenu another, once per invitation.
 export default function MembersPage() {
   const admins = members.filter((member) => member.role === "admin").length;
 
@@ -30,6 +32,15 @@ export default function MembersPage() {
               name={member.name}
               isSoleAdmin={member.role === "admin" && admins === 1}
             />
+          </li>
+        ))}
+      </ul>
+      <h2 className="text-sm font-medium">Pending invitations</h2>
+      <ul className="flex flex-col divide-y divide-border rounded-xl border border-border">
+        {invitations.map((invitation) => (
+          <li key={invitation.id} className="flex items-center gap-3 px-4 py-3">
+            <span className="min-w-0 flex-1 text-sm">{invitation.email}</span>
+            <InvitationRowMenu email={invitation.email} />
           </li>
         ))}
       </ul>
