@@ -1,0 +1,6 @@
+{
+  "name": "loupe",
+  "version": "0.1.0",
+  "description": "Install, remove and check Loupe, the dev-only toolbar for inspecting and overriding the props of real components in a running Next.js app. Every write goes through the pinned loupe CLI.",
+  "author": { "name": "Dana Rocha" }
+}
