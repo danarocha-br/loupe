@@ -6,6 +6,8 @@ import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
 import { hintTotal } from "../call-site.js";
 import { WRITES_ATTRIBUTE } from "../writes.js";
+import type { PropMeta } from "../meta/types.js";
+import type { CallSiteWrites } from "../writes.js";
 import type { Split } from "./authored.js";
 import {
   createOverrideStore,
@@ -35,8 +37,12 @@ export type MountedInstance = {
    * split into the app's own (the Current value) and what a library injected.
    */
   live(): Split;
+  /** What the call site writes, from the loader's record; null when there is none. */
+  writes(): CallSiteWrites | null;
   /** The component's State props (`X` with `onXChange`), from its metadata. */
   stateProps: readonly string[];
+  /** Every prop the component declares, from `generate`'s metadata; null for an Adapter made without it. */
+  meta: Readonly<Record<string, PropMeta>> | null;
   /** Per held State prop, the last value the component asked for through `onXChange`. */
   attempts: Map<string, unknown>;
   /** Rerender this Instance. */
@@ -53,6 +59,8 @@ export type Registry = {
   store: OverrideStore;
   instances: Map<string, MountedInstance>;
   status: Status;
+  /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
+  listeners: Set<() => void>;
 };
 
 const GLOBAL_KEY = "__loupeRegistry";
@@ -60,18 +68,22 @@ const GLOBAL_KEY = "__loupeRegistry";
 export function registry(): Registry {
   const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry };
   let value = host[GLOBAL_KEY];
+  // One made by an earlier version of this module, kept across a Fast Refresh.
+  if (value && !value.listeners) value.listeners = new Set();
   if (!value) {
     const problem = internalsProblem();
     value = {
       store: createOverrideStore(),
       instances: new Map(),
       status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
+      listeners: new Set(),
     };
     const created = value;
     created.store.subscribe((target) => {
       for (const instance of created.instances.values()) {
         if (reaches(target, identityOf(instance))) instance.notify();
       }
+      emitChange();
     });
     watchRoute(() => {
       // A page Override is per route: Instances that outlive a navigation (a layout's)
@@ -83,6 +95,24 @@ export function registry(): Registry {
     host[GLOBAL_KEY] = value;
   }
   return value;
+}
+
+/**
+ * Subscribes to the registry's changes: what the Toolbar redraws on. Listeners
+ * are called synchronously, often from a commit, so they must only schedule work.
+ */
+export function onRegistryChange(listener: () => void): () => void {
+  const { listeners } = registry();
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function emitChange(): void {
+  // Read off the global, not `registry()`, so a change while it is being created is a no-op.
+  const value = (globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry })[GLOBAL_KEY];
+  for (const listener of value?.listeners ?? []) listener();
 }
 
 /** The page's route, as a page-scope Override keys it: the pathname. */
@@ -142,6 +172,7 @@ export function disableOverrides(reason: string): void {
   value.status = { overrides: false, reason };
   warnInspectOnly(reason);
   for (const instance of value.instances.values()) instance.notify();
+  emitChange();
 }
 
 function warnInspectOnly(reason: string): void {
@@ -168,6 +199,7 @@ export function register(baseId: string, entry: Omit<MountedInstance, "id">): Mo
   // Also when this one took the free base id while a `~n` is still mounted.
   const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
   if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
+  emitChange();
   return instance;
 }
 
@@ -185,7 +217,9 @@ export function uniqueId(base: string, taken: { has(id: string): boolean }): str
 
 export function unregister(instance: MountedInstance): void {
   const { instances } = registry();
-  if (instances.get(instance.id) === instance) instances.delete(instance.id);
+  if (instances.get(instance.id) !== instance) return;
+  instances.delete(instance.id);
+  emitChange();
 }
 
 /** The app's props without the attributes the loader added to the call site. */

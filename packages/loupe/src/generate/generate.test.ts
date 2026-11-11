@@ -212,12 +212,12 @@ describe("the Adapter module", () => {
         `export { buttonVariants } from "@x/ds/components/ui/button";`,
         `export type { ButtonProps } from "@x/ds/components/ui/button";`,
         "",
-        `export const Button = createAdapter("Button", Button$original);`,
+        `export const Button = createAdapter("Button", Button$original, { props: {} });`,
         "",
       ].join("\n"),
     );
   });
-  it("passes each adapted component's State props to createAdapter, and nothing when it has none", () => {
+  it("passes each adapted component's prop metadata to createAdapter, keys sorted, State flags included", () => {
     const flag = (state: boolean) => ({
       editable: true as const,
       from: "@base-ui/react",
@@ -234,14 +234,17 @@ describe("the Adapter module", () => {
       files: {},
       exports: {
         Dialog: { kind: "component", shape: "function", props: { open: flag(true), modal: flag(false) } },
-        Switch: { kind: "component", shape: "function", props: { value: flag(true), checked: flag(true) } },
         DialogTitle: { kind: "component", shape: "function", props: { modal: flag(false) } },
       },
     };
-    const lines = adapterModule(module, ["Dialog", "DialogTitle", "Switch"], "@x/ds/components/ui/dialog").split("\n");
-    expect(lines).toContain(`export const Dialog = createAdapter("Dialog", Dialog$original, { state: ["open"] });`);
-    expect(lines).toContain(`export const Switch = createAdapter("Switch", Switch$original, { state: ["checked","value"] });`);
-    expect(lines).toContain(`export const DialogTitle = createAdapter("DialogTitle", DialogTitle$original);`);
+    const lines = adapterModule(module, ["Dialog", "DialogTitle"], "@x/ds/components/ui/dialog").split("\n");
+    expect(lines).toContain(
+      `export const DialogTitle = createAdapter("DialogTitle", DialogTitle$original, { props: {"modal":{"editable":true,"from":"@base-ui/react","kind":"options","options":[false,true],"status":"type-only"}} });`,
+    );
+    const dialog = lines.find((line) => line.startsWith("export const Dialog ="));
+    const json = dialog?.match(/\{ props: (.*) \}\);$/)?.[1];
+    expect(Object.keys(JSON.parse(json ?? "{}"))).toEqual(["modal", "open"]);
+    expect(JSON.parse(json ?? "{}").open.state).toBe(true);
   });
 });
 

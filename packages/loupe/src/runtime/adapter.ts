@@ -12,11 +12,13 @@ import {
   useState,
 } from "react";
 import { hintTotal } from "../call-site.js";
+import type { PropMeta } from "../meta/types.js";
 import { splitAuthored, writesOf } from "./authored.js";
 import { currentFiber, keyPathOf } from "./fiber.js";
 import {
   ANCHOR_PROP,
   disableOverrides,
+  emitChange,
   identityOf,
   instanceId,
   type MountedInstance,
@@ -31,7 +33,12 @@ import { createHoldTracker, formatValue, holdStateHandlers, trackHeldStates } fr
 import type { Props } from "./store.js";
 
 export type AdapterOptions = {
-  /** State props (`X` with `onXChange`), which `generate` reads from the component's types. */
+  /**
+   * Every prop the component declares, as `generate` read it (PER-117): which are
+   * Editable props, and why the others are inspect-only. The Toolbar's Coverage reads it.
+   */
+  props?: Readonly<Record<string, PropMeta>>;
+  /** State props (`X` with `onXChange`). Defaults to the props `props` flags `state`. */
   state?: readonly string[];
 };
 
@@ -65,7 +72,13 @@ export function adaptedName(type: unknown): string | null {
 }
 
 export function createAdapter<C extends ElementType>(name: string, Original: C, options: AdapterOptions = {}): C {
-  const stateProps = Object.freeze([...(options.state ?? [])]);
+  const meta = options.props ?? null;
+  const stateProps = Object.freeze([
+    ...(options.state ??
+      Object.keys(meta ?? {})
+        .filter((prop) => meta?.[prop]?.state === true)
+        .sort()),
+  ]);
 
   function Adapter(props: Props) {
     const latest = useRef(props);
@@ -122,6 +135,8 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
         instance.renders++;
         observeCallSite(instance);
         reportHeldStates(instance, overrides);
+        // The Toolbar's Current values are live.
+        emitChange();
       }
     });
 
@@ -133,7 +148,9 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
         component: name,
         keyPath,
         live: () => splitAuthored(withoutLoaderProps(latest.current), writesOf(latest.current)),
+        writes: () => writesOf(latest.current),
         stateProps,
+        meta,
         attempts: holds.attempts,
         notify: force,
         fiber,

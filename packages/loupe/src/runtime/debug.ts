@@ -16,6 +16,10 @@
 //   __loupe.discard(target)                drops a record, mounted or not
 //   __loupe.pick(element)          the Instance that rendered a DOM node
 //   __loupe.scan()                 server-rendered Instances, from React's `_debugInfo`
+//   __loupe.inspect(id)            the inspector's rows: every prop, Editable or inspect-only
+//                                  with a reason, Coverage, and what a library injected
+//   __loupe.nodes(id)              the DOM nodes an Instance renders, to highlight it
+//   __loupe.ancestors(id)          the adapted Instances around it, nearest first
 //   __loupe.status                 whether Overrides are on (the React self-check)
 
 import { adaptedName } from "./adapter.js";
@@ -34,7 +38,9 @@ import {
   uniqueId,
   withoutLoaderProps,
 } from "./registry.js";
+import { type Inspection, inspect } from "./inspect.js";
 import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
+import { writesOf } from "./authored.js";
 import { type OverrideRecord, type Props, reaches, type Scope, type ScopeTarget, type Source } from "./store.js";
 
 export type InstanceRow = {
@@ -100,7 +106,27 @@ export type LoupeDebug = {
   discard(target: ScopeTarget): RecordRow[];
   pick(element: Element): string | null;
   scan(): ServerInstance[];
+  inspect(id: string): Inspection;
+  nodes(id: string): Element[];
+  ancestors(id: string): string[];
 };
+
+// React's fiber tag for a DOM element.
+const HOST_COMPONENT = 5;
+
+/** The outermost DOM elements a fiber renders, through portals too (a dialog's popup is in one). */
+export function hostNodesOf(fiber: Fiber | null): Element[] {
+  const found: Element[] = [];
+  const stack: Fiber[] = fiber?.child ? [fiber.child] : [];
+  while (stack.length > 0) {
+    const node = stack.pop() as Fiber;
+    if (node.sibling) stack.push(node.sibling);
+    if (node.tag === HOST_COMPONENT && node.stateNode instanceof Element) found.push(node.stateNode);
+    else if (node.child) stack.push(node.child);
+  }
+  // Depth-first with a stack visits siblings in reverse.
+  return found.reverse();
+}
 
 const SERVER_REASON =
   "Rendered by a Server Component: Overrides apply only to Instances rendered in the browser.";
@@ -173,9 +199,12 @@ export function createDebug(): LoupeDebug {
     }));
   }
 
-  function scan(): ServerInstance[] {
+  type Scanned = { entry: ServerInstance; fiber: Fiber; raw: Props };
+
+  /** Server-rendered Instances with the fiber that carries each and its props as written. */
+  function scanFibers(): Scanned[] {
     if (typeof document === "undefined") return [];
-    const found = new Map<string, ServerInstance>();
+    const found = new Map<string, Scanned>();
     const seen = new Set<object>();
     for (const root of rootFibers(document)) {
       walkFibers(root, (fiber) => {
@@ -188,17 +217,64 @@ export function createDebug(): LoupeDebug {
           if (typeof info.name !== "string" || typeof anchor !== "string") continue;
           const id = uniqueId(instanceId(anchor, keyPathOf(fiber)), found);
           found.set(id, {
-            id,
-            component: info.name,
-            anchor,
-            hint: typeof props[SOURCE_PROP] === "string" ? (props[SOURCE_PROP] as string) : null,
-            env: typeof info.env === "string" ? info.env : "Server",
-            props: withoutLoaderProps(props),
+            entry: {
+              id,
+              component: info.name,
+              anchor,
+              hint: typeof props[SOURCE_PROP] === "string" ? (props[SOURCE_PROP] as string) : null,
+              env: typeof info.env === "string" ? info.env : "Server",
+              props: withoutLoaderProps(props),
+            },
+            fiber,
+            raw: props,
           });
         }
       });
     }
     return [...found.values()];
+  }
+
+  function scan(): ServerInstance[] {
+    return scanFibers().map((scanned) => scanned.entry);
+  }
+
+  function inspectInstance(id: string): Inspection {
+    const instance = reg.instances.get(id);
+    const status = reg.status;
+    if (instance) {
+      const { current, injected, authorship } = instance.live();
+      return inspect({
+        id,
+        component: instance.component,
+        anchor: instance.anchor,
+        hint: instance.hint,
+        rendered: "client",
+        current,
+        injected,
+        authorship,
+        writes: instance.writes(),
+        meta: instance.meta,
+        stateProps: instance.stateProps,
+        overridesOn: status.overrides,
+        ...(status.overrides ? { sources: describe(instance).sources } : { overridesOffReason: status.reason }),
+      });
+    }
+    const server = scanFibers().find((scanned) => scanned.entry.id === id);
+    if (!server) throw new Error(`[loupe] No Instance ${id} on this page.`);
+    return inspect({
+      id,
+      component: server.entry.component,
+      anchor: server.entry.anchor,
+      hint: server.entry.hint,
+      rendered: "server",
+      current: server.entry.props,
+      injected: {},
+      authorship: "server",
+      writes: writesOf(server.raw),
+      meta: null,
+      stateProps: [],
+      overridesOn: status.overrides,
+    });
   }
 
   return {
@@ -304,6 +380,32 @@ export function createDebug(): LoupeDebug {
     },
 
     scan,
+
+    inspect: inspectInstance,
+
+    nodes(id) {
+      const instance = reg.instances.get(id);
+      if (instance) return hostNodesOf(instance.fiber);
+      const server = scanFibers().find((scanned) => scanned.entry.id === id);
+      return server ? hostNodesOf(server.fiber) : [];
+    },
+
+    ancestors(id) {
+      const instance = reg.instances.get(id);
+      if (!instance) return [];
+      const byFiber = new Map<Fiber, string>();
+      for (const other of reg.instances.values()) {
+        if (!other.fiber) continue;
+        byFiber.set(other.fiber, other.id);
+        if (other.fiber.alternate) byFiber.set(other.fiber.alternate, other.id);
+      }
+      const found: string[] = [];
+      for (let fiber = instance.fiber?.return ?? null; fiber; fiber = fiber.return) {
+        const owner = byFiber.get(fiber);
+        if (owner && owner !== id) found.push(owner);
+      }
+      return found;
+    },
   };
 }
 

@@ -11,10 +11,18 @@ import { compare } from "../meta/sources.js";
 /**
  * What must not appear anywhere in a production build (PER-94, step 6).
  * Not `LoupeMount`: the layout's dev-gated mount is a `'use client'` module, so a
- * production build keeps it as a client reference that renders null. PER-130
- * must keep the Toolbar out of it, behind a dev-only dynamic import.
+ * production build keeps it as a client reference that renders null. The Toolbar
+ * stays out behind its dev-only dynamic import (PER-130); `data-loupe-toolbar`
+ * is the attribute only Toolbar code writes, so it finds the Toolbar if it leaks.
  */
-export const BUILD_NEEDLES = ["data-ds-anchor", "__loupe", "loupe/dist/loader.cjs", "@repo/loupe", "@danarocha/loupe"] as const;
+export const BUILD_NEEDLES = [
+  "data-ds-anchor",
+  "__loupe",
+  "loupe/dist/loader.cjs",
+  "@repo/loupe",
+  "@danarocha/loupe",
+  "data-loupe-toolbar",
+] as const;
 
 /**
  * What `required-server-files.json` must not name: it serialises the config's loader rules.
