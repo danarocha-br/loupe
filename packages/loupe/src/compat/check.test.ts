@@ -286,7 +286,78 @@ describe("loupe check choosing", () => {
   });
 });
 
+describe("loupe check edge cases", () => {
+  it("refuses a ledger that isn't the shape it expects, without a stack trace", async () => {
+    const root = makeRepo({ [LEDGER]: "[]" });
+    const { code, text } = await check(root, ["yes"], [], "24.1.0");
+    expect(code).toBe(1);
+    expect(text).toContain(`${LEDGER} isn't a Loupe ledger.`);
+  });
+
+  it("says so when it can't find the React that Next bundles", async () => {
+    const root = makeRepo({
+      "apps/web/node_modules/next/dist/compiled/react/cjs/react.development.js": null,
+    });
+    const { text } = await check(root);
+    expect(text).toContain("React: couldn't find the copy Next bundles");
+  });
+
+  it("asks between a shadcn and a cva design system rather than picking one", async () => {
+    const root = makeRepo({
+      "apps/web/package.json": {
+        name: "web",
+        scripts: { dev: "next dev" },
+        dependencies: { next: "16.3.6", "@repo/design-system": "workspace:*", "@repo/kit": "workspace:*" },
+      },
+      "packages/kit/package.json": { name: "@repo/kit", dependencies: { "class-variance-authority": "^0.7.1" } },
+      "packages/kit/src/badge.tsx": "export function Badge() {}\n",
+    });
+    const { questions, text } = await check(root, ["1"]);
+    expect(questions[0]).toMatch(/Which design system/);
+    expect(text).toMatch(/✓ Design system @repo\/design-system \(shadcn on Base UI\)/);
+  });
+
+  it("knows the app when run from inside it", async () => {
+    const root = makeRepo({
+      "apps/admin/package.json": { name: "admin", scripts: { dev: "next dev" }, dependencies: { next: "16.3.6" } },
+      "apps/admin/app/page.tsx": "",
+    });
+    const out: string[] = [];
+    const code = await run(["check"], {
+      out: (l) => out.push(l),
+      err: (l) => out.push(l),
+      ask: async () => { throw new Error("asked"); },
+      cwd: join(root, "apps/web/app"),
+      nodeVersion: "22.22.2",
+    });
+    expect(code).toBe(0);
+    expect(out.join("\n")).toContain("Compatibility check — apps/web");
+  });
+
+  it("names the missing value when --app ends the arguments", async () => {
+    const { code, text } = await check(makeRepo(), [], ["--app"]);
+    expect(code).toBe(1);
+    expect(text).toContain("--app needs a directory");
+  });
+});
+
 describe("version recheck for generate", () => {
+  it("never asks which app; it needs one", async () => {
+    const root = makeRepo({
+      "apps/admin/package.json": { name: "admin", scripts: { dev: "next dev" }, dependencies: { next: "16.3.6" } },
+      "apps/admin/app/page.tsx": "",
+    });
+    const out: string[] = [];
+    const result = await checkCompatibility({
+      cwd: root,
+      mode: "versions",
+      nodeVersion: "22.22.2",
+      io: { out: (l) => out.push(l), err: (l) => out.push(l), ask: async () => { throw new Error("asked"); } },
+    });
+    expect(result.ok).toBe(false);
+    expect(out.join("\n")).toContain("Several App Router apps; pass the app to check.");
+  });
+
   it("warns on an untested version and continues without asking", async () => {
     const root = makeRepo({ "apps/web/node_modules/next/package.json": { version: "16.2.0" } });
     const out: string[] = [];

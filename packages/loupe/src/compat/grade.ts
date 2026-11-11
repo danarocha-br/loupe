@@ -22,17 +22,18 @@ const NEEDS_PNPM =
 type ComponentsJson = { aliases?: { ui?: string } };
 
 /** Workspace packages the app depends on that could be its design system. */
-export function designSystemCandidates(app: Pkg, pkgs: Pkg[]): { shadcn: Pkg[]; cva: Pkg[] } {
+export type DesignSystem = { pkg: Pkg; kind: "shadcn" | "cva" };
+
+export function designSystemCandidates(app: Pkg, pkgs: Pkg[]): DesignSystem[] {
   const deps = new Set(dependencyNames(app.json));
-  const workspaceDeps = pkgs.filter((p) => p !== app && p.json.name && deps.has(p.json.name));
-  return {
-    shadcn: workspaceDeps.filter((p) => existsSync(join(p.abs, "components.json"))),
-    cva: workspaceDeps.filter(
-      (p) =>
-        dependencyNames(p.json).includes("class-variance-authority") &&
-        sourceFiles(p.abs, /\.tsx$/).length > 0,
-    ),
-  };
+  return pkgs.flatMap((pkg): DesignSystem[] => {
+    if (pkg === app || !pkg.json.name || !deps.has(pkg.json.name)) return [];
+    if (existsSync(join(pkg.abs, "components.json"))) return [{ pkg, kind: "shadcn" }];
+    const cva =
+      dependencyNames(pkg.json).includes("class-variance-authority") &&
+      sourceFiles(pkg.abs, /\.tsx$/).length > 0;
+    return cva ? [{ pkg, kind: "cva" }] : [];
+  });
 }
 
 /** The directory shadcn's `ui` alias points at, inside the design-system package. */
@@ -44,8 +45,8 @@ function uiDir(ds: Pkg): string {
   return "components/ui";
 }
 
-function gradeDesignSystem(ds: Pkg | undefined, kind: "shadcn" | "cva", app: Pkg): Item {
-  if (!ds) {
+function gradeDesignSystem(chosen: DesignSystem | undefined, app: Pkg): Item {
+  if (!chosen) {
     return {
       key: "designSystem",
       grade: "unsupported",
@@ -54,6 +55,7 @@ function gradeDesignSystem(ds: Pkg | undefined, kind: "shadcn" | "cva", app: Pkg
       detail: `Loupe needs one design system kept as a workspace package with its .tsx source; ${app.dir} depends on none.`,
     };
   }
+  const { pkg: ds, kind } = chosen;
   const name = ds.json.name ?? ds.dir;
   if (kind === "cva") {
     return {
@@ -102,12 +104,11 @@ function gradeNext(app: Pkg): { item: Item; react?: string } {
         seen: "missing",
         detail: "Loupe reads the installed Next.js to grade it.",
         fix: "run `pnpm install`.",
-        version: true,
       },
     };
   }
   const [major = 0, minor = 0] = version.split(".").map((n) => Number.parseInt(n, 10));
-  const base = { key: "next" as const, label: `Next.js ${version}`, seen: version, version: true };
+  const base = { key: "next" as const, label: `Next.js ${version}`, seen: version };
   const react = bundledReact(dir);
   if (major === 16 && minor === 3) return { item: { ...base, grade: "supported" }, react };
   if (major === 16) {
@@ -115,7 +116,7 @@ function gradeNext(app: Pkg): { item: Item; react?: string } {
       item: {
         ...base,
         grade: "untested",
-        detail: "Loupe has only been proven on Next.js 16.3. It will probably work; if components don't show up, move to 16.3.",
+        detail: "Loupe has only been proven on Next.js 16.3, so if components don't show up, move to 16.3.",
       },
       react,
     };
@@ -176,7 +177,7 @@ function gradeBundler(app: Pkg): Item {
       grade: "untested",
       label: parts.filter(Boolean).join(" and "),
       seen: [babel, compiler ? "reactCompiler" : ""].filter(Boolean).join("+"),
-      detail: "Loupe's dev loader hasn't been tested alongside it. It will probably work; if components don't show up, try without it.",
+      detail: "Loupe's dev loader hasn't been tested alongside it, so if components don't show up, try without it.",
     };
   }
   if (!dev) {
@@ -193,14 +194,14 @@ function gradeBundler(app: Pkg): Item {
 
 function gradeRuntime(app: Pkg, nodeVersion: string): Item {
   if (devCommand(app.json.scripts)?.runtime === "bun") {
-    return { key: "runtime", grade: "supported", label: "Dev server runs on Bun", seen: "Bun", version: true };
+    return { key: "runtime", grade: "supported", label: "Dev server runs on Bun", seen: "Bun" };
   }
-  const base = { key: "runtime" as const, label: `Dev server runs on Node ${nodeVersion}`, seen: `Node ${nodeVersion}`, version: true };
+  const base = { key: "runtime" as const, label: `Dev server runs on Node ${nodeVersion}`, seen: `Node ${nodeVersion}` };
   if (nodeVersion.split(".")[0] === "22") return { ...base, grade: "supported" };
   return {
     ...base,
     grade: "untested",
-    detail: "Loupe has only been proven with Node 22 and Bun. It will probably work; if components don't show up, run the dev server with Node 22.",
+    detail: "Loupe has only been proven with Node 22 and Bun, so if components don't show up, run the dev server with Node 22.",
   };
 }
 
@@ -243,24 +244,23 @@ export type Grading = { items: Item[]; react?: string };
 export type GradeInput = {
   app: Pkg;
   workspace: Workspace;
-  designSystem?: { pkg: Pkg | undefined; kind: "shadcn" | "cva" };
+  designSystem?: DesignSystem;
   nodeVersion: string;
   mode: "full" | "versions";
 };
 
-/** Items in the order they print. `versions` grades only what `generate` rechecks. */
+/** `versions` grades only what `generate` rechecks. */
 export function grade(input: GradeInput): Grading {
   const next = gradeNext(input.app);
   const runtime = gradeRuntime(input.app, input.nodeVersion);
   if (input.mode === "versions") return { items: [next.item, runtime], react: next.react };
-  const ds = input.designSystem ?? { pkg: undefined, kind: "shadcn" as const };
   return {
     items: [
       next.item,
       gradeRouter(input.app),
       gradeBundler(input.app),
       gradeWorkspace(input.workspace),
-      gradeDesignSystem(ds.pkg, ds.kind, input.app),
+      gradeDesignSystem(input.designSystem, input.app),
       gradeTypeScript(input.app),
       runtime,
     ],

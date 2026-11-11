@@ -1,8 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-// Reads the facts the compatibility check grades. Nothing here writes.
-
 export type PackageJson = {
   name?: string;
   scripts?: Record<string, string>;
@@ -51,6 +49,10 @@ export function findRoot(cwd: string): string {
   }
 }
 
+function normalise(pattern: string): string {
+  return pattern.replace(/^\.\//, "").replace(/\/+$/, "");
+}
+
 function pnpmPatterns(yaml: string): string[] {
   const patterns: string[] = [];
   let inPackages = false;
@@ -59,9 +61,9 @@ function pnpmPatterns(yaml: string): string[] {
       inPackages = true;
       continue;
     }
-    if (!inPackages) continue;
+    if (!inPackages || /^\s*(#|$)/.test(line)) continue;
     const item = /^\s*-\s*['"]?([^'"#\s]+)['"]?/.exec(line);
-    if (item?.[1]) patterns.push(item[1]);
+    if (item?.[1]) patterns.push(normalise(item[1]));
     else if (/^\S/.test(line)) inPackages = false;
   }
   return patterns;
@@ -72,7 +74,7 @@ export function readWorkspace(root: string): Workspace {
   if (existsSync(yaml)) return { kind: "pnpm", patterns: pnpmPatterns(readFileSync(yaml, "utf8")) };
   const ws = readJson<PackageJson>(join(root, "package.json"))?.workspaces;
   if (!ws) return { kind: "none" };
-  const patterns = Array.isArray(ws) ? ws : (ws.packages ?? []);
+  const patterns = (Array.isArray(ws) ? ws : (ws.packages ?? [])).map(normalise);
   if (existsSync(join(root, "yarn.lock"))) return { kind: "yarn", patterns };
   if (existsSync(join(root, "bun.lock")) || existsSync(join(root, "bun.lockb"))) {
     return { kind: "bun", patterns };
@@ -100,30 +102,39 @@ function subdirs(dir: string): string[] {
     .map((e) => join(dir, e.name));
 }
 
-/** Supports the pattern shapes workspaces use: `dir`, `dir/*` and `dir/**`. */
+function segmentRegex(segment: string): RegExp {
+  const escaped = segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`);
+}
+
+/** Directories matching `segments` under `base`; `*` matches within a segment, `**` any depth. */
+function expand(base: string, segments: string[]): string[] {
+  const [segment, ...rest] = segments;
+  if (segment === undefined) return [base];
+  if (segment === "**") {
+    const all: string[] = [];
+    const walk = (dir: string) => {
+      all.push(...expand(dir, rest));
+      for (const sub of subdirs(dir)) walk(sub);
+    };
+    walk(base);
+    return all;
+  }
+  if (!segment.includes("*")) return expand(join(base, segment), rest);
+  const match = segmentRegex(segment);
+  return subdirs(base)
+    .filter((dir) => match.test(dir.slice(dir.lastIndexOf(sep) + 1)))
+    .flatMap((dir) => expand(dir, rest));
+}
+
 export function workspacePackages(root: string, workspace: Workspace): Pkg[] {
   if (workspace.kind === "none") {
     const self = toPkg(root, root);
     return self ? [self] : [];
   }
-  const dirs = new Set<string>();
-  for (const pattern of workspace.patterns) {
-    if (pattern.startsWith("!")) continue;
-    const base = join(root, pattern.replace(/\/\*\*?$/, ""));
-    if (pattern.endsWith("/**")) {
-      const walk = (dir: string) => {
-        for (const sub of subdirs(dir)) {
-          dirs.add(sub);
-          walk(sub);
-        }
-      };
-      walk(base);
-    } else if (pattern.endsWith("/*")) {
-      for (const sub of subdirs(base)) dirs.add(sub);
-    } else {
-      dirs.add(base);
-    }
-  }
+  const dirs = new Set(
+    workspace.patterns.filter((p) => !p.startsWith("!")).flatMap((p) => expand(root, p.split("/"))),
+  );
   return [...dirs].flatMap((dir) => toPkg(root, dir) ?? []).sort((a, b) => a.dir.localeCompare(b.dir));
 }
 
@@ -168,7 +179,7 @@ export function bundledReact(next: string): string | undefined {
 
 export type DevCommand = { script: string; runtime: "bun" | "node"; webpack: boolean };
 
-/** Follows the dev script through `npm:x` and `run x` references to the `next dev` call. */
+/** Follows the dev script through other scripts it runs to the `next dev` call. */
 export function devCommand(scripts: Record<string, string> = {}, name = "dev", depth = 0): DevCommand | undefined {
   const script = scripts[name];
   if (script === undefined || depth > 5) return undefined;
@@ -177,13 +188,13 @@ export function devCommand(scripts: Record<string, string> = {}, name = "dev", d
     return {
       script: name,
       runtime: /\bbunx?\s+--bun\b/.test(part) ? "bun" : "node",
-      webpack: /\s--webpack\b/.test(part),
+      webpack: /\s--webpack(?![\w-])/.test(part),
     };
   }
   const refs = [
     ...script.matchAll(/\bnpm:([\w:.-]+)/g),
-    ...script.matchAll(/\b(?:npm|pnpm|yarn|bun)\s+run\s+([\w:.-]+)/g),
-  ].flatMap((m) => m[1] ?? []);
+    ...script.matchAll(/\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?([\w:.-]+)/g),
+  ].flatMap((m) => (m[1] && m[1] !== name && m[1] in scripts ? m[1] : []));
   for (const ref of refs) {
     const found = devCommand(scripts, ref, depth + 1);
     if (found) return found;
@@ -213,7 +224,6 @@ export function usesReactCompiler(appAbs: string): boolean {
   });
 }
 
-/** Source files under `dir`, skipping build output and dependencies. */
 export function sourceFiles(dir: string, extensions = /\.(tsx?|jsx?|mjs)$/): string[] {
   const files: string[] = [];
   const walk = (current: string) => {
@@ -229,11 +239,10 @@ export function sourceFiles(dir: string, extensions = /\.(tsx?|jsx?|mjs)$/): str
   return files;
 }
 
-/** How many of the app's source files mention any of `names`. */
 export function filesImporting(appAbs: string, names: string[]): number {
   if (names.length === 0) return 0;
   return sourceFiles(appAbs).filter((file) => {
     const text = readFileSync(file, "utf8");
-    return names.some((name) => text.includes(`"${name}`) || text.includes(`'${name}`));
+    return names.some((name) => new RegExp(`["']${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|["'])`).test(text));
   }).length;
 }

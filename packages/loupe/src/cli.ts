@@ -25,7 +25,13 @@ async function check(args: readonly string[], io: Io): Promise<number> {
   let app: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] ?? "";
-    if (arg === "--app" && args[i + 1] !== undefined) app = args[++i];
+    if (arg === "--app") {
+      app = args[++i];
+      if (app === undefined) {
+        io.err("--app needs a directory, such as --app apps/app.");
+        return 1;
+      }
+    }
     else if (arg.startsWith("--app=")) app = arg.slice("--app=".length);
     else {
       io.err(`Unknown option: ${arg}`);

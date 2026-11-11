@@ -1,5 +1,4 @@
-// The Compatibility statement for this release (PER-98). It names the minor
-// series 0.x was tested on, never a range. A setup joins it only once proven.
+// Names the minor series 0.x was tested on, never a range (PER-98).
 export const STATEMENT =
   "Loupe 0.x supports: Next.js 16.3 with the App Router and Turbopack in development, " +
   "on Node 22 or Bun; a pnpm workspace; TypeScript; one design system kept as a " +
@@ -19,6 +18,4 @@ export type Item = {
   detail?: string;
   /** Unsupported only, when a fix exists. */
   fix?: string;
-  /** Version items are the ones `generate` rechecks. */
-  version?: boolean;
 };
