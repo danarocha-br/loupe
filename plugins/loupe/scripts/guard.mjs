@@ -7,9 +7,9 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { LEDGER, PRODUCT_LAYER_PACKAGE } from "./pin.mjs";
 
-const LEDGER_FILE = "loupe.ledger.json";
-const LAYER_NAME = "@repo/loupe";
+const LEDGER_FILE = path.posix.basename(LEDGER);
 
 /** The real path of `file`, or of its nearest existing ancestor joined with the rest. */
 function realish(file) {
@@ -24,11 +24,11 @@ function realish(file) {
   return path.join(realpathSync(dir), ...rest);
 }
 
-/** A Product layer is a directory holding the ledger, or the package named @repo/loupe. */
+/** A Product layer is a directory holding the ledger, or the Product-layer package. */
 function isLayer(dir) {
   if (existsSync(path.join(dir, LEDGER_FILE))) return true;
   try {
-    return JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")).name === LAYER_NAME;
+    return JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")).name === PRODUCT_LAYER_PACKAGE;
   } catch {
     return false;
   }

@@ -6,7 +6,7 @@ description: Check a Loupe install without changing anything - run loupe doctor 
 # Loupe: doctor
 
 `loupe doctor` writes nothing. This skill runs it and relays the result. **You never edit `packages/loupe`
-yourself** (a hook refuses it).
+yourself, by any tool** (a hook refuses Edit and Write there).
 
 Run every command from the repo root (the folder with `pnpm-workspace.yaml`). `LOUPE` below means
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/loupe.mjs"`, which runs the app's own Loupe copy.

@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
-import { LOUPE_PACKAGE, LOUPE_VERSION } from "../scripts/pin.mjs";
+import { LEDGER, LOUPE_PACKAGE, LOUPE_VERSION, PRODUCT_LAYER, PRODUCT_LAYER_PACKAGE } from "../scripts/pin.mjs";
 
 const plugin = fileURLToPath(new URL("..", import.meta.url));
 const repo = path.resolve(plugin, "../..");
@@ -15,6 +15,16 @@ describe("the Installer plugin", () => {
     const loupe = json(path.join(repo, "packages/loupe/package.json"));
     assert.equal(LOUPE_PACKAGE, loupe.name);
     assert.equal(LOUPE_VERSION, loupe.version);
+  });
+
+  it("names the Product layer and its ledger as the CLI does", () => {
+    const src = (file) => readFileSync(path.join(repo, "packages/loupe/src", file), "utf8");
+    assert.match(
+      src("init/touch-points.ts"),
+      new RegExp(`PRODUCT_LAYER = \\{ name: "${PRODUCT_LAYER_PACKAGE}", path: "${PRODUCT_LAYER}" \\}`),
+    );
+    assert.match(src("init/touch-points.ts"), new RegExp(`NPM_PACKAGE = "${LOUPE_PACKAGE}"`));
+    assert.match(src("compat/ledger.ts"), new RegExp(`LEDGER_PATH = "${LEDGER}"`));
   });
 
   it("has a manifest, a marketplace entry, and no bin/ and no npm dependencies", () => {

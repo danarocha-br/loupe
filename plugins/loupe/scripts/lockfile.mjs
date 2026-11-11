@@ -1,27 +1,23 @@
 #!/usr/bin/env node
-// What installing or removing Loupe did to pnpm-lock.yaml, beyond Loupe's own
-// entries. Loupe brings TypeScript 6 through ts-morph, and pnpm then re-resolves
-// a missing `typescript` peer elsewhere in the workspace to it. `loupe remove`
-// doesn't undo that, because pnpm keeps a peer that is still satisfied.
+// What installing or removing Loupe did to pnpm-lock.yaml beyond Loupe's own
+// entries (the plugin README says why), and putting back a peer-only residue.
 //
-//   node lockfile.mjs report  [--base <ref>|auto]   lists the importer changes, writes nothing
-//   node lockfile.mjs restore [--base <ref>|auto]   puts the lockfile back to <ref>'s, only when
-//                                                   every remaining difference is a peer re-resolution,
-//                                                   and keeps it only if `pnpm install --frozen-lockfile` passes
+//   node lockfile.mjs report  [--base <ref>|auto]   writes nothing
+//   node lockfile.mjs restore [--base <ref>|auto]   writes <ref>'s lockfile only when every difference is a
+//                                                   peer re-resolution, and keeps it only if pnpm accepts it frozen
 //
-// `auto` is the commit before the one that added the ledger, when HEAD has one,
-// and HEAD otherwise. Run from the repo root.
+// `auto`: the commit before the one that added the ledger, if HEAD has one; else HEAD.
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { LEDGER, LOUPE_PACKAGE } from "./pin.mjs";
+import { LEDGER, LOUPE_PACKAGE, PRODUCT_LAYER, PRODUCT_LAYER_PACKAGE } from "./pin.mjs";
 import { findRoot } from "./loupe.mjs";
 
 const LOCKFILE = "pnpm-lock.yaml";
-const OWN = new Set([LOUPE_PACKAGE, "@repo/loupe"]);
-const LAYER_IMPORTER = path.posix.dirname(LEDGER);
+const OWN = new Set([LOUPE_PACKAGE, PRODUCT_LAYER_PACKAGE]);
+const LAYER_IMPORTER = PRODUCT_LAYER;
 
 /** `importer \t field \t name` → { specifier, version }, from a v9 lockfile's importers section. */
 export function importers(text) {
@@ -185,6 +181,7 @@ function main(argv) {
     return 0;
   }
   writeFileSync(file, current);
+  // The failed install may have relinked node_modules for the old lockfile.
   frozenInstall(root);
   console.error(`pnpm refused ${label}'s lockfile against today's package.json files, so the previous one is back.`);
   return 1;

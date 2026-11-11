@@ -7,8 +7,8 @@ description: Install Loupe into a Next.js app in this pnpm workspace - check com
 
 Loupe is a dev-only toolbar for inspecting and overriding the props of real components on a running page. The
 `loupe` CLI makes every write; this skill explains, asks, runs it and relays what it prints. **You never edit
-`packages/loupe` yourself** (a hook refuses it), you never run `npx …@latest`, `pnpm add`, `pnpm update` or change
-`pnpm.overrides`, and you never commit.
+`packages/loupe` yourself, by any tool** (a hook refuses Edit and Write there), you never run `npx …@latest`,
+`pnpm add`, `pnpm update` or change `pnpm.overrides`, and you never commit.
 
 Run every command from the repo root (the folder with `pnpm-workspace.yaml`). `LOUPE` below means
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/loupe.mjs"`, which runs the exact Loupe release this plugin pins: the app's
@@ -16,12 +16,15 @@ own copy once it is installed, `pnpm dlx` of that exact version before.
 
 ## 1. Before anything
 
-1. If `packages/loupe/loupe.ledger.json` exists, Loupe is already installed: say so and run the **doctor** skill
-   instead. Stop.
+1. If `packages/loupe/loupe.ledger.json` exists and has a `"loupe"` field, Loupe is already installed: say so
+   and run the **doctor** skill instead. Stop. (A ledger holding only `untestedAccepted` is a yes recorded by an
+   earlier attempt that didn't finish; carry on.)
 2. Run `git status --short`. `loupe init` refuses to run while the app's `package.json`, `next.config.ts`,
    root `layout.tsx`, the root Biome config, `pnpm-lock.yaml` or `packages/loupe/` have uncommitted changes. If
    any of them do, list them and ask the designer to commit or stash first. Stop. Never pass `--allow-dirty`
-   unless the designer asks for it by name.
+   unless the designer asks for it by name. The one exception to offer: when the only such change is
+   `packages/loupe/` left by an earlier attempt that didn't finish, say so and ask whether to continue with
+   `--allow-dirty`.
 
 ## 2. The compatibility check, and the Untested question
 
@@ -29,10 +32,13 @@ own copy once it is installed, `pnpm dlx` of that exact version before.
    - Exit code 3: the app already has another Loupe version. Relay the line and stop.
    - If it lists several apps and ends with "No app was chosen", show the list (one is marked as the one that
      uses the design system most) and ask which app. Rerun with `--app <dir>`. Use that `--app` from here on.
+   - If it lists several design systems and ends with "No design system was chosen", show the list and ask
+     which one. There is no flag for it: rerun with that number on stdin, `printf '<n>\n' | LOUPE --pinned check
+     --app <app>`, and keep the number for step 4.
 2. Read the `Result:` line.
    - `Result: Loupe can't be installed here.` Relay the ✗ lines word for word (each says what was found, what
      Loupe needs and the fix) and stop. Nothing was written.
-   - `Result: works here.` Go to step 3.
+   - `Result: works here.`, or `… untested item(s), accepted before.` Nothing to ask. Go to step 3.
    - `Result: works here, with N untested item(s).` (followed by "Continue? (yes/no)" and "Nothing was
      written." because nobody answered). This is the **Untested question, and you ask it once, here**: show each
      `!` line and its risk sentence word for word, then ask "Loupe hasn't been proven on these yet. Continue
@@ -62,8 +68,12 @@ Nothing is committed. Ask: "Shall I make these changes?" Continue only on a clea
 
 ## 4. Run `loupe init`
 
-- With a yes to untested items in step 2: `printf 'yes\n' | LOUPE --pinned init --app <app>`.
-- With none: `LOUPE --pinned init --app <app> </dev/null`.
+`init` reruns the check and asks the same questions in the same order, so pipe the designer's answers from
+step 2, one per line: the design-system number if it was asked, then `yes` if there were untested items to accept.
+
+- Both: `printf '<n>\nyes\n' | LOUPE --pinned init --app <app>`.
+- Only untested items: `printf 'yes\n' | LOUPE --pinned init --app <app>`.
+- Neither: `LOUPE --pinned init --app <app> </dev/null`.
 
 Give it a 10-minute timeout; `generate` reads every component. Then by exit code:
 
@@ -80,8 +90,12 @@ Give it a 10-minute timeout; `generate` reads every component. Then by exit code
    and the remove skill undoes them.
 2. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lockfile.mjs" report --base HEAD`. By its `Result:` line:
    - `loupe-only` or `loupe-and-peers`: as explained. Say in one line which packages had their peer re-resolved.
-   - `other-changes`: a dependency moved that Loupe didn't ask for. List those lines and ask the designer
-     whether to keep them. Don't fix them yourself.
+   - `other-changes`: a dependency moved that Loupe didn't ask for, such as a `"latest"` specifier (orbix-ai's
+     `radix-ui`) re-resolving. A plain install isn't expected to do that, since it re-resolves only the
+     importers whose `package.json` changed. List those lines, say it is a Loupe bug worth reporting, and ask
+     the designer whether to keep the install or undo it with the remove skill. Don't fix them yourself.
+   - `unchanged` or `peers-only`: Loupe's entries are missing, so the install didn't take. Relay the pnpm
+     output and stop.
 
 ## 6. `loupe doctor`
 

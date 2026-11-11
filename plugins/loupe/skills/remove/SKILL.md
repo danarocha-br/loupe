@@ -6,7 +6,7 @@ description: Remove Loupe from this repo - run loupe remove, which undoes loupe 
 # Loupe: remove
 
 The `loupe` CLI does the removal; this skill explains, asks, runs it and relays what it prints. **You never edit
-`packages/loupe` yourself** (a hook refuses it), and you never commit.
+`packages/loupe` yourself, by any tool** (a hook refuses Edit and Write there), and you never commit.
 
 Run every command from the repo root (the folder with `pnpm-workspace.yaml`). `LOUPE` below means
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/loupe.mjs"`, which runs the app's own Loupe copy, the one that wrote
