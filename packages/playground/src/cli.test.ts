@@ -1,0 +1,35 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { run } from "./cli.js";
+
+const { version } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+) as { version: string };
+
+function capture(argv: string[]) {
+  const out: string[] = [];
+  const err: string[] = [];
+  const code = run(argv, {
+    out: (line) => out.push(line),
+    err: (line) => err.push(line),
+  });
+  return { code, out, err };
+}
+
+describe("playground CLI", () => {
+  it.each([["--version"], ["-v"]])("%s prints the package version alone", (flag) => {
+    expect(capture([flag])).toEqual({ code: 0, out: [version], err: [] });
+  });
+
+  it("prints usage with no arguments", () => {
+    const { code, out } = capture([]);
+    expect(code).toBe(0);
+    expect(out.join("\n")).toContain("Usage: playground");
+  });
+
+  it("refuses an unknown command", () => {
+    const { code, err } = capture(["init"]);
+    expect(code).toBe(1);
+    expect(err.join("\n")).toContain("Unknown command: init");
+  });
+});

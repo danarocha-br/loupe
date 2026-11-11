@@ -1,0 +1,35 @@
+{
+  "name": "@danarocha/playground",
+  "version": "0.0.1",
+  "description": "Dev-only component playground for Next.js apps.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "playground": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.9"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danarocha-br/component-preview-skill.git",
+    "directory": "packages/playground"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
