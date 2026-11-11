@@ -382,15 +382,178 @@ describe("controls at This instance, edge cases", () => {
     expect(loupe.records()).toEqual([]);
   });
 
-  it("shows a group Override as chosen, tagged, with no Instance Reset", async () => {
+  it("shows a group Override as chosen, says where it comes from, with no Instance Reset", async () => {
     await mount();
     act(() => {
       loupe.set(BIA, "variant", "default", "group");
     });
     await select(BIA);
-    expect(row("variant").textContent).toContain("group override");
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from All in Members · Button 1 of 2");
+    expect(row("variant").querySelector("[data-testid=current]")?.textContent).toBe('Current: "ghost"');
     expect(inRow("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
     expect(inRow("variant", "Reset")).toBeUndefined();
+  });
+});
+
+const ANA = "app/members.tsx › Members › Button[1]#ana";
+const MENU = "app/members.tsx › Members › Button[2]";
+const GROUP = "All in Members · Button 1 of 2";
+const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
+const pill = (prop: string, option: string) =>
+  row(prop).querySelector<HTMLButtonElement>(`button[data-option='${option}']`) as HTMLButtonElement;
+const member = (id: string) => shadow().querySelector<HTMLInputElement>(`input[data-member="${id}"]`) as HTMLInputElement;
+const panelButton = (text: string) =>
+  [...shadow().querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>(".ring")].map((ring) => ring.dataset.ring);
+const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
+const backToList = async () => clickInPanel(panelButton("← All components"));
+
+describe("group and page scopes", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+  });
+
+  it("opens at This instance and offers each scope with its size", async () => {
+    await mount();
+    await select(BIA);
+    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+    expect(scopeButton("instance").textContent).toBe("This instance");
+    expect(scopeButton("group").textContent).toBe(`${GROUP} · 4`);
+    expect(scopeButton("page").textContent).toBe("All on page · 5");
+    expect(ringKinds()).toEqual(["ring"]);
+  });
+
+  it("rings every Instance of a call-site group, applies to all four, and leaves the other call site alone", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    expect(ringKinds()).toEqual(["ring", "ring", "ring", "ring"]);
+    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe("SAME ON ALL 4");
+    expect(pill("variant", '"ghost"').getAttribute("aria-pressed")).toBe("true");
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from the app");
+
+    await clickInPanel(pill("variant", '"default"'));
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe(`from ${GROUP}`);
+    expect(variants()).toEqual(["default", "default", "default", "default"]);
+    expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "group", anchor: "app/members.tsx › Members › Button[1]" }]);
+    expect(loupe.props(MENU).overrides).toEqual({});
+    // The pills keep counting the app's own values after the Override is set.
+    expect(pill("variant", '"ghost"').textContent).toBe('"ghost" 4');
+    expect(pill("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
+
+    // Hovering one row of the Instances list rings only that one.
+    act(() => member(ANA).closest("li")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true })));
+    await settle();
+    expect(ringKinds()).toEqual(["ring"]);
+
+    // A new selection opens at This instance again, and says which scope its value comes from.
+    await backToList();
+    await select(ANA);
+    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe(`from ${GROUP}`);
+    expect(shadow().querySelector("[data-testid=chips]")?.textContent).toBe(GROUP);
+  });
+
+  it("leaves one Instance out at its own value, and resetting the group keeps an Instance Override", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    await clickInPanel(pill("variant", '"default"'));
+    await clickInPanel(member(BIA));
+    expect(member(BIA).checked).toBe(false);
+    expect(variants()).toEqual(["default", "ghost", "default", "default"]);
+    expect(ringKinds().filter((kind) => kind === "out")).toHaveLength(1);
+    expect(pill("variant", '"ghost"').textContent).toBe('"ghost" 3');
+    // Hovering the left-out row rings it alone, still dashed.
+    act(() => member(BIA).closest("li")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true })));
+    await settle();
+    expect(ringKinds()).toEqual(["out"]);
+
+    // Ana gets her own value on top of the group's.
+    await backToList();
+    await select(ANA);
+    await clickInPanel(pill("variant", '"ghost"'));
+    expect(inRow("variant", "Reset to group value")).toBeTruthy();
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from This instance");
+
+    await clickInPanel(scopeButton("group"));
+    expect(row("variant").querySelector(".keeping")?.textContent).toBe("1 of 3 keeps its own value");
+    await clickInPanel(panelButton("Reset this scope"));
+    expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "instance", id: ANA }]);
+    expect(variants()).toEqual(["ghost", "ghost", "ghost", "ghost"]);
+    expect(loupe.props(ANA).overrides).toEqual({ variant: "ghost" });
+  });
+
+  it("selects the Instances a narrower scope keeps, from the row's note", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "children", "Ana");
+    });
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    act(() => {
+      loupe.set(BIA, "children", "Membro", "group");
+    });
+    await settle();
+    await clickInPanel(row("children").querySelector(".keeping") as HTMLButtonElement);
+    expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe(ANA);
+    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+    expect(inRow("children", "Reset to group value")).toBeTruthy();
+  });
+
+  it("notes a narrower value only where this scope overrides the prop", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+    });
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    expect(row("variant").querySelector(".keeping")).toBeNull();
+    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe("SAME ON ALL 4");
+  });
+
+  it("opens at This instance again when a scoped Instance comes back after unmounting", async () => {
+    await mount();
+    act(() => pageButton("Menu").click());
+    await settle();
+    const item = loupe.list("MenuItem")[0]?.id as string;
+    await select(item);
+    await clickInPanel(scopeButton("group"));
+    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    act(() => pageButton("Menu").click());
+    await settle();
+    act(() => pageButton("Menu").click());
+    await settle();
+    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("counts differing Current values at page scope and leaves a whole call site out in one click", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("page"));
+    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe('"ghost" 4 · not set 1');
+    expect(ringKinds()).toHaveLength(5);
+    expect(shadow().querySelectorAll("fieldset.site")).toHaveLength(2);
+
+    await clickInPanel(shadow().querySelector(`input[data-site="app/members.tsx › Members › Button[2]"]`) as HTMLInputElement);
+    expect(loupe.records()[0]?.excluded).toEqual([MENU]);
+    await clickInPanel(pill("variant", '"default"'));
+    expect(loupe.props(MENU).overrides).toEqual({});
+    expect(variants()).toEqual(["default", "default", "default", "default"]);
+
+    await backToList();
+    await select(MENU);
+    expect(shadow().querySelector("[data-testid=chips]")?.textContent).toBe("Left out of All on page");
+  });
+
+  it("offers a State prop at This instance only", async () => {
+    await mount();
+    await select(DIALOG);
+    await clickInPanel(scopeButton("group"));
+    expect(row("open").querySelector("[data-testid=state-only]")?.textContent).toBe("Change it on one Instance.");
+    expect(row("open").querySelectorAll(".pills")).toHaveLength(0);
+    // `modal` isn't a State prop: it keeps its pills, and its conflicting default selects none.
+    expect(row("modal").querySelectorAll(".pills")).toHaveLength(1);
   });
 });
 

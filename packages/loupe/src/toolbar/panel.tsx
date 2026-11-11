@@ -1,14 +1,17 @@
 // The panel of the 2e sketch: pinned header and footer, a scrolling middle whose
 // last card stretches, and either the component list (nothing selected) or the
-// inspector. Functional only; the visual pass is PER-140.
+// inspector, at This instance or a group or page scope (PER-134). Functional
+// only; the visual pass is PER-140.
 
-import type { LoupeDebug } from "../runtime/debug.js";
+import type { InstanceRow, LoupeDebug } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
+import type { Scope } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
-import { type Editing, PropRowView } from "./controls.js";
+import { attempt, type Editing, PropRowView, ScopeRowView } from "./controls.js";
 import { hasInstanceRecord, safeInspect, safeProps } from "./page.js";
 import { formatCurrent } from "./format.js";
+import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -16,6 +19,11 @@ type PanelProps = {
   page: PageSnapshot;
   selected: string | null;
   onSelect(id: string | null): void;
+  /** The scope the inspector edits at; a new selection always opens at This instance. */
+  scope: Scope;
+  onScope(scope: Scope): void;
+  /** The group or page scope being edited, or null at This instance. */
+  view: ScopeView | null;
   onHover(ids: string[]): void;
   picking: boolean;
   onPick(): void;
@@ -126,7 +134,8 @@ function instanceLabel(id: string, hint: string | null): string {
   return `${where}${key}`;
 }
 
-function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
+function Inspector(props: PanelProps & { id: string }) {
+  const { debug, id, onSelect, page, scope, onScope, view } = props;
   const inspection = safeInspect(debug, id);
   const recorded = debug.status.overrides && hasInstanceRecord(debug, id);
   const resetInstance = (
@@ -155,12 +164,17 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
     );
   }
   const ancestors = debug.ancestors(id);
+  const rows = page.rows;
+  const row = rows.find((candidate) => candidate.id === id) ?? null;
   // Null for a server-rendered Instance or while Overrides are off: no controls then.
   const live = inspection.rendered === "client" && debug.status.overrides ? safeProps(debug, id) : null;
-  const editing: Editing | null = live ? { debug, id, live } : null;
-  const editable = inspection.rows.filter((row) => row.editable);
-  const inspectOnly = inspection.rows.filter((row) => !row.editable);
+  const labels = row ? labelsOf(row) : { instance: "This instance", group: null, page: PAGE_LABEL };
+  const editing: Editing | null = live ? { debug, id, live, labels, fallback: row ? fallbacks(page.records, row) : {} } : null;
+  const scoped = editing !== null && view !== null && scope !== "instance";
+  const editable = inspection.rows.filter((candidate) => candidate.editable);
+  const inspectOnly = inspection.rows.filter((candidate) => !candidate.editable);
   const injected = Object.entries(inspection.injected);
+  const chips = row ? scopeChips(page.records, row, labels) : [];
   return (
     <>
       <div className="card">
@@ -181,6 +195,15 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
         <div className="mono" data-testid="instance-id">
           {inspection.id}
         </div>
+        {chips.length > 0 && (
+          <div className="chips" data-testid="chips">
+            {chips.map((chip) => (
+              <span key={chip} className="tag">
+                {chip}
+              </span>
+            ))}
+          </div>
+        )}
         {ancestors.length > 0 && (
           <div>
             Inside{" "}
@@ -192,6 +215,8 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
           </div>
         )}
       </div>
+      {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
+      {scoped && <MembersCard debug={debug} id={id} view={view} rows={rows} onHover={props.onHover} />}
       <CallSiteCard inspection={inspection} />
       {inspection.note && (
         <div className="banner" role="note">
@@ -207,11 +232,23 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
       </div>
       <div className="card">
         <h3>Editable props</h3>
-        {editable.length === 0 ? <div className="muted">None</div> : editable.map((row) => <PropRowView key={row.name} row={row} editing={editing} />)}
+        {editable.length === 0 ? (
+          <div className="muted">None</div>
+        ) : scoped ? (
+          editable.map((candidate) => (
+            <ScopeRowView key={candidate.name} row={candidate} editing={editing} view={view} onSelect={onSelect} onHover={props.onHover} />
+          ))
+        ) : (
+          editable.map((candidate) => <PropRowView key={candidate.name} row={candidate} editing={editing} />)
+        )}
       </div>
       <div className="card stretch">
         <h3>Inspect only</h3>
-        {inspectOnly.length === 0 ? <div className="muted">None</div> : inspectOnly.map((row) => <PropRowView key={row.name} row={row} editing={editing} />)}
+        {inspectOnly.length === 0 ? (
+          <div className="muted">None</div>
+        ) : (
+          inspectOnly.map((candidate) => <PropRowView key={candidate.name} row={candidate} editing={scoped ? null : editing} />)
+        )}
         {injected.length > 0 && (
           <details>
             <summary>
@@ -228,6 +265,143 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
       </div>
     </>
   );
+}
+
+/** This instance, every Instance from this call site, every Instance on this page: each with its size. */
+function ScopePicker({
+  debug,
+  page,
+  scope,
+  onScope,
+  row,
+}: Pick<PanelProps, "debug" | "page" | "scope" | "onScope"> & { row: InstanceRow }) {
+  const options = (["instance", "group", "page"] as const).map((option) => ({
+    option,
+    view: scopeView(debug, page.rows, page.records, row, option),
+  }));
+  return (
+    <div className="card">
+      <h3>Scope</h3>
+      <div className="scopes" role="group" aria-label="Scope">
+        {options.map(({ option, view }) => (
+          <button
+            key={option}
+            type="button"
+            data-scope={option}
+            aria-pressed={scope === option}
+            disabled={view === null}
+            title={view === null ? "No call site was anchored here, so it has no group." : undefined}
+            onClick={() => onScope(option)}
+          >
+            {view?.label ?? "No call site group"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Who a group or page change reaches, with a box to leave each one out. A page
+ * scope groups them by call site, so one box leaves a whole call site out.
+ */
+function MembersCard({
+  debug,
+  id,
+  view,
+  rows,
+  onHover,
+}: Pick<PanelProps, "debug" | "onHover"> & { id: string; view: ScopeView; rows: InstanceRow[] }) {
+  const scope = view.scope as "group" | "page";
+  const anchorOf = new Map(rows.map((candidate) => [candidate.id, candidate.anchor]));
+  const toggle = (memberId: string, out: boolean) =>
+    attempt(() => (out ? debug.include(memberId, scope) : debug.exclude(memberId, scope)));
+  const suspended = view.record?.suspended != null;
+  const bySite = new Map<string, ScopeView["members"]>();
+  for (const member of view.members) {
+    const anchor = anchorOf.get(member.id) ?? "";
+    bySite.set(anchor, [...(bySite.get(anchor) ?? []), member]);
+  }
+  const memberItem = (member: ScopeView["members"][number]) => (
+    <li key={member.id} onMouseEnter={() => onHover([member.id])} onMouseLeave={() => onHover([])}>
+      <label>
+        <input
+          type="checkbox"
+          data-member={member.id}
+          checked={!member.out}
+          disabled={suspended}
+          onChange={() => toggle(member.id, member.out)}
+        />{" "}
+        <span className="mono">{member.id === id ? "This instance" : keyOf(member.id)}</span>
+        {member.out && <span className="tag">Left out</span>}
+      </label>
+    </li>
+  );
+  return (
+    <div className="card" data-testid="members">
+      <h3>Instances</h3>
+      <div className="muted">Untick one to leave it out: it keeps its own value.</div>
+      {scope === "group" ? (
+        <ul className="list">{view.members.map(memberItem)}</ul>
+      ) : (
+        [...bySite].map(([anchor, members]) => {
+          const allIn = members.every((member) => !member.out);
+          return (
+            <fieldset key={anchor} className="site">
+              <legend>
+                <label onMouseEnter={() => onHover(members.map((member) => member.id))} onMouseLeave={() => onHover([])}>
+                  <input
+                    type="checkbox"
+                    data-site={anchor}
+                    checked={allIn}
+                    disabled={suspended}
+                    onChange={() => {
+                      for (const member of members) if (member.out !== allIn) toggle(member.id, member.out);
+                    }}
+                  />{" "}
+                  <span className="mono" title={anchor}>
+                    {anchor ? anchor.split(" › ").slice(-2).join(" › ") : "No call site"}
+                  </span>{" "}
+                  · {members.length}
+                </label>
+              </legend>
+              <ul className="list">{members.map(memberItem)}</ul>
+            </fieldset>
+          );
+        })
+      )}
+      {view.server.length > 0 && (
+        <ul className="list" aria-label="Server-rendered">
+          {view.server.map((server) => (
+            <li key={server.id} className="mono">
+              {server.id} <span className="tag">On the server</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {view.outUnmounted.length > 0 && (
+        <ul className="list" aria-label="Left out, not mounted">
+          {view.outUnmounted.map((outId) => (
+            <li key={outId} className="mono muted">
+              {outId} <span className="tag">Left out · not mounted</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button
+        type="button"
+        disabled={view.record === null}
+        onClick={() => attempt(() => debug.discard(view.target))}
+      >
+        Reset this scope
+      </button>
+    </div>
+  );
+}
+
+/** The key path that tells repeated Instances apart, or the whole id when there is none. */
+function keyOf(id: string): string {
+  return id.includes("#") ? id.slice(id.indexOf("#")) : id;
 }
 
 function CallSiteCard({ inspection }: { inspection: Inspection }) {
