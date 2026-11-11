@@ -12,6 +12,7 @@ import { attempt, type Editing, PropRowView, ScopeRowView } from "./controls.js"
 import { hasInstanceRecord, safeInspect, safeProps } from "./page.js";
 import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
+import { FlagsCard } from "./flags.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -70,6 +71,7 @@ function ComponentList({ page, onSelect, onHover }: PanelProps) {
           {instances} Instances of {page.groups.length} components on this page. Pick one on the page or below.
         </div>
       </div>
+      <FlagsCard />
       <div className={page.interaction.length === 0 ? "card stretch" : "card"}>
         <h3>On this page</h3>
         <ul className="list" aria-label="Components on this page">

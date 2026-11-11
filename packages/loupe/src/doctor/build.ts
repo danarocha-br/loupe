@@ -22,6 +22,7 @@ export const BUILD_NEEDLES = [
   "@repo/loupe",
   "@danarocha/loupe",
   "data-loupe-toolbar",
+  "loupe-flag-preview",
 ] as const;
 
 /**
