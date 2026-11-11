@@ -30,7 +30,13 @@ export type CheckOptions = {
   now?: () => Date;
 };
 
-export type CheckResult = { ok: boolean; root: string; app?: string };
+export type CheckResult = {
+  ok: boolean;
+  root: string;
+  app?: string;
+  /** The design system package directory, relative to the root; `full` mode only. */
+  designSystem?: string;
+};
 
 const NOTHING_WRITTEN = "Nothing was written.";
 
@@ -195,12 +201,12 @@ export async function checkCompatibility(opts: CheckOptions): Promise<CheckResul
   const untested = items.filter((i) => i.grade === "untested");
   if (untested.length === 0) {
     io.out("Result: works here.");
-    return { ok: true, root, app: appDir };
+    return { ok: true, root, app: appDir, designSystem: ds.chosen?.pkg.dir };
   }
   if (opts.mode === "versions" || untested.every(accepted)) {
     const before = opts.mode === "full" ? ", accepted before" : "";
     io.out(`Result: works here, with ${untestedCount(untested.length)}${before}.`);
-    return { ok: true, root, app: appDir };
+    return { ok: true, root, app: appDir, designSystem: ds.chosen?.pkg.dir };
   }
 
   io.out(`Result: works here, with ${untestedCount(untested.length)}.`);
@@ -215,5 +221,5 @@ export async function checkCompatibility(opts: CheckOptions): Promise<CheckResul
     (opts.now ?? (() => new Date()))(),
   );
   io.out(`Recorded your yes in ${LEDGER_PATH}.`);
-  return { ok: true, root, app: appDir };
+  return { ok: true, root, app: appDir, designSystem: ds.chosen?.pkg.dir };
 }

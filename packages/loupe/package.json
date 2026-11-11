@@ -5,6 +5,10 @@
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
+    "./mount": {
+      "types": "./dist/mount.d.ts",
+      "default": "./dist/mount.js"
+    },
     "./next": {
       "types": "./dist/next.d.cts",
       "default": "./dist/next.cjs"
@@ -50,6 +54,7 @@
   },
   "dependencies": {
     "@babel/parser": "^7.29.13",
+    "jsonc-parser": "3.3.1",
     "magic-string": "^0.30.21",
     "react-docgen-typescript": "2.4.0",
     "ts-morph": "28.0.0",

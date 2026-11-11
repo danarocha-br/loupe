@@ -28,8 +28,8 @@ describe("loupe CLI", () => {
   });
 
   it("refuses an unknown command", async () => {
-    const { code, err } = await capture(["init"]);
+    const { code, err } = await capture(["frobnicate"]);
     expect(code).toBe(1);
-    expect(err.join("\n")).toContain("Unknown command: init");
+    expect(err.join("\n")).toContain("Unknown command: frobnicate");
   });
 });
