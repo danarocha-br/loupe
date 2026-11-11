@@ -9,7 +9,9 @@ import {
   useLayoutEffect,
   useReducer,
   useRef,
+  useState,
 } from "react";
+import { splitAuthored, writesOf } from "./authored.js";
 import { currentFiber, keyPathOf } from "./fiber.js";
 import {
   ANCHOR_PROP,
@@ -24,7 +26,13 @@ import {
   unregister,
   withoutLoaderProps,
 } from "./registry.js";
+import { createHoldTracker, formatValue, holdStateHandlers, trackHeldStates } from "./state.js";
 import type { Props } from "./store.js";
+
+export type AdapterOptions = {
+  /** State props (`X` with `onXChange`), which `generate` reads from the component's types. */
+  state?: readonly string[];
+};
 
 const ADAPTER = Symbol.for("loupe.adapter");
 
@@ -55,11 +63,14 @@ export function adaptedName(type: unknown): string | null {
   return typeof name === "string" ? name : null;
 }
 
-export function createAdapter<C extends ElementType>(name: string, Original: C): C {
+export function createAdapter<C extends ElementType>(name: string, Original: C, options: AdapterOptions = {}): C {
+  const stateProps = Object.freeze([...(options.state ?? [])]);
+
   function Adapter(props: Props) {
     const latest = useRef(props);
     const [, force] = useReducer((n: number) => n + 1, 0);
     const mounted = useRef<{ baseId: string; instance: MountedInstance } | null>(null);
+    const [holds] = useState(createHoldTracker);
 
     const onClient = typeof window !== "undefined";
     const reg = onClient ? registry() : null;
@@ -83,7 +94,24 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
     // borrows another's for a render.
     const registered = mounted.current?.baseId === baseId ? mounted.current.instance : null;
 
-    // Committed renders only: a discarded render must not reach `current()` or `pick()`.
+    const resolved =
+      reg?.status.overrides && identified && registered
+        ? reg.store.resolve({ ...identityOf(registered), current: props })
+        : null;
+    const overrides = resolved?.overrides ?? {};
+
+    // Says once per attempt that an Override holds a State prop the app wants to
+    // change. Nothing is blocked; reset hands control back.
+    const reportHeldStates = (instance: MountedInstance, held: Props): void => {
+      if (stateProps.length === 0) return;
+      for (const attempt of trackHeldStates(holds, stateProps, instance.live().current, held)) {
+        console.info(
+          `[loupe] ${instance.id}: your Override holds ${attempt.prop} at ${formatValue(attempt.held)}; the app tried to set ${formatValue(attempt.tried)}. Reset it to hand control back.`,
+        );
+      }
+    };
+
+    // Committed renders only: a discarded render must not reach `live()` or `pick()`.
     useLayoutEffect(() => {
       latest.current = props;
       const instance = mounted.current?.instance;
@@ -91,6 +119,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
         instance.fiber = fiber;
         instance.hint = hintOf(props);
         instance.renders++;
+        reportHeldStates(instance, overrides);
       }
     });
 
@@ -101,7 +130,9 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
         hint: hintOf(latest.current),
         component: name,
         keyPath,
-        current: () => withoutLoaderProps(latest.current),
+        live: () => splitAuthored(withoutLoaderProps(latest.current), writesOf(latest.current)),
+        stateProps,
+        attempts: holds.attempts,
         notify: force,
         fiber,
         renders: 1,
@@ -116,10 +147,9 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
       };
     }, [baseId]);
 
-    const rendered =
-      reg?.status.overrides && identified && registered
-        ? reg.store.resolve({ ...identityOf(registered), current: props }).props
-        : props;
+    const rendered = resolved
+      ? holdStateHandlers(resolved.props, overrides, stateProps, holds.attempts, force)
+      : props;
     return createElement(Original as ElementType, rendered);
   }
 

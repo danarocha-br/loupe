@@ -1,4 +1,5 @@
 import path from "node:path";
+import { stateSiblingName } from "../state-prop.js";
 import type * as Docgen from "react-docgen-typescript";
 import type * as tsm from "ts-morph";
 import type * as TypeScript from "typescript";
@@ -13,7 +14,6 @@ import {
   judgeOptions,
   originOf,
   repoConfigFiles,
-  stateSiblingName,
   variantDefaults,
   variantLookup,
 } from "./policy.js";

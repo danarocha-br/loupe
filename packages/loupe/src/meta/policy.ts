@@ -145,10 +145,6 @@ export function repoConfigFiles(configs: VariantConfig[]): string[] {
   return configs.map((c) => c.filePath).filter((f) => !f.includes("/node_modules/"));
 }
 
-/** `open` / `onOpenChange`, `value` / `onValueChange` … (PER-96). */
-export function stateSiblingName(name: string): string {
-  return `on${name.charAt(0).toUpperCase()}${name.slice(1)}Change`;
-}
 
 /** Applies the default and the State flag every engine adds after classifying. */
 export function finishProp(prop: PropMeta, def: DefaultValue | undefined, state: boolean): PropMeta {

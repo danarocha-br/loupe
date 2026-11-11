@@ -4,6 +4,8 @@
 
 import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
+import { WRITES_ATTRIBUTE } from "../writes.js";
+import type { Split } from "./authored.js";
 import {
   createOverrideStore,
   type InstanceIdentity,
@@ -27,8 +29,15 @@ export type MountedInstance = {
   hint: string | null;
   component: string;
   keyPath: string;
-  /** The props the app passes right now, without the loader's attributes. */
-  current(): Props;
+  /**
+   * The props the Instance receives right now, without the loader's attributes,
+   * split into the app's own (the Current value) and what a library injected.
+   */
+  live(): Split;
+  /** The component's State props (`X` with `onXChange`), from its metadata. */
+  stateProps: readonly string[];
+  /** Per held State prop, the last value the component asked for through `onXChange`. */
+  attempts: Map<string, unknown>;
   /** Rerender this Instance. */
   notify(): void;
   /** The fiber of the latest render, to map a picked DOM node back. */
@@ -163,7 +172,7 @@ export function unregister(instance: MountedInstance): void {
 
 /** The app's props without the attributes the loader added to the call site. */
 export function withoutLoaderProps(props: Props): Props {
-  if (!(ANCHOR_PROP in props) && !(SOURCE_PROP in props)) return props;
-  const { [ANCHOR_PROP]: _anchor, [SOURCE_PROP]: _source, ...rest } = props;
+  if (!(ANCHOR_PROP in props) && !(SOURCE_PROP in props) && !(WRITES_ATTRIBUTE in props)) return props;
+  const { [ANCHOR_PROP]: _anchor, [SOURCE_PROP]: _source, [WRITES_ATTRIBUTE]: _writes, ...rest } = props;
   return rest;
 }

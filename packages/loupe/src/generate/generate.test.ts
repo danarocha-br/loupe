@@ -217,6 +217,32 @@ describe("the Adapter module", () => {
       ].join("\n"),
     );
   });
+  it("passes each adapted component's State props to createAdapter, and nothing when it has none", () => {
+    const flag = (state: boolean) => ({
+      editable: true as const,
+      from: "@base-ui/react",
+      kind: "options" as const,
+      status: "type-only" as const,
+      options: [false, true],
+      ...(state ? { state: true as const } : {}),
+    });
+    const module: ModuleMeta = {
+      formatVersion: 1,
+      engine: "ts-morph",
+      source: "ds/components/ui/dialog.tsx",
+      client: true,
+      files: {},
+      exports: {
+        Dialog: { kind: "component", shape: "function", props: { open: flag(true), modal: flag(false) } },
+        Switch: { kind: "component", shape: "function", props: { value: flag(true), checked: flag(true) } },
+        DialogTitle: { kind: "component", shape: "function", props: { modal: flag(false) } },
+      },
+    };
+    const lines = adapterModule(module, ["Dialog", "DialogTitle", "Switch"], "@x/ds/components/ui/dialog").split("\n");
+    expect(lines).toContain(`export const Dialog = createAdapter("Dialog", Dialog$original, { state: ["open"] });`);
+    expect(lines).toContain(`export const Switch = createAdapter("Switch", Switch$original, { state: ["checked","value"] });`);
+    expect(lines).toContain(`export const DialogTitle = createAdapter("DialogTitle", DialogTitle$original);`);
+  });
 });
 
 describe("loupe generate on the fixture", () => {

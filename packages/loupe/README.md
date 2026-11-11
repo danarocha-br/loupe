@@ -89,12 +89,29 @@ Until there is a Toolbar, drive it from the browser console:
 
 ```js
 __loupe.list()                         // adapted Instances, and server-rendered ones (inspect-only)
-__loupe.props(id)                      // Current value, Overrides, rendered props, the source of each
+__loupe.props(id)                      // Current value, injected props, Overrides, rendered props, sources, State props
 __loupe.set(id, "variant", "outline")  // an Instance Override
 __loupe.reset(id)                      // back to the Current value
 __loupe.pick($0)                       // the Instance that rendered a DOM node
 __loupe.status                         // { overrides: false, reason } when React's internals don't check out
 ```
+
+**The Current value is the app's own props**: the ones the call site writes, as
+the loader records them (`data-ds-writes`). What a library adds on top, such as Base
+UI's handlers, ARIA, `id` and `data-slot` on a `render={<Button/>}` trigger, is
+listed apart in `injected` and gets no source, so it never reaches Coverage or a
+Proposal. `authorship` is `spreads` when the call site spreads props and
+`unrecorded` when it has no record; then the two can't be separated and every
+live prop is in the Current value.
+
+**State props** (`X` with `onXChange`, such as `open`/`onOpenChange`) come from
+the component's types: `generate` passes them as
+`createAdapter("AlertDialog", Original, { state: ["open"] })`. They are Instance
+scope only: `set(id, "open", true, "group")` and `"page"` throw. An Override
+holds the value, and the app's `onXChange` keeps running. When the app tries to
+change a held value, through the handler or its own state,
+`props(id).states` reports `{ held: { value, appTried } }` and the console says
+so once per attempt. Reset hands control back.
 
 Instances rendered by a Server Component are listed from React's dev-only
 `_debugInfo` and stay inspect-only. If React's dev internals don't identify the
