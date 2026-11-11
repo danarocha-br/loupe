@@ -5,7 +5,8 @@
 //   hint  fixture/app/components/product/member-row-menu.tsx:42:11 2/2
 //
 // The id survives line shifts, prop edits and wrapping. The hint moves with every
-// edit and is for display and jump-to-source only: nothing may key on it.
+// edit and is for display and jump-to-source only: nothing may key on it. Its
+// total is the one exception: the hop guard (PER-125) compares it, through `hintTotal`.
 // The loader, `generate` and the Proposal all name call sites through this module.
 
 /** JSX at module top level, outside any named function. */
@@ -55,6 +56,12 @@ export function parseCallSiteId(id: string): CallSiteKey | null {
 
 export function callSiteHint(key: CallSiteKey, position: CallSitePosition): string {
   return `${key.path}:${position.line}:${position.column} ${key.ordinal}/${position.total}`;
+}
+
+/** The total in a hint, or null when there is no hint or it has none. */
+export function hintTotal(hint: string | null): number | null {
+  const match = hint === null ? null : / \d+\/(\d+)$/.exec(hint);
+  return match ? Number(match[1]) : null;
 }
 
 export type Occurrence = {

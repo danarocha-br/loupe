@@ -267,7 +267,13 @@ describe("createAdapter", () => {
       render(rows(["m1", "m2"]));
       expect(variants()).toEqual(["ghost", "outline", "ghost"]);
       expect(loupe.records()).toEqual([
-        { target: { scope: "group", anchor: anchor(1) }, values: { variant: "outline" }, excluded: [`${anchor(1)}#m1`] },
+        {
+          target: { scope: "group", anchor: anchor(1) },
+          values: { variant: "outline" },
+          excluded: [`${anchor(1)}#m1`],
+          suspended: null,
+          mounted: [`${anchor(1)}#m2`],
+        },
       ]);
 
       act(() => {
@@ -326,7 +332,7 @@ describe("createAdapter", () => {
     expect(loupe.pick(icon)).toBe(`${anchor(1)}#a`);
   });
 
-  it("tells apart Instances from one call site with no key, and lends neither the other's Override", () => {
+  it("tells apart Instances from one call site with no key, and suspends an Override that now matches both", () => {
     const row = () => h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps);
     render(h("div", null, row()));
     act(() => {
@@ -334,7 +340,103 @@ describe("createAdapter", () => {
     });
     render(h("div", null, row(), h("span", null, row())));
     expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), `${anchor(1)}~2`]);
-    expect(buttons().map((button) => button.dataset.variant)).toEqual(["destructive", "ghost"]);
+    // `~2` is mount order: never applied to a guess.
+    expect(buttons().map((button) => button.dataset.variant)).toEqual(["ghost", "ghost"]);
+    expect(loupe.records()[0]?.suspended).toEqual({ reason: "ambiguous", ids: [anchor(1)] });
+    expect(() => loupe.reapply({ scope: "instance", id: anchor(1) })).toThrow(/more than one Instance/);
+    act(() => {
+      loupe.discard({ scope: "instance", id: anchor(1) });
+    });
+    expect(loupe.records()).toEqual([]);
+  });
+
+  it("suspends an Override when a duplicate takes the free id while `~2` is still mounted", () => {
+    const row = () => h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps);
+    render(h("div", null, h("p", null, row()), h("p", null, row())));
+    expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), `${anchor(1)}~2`]);
+    act(() => {
+      loupe.set(`${anchor(1)}~2`, "variant", "destructive");
+    });
+    // The first unmounts; a new one mounts in its place and takes the free base id.
+    render(h("div", null, null, h("p", null, row())));
+    render(h("div", null, h("section", null, row()), h("p", null, row())));
+    expect(loupe.list().map((r) => r.id).sort()).toEqual([anchor(1), `${anchor(1)}~2`]);
+    expect(buttons().map((button) => button.dataset.variant)).toEqual(["ghost", "ghost"]);
+    expect(loupe.records()[0]?.suspended).toEqual({ reason: "ambiguous", ids: [`${anchor(1)}~2`] });
+  });
+
+  describe("kept across unmount, suspended for review (PER-125)", () => {
+    // A dialog: its confirm Button mounts only while it is open. 2nd of `total` Buttons.
+    const source = (total: number) => `app/page.tsx:12:7 2/${total}`;
+    const dialog = (open: boolean, total = 2) =>
+      h(
+        "div",
+        null,
+        open
+          ? h(Button, { variant: "default", "data-ds-anchor": anchor(2), "data-ds-source": source(total) } as ButtonProps)
+          : null,
+      );
+    const confirm = { scope: "instance", id: anchor(2) } as const;
+
+    it("an Override on a dialog's confirm Button survives close and reopen, and is listed while closed", () => {
+      render(dialog(true));
+      act(() => {
+        loupe.set(anchor(2), "variant", "destructive");
+      });
+      render(dialog(false));
+      expect(buttons()).toEqual([]);
+      expect(loupe.records()).toEqual([
+        { target: confirm, values: { variant: "destructive" }, excluded: [], suspended: null, mounted: [] },
+      ]);
+      render(dialog(true));
+      expect(buttons()[0]?.dataset.variant).toBe("destructive");
+      expect(loupe.records()[0]?.mounted).toEqual([anchor(2)]);
+    });
+
+    it("a call added before it while the dialog is closed suspends the Override on reopen; the record stays", () => {
+      render(dialog(true));
+      act(() => {
+        loupe.set(anchor(2), "variant", "destructive");
+      });
+      render(dialog(false));
+      render(dialog(true, 3));
+      expect(buttons()[0]?.dataset.variant).toBe("default");
+      expect(loupe.props(anchor(2)).sources.variant).toBe("app");
+      expect(loupe.records()[0]).toMatchObject({
+        values: { variant: "destructive" },
+        suspended: { reason: "code-changed", anchor: anchor(2), was: 2, now: 3 },
+      });
+      expect(() => loupe.set(anchor(2), "size", "sm")).toThrow(/suspended/);
+
+      act(() => {
+        loupe.reapply(confirm);
+      });
+      expect(buttons()[0]?.dataset.variant).toBe("destructive");
+    });
+
+    it("a call added while it is mounted suspends it on that render, before paint", () => {
+      render(dialog(true));
+      act(() => {
+        loupe.set(anchor(2), "variant", "destructive");
+      });
+      render(dialog(true, 3));
+      expect(buttons()[0]?.dataset.variant).toBe("default");
+      expect(loupe.records()[0]?.suspended).toMatchObject({ reason: "code-changed" });
+    });
+
+    it("a fresh registry, as after a reload, holds nothing", () => {
+      render(dialog(true));
+      act(() => {
+        loupe.set(anchor(2), "variant", "destructive");
+      });
+      act(() => root.unmount());
+      delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+      root = createRoot(container);
+      loupe = createDebug();
+      render(dialog(true));
+      expect(loupe.records()).toEqual([]);
+      expect(buttons()[0]?.dataset.variant).toBe("default");
+    });
   });
 
   it("lists server-rendered Instances from _debugInfo, inspect-only, with their key path", () => {

@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { hintTotal } from "../call-site.js";
 import { splitAuthored, writesOf } from "./authored.js";
 import { currentFiber, keyPathOf } from "./fiber.js";
 import {
@@ -119,6 +120,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
         instance.fiber = fiber;
         instance.hint = hintOf(props);
         instance.renders++;
+        observeCallSite(instance);
         reportHeldStates(instance, overrides);
       }
     });
@@ -138,6 +140,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
         renders: 1,
       });
       mounted.current = { baseId, instance };
+      observeCallSite(instance);
       // Before paint: an Override kept across a remount shows on the first frame.
       // A group or page Override set before this mount reaches it the same way.
       if (registry().store.applies(identityOf(instance))) force();
@@ -161,6 +164,11 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
   Adapter.displayName = `Loupe(${name})`;
   Object.defineProperty(Adapter, ADAPTER, { value: name });
   return Adapter as unknown as C;
+}
+
+/** The hop guard. Runs before paint, so a suspended Override is never shown. */
+function observeCallSite(instance: MountedInstance): void {
+  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: hintTotal(instance.hint) });
 }
 
 function hintOf(props: Props): string | null {

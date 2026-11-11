@@ -4,6 +4,7 @@
 
 import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
+import { hintTotal } from "../call-site.js";
 import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { Split } from "./authored.js";
 import {
@@ -90,8 +91,16 @@ export function currentRoute(): string {
 }
 
 /** What the store matches an Instance's records on, on the current route. */
-export function identityOf(instance: Pick<MountedInstance, "id" | "anchor" | "component">): InstanceIdentity {
-  return { id: instance.id, anchor: instance.anchor, component: instance.component, route: currentRoute() };
+export function identityOf(
+  instance: Pick<MountedInstance, "id" | "anchor" | "component" | "hint">,
+): InstanceIdentity {
+  return {
+    id: instance.id,
+    anchor: instance.anchor,
+    component: instance.component,
+    route: currentRoute(),
+    total: hintTotal(instance.hint),
+  };
 }
 
 const WRAPPED = Symbol.for("loupe.historyWrapped");
@@ -149,13 +158,22 @@ export function instanceId(anchor: string, keyPath: string): string {
  * Registers a mounted Instance under `baseId`, or `baseId~2`, `~3`… when another
  * mounted Instance already holds it (the same call site, rendered twice with no
  * key to tell them apart). Returns the id it got.
+ * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
-  const { instances } = registry();
+  const { instances, store } = registry();
   const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id };
   instances.set(id, instance);
+  // Also when this one took the free base id while a `~n` is still mounted.
+  const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
+  if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
   return instance;
+}
+
+/** Whether `id` is `base` or one of its mount-order duplicates, `base~n`. */
+export function sharesBase(id: string, base: string): boolean {
+  return id === base || (id.startsWith(`${base}~`) && /^\d+$/.test(id.slice(base.length + 1)));
 }
 
 /** `base`, or `base~2`, `~3`… when `taken` already holds it. */
