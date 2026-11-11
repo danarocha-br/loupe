@@ -46,5 +46,16 @@ trap 'rm -rf "$work" "$layer"' EXIT
   --app fixture/app \
   --specifier @/.loupe-packed >/dev/null)
 (cd "$root" && "$work/consumer/node_modules/.bin/loupe" generate --check --out fixture/app/.loupe-packed >/dev/null)
-grep -q 'createAdapter("Button", Button$original)' "$layer/adapters/ds/ui/button.tsx"
-echo "packed generate writes the Button Adapter and --check passes"
+# The Adapter carries the component's prop metadata, so the Toolbar can tell
+# editable props from inspect-only ones in the browser.
+grep -qF 'createAdapter("Button", Button$original, { props: {' "$layer/adapters/ds/ui/button.tsx"
+variant="$(node -e '
+  const line = require("fs").readFileSync(process.argv[1], "utf8").split("\n").find((l) => l.includes("createAdapter(\"Button\""));
+  const props = JSON.parse(line.slice(line.indexOf("{ props: ") + 9, line.lastIndexOf(" });")));
+  console.log(`${props.variant.editable} ${props.variant.status}`);
+' "$layer/adapters/ds/ui/button.tsx")"
+if [ "$variant" != "true verified" ]; then
+  echo "packed generate wrote Button.variant as '$variant', expected 'true verified'" >&2
+  exit 1
+fi
+echo "packed generate writes the Button Adapter with its prop metadata and --check passes"

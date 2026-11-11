@@ -39,7 +39,8 @@ pnpm exec loupe doctor --build   # also runs next build under Node and scans .ne
 
 `--build` runs the app's own `next build` under Node (not the app's build
 script, which may run Bun) and fails if `.next` holds `data-ds-anchor`,
-`__loupe`, Loupe's `loader.cjs`, `@repo/loupe` or `@danarocha/loupe`, or if
+`__loupe`, Loupe's `loader.cjs`, `@repo/loupe`, `@danarocha/loupe` or the
+Toolbar's `data-loupe-toolbar`, or if
 `required-server-files.json` names the loader. It skips `.next/cache`,
 `.next/dev` and source maps (they hold the app's own source, the layout's
 import of the mount included), and writes the app's `.next` as any build does (Next may also
@@ -119,7 +120,7 @@ where `adapt-list.json` lists one, in client code only.
 ## Adapters and `window.__loupe`
 
 An Adapter module re-exports a component module and replaces the components it
-adapts with `createAdapter` (Stage 1 writes them by hand; `generate` will emit them):
+adapts with `createAdapter` (`generate` emits them):
 
 ```tsx
 "use client";
@@ -130,10 +131,30 @@ export const Button = createAdapter("Button", Original);
 export { buttonVariants };
 ```
 
+`generate` also passes the component's prop metadata, `{ props: {…} }`, so the
+Toolbar knows which props are Editable and why the others are inspect-only.
+
 An Adapter registers each Instance it renders, under its call-site anchor plus
 the app's own keys (`… › Button[1]#m2`), and renders the component with the app's
 props plus any Override. Refs, `children`, context and memoization pass through.
-Until there is a Toolbar, drive it from the browser console:
+
+## The Toolbar
+
+`<LoupeMount />` (`@danarocha/loupe/mount`, written into the root layout by
+`init`) loads the Toolbar in `next dev` only. The mount is a `'use client'`
+module, so a production build keeps it as a client reference, but only as a
+null stub: the Toolbar's dynamic import sits inside the `NODE_ENV` condition, so
+the bundler drops it, and `doctor --build` fails if it ever leaks.
+
+The Toolbar is one right-hand panel in its own shadow root. With nothing
+selected it lists every Instance on the page by component, server-rendered ones
+included, and updates as menus and dialogs mount. **Pick** selects by clicking
+the page (Esc cancels); only while Pick is on does the Toolbar stop the page's
+pointer events. The inspector shows the Instance, its call site, Coverage as
+"N editable props · M inspect only", each prop's Current value with a reason per
+inspect-only prop, and what a library injected in one collapsed line.
+
+The same is on the console:
 
 ```js
 __loupe.list()                         // adapted Instances, and server-rendered ones (inspect-only)
@@ -141,6 +162,7 @@ __loupe.props(id)                      // Current value, injected props, Overrid
 __loupe.set(id, "variant", "outline")  // an Instance Override
 __loupe.reset(id)                      // back to the Current value
 __loupe.pick($0)                       // the Instance that rendered a DOM node
+__loupe.inspect(id)                    // the inspector's rows: Editable or inspect-only with a reason, Coverage
 __loupe.status                         // { overrides: false, reason } when React's internals don't check out
 ```
 
@@ -153,8 +175,8 @@ Proposal. `authorship` is `spreads` when the call site spreads props and
 live prop is in the Current value.
 
 **State props** (`X` with `onXChange`, such as `open`/`onOpenChange`) come from
-the component's types: `generate` passes them as
-`createAdapter("AlertDialog", Original, { state: ["open"] })`. They are Instance
+the component's types: `generate` flags them `state` in the prop metadata (a
+hand-written Adapter can pass `{ state: ["open"] }`). They are Instance
 scope only: `set(id, "open", true, "group")` and `"page"` throw. An Override
 holds the value, and the app's `onXChange` keeps running. When the app tries to
 change a held value, through the handler or its own state,

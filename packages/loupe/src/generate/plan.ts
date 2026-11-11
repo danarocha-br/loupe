@@ -139,19 +139,17 @@ export function adapterModule(module: ModuleMeta, adapted: readonly string[], or
   if (values.length > 0 || types.length > 0) lines.push("");
   for (const name of adapted) {
     const entry = module.exports[name];
-    // State props (PER-96) are Instance-scope only; the runtime needs their names.
-    const state = entry?.kind === "component" ? stateProps(entry) : [];
-    const options = state.length > 0 ? `, { state: ${JSON.stringify(state)} }` : "";
-    lines.push(`export const ${name} = createAdapter(${JSON.stringify(name)}, ${local(name)}${options});`);
+    // The component's prop metadata: the Toolbar's Coverage, and its State props (PER-96),
+    // which the runtime reads off the `state` flags.
+    const props = entry?.kind === "component" ? compactJson(entry.props) : "{}";
+    lines.push(`export const ${name} = createAdapter(${JSON.stringify(name)}, ${local(name)}, { props: ${props} });`);
   }
   return `${lines.join("\n")}\n`;
 }
 
-/** The component's State props, sorted: those its metadata flags `state`. */
-function stateProps(entry: ComponentExport): string[] {
-  return Object.keys(entry.props)
-    .filter((name) => entry.props[name]?.state === true)
-    .sort(compare);
+/** One line of JSON with sorted keys, so the output stays byte-deterministic. */
+function compactJson(value: unknown): string {
+  return JSON.stringify(JSON.parse(stableJson(value)));
 }
 
 /**

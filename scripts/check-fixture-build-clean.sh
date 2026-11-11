@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # After `next build` of the fixture: nothing of the dev loader may reach the
 # build. `withLoupe` adds the loader only for `next dev`, and this is the check
-# that it stayed that way (PER-116). `.next/cache` is skipped: it holds
+# that it stayed that way (PER-116). The layout mounts `<LoupeMount />` the way
+# `loupe init` does, so the Toolbar's needle checks that the Toolbar stayed out
+# too (PER-130). `.next/cache` is skipped: it holds
 # TypeScript's incremental state, which names every file in the tsconfig.
 set -euo pipefail
 
@@ -13,7 +15,7 @@ next_dir=.next
 }
 
 failed=0
-for needle in data-ds-anchor data-ds-source data-ds-writes __loupe loader.cjs loader-runtime; do
+for needle in data-ds-anchor data-ds-source data-ds-writes __loupe loader.cjs loader-runtime data-loupe-toolbar; do
   hits=$(grep -rlF --exclude-dir=cache -- "$needle" "$next_dir" || true)
   if [ -n "$hits" ]; then
     echo "✗ \"$needle\" found in the build:" >&2
