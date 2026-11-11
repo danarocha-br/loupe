@@ -9,10 +9,13 @@ import { nextDir } from "../compat/repo.js";
 import { compare } from "../meta/sources.js";
 
 /** What must not appear anywhere in a production build (PER-94, step 6). */
-export const BUILD_NEEDLES = ["data-ds-anchor", "__loupe", "loader.cjs", "@repo/loupe"] as const;
+export const BUILD_NEEDLES = ["data-ds-anchor", "__loupe", "loupe/dist/loader.cjs", "@repo/loupe", "@danarocha/loupe"] as const;
 
-/** What `required-server-files.json` must not name: it serialises the config's loader rules. */
-export const SERVER_FILES_NEEDLES = ["loader.cjs", "@danarocha/loupe", "adapt-list.json"] as const;
+/**
+ * What `required-server-files.json` must not name: it serialises the config's loader rules.
+ * The loader is matched by its path inside Loupe, since other packages ship a `loader.cjs` too.
+ */
+export const SERVER_FILES_NEEDLES = ["loupe/dist/loader.cjs", "@danarocha/loupe", "adapt-list.json"] as const;
 
 /**
  * Skipped: `cache` holds TypeScript's incremental state, which names every file

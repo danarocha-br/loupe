@@ -39,9 +39,10 @@ pnpm exec loupe doctor --build   # also runs next build under Node and scans .ne
 
 `--build` runs the app's own `next build` under Node (not the app's build
 script, which may run Bun) and fails if `.next` holds `data-ds-anchor`,
-`__loupe`, `loader.cjs` or `@repo/loupe`, or if `required-server-files.json`
-names the loader. It skips `.next/cache` and `.next/dev`, and writes the app's
-`.next` as any build does.
+`__loupe`, Loupe's `loader.cjs`, `@repo/loupe` or `@danarocha/loupe`, or if
+`required-server-files.json` names the loader. It skips `.next/cache` and
+`.next/dev`, and writes the app's `.next` as any build does (Next may also
+rewrite `next-env.d.ts`).
 
 ## Generating Adapters
 

@@ -2,13 +2,14 @@
 // with `--build`, a production build scanned for any trace of Loupe. Plain
 // `doctor` writes nothing at all: drift is listed, never repaired.
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "../adapt-list.js";
 import { checkCompatibility } from "../compat/check.js";
 import { LedgerError } from "../compat/ledger.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
 import { runGenerate } from "../generate/command.js";
+import { GENERATE_FORMAT_VERSION } from "../generate/header.js";
 import { type InitLedger, LEDGER_FORMAT_VERSION, LEDGER_PATH, readInitLedger } from "../init/ledger.js";
 import { fileHash, sha256 } from "../init/syntax.js";
 import { NPM_PACKAGE, PRODUCT_LAYER, touchPoints } from "../init/touch-points.js";
@@ -38,7 +39,8 @@ generated file changed by hand is listed as drift and left as it is.
 
 Options:
   --build   also run \`next build\` in the app, under Node, and scan .next for any
-            trace of Loupe. This writes the app's .next, as any build does.
+            trace of Loupe. This writes the app's .next, as any build does, and
+            Next may also rewrite next-env.d.ts or tsconfig.json.
 
 Exit codes: 0 healthy · 1 something needs attention`;
 
@@ -127,7 +129,7 @@ export async function runDoctor(options: DoctorOptions, io: DoctorIo): Promise<n
   io.out("");
   if (report.problems > 0) {
     const n = report.problems;
-    io.err(`Result: ${n} problem${n === 1 ? "" : "s"}. loupe doctor changed nothing.`);
+    io.err(`Result: ${n} problem${n === 1 ? "" : "s"}. loupe doctor changed nothing${options.build ? " but the app's .next" : ""}.`);
     return 1;
   }
   const warned = report.warnings > 0 ? `, with ${report.warnings} warning${report.warnings === 1 ? "" : "s"}` : "";
@@ -245,6 +247,10 @@ function productLayerChecks(report: Report, root: string, ledger: InitLedger, la
     report.fail(`${drift.length} of loupe init's files changed by hand (drift)`, [...drift, "Left as they are: git restore them."]);
   }
 
+  if (!existsSync(path.join(root, layerPath, "adapt-list.json"))) {
+    report.fail("adapt-list.json is missing", ["Run loupe generate."]);
+    return;
+  }
   let generated: ReturnType<typeof runGenerate>;
   try {
     generated = runGenerate({ out: layerPath, root, check: true, verbose: false }, root);
@@ -257,10 +263,19 @@ function productLayerChecks(report: Report, root: string, ledger: InitLedger, la
   const foreign = generated.refusals.filter((r) => r.why === "foreign").map((r) => r.file);
   const absent = generated.changes.filter((c) => c.why === "missing").map((c) => c.file);
   const leftover = generated.changes.filter((c) => c.why === "leftover").map((c) => c.file);
-  const stale = generated.changes.filter((c) => c.why === "changed" || c.why === "stale" || c.why === "formatVersion");
+  // A file stamped by a newer generate is not stale: this Loupe would overwrite it with an older format.
+  const newer = generated.changes
+    .filter((c) => c.why === "formatVersion" && headerVersion(path.join(root, layerPath, c.file)) > GENERATE_FORMAT_VERSION)
+    .map((c) => c.file);
+  const stale = generated.changes.filter(
+    (c) => c.why === "changed" || c.why === "stale" || (c.why === "formatVersion" && !newer.includes(c.file)),
+  );
 
-  if (edited.length === 0 && foreign.length === 0 && absent.length === 0 && leftover.length === 0) {
+  if (edited.length === 0 && foreign.length === 0 && absent.length === 0 && leftover.length === 0 && newer.length === 0) {
     report.ok(`${generated.unchanged + stale.length} files from loupe generate, none edited by hand`);
+  }
+  if (newer.length > 0) {
+    report.fail(`${newer.length} generated file${newer.length === 1 ? "" : "s"} written by a newer Loupe`, [...newer, "Upgrade Loupe."]);
   }
   if (edited.length > 0) {
     report.fail(`${edited.length} generated file${edited.length === 1 ? "" : "s"} edited by hand (drift)`, [
@@ -269,9 +284,10 @@ function productLayerChecks(report: Report, root: string, ledger: InitLedger, la
     ]);
   }
   if (foreign.length > 0) {
-    report.fail(`${foreign.length} file${foreign.length === 1 ? "" : "s"} where loupe generate needs to write`, [
+    // Also what a generated file looks like once a hand edit removed its header.
+    report.fail(`${foreign.length} file${foreign.length === 1 ? "" : "s"} without loupe generate's header where it needs to write (drift)`, [
       ...foreign,
-      "Move them away, then run loupe generate.",
+      "Left as they are. Move them away or git restore them, then run loupe generate.",
     ]);
   }
   if (absent.length > 0) report.fail(`${absent.length} generated file${absent.length === 1 ? "" : "s"} missing`, [...absent, "Run loupe generate."]);
@@ -287,8 +303,10 @@ function productLayerChecks(report: Report, root: string, ledger: InitLedger, la
   }
 }
 
-const RELATIVE_IMPORT = /\bfrom\s+["'](\.{1,2}\/[^"']+)["']/g;
+/** `from "./x"`, `import "./x"` and `import("./x")`. */
+const RELATIVE_IMPORT = /(?:\bfrom|\bimport)\s*\(?\s*["'](\.{1,2}\/[^"']+)["']/g;
 const EXTENSIONS = ["", ".tsx", ".ts", ".jsx", ".js", "/index.tsx", "/index.ts", "/index.jsx", "/index.js"];
+const isFile = (file: string) => statSync(file, { throwIfNoEntry: false })?.isFile() === true;
 
 // 6 and 7. The app Adapters' relative imports, and the packages each side needs.
 function resolution(report: Report, root: string, layerPath: string, app: string): void {
@@ -304,7 +322,7 @@ function resolution(report: Report, root: string, layerPath: string, app: string
       if (specifier === undefined) continue;
       count += 1;
       const target = path.resolve(path.dirname(file), specifier);
-      if (!EXTENSIONS.some((ext) => existsSync(target + ext))) {
+      if (!EXTENSIONS.some((ext) => isFile(target + ext))) {
         broken.push(`${path.relative(layerAbs, file).split(path.sep).join("/")} imports ${specifier}`);
       }
     }
@@ -346,7 +364,9 @@ async function buildCheck(report: Report, root: string, app: string, io: DoctorI
   report.ok(`next build passed (${result.describe})`);
   const scan = scanBuild(path.join(appAbs, ".next"));
   if (!scan.found) {
-    report.fail(`No ${app}/.next/required-server-files.json after the build`);
+    report.fail(`Can't find a build to scan: no ${app}/.next/required-server-files.json`, [
+      "doctor --build reads .next; a custom distDir or output: \"export\" isn't supported.",
+    ]);
     return;
   }
   report.note(`Scanned ${scan.files} files in ${app}/.next (skipping .next/cache and .next/dev).`);
@@ -356,6 +376,12 @@ async function buildCheck(report: Report, root: string, app: string, io: DoctorI
   }
   if (scan.serverFiles.length === 0) report.ok("required-server-files.json names no Loupe loader");
   else report.fail(`required-server-files.json names ${scan.serverFiles.map((n) => `"${n}"`).join(", ")}`);
+}
+
+/** The formatVersion a generated file's header names, 0 when it names none. */
+function headerVersion(file: string): number {
+  const match = /formatVersion (\d+), sha256:/.exec(readFileSync(file, "utf8"));
+  return match ? Number(match[1]) : 0;
 }
 
 /** The directory of `name` as Node resolves it from `from`: the nearest node_modules holding it. */

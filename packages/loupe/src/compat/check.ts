@@ -106,6 +106,7 @@ async function chooseDesignSystem(app: Pkg, pkgs: Pkg[], opts: CheckOptions): Pr
   if (candidates.length <= 1) return { chosen: candidates[0] };
   const named = candidates.find((d) => d.pkg.dir === opts.designSystem);
   if (named) return { chosen: named };
+  if (opts.designSystem !== undefined) return { refused: `${opts.designSystem} isn't a design system ${app.dir} depends on.` };
   if (opts.mode !== "full") return { refused: "Several design systems; pass the one to check." };
   io.out(`${app.dir} depends on several design systems. Loupe covers one:`);
   candidates.forEach((d, i) => io.out(`  ${i + 1}. ${d.pkg.json.name} (${d.pkg.dir})`));
