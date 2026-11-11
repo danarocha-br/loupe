@@ -22,3 +22,16 @@ if [ "$actual" != "$expected" ]; then
   exit 1
 fi
 echo "packed bin prints $actual"
+
+# `meta` loads ts-morph and the TypeScript 6 alias lazily; only an installed
+# tarball shows they resolve outside this workspace.
+./node_modules/.bin/loupe meta \
+  --tsconfig "$root/fixture/design-system/tsconfig.json" \
+  --include components \
+  --out "$work/meta"
+status="$(node -p "require('$work/meta/components/ui/button.tsx.json').exports.Button.props.variant.status")"
+if [ "$status" != "verified" ]; then
+  echo "packed loupe meta read Button.variant as '$status', expected 'verified'" >&2
+  exit 1
+fi
+echo "packed meta reads Button.variant as verified"
