@@ -48,6 +48,32 @@ Every generated file carries a header with a hash of its content. If one was
 edited by hand, `generate` and `--check` write nothing, name the file and exit 1.
 There is no `--force`: delete the file (or `git restore` it) and rerun.
 
+## Removing Loupe
+
+`remove` undoes `init` in a fixed order: the `<LoupeMount />` block and the
+`withLoupe` wrapper, then the Product layer, the Biome exclusion and the
+dependencies, followed by `pnpm install` (which updates the lockfile; Loupe
+itself never writes it). It reads `packages/loupe/loupe.ledger.json` and deletes
+it last, once nothing is left.
+
+```bash
+pnpm exec loupe remove
+pnpm exec loupe remove --allow-dirty  # proceed although a file it would change has uncommitted changes
+```
+
+It never overwrites a hand edit. A touch point or a Product layer file changed
+since Loupe wrote it is left alone and listed, and `remove` exits 1. Files git
+ignores in the Product layer are kept too, except its `node_modules`. If the
+mount or `withLoupe` stays (edited, or a manual step never adopted), it stops
+before the Product layer, so the app still builds. Undo what it lists and run it
+again: the second run works from the files as they are now, so it picks up where
+the first stopped. When it removes the mount or the wrapper, it asks you to
+restart a running `next dev`; `.next` is left alone.
+
+It refuses when a file it would change has uncommitted changes (the lockfile
+counts when the dependencies go), and outside a git repository. If `pnpm install`
+fails, it puts the dependencies back so the next run retries.
+
 ## The dev loader
 
 Wrap the app's `next.config.ts`. The loader is added for `next dev` only; every

@@ -32,4 +32,13 @@ describe("loupe CLI", () => {
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("Unknown command: frobnicate");
   });
+
+  it("prints remove's usage, and refuses an option it doesn't know", async () => {
+    const help = await capture(["remove", "--help"]);
+    expect(help.code).toBe(0);
+    expect(help.out.join("\n")).toContain("Usage: loupe remove");
+    const bad = await capture(["remove", "--force"]);
+    expect(bad.code).toBe(1);
+    expect(bad.err.join("\n")).toContain("Unknown option: --force");
+  });
 });
