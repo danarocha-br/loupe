@@ -45,6 +45,13 @@ button[aria-pressed="true"] { background: #111; color: #fff; }
 details summary { cursor: pointer; }
 .ring { position: fixed; pointer-events: none; z-index: 2147483646; border: 2px solid #a343f5; border-radius: 3px; }
 .ring.hover { border-style: dashed; border-color: #6b7280; }
+.ring.out { border-style: dashed; }
+.scopes { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0; }
+.row .source { padding-left: 4px; font-size: 11px; }
+.row .keeping { all: unset; cursor: pointer; font-size: 11px; color: #a343f5; text-decoration: underline; }
+.pills .count { opacity: .6; }
+fieldset.site { border: 0; padding: 0; margin: 4px 0; }
 .ring .label { position: absolute; top: -18px; left: -2px; background: #a343f5; color: #fff; font: 11px/16px ui-monospace, monospace; padding: 0 4px; border-radius: 3px; white-space: nowrap; }
 .dock { position: fixed; bottom: 16px; right: 16px; z-index: 2147483647; font: 13px system-ui, sans-serif; }
 `;

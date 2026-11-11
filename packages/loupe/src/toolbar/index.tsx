@@ -7,10 +7,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { Scope } from "../runtime/store.js";
 import { Highlight } from "./highlight.js";
 import { Panel } from "./panel.js";
 import { usePicker } from "./picker.js";
 import { type SeenComponents, safeInspect, snapshot, useDebug, usePageVersion } from "./page.js";
+import { scopeView } from "./scopes.js";
 import { CSS, HOST_ATTRIBUTE } from "./styles.js";
 
 export default function Toolbar() {
@@ -38,7 +40,13 @@ function useShadowRoot(): ShadowRoot | null {
 
 function ToolbarBody({ host }: { host: Element }) {
   const [selected, setSelected] = useState<string | null>(null);
+  // Never remembered: every selection opens at This instance (PER-90).
+  const [scope, setScope] = useState<Scope>("instance");
   const [hidden, setHidden] = useState(false);
+  const select = (id: string | null) => {
+    setSelected(id);
+    setScope("instance");
+  };
   if (hidden) {
     return (
       <div className="dock">
@@ -48,7 +56,16 @@ function ToolbarBody({ host }: { host: Element }) {
       </div>
     );
   }
-  return <ToolbarOpen host={host} selected={selected} onSelect={setSelected} onHide={() => setHidden(true)} />;
+  return (
+    <ToolbarOpen
+      host={host}
+      selected={selected}
+      onSelect={select}
+      scope={scope}
+      onScope={setScope}
+      onHide={() => setHidden(true)}
+    />
+  );
 }
 
 /** Everything that watches the page, mounted only while the panel is open. */
@@ -56,11 +73,15 @@ function ToolbarOpen({
   host,
   selected,
   onSelect,
+  scope,
+  onScope,
   onHide,
 }: {
   host: Element;
   selected: string | null;
   onSelect(id: string | null): void;
+  scope: Scope;
+  onScope(scope: Scope): void;
   onHide(): void;
 }) {
   const debug = useDebug();
@@ -73,6 +94,12 @@ function ToolbarOpen({
     setHovered([]);
   });
   const selectedLabel = selected === null ? null : (safeInspect(debug, selected)?.component ?? null);
+  const view = useMemo(() => {
+    if (selected === null || scope === "instance" || !debug.status.overrides) return null;
+    const rows = page.groups.flatMap((group) => group.instances);
+    const row = rows.find((candidate) => candidate.id === selected && candidate.rendered === "client");
+    return row ? scopeView(debug, rows, page.records, row, scope) : null;
+  }, [debug, page, selected, scope]);
 
   return (
     <>
@@ -82,6 +109,7 @@ function ToolbarOpen({
         selected={selected}
         selectedLabel={selectedLabel}
         hovered={picker.picking ? (picker.hovered ? [picker.hovered] : []) : hovered}
+        members={view && !picker.picking ? view.members.map(({ id, out }) => ({ id, out })) : null}
       />
       <Panel
         debug={debug}
@@ -89,6 +117,9 @@ function ToolbarOpen({
         page={page}
         selected={selected}
         onSelect={onSelect}
+        scope={view ? scope : "instance"}
+        onScope={onScope}
+        view={view}
         onHover={setHovered}
         picking={picker.picking}
         onPick={picker.toggle}
