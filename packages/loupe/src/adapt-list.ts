@@ -1,6 +1,8 @@
 // `adapt-list.json`: what the dev loader reads from the Product layer (PER-100 §3).
 // `generate` will write it; until then it is written by hand. Every path is POSIX
 // and relative to the repo root, so the file holds no machine-specific content.
+// It sits at the Product layer's root, and the loader never transforms anything
+// under that directory: an Adapter's own import of its original must not be swapped.
 //
 // {
 //   "formatVersion": 1,

@@ -125,7 +125,7 @@ export function matchPaths(paths: Record<string, string[]>, specifier: string): 
   }
   if (!best) return [];
   const { targets, captured } = best;
-  return targets.map((target) => target.replace("*", captured));
+  return targets.map((target) => target.replace("*", () => captured));
 }
 
 function readTsconfig(file: string, seen: Set<string>): PathsConfig {
@@ -233,7 +233,7 @@ function resolveExports(exports: unknown, key: string): string | null {
     const target = pickTarget(value);
     if (target) {
       const captured = key.slice(prefix.length, key.length - suffix.length);
-      best = { prefixLength: prefix.length, target: target.replaceAll("*", captured) };
+      best = { prefixLength: prefix.length, target: target.replaceAll("*", () => captured) };
     }
   }
   return best?.target ?? null;
@@ -287,7 +287,7 @@ function isFile(file: string): boolean {
 /** JSON with comments and trailing commas → JSON. Leaves string contents alone. */
 export function stripJsonc(text: string): string {
   let out = "";
-  let i = 0;
+  let i = text.charCodeAt(0) === 0xfeff ? 1 : 0;
   while (i < text.length) {
     const char = text[i] as string;
     if (char === '"') {

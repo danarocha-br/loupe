@@ -144,6 +144,25 @@ const loose = <Button />;
     ]);
   });
 
+  it("names components wrapped in any other HOC by their binding, not <module>", () => {
+    const source = `import { observer } from "mobx-react";
+import { Button } from "@ds/button";
+export const Toolbar = observer(() => <Button />);
+export const Panel = withTheme({ dark: true })(() => <Button />);
+export default observer(() => <Button />);
+export function List({ items }: { items: string[] }) {
+  const rows = items.map((item) => <Button key={item} />);
+  return <>{rows}</>;
+}
+`;
+    expect(ids(source)).toEqual([
+      "app/page.tsx › Toolbar › Button[1]",
+      "app/page.tsx › Panel › Button[1]",
+      "app/page.tsx › <default> › Button[1]",
+      "app/page.tsx › List › Button[1]",
+    ]);
+  });
+
   it("counts both branches of a ternary and a render-prop element as call sites", () => {
     const source = `import { Button } from "@ds/button";
 import { Trigger } from "@ds/menu";

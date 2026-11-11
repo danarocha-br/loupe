@@ -5,7 +5,7 @@
 // serialises `turbopack.rules`, loader path included, into
 // `.next/required-server-files.json` even when the rule's condition never fires.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 
 /** Next's `PHASE_DEVELOPMENT_SERVER`, inlined so Loupe needs no `next` import. */
@@ -35,7 +35,7 @@ export function withLoupe<C extends Config>(
     // Fail at startup, once, rather than on every file the loader sees.
     const { parseAdaptList } = await import("./adapt-list.js");
     parseAdaptList(readFileSync(adaptList, "utf8"), adaptList);
-    const root = path.resolve(options.root ?? findWorkspaceRoot(path.dirname(adaptList)));
+    const root = realpathSync(path.resolve(options.root ?? findWorkspaceRoot(path.dirname(adaptList))));
 
     const rules = base.turbopack?.rules ?? {};
     if (LOADER_RULE in rules) {

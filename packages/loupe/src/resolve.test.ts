@@ -122,6 +122,8 @@ describe("resolve: tsconfig shapes from orbix-ai", () => {
       "./button",
     ]);
     expect(matchPaths({ "@/*": ["./*"] }, "react")).toEqual([]);
+    expect(matchPaths({ "@/*": ["./*"] }, "@/a$&b")).toEqual(["./a$&b"]);
+    expect(JSON.parse(stripJsonc('\uFEFF{ "a": 1 }'))).toEqual({ a: 1 });
     expect(JSON.parse(stripJsonc('{ "a": "//not a comment /*", /* c */ "b": [1,], }'))).toEqual({
       a: "//not a comment /*",
       b: [1],

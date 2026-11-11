@@ -30,13 +30,19 @@ export function runLoader(
   source: string,
   resourcePath: string,
   options: LoaderOptions,
-): { code: string; map: string | null } {
+): { code: string; map: string | null; dependencies: string[] } {
+  // Turbopack caches each file's output: it must be told which other files that
+  // output read, or editing adapt-list.json or a target's 'use client' leaves it stale.
+  const dependencies = new Set([options.adaptList]);
   const { code, map } = transform(source, resourcePath, {
     root: options.root,
     adaptList: readAdaptList(options.adaptList),
     layerDir: path.dirname(options.adaptList),
     resolve: resolver.resolve,
-    isClientModule: resolver.isClientModule,
+    isClientModule: (file) => {
+      dependencies.add(file);
+      return resolver.isClientModule(file);
+    },
   });
-  return { code, map };
+  return { code, map, dependencies: [...dependencies] };
 }

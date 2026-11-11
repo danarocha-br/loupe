@@ -156,6 +156,7 @@ export function transform(source: string, file: string, ctx: TransformContext): 
           adapted: adapted.includes(component),
         });
       } else if (specifier.type === "ImportDefaultSpecifier") {
+        // The imported name would only be "default"; default exports are inspect-only.
         bindings.set(local, { component: local, module: targetRel, adapted: false });
       } else if (specifier.type === "ImportNamespaceSpecifier") {
         namespaces.set(local, { module: targetRel, adapted });
@@ -315,12 +316,28 @@ function enclosingName(ancestors: readonly Node[]): string {
       child = ancestors[j] as Node;
       j--;
     }
-    const parent = ancestors[j];
+    let parent = ancestors[j];
     if (parent?.type === "VariableDeclarator" && parent.init === child) {
       const binding = parent.id as { type: string; name: string };
       if (binding.type === "Identifier") return binding.name;
     }
     if (parent?.type === "ExportDefaultDeclaration") return DEFAULT_EXPORT_SCOPE;
+
+    // Any other wrapper, `observer(() => …)` or `withX(…)(() => …)`, counts when it
+    // is bound to a component-cased name; `const items = list.map(() => …)` does not.
+    while (parent?.type === "CallExpression" && (parent.arguments as Node[]).includes(child)) {
+      child = parent;
+      parent = ancestors[--j];
+      while (parent?.type === "CallExpression" && parent.callee === child) {
+        child = parent;
+        parent = ancestors[--j];
+      }
+    }
+    if (child !== node && parent?.type === "VariableDeclarator" && parent.init === child) {
+      const binding = parent.id as { type: string; name: string };
+      if (binding.type === "Identifier" && /^[A-Z]/.test(binding.name)) return binding.name;
+    }
+    if (child !== node && parent?.type === "ExportDefaultDeclaration") return DEFAULT_EXPORT_SCOPE;
   }
   return MODULE_SCOPE;
 }
