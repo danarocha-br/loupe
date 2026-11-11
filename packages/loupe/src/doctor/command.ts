@@ -369,7 +369,7 @@ async function buildCheck(report: Report, root: string, app: string, io: DoctorI
     ]);
     return;
   }
-  report.note(`Scanned ${scan.files} files in ${app}/.next (skipping .next/cache and .next/dev).`);
+  report.note(`Scanned ${scan.files} files in ${app}/.next (skipping .next/cache, .next/dev and source maps).`);
   for (const [needle, files] of scan.hits) {
     if (files.length === 0) report.ok(`No "${needle}" in .next`);
     else report.fail(`"${needle}" found in ${files.length} file${files.length === 1 ? "" : "s"}`, files);

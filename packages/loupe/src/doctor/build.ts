@@ -8,7 +8,12 @@ import path from "node:path";
 import { nextDir } from "../compat/repo.js";
 import { compare } from "../meta/sources.js";
 
-/** What must not appear anywhere in a production build (PER-94, step 6). */
+/**
+ * What must not appear anywhere in a production build (PER-94, step 6).
+ * Not `LoupeMount`: the layout's dev-gated mount is a `'use client'` module, so a
+ * production build keeps it as a client reference that renders null. PER-130
+ * must keep the Toolbar out of it, behind a dev-only dynamic import.
+ */
 export const BUILD_NEEDLES = ["data-ds-anchor", "__loupe", "loupe/dist/loader.cjs", "@repo/loupe", "@danarocha/loupe"] as const;
 
 /**
@@ -22,6 +27,13 @@ export const SERVER_FILES_NEEDLES = ["loupe/dist/loader.cjs", "@danarocha/loupe"
  * in the tsconfig, and `dev` is `next dev`'s own output, which a build leaves alone.
  */
 const SKIPPED = new Set(["cache", "dev"]);
+
+/**
+ * Source maps are skipped too: their `sourcesContent` is the app's own source,
+ * so the layout's import line of the mount is in them. Code that runs is in the
+ * files they map, and those are scanned.
+ */
+const SOURCE_MAP = /\.map$/;
 
 export type BuildResult = { code: number; describe: string };
 export type BuildRunner = (appAbs: string, io: { out: (line: string) => void }) => Promise<BuildResult>;
@@ -71,7 +83,7 @@ export function scanBuild(dotNext: string): BuildScan {
       const child = relative ? `${relative}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
         if (!(relative === "" && SKIPPED.has(entry.name))) walk(child);
-      } else if (entry.isFile()) {
+      } else if (entry.isFile() && !SOURCE_MAP.test(entry.name)) {
         files += 1;
         const bytes = readFileSync(path.join(dotNext, child));
         for (const [needle, buffer] of needles) if (bytes.includes(buffer)) hits.get(needle)?.push(child);

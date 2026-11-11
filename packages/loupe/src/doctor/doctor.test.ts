@@ -344,7 +344,7 @@ describe("loupe doctor --build", () => {
     return { code, text: out.join("\n") };
   }
 
-  it("passes a build with no trace of Loupe, ignoring .next/dev and .next/cache", async () => {
+  it("passes a build with no trace of Loupe, ignoring .next/dev, .next/cache and source maps", async () => {
     const root = await installed();
     const { code, text } = await withBuild(
       root,
@@ -355,6 +355,7 @@ describe("loupe doctor --build", () => {
         "cache/tsbuildinfo": "@repo/loupe",
         "server/cache/kept.js": "ok",
         "static/media/loader.cjs": "a dependency's own loader",
+        "server/chunks/layout.js.map": '{"sourcesContent":["import { LoupeMount } from \\"@repo/loupe/mount\\";"]}',
       }),
     );
     for (const needle of ["data-ds-anchor", "__loupe", "loupe/dist/loader.cjs", "@repo/loupe", "@danarocha/loupe"]) {
