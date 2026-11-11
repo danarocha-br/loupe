@@ -7,7 +7,7 @@ documents this is the Component Playground.
 | Path | What it is |
 | -- | -- |
 | `packages/loupe` | Runtime, dev loader and the `loupe` CLI. Published to npm as `@danarocha/loupe`. |
-| `plugins/loupe` | The Installer: a thin Claude Code plugin that runs the CLI. Empty for now. |
+| `plugins/loupe` | The Installer: a thin Claude Code plugin (skills `install`, `remove`, `doctor` and a guard hook) that runs the CLI. |
 | `fixture/app` | A Next 16.3 app that CI runs every check against. |
 | `fixture/design-system` | The fixture's tiny shadcn-on-Base-UI design system. |
 | `fixture/app/loupe` | The fixture's Product layer, written by `loupe generate` and checked by `generate --check` in CI. |

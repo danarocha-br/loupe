@@ -1,0 +1,12 @@
+{
+  "name": "loupe",
+  "owner": { "name": "Dana Rocha" },
+  "description": "The Loupe Installer plugin.",
+  "plugins": [
+    {
+      "name": "loupe",
+      "source": "./plugins/loupe",
+      "description": "Install, remove and check Loupe, the dev-only toolbar for inspecting and overriding the props of real components in a running Next.js app."
+    }
+  ]
+}
