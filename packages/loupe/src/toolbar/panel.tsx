@@ -2,13 +2,13 @@
 // last card stretches, and either the component list (nothing selected) or the
 // inspector. Functional only; the visual pass is PER-140.
 
-import type { ReactNode } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
-import type { Inspection, PropRow } from "../runtime/inspect.js";
+import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
 import type { PageSnapshot } from "./page.js";
-import { safeInspect } from "./page.js";
-import { formatCurrent, formatDefault } from "./format.js";
+import { type Editing, PropRowView } from "./controls.js";
+import { hasInstanceRecord, safeInspect, safeProps } from "./page.js";
+import { formatCurrent } from "./format.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -128,12 +128,26 @@ function instanceLabel(id: string, hint: string | null): string {
 
 function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
   const inspection = safeInspect(debug, id);
+  const recorded = debug.status.overrides && hasInstanceRecord(debug, id);
+  const resetInstance = (
+    <button
+      type="button"
+      disabled={!recorded}
+      onClick={() => {
+        // `discard` also drops the record of an Instance that isn't mounted, where `reset(id)` throws (PER-128).
+        debug.discard({ scope: "instance", id });
+      }}
+    >
+      Reset this Instance
+    </button>
+  );
   if (inspection === null) {
     return (
       <div className="card stretch">
         <h3>Not on the page now</h3>
         <p className="mono">{id}</p>
         <p className="muted">It shows here again when it mounts, for example when its menu or dialog opens.</p>
+        {recorded && resetInstance}
         <button type="button" onClick={() => onSelect(null)}>
           Back to the list
         </button>
@@ -141,6 +155,9 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
     );
   }
   const ancestors = debug.ancestors(id);
+  // Null for a server-rendered Instance or while Overrides are off: no controls then.
+  const live = inspection.rendered === "client" && debug.status.overrides ? safeProps(debug, id) : null;
+  const editing: Editing | null = live ? { debug, id, live } : null;
   const editable = inspection.rows.filter((row) => row.editable);
   const inspectOnly = inspection.rows.filter((row) => !row.editable);
   const injected = Object.entries(inspection.injected);
@@ -160,6 +177,7 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
           )}{" "}
           <span className="tag">{inspection.rendered === "server" ? "On the server" : "In the browser"}</span>
         </div>
+        {editing && resetInstance}
         <div className="mono" data-testid="instance-id">
           {inspection.id}
         </div>
@@ -189,11 +207,11 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
       </div>
       <div className="card">
         <h3>Editable props</h3>
-        {editable.length === 0 ? <div className="muted">None</div> : editable.map((row) => <Row key={row.name} row={row} />)}
+        {editable.length === 0 ? <div className="muted">None</div> : editable.map((row) => <PropRowView key={row.name} row={row} editing={editing} />)}
       </div>
       <div className="card stretch">
         <h3>Inspect only</h3>
-        {inspectOnly.length === 0 ? <div className="muted">None</div> : inspectOnly.map((row) => <Row key={row.name} row={row} />)}
+        {inspectOnly.length === 0 ? <div className="muted">None</div> : inspectOnly.map((row) => <PropRowView key={row.name} row={row} editing={editing} />)}
         {injected.length > 0 && (
           <details>
             <summary>
@@ -225,24 +243,6 @@ function CallSiteCard({ inspection }: { inspection: Inspection }) {
         <div className="muted">No call site was anchored here.</div>
       )}
       <div className="mono muted">{inspection.anchor}</div>
-    </div>
-  );
-}
-
-function Row({ row }: { row: PropRow }) {
-  let value: ReactNode;
-  if (row.set) value = formatCurrent(row.value);
-  else if (row.default) value = <span className="tag">{formatDefault(row.default)}</span>;
-  else value = <span className="muted">not set</span>;
-  return (
-    <div className="row" data-prop={row.name}>
-      <span className="name">
-        {row.label}
-        {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
-      </span>
-      <span className="value mono">{value}</span>
-      {row.state && <span className="tag">State</span>}
-      {row.reason && <span className="tag">{row.reason}</span>}
     </div>
   );
 }

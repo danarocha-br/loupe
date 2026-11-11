@@ -2,7 +2,7 @@
 // changes. Nothing here writes; the rules live in the runtime (`inspect.ts`).
 
 import { useEffect, useMemo, useState } from "react";
-import { createDebug, type InstanceRow, type LoupeDebug, type RecordRow } from "../runtime/debug.js";
+import { createDebug, type InstanceProps, type InstanceRow, type LoupeDebug, type RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { currentRoute, onRegistryChange, registry, type Status } from "../runtime/registry.js";
 
@@ -116,4 +116,20 @@ export function safeInspect(debug: LoupeDebug, id: string): Inspection | null {
   } catch {
     return null;
   }
+}
+
+/** A mounted Instance's live props and Overrides, or null when it isn't mounted in the browser. */
+export function safeProps(debug: LoupeDebug, id: string): InstanceProps | null {
+  try {
+    return debug.props(id);
+  } catch {
+    return null;
+  }
+}
+
+/** Whether an Instance-scope record holds an Override for this Instance, mounted or not. */
+export function hasInstanceRecord(debug: LoupeDebug, id: string): boolean {
+  return debug
+    .records()
+    .some((record) => record.target.scope === "instance" && record.target.id === id && Object.keys(record.values).length > 0);
 }
