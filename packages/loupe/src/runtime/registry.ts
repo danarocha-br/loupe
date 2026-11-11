@@ -4,7 +4,13 @@
 
 import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
-import { createOverrideStore, type OverrideStore, type Props } from "./store.js";
+import {
+  createOverrideStore,
+  type InstanceIdentity,
+  type OverrideStore,
+  type Props,
+  reaches,
+} from "./store.js";
 
 export const ANCHOR_PROP = "data-ds-anchor";
 export const SOURCE_PROP = "data-ds-source";
@@ -52,13 +58,63 @@ export function registry(): Registry {
       status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
     };
     const created = value;
-    created.store.subscribe((ids) => {
-      for (const id of ids) created.instances.get(id)?.notify();
+    created.store.subscribe((target) => {
+      for (const instance of created.instances.values()) {
+        if (reaches(target, identityOf(instance))) instance.notify();
+      }
+    });
+    watchRoute(() => {
+      // A page Override is per route: Instances that outlive a navigation (a layout's)
+      // stop or start matching one.
+      if (!created.store.records().some((record) => record.target.scope === "page")) return;
+      for (const instance of created.instances.values()) instance.notify();
     });
     if (problem !== null) warnInspectOnly(problem);
     host[GLOBAL_KEY] = value;
   }
   return value;
+}
+
+/** The page's route, as a page-scope Override keys it: the pathname. */
+export function currentRoute(): string {
+  return typeof location === "undefined" ? "" : location.pathname;
+}
+
+/** What the store matches an Instance's records on, on the current route. */
+export function identityOf(instance: Pick<MountedInstance, "id" | "anchor" | "component">): InstanceIdentity {
+  return { id: instance.id, anchor: instance.anchor, component: instance.component, route: currentRoute() };
+}
+
+const WRAPPED = Symbol.for("loupe.historyWrapped");
+const HISTORY_EVENT = "loupe:history";
+
+/**
+ * Calls `onChange` after the pathname changes. Next's client navigations go through
+ * `history.pushState`/`replaceState`, which fire no event, so both are wrapped once
+ * per page to fire one. Next calls them from an insertion effect, where React
+ * forbids scheduling updates, so the check waits for a microtask.
+ */
+function watchRoute(onChange: () => void): void {
+  if (typeof window === "undefined" || typeof history === "undefined") return;
+  let last = currentRoute();
+  const check = () => {
+    const route = currentRoute();
+    if (route === last) return;
+    last = route;
+    onChange();
+  };
+  for (const method of ["pushState", "replaceState"] as const) {
+    const original = history[method] as History["pushState"] & { [WRAPPED]?: true };
+    if (original[WRAPPED]) continue;
+    const wrapped = function (this: History, ...args: Parameters<History["pushState"]>) {
+      original.apply(this, args);
+      queueMicrotask(() => window.dispatchEvent(new Event(HISTORY_EVENT)));
+    };
+    Object.defineProperty(wrapped, WRAPPED, { value: true });
+    history[method] = wrapped;
+  }
+  window.addEventListener(HISTORY_EVENT, check);
+  window.addEventListener("popstate", check);
 }
 
 /** Drops to inspect-only for the rest of the page's life. Fails closed. */

@@ -2,8 +2,13 @@
 //
 //   __loupe.list(filter?)          every Instance on the page, adapted and server-rendered
 //   __loupe.props(id)              Current value, Overrides, rendered props and each value's source
-//   __loupe.set(id, prop, value)   an Instance-scope Override
-//   __loupe.reset(id, prop?)       back to the Current value
+//   __loupe.set(id, prop, value, scope?)   an Override; scope is "instance" (default),
+//                                          "group" (the Instance's call site) or "page"
+//                                          (its component on this route)
+//   __loupe.reset(id, prop?, scope?)       undoes that scope's Override only
+//   __loupe.exclude(id, scope)             keeps a group or page Override off one Instance
+//   __loupe.include(id, scope)             undoes `exclude`
+//   __loupe.records()                      every Override record, with its exclusions
 //   __loupe.pick(element)          the Instance that rendered a DOM node
 //   __loupe.scan()                 server-rendered Instances, from React's `_debugInfo`
 //   __loupe.status                 whether Overrides are on (the React self-check)
@@ -12,15 +17,18 @@ import { adaptedName } from "./adapter.js";
 import { type Fiber, fiberOfNode, keyPathOf, rootFibers, walkFibers } from "./fiber.js";
 import {
   ANCHOR_PROP,
+  currentRoute,
+  identityOf,
   instanceId,
   type MountedInstance,
   registry,
   SOURCE_PROP,
   type Status,
+  UNANCHORED,
   uniqueId,
   withoutLoaderProps,
 } from "./registry.js";
-import type { Props, Source } from "./store.js";
+import type { OverrideRecord, Props, Scope, ScopeTarget, Source } from "./store.js";
 
 export type InstanceRow = {
   id: string;
@@ -62,8 +70,11 @@ export type LoupeDebug = {
   readonly status: Status;
   list(filter?: string): InstanceRow[];
   props(id: string): InstanceProps;
-  set(id: string, prop: string, value: unknown): InstanceProps;
-  reset(id: string, prop?: string): InstanceProps;
+  set(id: string, prop: string, value: unknown, scope?: Scope): InstanceProps;
+  reset(id: string, prop?: string, scope?: Scope): InstanceProps;
+  exclude(id: string, scope: "group" | "page"): InstanceProps;
+  include(id: string, scope: "group" | "page"): InstanceProps;
+  records(): OverrideRecord[];
   pick(element: Element): string | null;
   scan(): ServerInstance[];
 };
@@ -89,7 +100,7 @@ export function createDebug(): LoupeDebug {
       const sources = Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const]));
       return { id: instance.id, current, overrides: {}, rendered: current, sources };
     }
-    const resolved = reg.store.resolve({ id: instance.id, current });
+    const resolved = reg.store.resolve({ ...identityOf(instance), current });
     return {
       id: instance.id,
       current,
@@ -97,6 +108,23 @@ export function createDebug(): LoupeDebug {
       rendered: resolved.props,
       sources: resolved.sources,
     };
+  };
+
+  /** The record an Override on this Instance at this scope goes into. */
+  const targetOf = (instance: MountedInstance, scope: Scope): ScopeTarget => {
+    switch (scope) {
+      case "instance":
+        return { scope, id: instance.id };
+      case "group":
+        if (instance.anchor.startsWith(UNANCHORED)) {
+          throw new Error(`[loupe] ${instance.id}: no call site was anchored here, so it has no group.`);
+        }
+        return { scope, anchor: instance.anchor };
+      case "page":
+        return { scope, route: currentRoute(), component: instance.component };
+      default:
+        throw new Error(`[loupe] Unknown scope ${JSON.stringify(scope)}: use "instance", "group" or "page".`);
+    }
   };
 
   const assertEditable = (): void => {
@@ -173,18 +201,36 @@ export function createDebug(): LoupeDebug {
       return describe(requireMounted(id));
     },
 
-    set(id, prop, value) {
+    set(id, prop, value, scope = "instance") {
       const instance = requireMounted(id);
       assertEditable();
-      reg.store.set(instance.id, prop, value);
+      reg.store.set(targetOf(instance, scope), prop, value);
       return describe(instance);
     },
 
-    reset(id, prop) {
+    reset(id, prop, scope = "instance") {
       const instance = requireMounted(id);
       assertEditable();
-      reg.store.reset(instance.id, prop);
+      reg.store.reset(targetOf(instance, scope), prop);
       return describe(instance);
+    },
+
+    exclude(id, scope) {
+      const instance = requireMounted(id);
+      assertEditable();
+      reg.store.exclude(targetOf(instance, scope), instance.id);
+      return describe(instance);
+    },
+
+    include(id, scope) {
+      const instance = requireMounted(id);
+      assertEditable();
+      reg.store.include(targetOf(instance, scope), instance.id);
+      return describe(instance);
+    },
+
+    records() {
+      return reg.store.records();
     },
 
     pick(element) {

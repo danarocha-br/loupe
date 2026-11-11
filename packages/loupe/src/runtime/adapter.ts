@@ -14,6 +14,7 @@ import { currentFiber, keyPathOf } from "./fiber.js";
 import {
   ANCHOR_PROP,
   disableOverrides,
+  identityOf,
   instanceId,
   type MountedInstance,
   register,
@@ -107,7 +108,8 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
       });
       mounted.current = { baseId, instance };
       // Before paint: an Override kept across a remount shows on the first frame.
-      if (registry().store.has(instance.id)) force();
+      // A group or page Override set before this mount reaches it the same way.
+      if (registry().store.applies(identityOf(instance))) force();
       return () => {
         unregister(instance);
         mounted.current = null;
@@ -116,7 +118,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
 
     const rendered =
       reg?.status.overrides && identified && registered
-        ? reg.store.resolve({ id: registered.id, current: props }).props
+        ? reg.store.resolve({ ...identityOf(registered), current: props }).props
         : props;
     return createElement(Original as ElementType, rendered);
   }
