@@ -5,6 +5,7 @@
 // root, it adds two dev-only attributes and leaves the call site's own text alone:
 //   data-ds-anchor  the call-site id (call-site.ts), stable across edits
 //   data-ds-source  the line:col n/total hint, which moves with every edit
+//   data-ds-writes  what the call site writes: prop names, spread, children kind (writes.ts)
 // and, where `adapt-list.json` names an Adapter, rewrites the import specifier.
 
 import path from "node:path";
@@ -18,9 +19,22 @@ import {
   DEFAULT_EXPORT_SCOPE,
   MODULE_SCOPE,
 } from "./call-site.js";
+import {
+  type CallSiteWrites,
+  encodeCallSiteWrites,
+  readCallSiteWrites,
+  WRITES_ATTRIBUTE,
+} from "./writes.js";
 
 export const ANCHOR_ATTRIBUTE = "data-ds-anchor";
 export const SOURCE_ATTRIBUTE = "data-ds-source";
+export { WRITES_ATTRIBUTE };
+
+const LOUPE_ATTRIBUTES: ReadonlySet<string> = new Set([
+  ANCHOR_ATTRIBUTE,
+  SOURCE_ATTRIBUTE,
+  WRITES_ATTRIBUTE,
+]);
 
 export type TransformContext = {
   /** Absolute repo root; every path in `adaptList` is relative to it. */
@@ -48,6 +62,8 @@ export type CallSite = {
   module: string;
   /** Whether this call site renders through an Adapter. */
   adapted: boolean;
+  /** What the call site writes, from the source alone. */
+  writes: CallSiteWrites;
 };
 
 export type TransformResult = {
@@ -168,13 +184,15 @@ export function transform(source: string, file: string, ctx: TransformContext): 
     return s.hasChanged() ? finish(s, file, []) : unchanged;
   }
 
-  type Found = { element: Node; binding: Binding; enclosing: string };
+  // `element` is the opening tag; `jsx` the whole element, children included.
+  type Found = { element: Node; jsx: Node; binding: Binding; enclosing: string };
   const found: Found[] = [];
   walk(program, [], (node, ancestors) => {
     if (node.type !== "JSXOpeningElement") return;
     const binding = bindingFor(node.name as Node, bindings, namespaces);
     if (!binding) return;
-    found.push({ element: node, binding, enclosing: enclosingName(ancestors) });
+    const jsx = ancestors.at(-1) as Node;
+    found.push({ element: node, jsx, binding, enclosing: enclosingName(ancestors) });
   });
   found.sort((a, b) => a.element.start - b.element.start);
 
@@ -187,13 +205,14 @@ export function transform(source: string, file: string, ctx: TransformContext): 
   );
 
   const callSites: CallSite[] = [];
-  found.forEach(({ element, binding, enclosing }, index) => {
+  found.forEach(({ element, jsx, binding, enclosing }, index) => {
     const { ordinal, total } = numbers[index] ?? { ordinal: 0, total: 0 };
     const key = { path: rel, enclosing, component: binding.component, ordinal };
     const line = element.loc.start.line;
     const column = element.loc.start.column + 1;
     const id = callSiteId(key);
     const hint = callSiteHint(key, { line, column, total });
+    const writes = readCallSiteWrites(jsx, source, LOUPE_ATTRIBUTES);
     callSites.push({
       id,
       hint,
@@ -206,6 +225,7 @@ export function transform(source: string, file: string, ctx: TransformContext): 
       column,
       module: binding.module,
       adapted: binding.adapted,
+      writes,
     });
 
     const attributes = element.attributes as Node[];
@@ -220,7 +240,8 @@ export function transform(source: string, file: string, ctx: TransformContext): 
     const last = attributes.at(-1) ?? (element.typeParameters as Node | undefined) ?? (element.name as Node);
     s.appendLeft(
       last.end,
-      ` ${ANCHOR_ATTRIBUTE}={${JSON.stringify(id)}} ${SOURCE_ATTRIBUTE}={${JSON.stringify(hint)}}`,
+      ` ${ANCHOR_ATTRIBUTE}={${JSON.stringify(id)}} ${SOURCE_ATTRIBUTE}={${JSON.stringify(hint)}}` +
+        ` ${WRITES_ATTRIBUTE}={${JSON.stringify(encodeCallSiteWrites(writes))}}`,
     );
   });
 

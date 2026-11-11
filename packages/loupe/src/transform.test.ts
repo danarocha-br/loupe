@@ -3,6 +3,7 @@ import { parse } from "@babel/parser";
 import { describe, expect, it } from "vitest";
 import type { AdaptList } from "./adapt-list.js";
 import { hasUseClientDirective, type TransformContext, transform } from "./transform.js";
+import { parseCallSiteWrites, WRITES_ATTRIBUTE } from "./writes.js";
 
 const root = "/repo";
 const adaptList: AdaptList = {
@@ -59,10 +60,12 @@ describe("transform: call-site ids", () => {
       { id: "app/page.tsx › Page › Button[2]", hint: "app/page.tsx:9:7 2/2" },
     ]);
     expect(code).toContain(
-      '<Button variant="ghost" data-ds-anchor={"app/page.tsx › Page › Button[1]"} data-ds-source={"app/page.tsx:7:7 1/2"}>',
+      '<Button variant="ghost" data-ds-anchor={"app/page.tsx › Page › Button[1]"} data-ds-source={"app/page.tsx:7:7 1/2"}' +
+        ' data-ds-writes={"{\\"attributes\\":[{\\"name\\":\\"variant\\",\\"writtenAs\\":\\"literal\\"}],\\"spreads\\":false,\\"children\\":\\"text\\"}"}>',
     );
     expect(code).toContain(
-      '<Badge data-ds-anchor={"app/page.tsx › Page › Badge[1]"} data-ds-source={"app/page.tsx:8:7 1/1"} />',
+      '<Badge data-ds-anchor={"app/page.tsx › Page › Badge[1]"} data-ds-source={"app/page.tsx:8:7 1/1"}' +
+        ' data-ds-writes={"{\\"attributes\\":[],\\"spreads\\":false,\\"children\\":\\"none\\"}"} />',
     );
   });
 
@@ -255,6 +258,173 @@ export const X = () => (
     const { code, map } = run(source);
     expect(() => parse(code, { sourceType: "module", plugins: ["typescript", "jsx"] })).not.toThrow();
     expect(JSON.parse(map as string)).toMatchObject({ version: 3, sources: [PAGE] });
+  });
+});
+
+describe("transform: what each call site writes", () => {
+  // The first Button in a page whose only call site is `jsx`.
+  const writesOf = (jsx: string) => {
+    const source = `import { Button } from "@ds/button";\nimport { Icon } from "@ds/icon";\nexport function Page({ ok, label }: { ok: boolean; label: string }) {\n  return (\n    ${jsx}\n  );\n}\n`;
+    const site = run(source).callSites.find((callSite) => callSite.component === "Button");
+    if (!site) throw new Error("no Button call site");
+    return site.writes;
+  };
+  const childrenOf = (jsx: string) => writesOf(jsx).children;
+
+  it.each([
+    ["JSXText", "<Button>Cancelar</Button>"],
+    ["multi-line JSXText", "<Button>\n      Remover do espaço\n      agora\n    </Button>"],
+    ["a string-literal expression", '<Button>{"Cancelar"}</Button>'],
+    ["a template literal with no ${}", "<Button>{`Cancelar`}</Button>"],
+    ["text with HTML entities", "<Button>Salvar &amp; sair&nbsp;agora</Button>"],
+    ["text split by a literal space", '<Button>Remover{" "}membro</Button>'],
+    ["a lone space", "<Button> </Button>"],
+    ["a string-literal children attribute", '<Button children="Cancelar" />'],
+  ])("classifies %s as text", (_, jsx) => {
+    expect(childrenOf(jsx)).toBe("text");
+  });
+
+  it.each([
+    ["a variable", "<Button>{label}</Button>"],
+    ["a catalogue string", "<Button>{copy.members.remove}</Button>"],
+    ["a ternary of two literals", '<Button>{ok ? "Removendo…" : "Remover"}</Button>'],
+    ["a logical conditional", '<Button>{ok && "Remover"}</Button>'],
+    ["a template literal with ${}", "<Button>{`Remover ${label}`}</Button>"],
+    ["a concatenation", '<Button>{"Remover " + label}</Button>'],
+    ["a call", "<Button>{t(\"remove\")}</Button>"],
+    ["a number", "<Button>{3}</Button>"],
+    ["an expression children attribute", "<Button children={label} />"],
+  ])("classifies %s as from-code", (_, jsx) => {
+    expect(childrenOf(jsx)).toBe("from-code");
+  });
+
+  it.each([
+    ["text plus an expression", "<Button>Remover {label} do espaço?</Button>"],
+    ["an element plus text", "<Button><Icon />Enviando…</Button>"],
+    ["text plus an element on its own line", "<Button>\n      Enviando…\n      <Icon />\n    </Button>"],
+    ["an element plus an expression", "<Button><Icon />{label}</Button>"],
+    ["a conditional element plus text", "<Button>{ok && <Icon />}Enviando…</Button>"],
+  ])("classifies %s as mixed", (_, jsx) => {
+    expect(childrenOf(jsx)).toBe("mixed");
+  });
+
+  it.each([
+    ["one element", "<Button><Icon /></Button>"],
+    ["an element on its own line", "<Button>\n      <Icon />\n    </Button>"],
+    ["two elements separated by a space", "<Button><Icon /> <Icon /></Button>"],
+    ["a fragment", "<Button><><Icon /></></Button>"],
+    ["an element children attribute", "<Button children={<Icon />} />"],
+  ])("classifies %s as elements", (_, jsx) => {
+    expect(childrenOf(jsx)).toBe("elements");
+  });
+
+  it.each([
+    ["a self-closing element", "<Button />"],
+    ["an empty element", "<Button></Button>"],
+    ["only whitespace across lines", "<Button>\n    </Button>"],
+    ["only a comment", "<Button>{/* later */}</Button>"],
+  ])("classifies %s as none", (_, jsx) => {
+    expect(childrenOf(jsx)).toBe("none");
+  });
+
+  it("lets JSX children win over a children attribute, as React does", () => {
+    expect(childrenOf("<Button children={label}>Cancelar</Button>")).toBe("text");
+  });
+
+  it("records the attribute names the call site writes, in source order", () => {
+    const writes = writesOf(
+      '<Button className="w-full" size="sm" type="button" variant={ok ? "ghost" : "outline"} disabled />',
+    );
+    expect(writes.attributes.map((attribute) => attribute.name)).toEqual([
+      "className",
+      "size",
+      "type",
+      "variant",
+      "disabled",
+    ]);
+    expect(writes.spreads).toBe(false);
+  });
+
+  it("records whether each attribute is written as a literal or an expression", () => {
+    const writes = writesOf(
+      '<Button variant="ghost" size={"sm"} tabIndex={-1} aria-hidden={true} asChild title={`Sair`} open={open} render={<Icon />} onClick={() => setOpen(false)} />',
+    );
+    expect(writes.attributes).toEqual([
+      { name: "variant", writtenAs: "literal" },
+      { name: "size", writtenAs: "literal" },
+      { name: "tabIndex", writtenAs: "literal" },
+      { name: "aria-hidden", writtenAs: "literal" },
+      { name: "asChild", writtenAs: "literal" },
+      { name: "title", writtenAs: "literal" },
+      { name: "open", writtenAs: "expression", expression: "open" },
+      { name: "render", writtenAs: "expression", expression: "<Icon />" },
+      { name: "onClick", writtenAs: "expression", expression: "() => setOpen(false)" },
+    ]);
+  });
+
+  it("keeps an expression's text short and on one line", () => {
+    const writes = writesOf(
+      "<Button onClick={() => {\n        startTransition(async () => {\n          await removeMemberFromOrganization(member.id, organization.id);\n        });\n      }} />",
+    );
+    const expression = writes.attributes[0]?.expression ?? "";
+    expect(expression).not.toContain("\n");
+    expect(expression.length).toBeLessThanOrEqual(80);
+    expect(expression.startsWith("() => { startTransition(async () => {")).toBe(true);
+    expect(expression.endsWith("…")).toBe(true);
+  });
+
+  it("leaves out key and Loupe's own attributes, and keeps the last of a repeated name", () => {
+    const writes = writesOf(
+      '<Button key={member.id} data-ds-anchor="mine" variant="ghost" variant={variant} />',
+    );
+    expect(writes.attributes).toEqual([{ name: "variant", writtenAs: "expression", expression: "variant" }]);
+  });
+
+  it("flags a spreading call site", () => {
+    const writes = writesOf('<Button {...props} variant="ghost" />');
+    expect(writes.spreads).toBe(true);
+    expect(writes.attributes.map((attribute) => attribute.name)).toEqual(["variant"]);
+  });
+
+  it("records namespaced attribute names whole", () => {
+    expect(writesOf('<Button xlink:href="#a" />').attributes[0]?.name).toBe("xlink:href");
+  });
+
+  it("hands the record to the runtime on the element, readable by parseCallSiteWrites", () => {
+    const source = 'import { Button } from "@ds/button";\nexport const X = ({ label }: { label: string }) => <Button variant="ghost" {...rest}>{label}</Button>;\n';
+    const { code, callSites } = run(source);
+    const element = (parse(code, { sourceType: "module", plugins: ["typescript", "jsx"] }).program
+      .body[1] as unknown as {
+      declaration: { declarations: { init: { body: { openingElement: { attributes: unknown[] } } } }[] };
+    }).declaration.declarations[0]?.init.body.openingElement;
+    const attribute = element?.attributes.find(
+      (node) => (node as { name?: { name?: string } }).name?.name === WRITES_ATTRIBUTE,
+    ) as { value: { expression: { value: string } } } | undefined;
+    const value = attribute?.value.expression.value;
+    expect(parseCallSiteWrites(value)).toEqual(callSites[0]?.writes);
+    expect(callSites[0]?.writes).toEqual({
+      attributes: [{ name: "variant", writtenAs: "literal" }],
+      spreads: true,
+      children: "from-code",
+    });
+  });
+
+  it("does not record its own anchor attributes as written when transforming twice", () => {
+    const once = run('import { Button } from "@ds/button";\nexport const X = () => <Button size="sm" />;\n');
+    const twice = run(once.code);
+    expect(twice.callSites[0]?.writes.attributes.map((attribute) => attribute.name)).toEqual(["size"]);
+  });
+});
+
+describe("parseCallSiteWrites", () => {
+  it.each([
+    ["not a string", 3],
+    ["not JSON", "{"],
+    ["the wrong shape", JSON.stringify({ attributes: "variant", spreads: false, children: "text" })],
+    ["an unknown children kind", JSON.stringify({ attributes: [], spreads: false, children: "words" })],
+    ["an unknown writtenAs", JSON.stringify({ attributes: [{ name: "a", writtenAs: "maybe" }], spreads: false, children: "none" })],
+  ])("returns null for %s", (_, value) => {
+    expect(parseCallSiteWrites(value)).toBeNull();
   });
 });
 
