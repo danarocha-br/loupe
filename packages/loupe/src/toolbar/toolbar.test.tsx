@@ -24,6 +24,25 @@ const Button = createAdapter(
   ({ variant = "default", ...props }: ButtonProps) => <button type="button" {...props} data-variant={variant} />,
   { props: META },
 );
+type DialogProps = { open?: boolean; onOpenChange?: (open: boolean) => void; children?: ReactNode };
+const Dialog = createAdapter(
+  "Dialog",
+  ({ open, onOpenChange, children }: DialogProps) =>
+    open ? (
+      <div role="dialog">
+        {children}
+        <button type="button" onClick={() => onOpenChange?.(false)}>
+          Fechar
+        </button>
+      </div>
+    ) : null,
+  {
+    props: {
+      open: { editable: true, from: "@base-ui/react", kind: "options", status: "type-only", options: [false, true], state: true },
+      onOpenChange: { editable: false, from: "@base-ui/react", reason: "FUNCTION" },
+    },
+  },
+);
 const MenuItem = createAdapter("MenuItem", (props: { children?: ReactNode }) => <div role="menuitem">{props.children}</div>);
 
 // What the loader writes at a call site.
@@ -37,6 +56,7 @@ const LoupeMount = devMount(Toolbar);
 
 function Page({ onRowClick }: { onRowClick: (member: string) => void }) {
   const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   return (
     <main>
       <ul>
@@ -54,6 +74,26 @@ function Page({ onRowClick }: { onRowClick: (member: string) => void }) {
       {open && (
         <MenuItem {...({ "data-ds-anchor": "app/members.tsx › Members › MenuItem[1]" } as object)}>Remover</MenuItem>
       )}
+      <button type="button" onClick={() => setConfirming(true)}>
+        Abrir
+      </button>
+      <Dialog
+        {...({
+          "data-ds-anchor": "app/members.tsx › Members › Dialog[1]",
+          "data-ds-writes": JSON.stringify({
+            attributes: [
+              { name: "open", writtenAs: "expression", expression: "confirming" },
+              { name: "onOpenChange", writtenAs: "expression", expression: "setConfirming" },
+            ],
+            spreads: false,
+            children: "text",
+          }),
+        } as object)}
+        open={confirming}
+        onOpenChange={setConfirming}
+      >
+        Remover membro?
+      </Dialog>
     </main>
   );
 }
@@ -228,6 +268,89 @@ describe("the Toolbar", () => {
     const ring = shadow().querySelector<HTMLElement>(".ring");
     expect(ring?.style.top).toBe("8px");
     expect(ring?.textContent).toBe("Button");
+  });
+});
+
+const BIA = "app/members.tsx › Members › Button[1]#bia";
+const DIALOG = "app/members.tsx › Members › Dialog[1]";
+const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
+const inRow = (prop: string, text: string) =>
+  [...row(prop).querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+const select = async (id: string) =>
+  clickInPanel(instanceButtons().find((button) => button.dataset.instance === id) as HTMLButtonElement);
+
+describe("controls at This instance", () => {
+  it("overrides an option on one Instance, shows the Current value beside it, and resets it", async () => {
+    await mount();
+    await select(BIA);
+    expect(inRow("variant", '"ghost"').getAttribute("aria-pressed")).toBe("true");
+    expect(row("variant").classList.contains("overridden")).toBe(false);
+
+    await clickInPanel(inRow("variant", '"default"'));
+    expect(loupe.props(BIA).overrides).toEqual({ variant: "default" });
+    expect(pageButton("bia").dataset.variant).toBe("default");
+    // Only this Instance: the other rows keep the app's value.
+    expect(pageButton("ana").dataset.variant).toBe("ghost");
+    expect(row("variant").classList.contains("overridden")).toBe(true);
+    expect(inRow("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
+    expect(row("variant").querySelector("[data-testid=current]")?.textContent).toBe('Current: "ghost"');
+
+    await clickInPanel(inRow("variant", "Reset"));
+    expect(loupe.props(BIA).overrides).toEqual({});
+    expect(pageButton("bia").dataset.variant).toBe("ghost");
+    expect(row("variant").querySelector("[data-testid=current]")).toBeNull();
+  });
+
+  it("edits label text in a field and resets the whole Instance", async () => {
+    await mount();
+    await select(BIA);
+    const field = row("children").querySelector("input") as HTMLInputElement;
+    expect(field.value).toBe("bia");
+    act(() => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setValue?.call(field, "Bianca");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await settle();
+    await clickInPanel(inRow("variant", '"default"'));
+    expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca", variant: "default" });
+    expect(container.textContent).toContain("Bianca");
+    expect(row("children").querySelector("[data-testid=current]")?.textContent).toBe('Current: "bia"');
+
+    const resetInstance = [...shadow().querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement;
+    expect(resetInstance.disabled).toBe(false);
+    await clickInPanel(resetInstance);
+    expect(loupe.records()).toEqual([]);
+    expect(pageButton("bia")).toBeTruthy();
+    expect(resetInstance.disabled).toBe(true);
+  });
+
+  it("tags a State prop and says when the app tries to change a held value, while Current tracks the app", async () => {
+    await mount();
+    await select(DIALOG);
+    expect(row("open").textContent).toContain("STATE");
+    await clickInPanel(inRow("open", "true"));
+    expect(container.querySelector("[role=dialog]")).not.toBeNull();
+    expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: false");
+    expect(row("open").querySelector("[data-testid=held]")).toBeNull();
+
+    // The app's own state moves: Current follows it.
+    act(() => pageButton("Abrir").click());
+    await settle();
+    expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: true");
+
+    // The app tries to close it: the Override holds, and the row says so.
+    act(() => pageButton("Fechar").click());
+    await settle();
+    expect(container.querySelector("[role=dialog]")).not.toBeNull();
+    expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: false");
+    expect(row("open").querySelector("[data-testid=held]")?.textContent).toBe(
+      "Your Override holds this at true; the app tried to set false. Reset",
+    );
+
+    await clickInPanel(inRow("open", "Reset"));
+    expect(container.querySelector("[role=dialog]")).toBeNull();
+    expect(row("open").querySelector("[data-testid=held]")).toBeNull();
   });
 });
 

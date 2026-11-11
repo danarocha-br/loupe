@@ -27,9 +27,17 @@ button[aria-pressed="true"] { background: #111; color: #fff; }
 .mono { font-family: ui-monospace, monospace; font-size: 11px; }
 .tag { font-family: ui-monospace, monospace; font-size: 10px; text-transform: uppercase; background: #f1f3f3; border-radius: 4px; padding: 1px 4px; }
 .tag.supported { background: #d9f5df; }
-.row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+.row { padding: 3px 0; }
+.row .line { display: flex; gap: 8px; align-items: baseline; }
 .row .name { flex: none; min-width: 96px; }
 .row .value { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.row.overridden .name { color: #a343f5; font-weight: 600; }
+.row.overridden .reset { margin-left: auto; }
+.row .current { color: #666; padding-left: 4px; }
+.pills { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0; }
+.row.overridden .pills button[aria-pressed="true"] { background: #a343f5; }
+.row .text { width: 100%; font: inherit; }
+.notice { background: #f3e8fe; border-radius: 6px; padding: 4px 6px; margin-top: 2px; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list button { all: unset; cursor: pointer; display: block; width: 100%; padding: 3px 4px; border-radius: 4px; }
 .list button:hover, .list button:focus-visible { background: #f1f3f3; }
