@@ -7,6 +7,11 @@
 // by Instance id; an excluded Instance falls through to the next scope. Records
 // are keyed by ids, not mounted components, so they outlive a remount and reach
 // Instances that mount later.
+//
+// A record pins the total of every call site it names (`n/total` in the hint).
+// When that call site renders with another total, the code moved under it: the
+// record is suspended for review and never rebound to whatever is now nth. So is
+// a record naming an id that more than one mounted Instance holds.
 
 export type Props = Record<string, unknown>;
 
@@ -30,7 +35,19 @@ export type InstanceIdentity = {
   component: string;
   /** The pathname of the page the Instance renders on. */
   route: string;
+  /** Uses of this component in its enclosing component, as rendered now. Null when unanchored. */
+  total?: number | null;
 };
+
+/** A call site as one Instance just rendered it: what the hop guard checks records against. */
+export type CallSiteSeen = { id: string; anchor: string; total: number | null };
+
+/** Why a record stopped applying until it is reapplied or discarded. */
+export type Suspension =
+  /** "Code changed here, review": the call site's total moved from `was` to `now`. */
+  | { reason: "code-changed"; anchor: string; was: number; now: number }
+  /** "Matches N Instances, review": these ids each name more than one mounted Instance. Discard only. */
+  | { reason: "ambiguous"; ids: string[] };
 
 /** What the store needs to resolve an Instance. */
 export type InstanceKey = InstanceIdentity & {
@@ -52,20 +69,24 @@ export type OverrideRecord = {
   values: Props;
   /** Instance ids this record skips. Always empty for an Instance record. */
   excluded: string[];
+  suspended: Suspension | null;
 };
 
 /** Called with the target a change was made to; `reaches` says which Instances it affects. */
 export type StoreListener = (changed: ScopeTarget) => void;
 
 export type OverrideStore = {
-  /** Overrides one prop for a scope target. `undefined` is a real Override: the prop is unset. */
+  /**
+   * Overrides one prop for a scope target. `undefined` is a real Override: the prop
+   * is unset. Throws on a suspended record.
+   */
   set(target: ScopeTarget, prop: string, value: unknown): void;
   /**
    * Drops one prop's Override from this scope target only. With no prop, drops the
    * whole record, exclusions included.
    */
   reset(target: ScopeTarget, prop?: string): void;
-  /** Keeps a group or page record from reaching one Instance. */
+  /** Keeps a group or page record from reaching one Instance. Throws on a suspended record. */
   exclude(target: ScopeTarget, instanceId: string): void;
   /** Undoes `exclude`. */
   include(target: ScopeTarget, instanceId: string): void;
@@ -75,6 +96,15 @@ export type OverrideStore = {
   applies(instance: InstanceIdentity): boolean;
   /** Instance records first, then group, then page. */
   records(): OverrideRecord[];
+  /**
+   * Records a call site's total as an Instance just rendered it, and suspends every
+   * record pinned to another total there. Call it after each committed render.
+   */
+  observe(site: CallSiteSeen): void;
+  /** Suspends every record naming an id that `ambiguous` matches. */
+  suspendAmbiguous(ambiguous: (id: string) => boolean): void;
+  /** Pins a "code changed" record to its call sites' current totals and applies it again. */
+  reapply(target: ScopeTarget): void;
   subscribe(listener: StoreListener): () => void;
 };
 
@@ -114,7 +144,17 @@ function targetsOf(instance: InstanceIdentity): ScopeTarget[] {
   ];
 }
 
-type Entry = { target: ScopeTarget; values: Map<string, unknown>; excluded: Set<string> };
+type Entry = {
+  target: ScopeTarget;
+  values: Map<string, unknown>;
+  excluded: Set<string>;
+  /** Call-site anchor → the total it had when this record first named it. */
+  pins: Map<string, number>;
+  suspended: Suspension | null;
+};
+
+const describeTarget = (target: ScopeTarget): string =>
+  target.scope === "page" ? `page ${target.component} on ${target.route}` : `${target.scope} ${keyOf(target)}`;
 
 export function createOverrideStore(): OverrideStore {
   const scopes: Record<Scope, Map<string, Entry>> = {
@@ -123,6 +163,9 @@ export function createOverrideStore(): OverrideStore {
     page: new Map(),
   };
   const listeners = new Set<StoreListener>();
+  /** The latest total seen per call-site anchor, and the anchor of every id seen. */
+  const totals = new Map<string, number>();
+  const anchors = new Map<string, string>();
 
   const emit = (changed: ScopeTarget) => {
     for (const listener of listeners) listener(changed);
@@ -133,10 +176,49 @@ export function createOverrideStore(): OverrideStore {
   const findOrCreate = (target: ScopeTarget): Entry => {
     let entry = find(target);
     if (!entry) {
-      entry = { target: { ...target }, values: new Map(), excluded: new Set() };
+      entry = { target: { ...target }, values: new Map(), excluded: new Set(), pins: new Map(), suspended: null };
       scopes[target.scope].set(keyOf(target), entry);
     }
     return entry;
+  };
+
+  /** The call sites a record depends on: its own, and those of the Instances it excludes. */
+  const namedAnchors = (entry: Entry): Set<string> => {
+    const named = new Set<string>();
+    const own = entry.target.scope === "group" ? entry.target.anchor : entry.target.scope === "instance" ? anchors.get(entry.target.id) : undefined;
+    if (own !== undefined) named.add(own);
+    for (const id of entry.excluded) {
+      const anchor = anchors.get(id);
+      if (anchor !== undefined) named.add(anchor);
+    }
+    return named;
+  };
+
+  /** Pins each newly named call site at its latest total, and drops pins nothing names any more. */
+  const repin = (entry: Entry) => {
+    const named = namedAnchors(entry);
+    for (const anchor of entry.pins.keys()) if (!named.has(anchor)) entry.pins.delete(anchor);
+    for (const anchor of named) {
+      const total = totals.get(anchor);
+      if (!entry.pins.has(anchor) && total !== undefined) entry.pins.set(anchor, total);
+    }
+  };
+
+  const requireActive = (entry: Entry) => {
+    if (entry.suspended) {
+      throw new Error(
+        `[loupe] The ${describeTarget(entry.target)} Override is suspended for review: reapply or discard it first.`,
+      );
+    }
+  };
+
+  const allEntries = (): Entry[] => PRECEDENCE.flatMap((scope) => [...scopes[scope].values()]);
+
+  /** Whether a record applies to this Instance as it renders now: not suspended, and its call site unmoved. */
+  const live = (entry: Entry, instance: InstanceIdentity): boolean => {
+    if (entry.suspended) return false;
+    const pinned = entry.pins.get(instance.anchor);
+    return pinned === undefined || instance.total == null || pinned === instance.total;
   };
 
   const dropIfEmpty = (entry: Entry) => {
@@ -149,7 +231,9 @@ export function createOverrideStore(): OverrideStore {
   const reaching = (instance: InstanceIdentity): Entry[] =>
     targetsOf(instance)
       .map(find)
-      .filter((entry): entry is Entry => entry !== undefined && !entry.excluded.has(instance.id));
+      .filter(
+        (entry): entry is Entry => entry !== undefined && !entry.excluded.has(instance.id) && live(entry, instance),
+      );
 
   const requireExcludable = (target: ScopeTarget) => {
     if (target.scope === "instance") {
@@ -159,7 +243,10 @@ export function createOverrideStore(): OverrideStore {
 
   return {
     set(target, prop, value) {
-      const entry = findOrCreate(target);
+      const existing = find(target);
+      if (existing) requireActive(existing);
+      const entry = existing ?? findOrCreate(target);
+      repin(entry);
       if (entry.values.has(prop) && Object.is(entry.values.get(prop), value)) return;
       entry.values.set(prop, value);
       emit(target);
@@ -179,9 +266,12 @@ export function createOverrideStore(): OverrideStore {
 
     exclude(target, instanceId) {
       requireExcludable(target);
-      const entry = findOrCreate(target);
+      const existing = find(target);
+      if (existing) requireActive(existing);
+      const entry = existing ?? findOrCreate(target);
       if (entry.excluded.has(instanceId)) return;
       entry.excluded.add(instanceId);
+      repin(entry);
       emit({ scope: "instance", id: instanceId });
     },
 
@@ -189,6 +279,7 @@ export function createOverrideStore(): OverrideStore {
       requireExcludable(target);
       const entry = find(target);
       if (!entry?.excluded.delete(instanceId)) return;
+      repin(entry);
       dropIfEmpty(entry);
       emit({ scope: "instance", id: instanceId });
     },
@@ -219,8 +310,47 @@ export function createOverrideStore(): OverrideStore {
           target: { ...entry.target },
           values: Object.fromEntries(entry.values),
           excluded: [...entry.excluded],
+          suspended: entry.suspended ? structuredClone(entry.suspended) : null,
         })),
       );
+    },
+
+    observe(site) {
+      anchors.set(site.id, site.anchor);
+      if (site.total === null) return;
+      totals.set(site.anchor, site.total);
+      for (const entry of allEntries()) {
+        if (entry.suspended) continue;
+        const was = entry.pins.get(site.anchor);
+        if (was === undefined || was === site.total) continue;
+        entry.suspended = { reason: "code-changed", anchor: site.anchor, was, now: site.total };
+        emit(entry.target);
+      }
+    },
+
+    suspendAmbiguous(ambiguous) {
+      for (const entry of allEntries()) {
+        if (entry.suspended) continue;
+        const named = entry.target.scope === "instance" ? [entry.target.id] : [...entry.excluded];
+        const ids = named.filter(ambiguous).sort();
+        if (ids.length === 0) continue;
+        entry.suspended = { reason: "ambiguous", ids };
+        emit(entry.target);
+      }
+    },
+
+    reapply(target) {
+      const entry = find(target);
+      if (!entry?.suspended) return;
+      if (entry.suspended.reason === "ambiguous") {
+        throw new Error(
+          `[loupe] The ${describeTarget(target)} Override matches more than one Instance: discard it and set it again on the one you mean.`,
+        );
+      }
+      entry.pins.clear();
+      repin(entry);
+      entry.suspended = null;
+      emit(target);
     },
 
     subscribe(listener) {

@@ -10,7 +10,12 @@
 //   __loupe.reset(id, prop?, scope?)       undoes that scope's Override only
 //   __loupe.exclude(id, scope)             keeps a group or page Override off one Instance
 //   __loupe.include(id, scope)             undoes `exclude`
-//   __loupe.records()                      every Override record, with its exclusions
+//   __loupe.records()                      every Override record, with its exclusions, whether
+//                                          it is suspended for review, and the mounted
+//                                          Instances it reaches (none: "No Instance mounted")
+//   __loupe.reapply(target)                a "code changed" record applies again, pinned to the
+//                                          code as it is now (target: a record's `target`)
+//   __loupe.discard(target)                drops a record, mounted or not, suspended or not
 //   __loupe.pick(element)          the Instance that rendered a DOM node
 //   __loupe.scan()                 server-rendered Instances, from React's `_debugInfo`
 //   __loupe.status                 whether Overrides are on (the React self-check)
@@ -32,7 +37,7 @@ import {
   withoutLoaderProps,
 } from "./registry.js";
 import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
-import type { OverrideRecord, Props, Scope, ScopeTarget, Source } from "./store.js";
+import { type OverrideRecord, type Props, reaches, type Scope, type ScopeTarget, type Source } from "./store.js";
 
 export type InstanceRow = {
   id: string;
@@ -70,6 +75,11 @@ export type InstanceProps = {
   states: Record<string, StateProp>;
 };
 
+export type RecordRow = OverrideRecord & {
+  /** Ids of the mounted Instances the record reaches. Empty: "No Instance mounted". */
+  reaches: string[];
+};
+
 export type ServerInstance = {
   id: string;
   component: string;
@@ -87,7 +97,9 @@ export type LoupeDebug = {
   reset(id: string, prop?: string, scope?: Scope): InstanceProps;
   exclude(id: string, scope: "group" | "page"): InstanceProps;
   include(id: string, scope: "group" | "page"): InstanceProps;
-  records(): OverrideRecord[];
+  records(): RecordRow[];
+  reapply(target: ScopeTarget): RecordRow[];
+  discard(target: ScopeTarget): RecordRow[];
   pick(element: Element): string | null;
   scan(): ServerInstance[];
 };
@@ -152,6 +164,16 @@ export function createDebug(): LoupeDebug {
       throw new Error(`[loupe] Overrides are off, everything is inspect-only: ${reg.status.reason}`);
     }
   };
+
+  function records(): RecordRow[] {
+    const mounted = [...reg.instances.values()];
+    return reg.store.records().map((record) => ({
+      ...record,
+      reaches: mounted
+        .filter((instance) => reaches(record.target, identityOf(instance)) && !record.excluded.includes(instance.id))
+        .map((instance) => instance.id),
+    }));
+  }
 
   function scan(): ServerInstance[] {
     if (typeof document === "undefined") return [];
@@ -254,8 +276,18 @@ export function createDebug(): LoupeDebug {
       return describe(instance);
     },
 
-    records() {
-      return reg.store.records();
+    records,
+
+    reapply(target) {
+      assertEditable();
+      reg.store.reapply(target);
+      return records();
+    },
+
+    discard(target) {
+      assertEditable();
+      reg.store.reset(target);
+      return records();
     },
 
     pick(element) {

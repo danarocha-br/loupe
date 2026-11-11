@@ -100,7 +100,7 @@ describe("Override store: the Instance scope", () => {
     store.set(instance(ROW_2), "size", "sm");
     store.reset(instance(ROW_1));
     expect(store.applies(row(1))).toBe(false);
-    expect(store.records()).toEqual([{ target: instance(ROW_2), values: { size: "sm" }, excluded: [] }]);
+    expect(store.records()).toEqual([{ target: instance(ROW_2), values: { size: "sm" }, excluded: [], suspended: null }]);
   });
 
   it("resetting the last prop drops the record", () => {
@@ -286,7 +286,7 @@ describe("Override store: group and page scopes", () => {
     store.exclude(group(), ROW_1);
 
     store.reset(group(), "variant");
-    expect(store.records()).toEqual([{ target: group(), values: {}, excluded: [ROW_1] }]);
+    expect(store.records()).toEqual([{ target: group(), values: {}, excluded: [ROW_1], suspended: null }]);
     store.set(group(), "variant", "outline");
     expect(store.resolve(row(1)).props.variant).toBe("ghost");
 
@@ -310,9 +310,9 @@ describe("Override store: group and page scopes", () => {
     store.exclude(group(), ROW_2);
     store.set(page(), "disabled", true);
     expect(store.records()).toEqual([
-      { target: instance(ROW_1), values: { size: "lg" }, excluded: [] },
-      { target: group(), values: { variant: "outline" }, excluded: [ROW_2] },
-      { target: page(), values: { disabled: true }, excluded: [] },
+      { target: instance(ROW_1), values: { size: "lg" }, excluded: [], suspended: null },
+      { target: group(), values: { variant: "outline" }, excluded: [ROW_2], suspended: null },
+      { target: page(), values: { disabled: true }, excluded: [], suspended: null },
     ]);
   });
 
@@ -392,5 +392,174 @@ describe("Override store: change notifications", () => {
     expect(reaches(page(), invite())).toBe(true);
     expect(reaches(page("Badge"), invite())).toBe(false);
     expect(reaches(page("Button", "/other"), invite())).toBe(false);
+  });
+});
+
+describe("Override store: kept across unmount, suspended for review (PER-125)", () => {
+  // The member trigger renders 1st of 3 Buttons in MemberRowMenu.
+  const at = (n: number, total: number | null, current: Record<string, unknown> = { variant: "ghost" }) => ({
+    ...row(n, current),
+    total,
+  });
+  const seen = (n: number, total: number | null) => ({ id: row(n).id, anchor: TRIGGER, total });
+
+  it("keeps an Instance record with no Instance mounted, and applies it again on remount", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    // Nothing tells the store an Instance unmounted: the record is keyed by id, so it stays.
+    expect(store.records()).toHaveLength(1);
+    expect(store.resolve(at(1, 3)).props.variant).toBe("destructive");
+  });
+
+  it("an Instance whose call site's total changed shows its Current value, and the record stays", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    // A same-component call was added before it: the Instance renders with 4.
+    const resolved = store.resolve(at(1, 4));
+    expect(resolved.props.variant).toBe("ghost");
+    expect(resolved.sources.variant).toBe("app");
+    expect(store.applies(at(1, 4))).toBe(false);
+    expect(store.records()).toEqual([
+      { target: instance(ROW_1), values: { variant: "destructive" }, excluded: [], suspended: null },
+    ]);
+  });
+
+  it("observing the new total suspends every record pinned to that call site, at every scope, and notifies", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.observe(seen(2, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.set(group(), "size", "sm");
+    store.set(page(), "disabled", true);
+    store.exclude(page(), ROW_2);
+    const listener = vi.fn();
+    store.subscribe(listener);
+
+    store.observe(seen(2, 4));
+
+    const suspended = { reason: "code-changed", anchor: TRIGGER, was: 3, now: 4 };
+    expect(store.records().map((r) => r.suspended)).toEqual([suspended, suspended, suspended]);
+    expect(listener).toHaveBeenCalledWith(instance(ROW_1));
+    expect(listener).toHaveBeenCalledWith(group());
+    expect(listener).toHaveBeenCalledWith(page());
+    // The page record is suspended because an exclusion names that call site.
+    expect(store.resolve(invite()).props).toEqual({ variant: "ghost" });
+  });
+
+  it("stays suspended when the total comes back: it is never rebound automatically", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.observe(seen(1, 4));
+    store.observe(seen(1, 3));
+    expect(store.resolve(at(1, 3)).props.variant).toBe("ghost");
+    expect(store.records()[0]?.suspended).toMatchObject({ reason: "code-changed" });
+  });
+
+  it("observing an unchanged total, or one at another call site, suspends nothing and notifies no one", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(group(), "variant", "outline");
+    const listener = vi.fn();
+    store.subscribe(listener);
+    store.observe(seen(1, 3));
+    store.observe({ id: invite().id, anchor: OTHER_SITE, total: 1 });
+    store.observe({ id: invite().id, anchor: OTHER_SITE, total: 2 });
+    expect(listener).not.toHaveBeenCalled();
+    expect(store.records()[0]?.suspended).toBeNull();
+  });
+
+  it("a page record with no exclusions pins no call site, so a changed total leaves it applying", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(page(), "disabled", true);
+    store.observe(seen(1, 4));
+    expect(store.records()[0]?.suspended).toBeNull();
+    expect(store.resolve(at(1, 4)).props.disabled).toBe(true);
+  });
+
+  it("including the excluded Instance unpins its call site from a page record", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(page(), "disabled", true);
+    store.exclude(page(), ROW_1);
+    store.include(page(), ROW_1);
+    store.observe(seen(1, 4));
+    expect(store.records()[0]?.suspended).toBeNull();
+  });
+
+  it("a suspended record falls through to the next scope", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.set(page(), "variant", "secondary");
+    store.observe(seen(1, 4));
+    expect(store.resolve(at(1, 4)).sources.variant).toBe("page");
+  });
+
+  it("Reapply pins the call site's new total and applies the record again", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.observe(seen(1, 4));
+    const listener = vi.fn();
+    store.subscribe(listener);
+    store.reapply(instance(ROW_1));
+    expect(listener).toHaveBeenCalledWith(instance(ROW_1));
+    expect(store.records()[0]?.suspended).toBeNull();
+    expect(store.resolve(at(1, 4)).props.variant).toBe("destructive");
+    // Pinned at 4 now, so a later change suspends it again.
+    store.observe(seen(1, 5));
+    expect(store.records()[0]?.suspended).toMatchObject({ was: 4, now: 5 });
+  });
+
+  it("Discard is a whole-record reset, and works on a suspended record", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(group(), "variant", "outline");
+    store.observe(seen(1, 4));
+    store.reset(group());
+    expect(store.records()).toEqual([]);
+  });
+
+  it("refuses a new Override or exclusion on a suspended record: review it first", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(group(), "variant", "outline");
+    store.observe(seen(1, 4));
+    expect(() => store.set(group(), "size", "sm")).toThrow(/suspended/);
+    expect(() => store.exclude(group(), ROW_1)).toThrow(/suspended/);
+  });
+
+  it("an id that matches more than one mounted Instance suspends the records naming it, with no Reapply", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.set(group(OTHER_SITE), "variant", "outline");
+    store.exclude(group(OTHER_SITE), invite().id);
+    store.set(page(), "size", "sm");
+    const listener = vi.fn();
+    store.subscribe(listener);
+
+    store.suspendAmbiguous((id) => id === ROW_1 || id === invite().id);
+
+    expect(store.records().map((r) => r.suspended)).toEqual([
+      { reason: "ambiguous", ids: [ROW_1] },
+      { reason: "ambiguous", ids: [invite().id] },
+      null,
+    ]);
+    expect(listener).toHaveBeenCalledWith(instance(ROW_1));
+    expect(listener).toHaveBeenCalledWith(group(OTHER_SITE));
+    expect(store.resolve(at(1, null)).props.variant).toBe("ghost");
+    expect(() => store.reapply(instance(ROW_1))).toThrow(/more than one Instance/);
+  });
+
+  it("an Instance with no total (unanchored) is never suspended by the hop guard", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, null));
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.observe(seen(1, null));
+    expect(store.resolve(at(1, null)).props.variant).toBe("destructive");
   });
 });
