@@ -1,5 +1,5 @@
 // `adapt-list.json`: what the dev loader reads from the Product layer (PER-100 §3).
-// `generate` will write it; until then it is written by hand. Every path is POSIX
+// `loupe generate` writes it, with a `"$generated"` header key the loader ignores. Every path is POSIX
 // and relative to the repo root, so the file holds no machine-specific content.
 // It sits at the Product layer's root, and the loader never transforms anything
 // under that directory: an Adapter's own import of its original must not be swapped.
@@ -10,7 +10,7 @@
 //   "app": ["apps/app"],
 //   "modules": {
 //     "packages/design-system/components/ui/button.tsx": {
-//       "adapter": "@repo/playground/adapters/ds/ui/button",
+//       "adapter": "@repo/loupe/adapters/ds/ui/button",
 //       "adapted": ["Button"]
 //     }
 //   }

@@ -10,7 +10,7 @@ documents this is the Component Playground.
 | `plugins/loupe` | The Installer: a thin Claude Code plugin that runs the CLI. Empty for now. |
 | `fixture/app` | A Next 16.3 app that CI runs every check against. |
 | `fixture/design-system` | The fixture's tiny shadcn-on-Base-UI design system. |
-| `fixture/app/loupe` | A stand-in Product layer: `adapt-list.json` and pass-through Adapters, until `generate` writes them. |
+| `fixture/app/loupe` | A stand-in Product layer: `adapt-list.json` and pass-through Adapters, until the runtime (PER-120) lets `generate` write them here. |
 
 The fixture app imports the design system through tsconfig `paths`, the same
 way orbix-ai's `apps/app` imports `@repo/design-system`. The dev loader has to
