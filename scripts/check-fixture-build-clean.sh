@@ -13,7 +13,7 @@ next_dir=.next
 }
 
 failed=0
-for needle in data-ds-anchor data-ds-source __loupe loader.cjs loader-runtime; do
+for needle in data-ds-anchor data-ds-source data-ds-writes __loupe loader.cjs loader-runtime; do
   hits=$(grep -rlF --exclude-dir=cache -- "$needle" "$next_dir" || true)
   if [ -n "$hits" ]; then
     echo "✗ \"$needle\" found in the build:" >&2

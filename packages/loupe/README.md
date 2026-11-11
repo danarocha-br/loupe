@@ -36,6 +36,9 @@ export default withLoupe(nextConfig, { adaptList: "../../packages/playground/ada
 
 Under `next dev` it tags each JSX call site of a design-system or app component
 with `data-ds-anchor` (`path › EnclosingComponent › Component[n]`, stable across
-edits) and `data-ds-source` (`path:line:col n/total`, a hint only), and swaps an
-import to its Adapter where `adapt-list.json` lists one, in client code only.
+edits), `data-ds-source` (`path:line:col n/total`, a hint only) and
+`data-ds-writes` (what the call site writes: its prop names, each as a literal
+or an expression, whether it spreads props, and its children kind `text`,
+`from-code`, `mixed`, `elements` or `none`), and swaps an import to its Adapter
+where `adapt-list.json` lists one, in client code only.
 `LOUPE=0 next dev` runs without it.
