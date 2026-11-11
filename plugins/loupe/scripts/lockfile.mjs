@@ -131,8 +131,12 @@ function lockfileAt(root, ref) {
   return execFileSync("git", ["show", `${ref}:${prefix}${LOCKFILE}`], { cwd: root, encoding: "utf8", maxBuffer: 1 << 28 });
 }
 
+/** Prints pnpm's output only when it fails: a passing install lists every unmet peer in the workspace. */
 function frozenInstall(root) {
-  return spawnSync("pnpm", ["install", "--frozen-lockfile"], { cwd: root, stdio: "inherit" }).status === 0;
+  const result = spawnSync("pnpm", ["install", "--frozen-lockfile"], { cwd: root, encoding: "utf8", maxBuffer: 1 << 26 });
+  if (result.status === 0) return true;
+  process.stderr.write(`${result.stdout ?? ""}${result.stderr ?? ""}`.split("\n").slice(-40).join("\n"));
+  return false;
 }
 
 function main(argv) {
