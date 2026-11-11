@@ -6,6 +6,18 @@
     "fixture/design-system/components/ui/button.tsx": {
       "adapter": "@/loupe/adapters/ds/ui/button",
       "adapted": ["Button"]
+    },
+    "fixture/design-system/components/ui/dropdown-menu.tsx": {
+      "adapter": "@/loupe/adapters/ds/ui/dropdown-menu",
+      "adapted": ["DropdownMenuItem"]
+    },
+    "fixture/design-system/components/ui/alert-dialog.tsx": {
+      "adapter": "@/loupe/adapters/ds/ui/alert-dialog",
+      "adapted": ["AlertDialog"]
+    },
+    "fixture/app/components/product/member-row-menu.tsx": {
+      "adapter": "@/loupe/adapters/app/components/product/member-row-menu",
+      "adapted": ["MemberRowMenu"]
     }
   }
 }

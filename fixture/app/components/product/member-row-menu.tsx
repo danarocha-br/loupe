@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 
 import {
   AlertDialog,
@@ -25,8 +25,9 @@ type MemberRowMenuProps = {
 };
 
 // A client product component built from design-system parts: a render-prop
-// trigger, menu items in a portal, and a dialog opened from app state.
-export function MemberRowMenu({ name, isSoleAdmin }: MemberRowMenuProps) {
+// trigger, menu items in a portal, and a dialog opened from app state. Memoized,
+// so an Override inside it must apply without its parent rerendering.
+export const MemberRowMenu = memo(function MemberRowMenu({ name, isSoleAdmin }: MemberRowMenuProps) {
   const [confirming, setConfirming] = useState(false);
 
   return (
@@ -64,4 +65,4 @@ export function MemberRowMenu({ name, isSoleAdmin }: MemberRowMenuProps) {
       </AlertDialog>
     </>
   );
-}
+});
