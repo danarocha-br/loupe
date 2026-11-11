@@ -278,17 +278,17 @@ describe("writing meta files", () => {
 });
 
 describe("loupe meta", () => {
-  function capture(argv: string[]) {
+  async function capture(argv: string[]) {
     const out: string[] = [];
     const err: string[] = [];
-    const code = run(argv, { out: (l) => out.push(l), err: (l) => err.push(l) });
+    const code = await run(argv, { out: (l) => out.push(l), err: (l) => err.push(l) });
     return { code, out, err };
   }
 
-  it("runs headless and prints a summary", () => {
+  it("runs headless and prints a summary", async () => {
     const out = mkdtempSync(path.join(tmpdir(), "loupe-cli-"));
     try {
-      const result = capture(["meta", "--tsconfig", designSystem, "--include", "components", "--out", out]);
+      const result = await capture(["meta", "--tsconfig", designSystem, "--include", "components", "--out", out]);
       expect(result.code).toBe(0);
       expect(result.out[0]).toMatch(/^4 modules · \d+ components · \d+ editable props · \d+ inspect only$/);
       expect(result.out[1]).toMatch(/^4 files written · ts-morph · \d+\.\d\d s$/);
@@ -302,8 +302,8 @@ describe("loupe meta", () => {
     [["meta", "--out"], "Missing value for --out"],
     [["meta", "--watch"], "Unknown option: --watch"],
     [["meta", "--include", "nowhere", "--tsconfig", designSystem], "Not a directory: nowhere"],
-  ])("refuses %j", (argv, message) => {
-    const { code, err } = capture(argv);
+  ])("refuses %j", async (argv, message) => {
+    const { code, err } = await capture(argv);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain(message);
   });

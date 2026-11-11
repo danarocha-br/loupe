@@ -6,10 +6,10 @@ const { version } = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
-function capture(argv: string[]) {
+async function capture(argv: string[]) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = run(argv, {
+  const code = await run(argv, {
     out: (line) => out.push(line),
     err: (line) => err.push(line),
   });
@@ -17,18 +17,18 @@ function capture(argv: string[]) {
 }
 
 describe("loupe CLI", () => {
-  it.each([["--version"], ["-v"]])("%s prints the package version alone", (flag) => {
-    expect(capture([flag])).toEqual({ code: 0, out: [version], err: [] });
+  it.each([["--version"], ["-v"]])("%s prints the package version alone", async (flag) => {
+    expect(await capture([flag])).toEqual({ code: 0, out: [version], err: [] });
   });
 
-  it("prints usage with no arguments", () => {
-    const { code, out } = capture([]);
+  it("prints usage with no arguments", async () => {
+    const { code, out } = await capture([]);
     expect(code).toBe(0);
     expect(out.join("\n")).toContain("Usage: loupe");
   });
 
-  it("refuses an unknown command", () => {
-    const { code, err } = capture(["init"]);
+  it("refuses an unknown command", async () => {
+    const { code, err } = await capture(["init"]);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("Unknown command: init");
   });
