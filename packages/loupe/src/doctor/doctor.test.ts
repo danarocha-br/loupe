@@ -46,8 +46,9 @@ const repoFiles: Files = {
   "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
 };
 
+// No background maintenance: it writes a lock file under .git while a snapshot reads the tree.
 const git = (root: string, ...args: string[]) =>
-  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], {
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "gc.auto=0", "-c", "maintenance.auto=false", ...args], {
     cwd: root,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
