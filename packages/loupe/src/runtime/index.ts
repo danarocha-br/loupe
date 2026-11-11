@@ -11,7 +11,6 @@ export { STATE_SCOPE_REASON, stateScopeRefusal } from "./state.js";
 export type { InstanceProps, InstanceRow, LoupeDebug, RecordRow, ServerInstance } from "./debug.js";
 export type { Status } from "./registry.js";
 export type {
-  CallSiteSeen,
   InstanceIdentity,
   OverrideRecord,
   Props,

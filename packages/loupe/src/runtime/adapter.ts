@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { hintTotal } from "../call-site.js";
 import { splitAuthored, writesOf } from "./authored.js";
 import { currentFiber, keyPathOf } from "./fiber.js";
 import {
@@ -22,7 +23,6 @@ import {
   register,
   registry,
   SOURCE_PROP,
-  totalOf,
   UNANCHORED,
   unregister,
   withoutLoaderProps,
@@ -166,9 +166,9 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
   return Adapter as unknown as C;
 }
 
-/** The hop guard: a record pinned to another total at this call site is suspended. */
+/** The hop guard. Runs before paint, so a suspended Override is never shown. */
 function observeCallSite(instance: MountedInstance): void {
-  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: totalOf(instance.hint) });
+  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: hintTotal(instance.hint) });
 }
 
 function hintOf(props: Props): string | null {

@@ -555,6 +555,24 @@ describe("Override store: kept across unmount, suspended for review (PER-125)", 
     expect(() => store.reapply(instance(ROW_1))).toThrow(/more than one Instance/);
   });
 
+  it("an ambiguous id takes over a code-changed suspension, so Reapply can't put it back on a guess", () => {
+    const store = createOverrideStore();
+    store.observe(seen(1, 3));
+    store.set(instance(ROW_1), "variant", "destructive");
+    store.observe(seen(1, 4));
+    store.suspendAmbiguous((id) => id === ROW_1);
+    expect(store.records()[0]?.suspended).toEqual({ reason: "ambiguous", ids: [ROW_1] });
+    expect(() => store.reapply(instance(ROW_1))).toThrow(/more than one Instance/);
+  });
+
+  it("a record set before its call site was seen is pinned the first time it is", () => {
+    const store = createOverrideStore();
+    store.set(group(), "variant", "outline");
+    store.observe(seen(1, 3));
+    store.observe(seen(1, 4));
+    expect(store.records()[0]?.suspended).toMatchObject({ reason: "code-changed", was: 3, now: 4 });
+  });
+
   it("an Instance with no total (unanchored) is never suspended by the hop guard", () => {
     const store = createOverrideStore();
     store.observe(seen(1, null));

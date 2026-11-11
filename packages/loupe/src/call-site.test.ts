@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assignOrdinals, callSiteHint, callSiteId, parseCallSiteId } from "./call-site.js";
+import { assignOrdinals, callSiteHint, callSiteId, hintTotal, parseCallSiteId } from "./call-site.js";
 
 const key = {
   path: "apps/app/membros/member-row-menu.tsx",
@@ -39,5 +39,12 @@ describe("call-site identity", () => {
       { ordinal: 1, total: 1 },
       { ordinal: 1, total: 1 },
     ]);
+  });
+
+  it("reads the total back from a hint, for the hop guard, and nothing else", () => {
+    const key = { path: "app/a b/menu.tsx", enclosing: "Menu", component: "Item", ordinal: 2 };
+    expect(hintTotal(callSiteHint(key, { line: 9, column: 3, total: 4 }))).toBe(4);
+    expect(hintTotal(null)).toBeNull();
+    expect(hintTotal("app/menu.tsx:9:3")).toBeNull();
   });
 });

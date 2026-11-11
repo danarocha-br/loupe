@@ -4,6 +4,7 @@
 
 import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
+import { hintTotal } from "../call-site.js";
 import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { Split } from "./authored.js";
 import {
@@ -98,14 +99,8 @@ export function identityOf(
     anchor: instance.anchor,
     component: instance.component,
     route: currentRoute(),
-    total: totalOf(instance.hint),
+    total: hintTotal(instance.hint),
   };
-}
-
-/** The call-site total from a `path:line:col n/total` hint, or null without one. */
-export function totalOf(hint: string | null): number | null {
-  const match = hint === null ? null : / \d+\/(\d+)$/.exec(hint);
-  return match ? Number(match[1]) : null;
 }
 
 const WRAPPED = Symbol.for("loupe.historyWrapped");
@@ -163,16 +158,16 @@ export function instanceId(anchor: string, keyPath: string): string {
  * Registers a mounted Instance under `baseId`, or `baseId~2`, `~3`… when another
  * mounted Instance already holds it (the same call site, rendered twice with no
  * key to tell them apart). Returns the id it got.
- *
- * The `~n` suffix is mount order, which a close and reopen can change, so a record
- * naming any of those ids is suspended rather than applied to a guess.
+ * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
   const { instances, store } = registry();
   const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id };
   instances.set(id, instance);
-  if (id !== baseId) store.suspendAmbiguous((named) => sharesBase(named, baseId));
+  // Also when this one took the free base id while a `~n` is still mounted.
+  const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
+  if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
   return instance;
 }
 

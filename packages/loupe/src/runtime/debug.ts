@@ -10,12 +10,10 @@
 //   __loupe.reset(id, prop?, scope?)       undoes that scope's Override only
 //   __loupe.exclude(id, scope)             keeps a group or page Override off one Instance
 //   __loupe.include(id, scope)             undoes `exclude`
-//   __loupe.records()                      every Override record, with its exclusions, whether
-//                                          it is suspended for review, and the mounted
-//                                          Instances it reaches (none: "No Instance mounted")
-//   __loupe.reapply(target)                a "code changed" record applies again, pinned to the
-//                                          code as it is now (target: a record's `target`)
-//   __loupe.discard(target)                drops a record, mounted or not, suspended or not
+//   __loupe.records()                      every Override record: exclusions, suspension, and
+//                                          the mounted Instances it names (none: "No Instance mounted")
+//   __loupe.reapply(target)                a "code changed" record applies again (target: a record's `target`)
+//   __loupe.discard(target)                drops a record, mounted or not
 //   __loupe.pick(element)          the Instance that rendered a DOM node
 //   __loupe.scan()                 server-rendered Instances, from React's `_debugInfo`
 //   __loupe.status                 whether Overrides are on (the React self-check)
@@ -76,8 +74,8 @@ export type InstanceProps = {
 };
 
 export type RecordRow = OverrideRecord & {
-  /** Ids of the mounted Instances the record reaches. Empty: "No Instance mounted". */
-  reaches: string[];
+  /** Mounted Instances the record names, suspended or not. Empty: "No Instance mounted". */
+  mounted: string[];
 };
 
 export type ServerInstance = {
@@ -169,7 +167,7 @@ export function createDebug(): LoupeDebug {
     const mounted = [...reg.instances.values()];
     return reg.store.records().map((record) => ({
       ...record,
-      reaches: mounted
+      mounted: mounted
         .filter((instance) => reaches(record.target, identityOf(instance)) && !record.excluded.includes(instance.id))
         .map((instance) => instance.id),
     }));
