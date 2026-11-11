@@ -1,3 +1,4 @@
+import { withLoupe } from "@danarocha/loupe/next";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -5,4 +6,5 @@ const nextConfig: NextConfig = {
   agentRules: false,
 };
 
-export default nextConfig;
+// The loader runs under `next dev` only; every other phase gets nextConfig as is.
+export default withLoupe(nextConfig, { adaptList: "./loupe/adapt-list.json" });

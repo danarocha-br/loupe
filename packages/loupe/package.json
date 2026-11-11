@@ -4,6 +4,13 @@
   "description": "Inspect and override the props of real components in a running Next.js app.",
   "license": "UNLICENSED",
   "type": "module",
+  "exports": {
+    "./next": {
+      "types": "./dist/next.d.cts",
+      "default": "./dist/next.cjs"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "loupe": "dist/bin.js"
   },
@@ -32,5 +39,9 @@
     "@types/node": "^22.19.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.29.13",
+    "magic-string": "^0.30.21"
   }
 }

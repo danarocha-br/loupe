@@ -10,6 +10,7 @@ documents this is the Component Playground.
 | `plugins/loupe` | The Installer: a thin Claude Code plugin that runs the CLI. Empty for now. |
 | `fixture/app` | A Next 16.3 app that CI runs every check against. |
 | `fixture/design-system` | The fixture's tiny shadcn-on-Base-UI design system. |
+| `fixture/app/loupe` | A stand-in Product layer: `adapt-list.json` and pass-through Adapters, until `generate` writes them. |
 
 The fixture app imports the design system through tsconfig `paths`, the same
 way orbix-ai's `apps/app` imports `@repo/design-system`. The dev loader has to
@@ -19,9 +20,11 @@ treat those files as app source, not as `node_modules`.
 
 ```bash
 pnpm install
+pnpm --filter @danarocha/loupe build   # the fixture's next.config.ts imports dist
 pnpm test
 pnpm typecheck
 pnpm --filter @fixture/app build
+scripts/check-fixture-build-clean.sh
 scripts/check-packed-bin.sh
 ```
 
