@@ -1,7 +1,8 @@
 # @danarocha/loupe
 
 A dev-only toolbar for inspecting and overriding the props of real components in
-a running Next.js app. Pre-release: this version ships the CLI skeleton and the dev loader.
+a running Next.js app. Pre-release: this version ships the CLI, its compatibility
+check and the dev loader.
 
 Install it exact-pinned, as a dev dependency of the app, and run the CLI from
 that copy so the generator and runtime versions stay paired:
@@ -9,6 +10,17 @@ that copy so the generator and runtime versions stay paired:
 ```bash
 pnpm add -D -E @danarocha/loupe
 pnpm exec loupe --version
+```
+
+## The compatibility check
+
+Check the repo against the compatibility statement before anything else.
+It writes nothing, except a yes to untested items, which it keeps in
+`packages/loupe/loupe.ledger.json` so a rerun doesn't ask again:
+
+```bash
+pnpm exec loupe check            # asks which app when there are several
+pnpm exec loupe check --app apps/app
 ```
 
 ## The dev loader
