@@ -1,8 +1,8 @@
 import { checkCompatibility } from "./compat/check.js";
 import { generateUsage, parseGenerateArgs, runGenerate } from "./generate/command.js";
 import { initUsage, parseInitArgs, runInit } from "./init/command.js";
-import { parseRemoveArgs, removeUsage, runRemove } from "./remove/command.js";
 import { metaUsage, parseMetaArgs, runMeta, summarise } from "./meta/command.js";
+import { parseRemoveArgs, removeUsage, runRemove } from "./remove/command.js";
 import { version } from "./version.js";
 
 export type Io = {
@@ -23,7 +23,7 @@ Commands:
   check [--app <dir>]  Check this repo against Loupe's compatibility statement
   generate [--check]   Write Adapters, meta/ and adapt-list.json into the Product layer
   init [--adopt]       Install Loupe into an app: the Product layer and four edits, recorded in a ledger
-  remove               Undo loupe init: the mount, withLoupe, the Product layer, the Biome exclusion and the dependencies
+  remove               Undo loupe init, never overwriting a hand edit
   meta                 Read prop metadata from the TypeScript checker and cva (headless)
 
 Options:

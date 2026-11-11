@@ -28,8 +28,8 @@ export type InitOptions = { app?: string; allowDirty: boolean; adopt: boolean; h
 /** A touch point needs a hand edit, then `loupe init --adopt`. */
 export const EXIT_MANUAL = 2;
 
-const NOTHING_WRITTEN = "Nothing was written.";
-const LOCKFILE = "pnpm-lock.yaml";
+export const NOTHING_WRITTEN = "Nothing was written.";
+export const LOCKFILE = "pnpm-lock.yaml";
 
 export const initUsage = `Usage: loupe init [options]
 

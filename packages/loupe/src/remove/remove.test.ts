@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
@@ -64,7 +64,7 @@ const repoFiles: Files = {
   "packages/design-system/components/ui/button.tsx":
     'export type ButtonProps = { variant?: "default" | "ghost" };\nexport function Button(_props: ButtonProps) {\n  return null;\n}\n',
   "biome.jsonc": biome,
-  ".gitignore": "node_modules/\n",
+  ".gitignore": "node_modules/\n*.log\n",
   "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
 };
 
@@ -144,7 +144,7 @@ describe("loupe remove after init", () => {
 
   it("removes the layer's ignored leftovers, such as its node_modules", async () => {
     const { root, start } = await installed();
-    execFileSync("mkdir", ["-p", path.join(root, "packages/loupe/node_modules/react")]);
+    mkdirSync(path.join(root, "packages/loupe/node_modules/react"), { recursive: true });
     writeFileSync(path.join(root, "packages/loupe/node_modules/react/index.js"), "");
     const { code } = await cli(root, ["remove"]);
     expect(code).toBe(0);
@@ -153,7 +153,7 @@ describe("loupe remove after init", () => {
   });
 });
 
-describe("a hand edit outside Loupe's block (5a)", () => {
+describe("a hand edit outside Loupe's block and in an Adapter", () => {
   it("keeps the edit and an edited Adapter, keeps the exclusion, then finishes on a second run", async () => {
     const { root, start } = await installed();
     const edited = read(root, LAYOUT).replace('<html lang="en">', '<html lang="pt-BR">');
@@ -193,7 +193,7 @@ describe("a hand edit outside Loupe's block (5a)", () => {
   });
 });
 
-describe("a hand edit inside Loupe's block (5b)", () => {
+describe("a hand edit inside Loupe's block", () => {
   it("removes withLoupe, stops before the Product layer and the dependencies, and finishes once the edit is undone", async () => {
     const { root, start } = await installed();
     const ours = read(root, LAYOUT);
@@ -257,13 +257,71 @@ describe("what stays", () => {
     expect(existsSync(path.join(root, LEDGER))).toBe(true);
   });
 
-  it("keeps the ledger when pnpm install fails", async () => {
-    const { root } = await installed();
-    const { code, text } = await cli(root, ["remove"], [], 1);
+  it("puts the dependencies back when pnpm install fails, so a rerun retries it", async () => {
+    const { root, start } = await installed();
+    const pkg = read(root, "apps/web/package.json");
+    const installs: string[] = [];
+    const { code, text } = await cli(root, ["remove"], installs, 1);
     expect(code).toBe(1);
     expect(text).toContain("pnpm install exited with 1");
     expect(text).not.toContain("left as is");
+    expect(read(root, "apps/web/package.json")).toBe(pkg);
     expect(existsSync(path.join(root, LEDGER))).toBe(true);
+
+    const again = await cli(root, ["remove", "--allow-dirty"], installs);
+    expect(again.code, again.text).toBe(0);
+    expect(installs).toHaveLength(2);
+    expect(diff(root, start)).toBe("");
+  });
+
+  it("keeps an edited file init wrote, and an ignored file it can't vouch for", async () => {
+    const { root } = await installed();
+    writeFileSync(path.join(root, "packages/loupe/mount.tsx"), `${read(root, "packages/loupe/mount.tsx")}// mine\n`);
+    commit(root);
+    writeFileSync(path.join(root, "packages/loupe/debug.log"), "x\n");
+    const { code, text } = await cli(root, ["remove"]);
+    expect(code).toBe(1);
+    expect(text).toContain("✗ packages/loupe/mount.tsx: edited since loupe init wrote it; left as is");
+    expect(text).toContain("✗ packages/loupe/debug.log: ignored by git, so Loupe can't tell who wrote it; left as is");
+    expect(read(root, "packages/loupe/debug.log")).toBe("x\n");
+  });
+
+  it("keeps a manual step never adopted, and stops before the Product layer", async () => {
+    const { root } = await installed();
+    const l = JSON.parse(read(root, LEDGER));
+    for (const t of l.touchPoints) if (t.id === "next-config") Object.assign(t, { mode: "manual", sha256: null });
+    writeFileSync(path.join(root, LEDGER), `${JSON.stringify(l, null, 2)}\n`);
+    commit(root);
+    const { code, text } = await cli(root, ["remove"]);
+    expect(code).toBe(1);
+    expect(text).toMatch(/✗ next-config +apps\/web\/next\.config\.ts: a manual step loupe init never recorded/);
+    expect(text).toContain("Stopped before the Product layer");
+    expect(read(root, LAYOUT)).not.toContain("LoupeMount");
+    expect(existsSync(path.join(root, "packages/loupe/mount.tsx"))).toBe(true);
+  });
+
+  it("treats a touch point file deleted by hand as done", async () => {
+    const { root } = await installed();
+    rmSync(path.join(root, "biome.jsonc"));
+    commit(root);
+    const { code, text } = await cli(root, ["remove"]);
+    expect(code, text).toBe(0);
+    expect(existsSync(path.join(root, LEDGER))).toBe(false);
+  });
+
+  it("refuses a ledger that points outside the Product layer, or from a newer format", async () => {
+    const { root } = await installed();
+    const l = JSON.parse(read(root, LEDGER));
+    writeFileSync(path.join(root, LEDGER), `${JSON.stringify({ ...l, productLayer: { ...l.productLayer, path: "." } }, null, 2)}\n`);
+    commit(root);
+    const before = snapshot(root);
+    const outside = await cli(root, ["remove"]);
+    expect(outside.code).toBe(1);
+    expect(outside.text).toContain("isn't one loupe init wrote");
+    expect(snapshot(root)).toEqual(before);
+
+    writeFileSync(path.join(root, LEDGER), `${JSON.stringify({ ...l, formatVersion: 2 }, null, 2)}\n`);
+    expect((await cli(root, ["remove"])).text).toContain("formatVersion 2");
   });
 
   it("says so when there is no ledger", async () => {
@@ -273,6 +331,28 @@ describe("what stays", () => {
     const { code, text } = await cli(root, ["remove"]);
     expect(code).toBe(0);
     expect(text).toContain("Nothing to remove");
+  });
+});
+
+describe("when a hand edit moved things, each undo takes out only Loupe's lines", () => {
+  it("keeps a comment of the user's next to the Biome exclusion", async () => {
+    const { root, start } = await installed();
+    const text = read(root, "biome.jsonc").replace('      // Loupe', '      // mine\n      // Loupe');
+    writeFileSync(path.join(root, "biome.jsonc"), text);
+    commit(root);
+    expect((await cli(root, ["remove"])).code).toBe(0);
+    expect(git(root, "diff", start, "--", "biome.jsonc")).toContain("+      // mine");
+    expect(git(root, "diff", start, "--name-only").trim()).toBe("biome.jsonc");
+  });
+
+  it("removes a mount that is no longer the last child", async () => {
+    const { root, start } = await installed();
+    const text = read(root, LAYOUT).replace("<LoupeMount />}\n", "<LoupeMount />}\n        <footer />\n");
+    writeFileSync(path.join(root, LAYOUT), text);
+    commit(root);
+    expect((await cli(root, ["remove"])).code).toBe(0);
+    expect(read(root, LAYOUT)).toBe(layout.replace("        )}\n      </body>", "        )}\n        <footer />\n      </body>"));
+    expect(git(root, "diff", start, "--name-only").trim()).toBe(LAYOUT);
   });
 });
 

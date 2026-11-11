@@ -62,10 +62,17 @@ pnpm exec loupe remove --allow-dirty  # proceed although a file it would change 
 ```
 
 It never overwrites a hand edit. A touch point or a Product layer file changed
-since Loupe wrote it is left alone and listed, and `remove` exits 1. If the
-mount or `withLoupe` was edited, it stops before the Product layer, so the app
-still builds. Undo what it lists and run it again; the second run picks up where
-the first stopped. Restart a running `next dev` afterwards; `.next` is left alone.
+since Loupe wrote it is left alone and listed, and `remove` exits 1. Files git
+ignores in the Product layer are kept too, except its `node_modules`. If the
+mount or `withLoupe` stays (edited, or a manual step never adopted), it stops
+before the Product layer, so the app still builds. Undo what it lists and run it
+again: the second run works from the files as they are now, so it picks up where
+the first stopped. When it removes the mount or the wrapper, it asks you to
+restart a running `next dev`; `.next` is left alone.
+
+It refuses when a file it would change has uncommitted changes (the lockfile
+counts when the dependencies go), and outside a git repository. If `pnpm install`
+fails, it puts the dependencies back so the next run retries.
 
 ## The dev loader
 
