@@ -25,7 +25,7 @@ export type PropRow = {
   /** The default the metadata knows, for an unset row. `unknown`: a library's runtime default. */
   default?: DefaultValue;
   editable: boolean;
-  /** Present exactly when the row is inspect-only. */
+  /** Why an inspect-only row is; absent on a server-rendered Instance, whose note says why. */
   reason?: RowReason;
   /** The closed set an Editable prop picks from. */
   options?: readonly OptionValue[];
@@ -156,18 +156,18 @@ export function inspect(input: InspectInput): Inspection {
     if (source) row.source = source;
 
     let judged: Pick<PropRow, "editable" | "reason">;
-    // With no metadata on the browser, a value's type proves nothing; on the server the card says why.
+    // With no metadata, a value's type proves nothing (a "ghost" may be one of a closed set).
     if (declared === undefined) {
-      judged = { editable: false, reason: meta === null && !server ? "UNVERIFIED" : reasonOfValue(current[name], name) };
+      judged = { editable: false, reason: meta === null ? "UNVERIFIED" : reasonOfValue(current[name], name) };
     }
     else if (name === "children") judged = childrenRow(declared, writes);
     else judged = declared.editable ? { editable: true } : { editable: false, reason: declared.reason };
 
     if (judged.editable && declared?.editable && declared.kind === "options") row.options = declared.options;
     // Only a browser-rendered Instance is previewable, and only while Overrides are on.
-    if (judged.editable && (server || !input.overridesOn)) {
-      judged = server ? { editable: false, reason: "UNVERIFIED" } : { editable: false, reason: "OVERRIDES OFF" };
-    }
+    if (judged.editable && !input.overridesOn) judged = { editable: false, reason: "OVERRIDES OFF" };
+    // A server-rendered Instance gets one card-level line instead of a reason per row (PER-84).
+    if (server) judged = { editable: false };
     row.editable = judged.editable;
     if (judged.reason) row.reason = judged.reason;
     return row;

@@ -1,21 +1,14 @@
-// Rings over the selected Instance and the ones hovered in the list or under the
-// picker. Positions are re-read every frame while anything is ringed, since menus
-// and dialogs move as they animate.
+// Rings over the selected Instance and the hovered ones. The nodes are found once
+// per change; only their boxes are re-read each frame, as menus and dialogs animate.
 
 import { useEffect, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 
+type Target = { id: string; node: Element; label: string | null; hover: boolean };
 type Ring = { key: string; top: number; left: number; width: number; height: number; label: string | null; hover: boolean };
 
-function ringsFor(debug: LoupeDebug, id: string, hover: boolean): Ring[] {
-  let label: string | null = hover ? null : id.split(" › ").at(-1)?.replace(/\[\d+\].*$/, "") ?? null;
-  return debug.nodes(id).flatMap((node, index) => {
-    const rect = node.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return [];
-    const ring: Ring = { key: `${hover ? "h" : "s"}:${id}:${index}`, top: rect.top, left: rect.left, width: rect.width, height: rect.height, label, hover };
-    label = null;
-    return [ring];
-  });
+function targetsFor(debug: LoupeDebug, id: string, hover: boolean, label: string | null): Target[] {
+  return debug.nodes(id).map((node, index) => ({ id, node, label: index === 0 ? label : null, hover }));
 }
 
 const same = (a: Ring[], b: Ring[]) =>
@@ -29,32 +22,43 @@ export function Highlight({
   debug,
   version,
   selected,
+  selectedLabel,
   hovered,
 }: {
   debug: LoupeDebug;
   version: number;
   selected: string | null;
+  selectedLabel: string | null;
   hovered: readonly string[];
 }) {
   const [rings, setRings] = useState<Ring[]>([]);
+  const hoveredKey = hovered.join("\n");
   useEffect(() => {
-    const ids = [...hovered.filter((id) => id !== selected)];
-    if (selected === null && ids.length === 0) {
+    const targets = [
+      ...(selected === null ? [] : targetsFor(debug, selected, false, selectedLabel)),
+      ...hoveredKey
+        .split("\n")
+        .filter((id) => id !== "" && id !== selected)
+        .flatMap((id) => targetsFor(debug, id, true, null)),
+    ];
+    if (targets.length === 0) {
       setRings([]);
       return;
     }
     let frame = 0;
     const measure = () => {
-      const next = [
-        ...(selected === null ? [] : ringsFor(debug, selected, false)),
-        ...ids.flatMap((id) => ringsFor(debug, id, true)),
-      ];
+      const next = targets.flatMap((target, index): Ring[] => {
+        const rect = target.node.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) return [];
+        const { top, left, width, height } = rect;
+        return [{ key: `${index}:${target.id}`, top, left, width, height, label: target.label, hover: target.hover }];
+      });
       setRings((previous) => (same(previous, next) ? previous : next));
       frame = requestAnimationFrame(measure);
     };
     measure();
     return () => cancelAnimationFrame(frame);
-  }, [debug, selected, hovered, version]);
+  }, [debug, selected, selectedLabel, hoveredKey, version]);
 
   return (
     <>

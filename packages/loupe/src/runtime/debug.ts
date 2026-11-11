@@ -385,7 +385,11 @@ export function createDebug(): LoupeDebug {
 
     nodes(id) {
       const instance = reg.instances.get(id);
-      if (instance) return hostNodesOf(instance.fiber);
+      if (instance) {
+        // The recorded fiber may be the stale one of React's two copies.
+        const nodes = hostNodesOf(instance.fiber).filter((node) => node.isConnected);
+        return nodes.length > 0 ? nodes : hostNodesOf(instance.fiber?.alternate ?? null).filter((node) => node.isConnected);
+      }
       const server = scanFibers().find((scanned) => scanned.entry.id === id);
       return server ? hostNodesOf(server.fiber) : [];
     },

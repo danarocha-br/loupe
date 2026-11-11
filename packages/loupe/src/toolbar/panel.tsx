@@ -81,7 +81,7 @@ function ComponentList({ page, onSelect, onHover }: PanelProps) {
                       Inspect only
                     </span>
                   )}
-                  {!group.supported && group.reason && <div className="muted">{group.reason}</div>}
+                  {!group.supported && group.reason && <span className="muted"> · {group.reason}</span>}
                 </summary>
                 <ul className="list">
                   {group.instances.map((row) => (
@@ -260,7 +260,7 @@ function Footer({ page, debug }: PanelProps) {
         onClick={() => {
           // `discard` takes a record's target, so it also drops a record whose
           // Instance isn't mounted, where `reset(id)` throws (PER-128).
-          for (const record of page.records) debug.discard(record.target);
+          for (const record of debug.records()) debug.discard(record.target);
         }}
       >
         Reset all

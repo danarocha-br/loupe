@@ -4,7 +4,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { createDebug, type InstanceRow, type LoupeDebug, type RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { onRegistryChange, registry, type Status } from "../runtime/registry.js";
+import { currentRoute, onRegistryChange, registry, type Status } from "../runtime/registry.js";
+
+/** Components seen on the current route, for "Appears on interaction". */
+export type SeenComponents = { route: string; components: Set<string> };
 
 export type ComponentGroup = {
   component: string;
@@ -63,14 +66,18 @@ export function useDebug(): LoupeDebug {
 }
 
 /** Every component on the page, grouped, with the Coverage badge each one gets. */
-export function snapshot(debug: LoupeDebug, seen: Set<string>): PageSnapshot {
+export function snapshot(debug: LoupeDebug, seen: SeenComponents): PageSnapshot {
+  if (seen.route !== currentRoute()) {
+    seen.route = currentRoute();
+    seen.components.clear();
+  }
   const rows = debug.list();
   const byComponent = new Map<string, InstanceRow[]>();
   for (const row of rows) {
     const list = byComponent.get(row.component) ?? [];
     list.push(row);
     byComponent.set(row.component, list);
-    seen.add(row.component);
+    seen.components.add(row.component);
   }
   const status = registry().status;
   const groups: ComponentGroup[] = [...byComponent.entries()]
@@ -96,7 +103,7 @@ export function snapshot(debug: LoupeDebug, seen: Set<string>): PageSnapshot {
   return {
     status,
     groups,
-    interaction: [...seen].filter((component) => !byComponent.has(component)).sort(),
+    interaction: [...seen.components].filter((component) => !byComponent.has(component)).sort(),
     records,
     overrideCount: records.reduce((sum, record) => sum + Object.keys(record.values).length, 0),
   };

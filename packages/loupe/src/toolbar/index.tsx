@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import { Highlight } from "./highlight.js";
 import { Panel } from "./panel.js";
 import { usePicker } from "./picker.js";
-import { snapshot, useDebug, usePageVersion } from "./page.js";
+import { type SeenComponents, safeInspect, snapshot, useDebug, usePageVersion } from "./page.js";
 import { CSS, HOST_ATTRIBUTE } from "./styles.js";
 
 export default function Toolbar() {
@@ -37,18 +37,8 @@ function useShadowRoot(): ShadowRoot | null {
 }
 
 function ToolbarBody({ host }: { host: Element }) {
-  const debug = useDebug();
-  const version = usePageVersion(host);
-  const seen = useRef(new Set<string>()).current;
-  const page = useMemo(() => snapshot(debug, seen), [debug, seen, version]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string[]>([]);
   const [hidden, setHidden] = useState(false);
-  const picker = usePicker(debug, host, (id) => {
-    setSelected(id);
-    setHovered([]);
-  });
-
   if (hidden) {
     return (
       <div className="dock">
@@ -58,24 +48,51 @@ function ToolbarBody({ host }: { host: Element }) {
       </div>
     );
   }
+  return <ToolbarOpen host={host} selected={selected} onSelect={setSelected} onHide={() => setHidden(true)} />;
+}
 
-  const highlighted = picker.picking ? (picker.hovered ? [picker.hovered] : []) : hovered;
+/** Everything that watches the page, mounted only while the panel is open. */
+function ToolbarOpen({
+  host,
+  selected,
+  onSelect,
+  onHide,
+}: {
+  host: Element;
+  selected: string | null;
+  onSelect(id: string | null): void;
+  onHide(): void;
+}) {
+  const debug = useDebug();
+  const version = usePageVersion(host);
+  const seen = useRef<SeenComponents>({ route: "", components: new Set() }).current;
+  const page = useMemo(() => snapshot(debug, seen), [debug, seen, version]);
+  const [hovered, setHovered] = useState<string[]>([]);
+  const picker = usePicker(debug, host, (id) => {
+    onSelect(id);
+    setHovered([]);
+  });
+  const selectedLabel = selected === null ? null : (safeInspect(debug, selected)?.component ?? null);
+
   return (
     <>
-      <Highlight debug={debug} version={version} selected={selected} hovered={highlighted} />
+      <Highlight
+        debug={debug}
+        version={version}
+        selected={selected}
+        selectedLabel={selectedLabel}
+        hovered={picker.picking ? (picker.hovered ? [picker.hovered] : []) : hovered}
+      />
       <Panel
         debug={debug}
         version={version}
         page={page}
         selected={selected}
-        onSelect={setSelected}
+        onSelect={onSelect}
         onHover={setHovered}
         picking={picker.picking}
         onPick={picker.toggle}
-        onHide={() => {
-          picker.stop();
-          setHidden(true);
-        }}
+        onHide={onHide}
       />
     </>
   );

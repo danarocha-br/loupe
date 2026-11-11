@@ -98,7 +98,8 @@ describe("inspect", () => {
     );
     expect(result.note).toBe(SERVER_NOTE);
     expect(result.coverage).toEqual({ editable: 0, inspectOnly: 2 });
-    expect(result.rows.map((row) => row.reason)).toEqual(["OPEN TEXT", "FUNCTION"]);
+    // No per-row guess: "pro" may be one of a closed set we can't see from here.
+    expect(result.rows.map((row) => row.reason)).toEqual([undefined, undefined]);
   });
 
   it("flags a spreading call site and an Adapter with no metadata", () => {

@@ -133,7 +133,9 @@ describe("the Toolbar", () => {
     expect(shadow().querySelector("[data-prop=render]")?.textContent).toContain("STRUCTURAL");
     // Injected by "the library": one collapsed line, not a row.
     expect(shadow().querySelector("[data-prop=aria-expanded]")).toBeNull();
-    expect(shadow().querySelector("details summary")?.textContent).toContain("set by the library");
+    const injected = [...shadow().querySelectorAll("details")].at(-1) as HTMLDetailsElement;
+    expect(injected.querySelector("summary")?.textContent).toBe("1 set by the library");
+    expect(injected.open).toBe(false);
   });
 
   it("picks the right one of four repeated row Instances by clicking the page, without the page reacting", async () => {
@@ -155,6 +157,24 @@ describe("the Toolbar", () => {
     // Pick is off again: the page's own clicks go through.
     act(() => pageButton("dani").click());
     expect(clicked).toEqual(["dani"]);
+  });
+
+  it("lets Esc and Hide end Pick, after which the page's clicks go through", async () => {
+    const clicked: string[] = [];
+    await mount((member) => clicked.push(member));
+    const button = (text: string) => [...shadow().querySelectorAll("button")].find((b) => b.textContent === text) as HTMLButtonElement;
+    await clickInPanel(button("Pick"));
+    act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+    await settle();
+    expect(button("Pick").getAttribute("aria-pressed")).toBe("false");
+    act(() => pageButton("ana").click());
+    expect(clicked).toEqual(["ana"]);
+
+    await clickInPanel(button("Pick"));
+    await clickInPanel(button("Hide"));
+    act(() => pageButton("bia").click());
+    expect(clicked).toEqual(["ana", "bia"]);
+    expect(shadow().querySelector(".panel")).toBeNull();
   });
 
   it("keeps showing a selected Instance's place while its menu is closed", async () => {

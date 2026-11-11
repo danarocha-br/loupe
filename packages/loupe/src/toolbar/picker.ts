@@ -20,7 +20,9 @@ export function usePicker(debug: LoupeDebug, host: Element, onPicked: (id: strin
   const [picking, setPicking] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const picked = useRef(onPicked);
-  picked.current = onPicked;
+  useEffect(() => {
+    picked.current = onPicked;
+  });
 
   const stop = useCallback(() => {
     setPicking(false);
@@ -34,10 +36,17 @@ export function usePicker(debug: LoupeDebug, host: Element, onPicked: (id: strin
       const target = event.composedPath()[0];
       return target instanceof Element ? target : null;
     };
+    // `pick` can walk the whole fiber tree, so at most once a frame.
+    let frame = 0;
+    let latest: Element | null = null;
     const onMove = (event: PointerEvent) => {
       if (fromToolbar(event)) return;
-      const target = targetOf(event);
-      setHovered(target ? debug.pick(target) : null);
+      latest = targetOf(event);
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setHovered(latest ? debug.pick(latest) : null);
+      });
     };
     const swallow = (event: Event) => {
       if (fromToolbar(event)) return;
@@ -61,6 +70,7 @@ export function usePicker(debug: LoupeDebug, host: Element, onPicked: (id: strin
     const cursor = document.documentElement.style.cursor;
     document.documentElement.style.cursor = "crosshair";
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("pointermove", onMove, true);
       for (const type of SWALLOWED) window.removeEventListener(type, swallow, true);
       window.removeEventListener("keydown", onKey, true);
