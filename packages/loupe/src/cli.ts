@@ -1,4 +1,5 @@
 import { checkCompatibility } from "./compat/check.js";
+import { generateUsage, parseGenerateArgs, runGenerate } from "./generate/command.js";
 import { metaUsage, parseMetaArgs, runMeta, summarise } from "./meta/command.js";
 import { version } from "./version.js";
 
@@ -16,6 +17,7 @@ const usage = `Usage: loupe <command>
 
 Commands:
   check [--app <dir>]  Check this repo against Loupe's compatibility statement
+  generate [--check]   Write Adapters, meta/ and adapt-list.json into the Product layer
   meta                 Read prop metadata from the TypeScript checker and cva (headless)
 
 Options:
@@ -63,6 +65,27 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
   }
 
   if (first === "check") return check(rest, io);
+
+  if (first === "generate") {
+    const options = parseGenerateArgs(rest);
+    if (typeof options === "string") {
+      io.err(options);
+      io.err(generateUsage);
+      return 1;
+    }
+    if (options.help) {
+      io.out(generateUsage);
+      return 0;
+    }
+    try {
+      const result = runGenerate(options, io.cwd ?? process.cwd());
+      for (const line of result.lines) (result.ok ? io.out : io.err)(line);
+      return result.ok ? 0 : 1;
+    } catch (error) {
+      io.err(error instanceof Error ? error.message : String(error));
+      return 1;
+    }
+  }
 
   if (first === "meta") {
     const options = parseMetaArgs(rest);

@@ -23,6 +23,31 @@ pnpm exec loupe check            # asks which app when there are several
 pnpm exec loupe check --app apps/app
 ```
 
+## Generating Adapters
+
+`generate` reads every component of the design system's `components/` and of the
+app with the TypeScript checker, and writes the Product layer's generated files:
+
+- `adapters/ds/…` and `adapters/app/…`: a thin `'use client'` Adapter for each
+  module with at least one component that can take an Override, mirroring the
+  source path;
+- `meta/ds/…` and `meta/app/…`: prop metadata for every component module,
+  Adapter or not;
+- `adapt-list.json`: what the dev loader reads.
+
+```bash
+pnpm exec loupe generate --out packages/loupe \
+  --design-system packages/design-system --app apps/app --specifier @repo/loupe
+pnpm exec loupe generate          # later runs read the roots back from adapt-list.json
+pnpm exec loupe generate --check  # for CI: writes nothing, exits 1 when out of date
+```
+
+It writes only files whose bytes differ, deletes generated files that left the
+set, and prints a Coverage summary (Adapters, Inspect only, skipped by shape).
+Every generated file carries a header with a hash of its content. If one was
+edited by hand, `generate` and `--check` write nothing, name the file and exit 1.
+There is no `--force`: delete the file (or `git restore` it) and rerun.
+
 ## The dev loader
 
 Wrap the app's `next.config.ts`. The loader is added for `next dev` only; every

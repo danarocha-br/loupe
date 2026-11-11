@@ -15,12 +15,14 @@ describe("runLoader on the fixture", () => {
       adaptList,
     });
     expect(code).toContain('data-ds-anchor={"fixture/app/app/page.tsx › MembersPage › Button[1]"}');
-    // page.tsx is a server file, so the swap depended on whether button.tsx is client.
+    // page.tsx is a server file, so each swap depended on whether badge.tsx and button.tsx are client.
+    expect(code).toContain('from "@fixture/design-system/components/ui/badge"');
     expect(code).toContain('from "@fixture/design-system/components/ui/button"');
     // MemberRowMenu is swapped too, because its target is a client module.
     expect(code).toContain('from "@/loupe/adapters/app/components/product/member-row-menu"');
     expect(dependencies).toEqual([
       adaptList,
+      path.join(repo, "fixture/design-system/components/ui/badge.tsx"),
       path.join(repo, "fixture/design-system/components/ui/button.tsx"),
       path.join(repo, "fixture/app/components/product/member-row-menu.tsx"),
     ]);

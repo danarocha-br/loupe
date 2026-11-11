@@ -35,3 +35,16 @@ if [ "$status" != "verified" ]; then
   exit 1
 fi
 echo "packed meta reads Button.variant as verified"
+
+# `generate` from the installed tarball, into a throwaway Product layer inside the
+# fixture (it must sit in the repo), then `--check` against what it wrote.
+layer="$root/fixture/app/.loupe-packed"
+trap 'rm -rf "$work" "$layer"' EXIT
+(cd "$root" && "$work/consumer/node_modules/.bin/loupe" generate \
+  --out fixture/app/.loupe-packed \
+  --design-system fixture/design-system \
+  --app fixture/app \
+  --specifier @/.loupe-packed >/dev/null)
+(cd "$root" && "$work/consumer/node_modules/.bin/loupe" generate --check --out fixture/app/.loupe-packed >/dev/null)
+grep -q 'createAdapter("Button", Button$original)' "$layer/adapters/ds/ui/button.tsx"
+echo "packed generate writes the Button Adapter and --check passes"

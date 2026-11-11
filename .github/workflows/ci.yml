@@ -24,6 +24,9 @@ jobs:
       # The fixture's next.config.ts imports @danarocha/loupe/next from dist.
       - name: Build loupe
         run: pnpm --filter @danarocha/loupe build
+      # The fixture's Product layer is generated; a source change without a rerun fails here.
+      - name: Generated files are up to date
+        run: node packages/loupe/dist/bin.js generate --check --out fixture/app/loupe
       - name: Typecheck
         run: pnpm typecheck
       - name: Test

@@ -16,18 +16,25 @@ export type SourceSet = {
 const SOURCE = /\.(ts|tsx)$/;
 const SKIPPED = /\.d\.ts$|\.(test|spec|stories)\.(ts|tsx)$/;
 
-export function collectSources(tsconfig: string, include: readonly string[]): SourceSet {
+/** `exclude`: absolute directories never read, e.g. the Product layer inside an app. */
+export function collectSources(
+  tsconfig: string,
+  include: readonly string[],
+  exclude: readonly string[] = [],
+): SourceSet {
   const tsconfigPath = path.resolve(tsconfig);
   const root = path.dirname(tsconfigPath);
   const relative = (absolute: string) => path.relative(root, absolute).split(path.sep).join("/");
 
+  const excluded = new Set(exclude.map((dir) => path.resolve(dir)));
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) walk(full);
-      else if (SOURCE.test(entry.name) && !SKIPPED.test(entry.name)) files.push(full);
+      if (entry.isDirectory()) {
+        if (!excluded.has(full)) walk(full);
+      } else if (SOURCE.test(entry.name) && !SKIPPED.test(entry.name)) files.push(full);
     }
   };
   for (const dir of include.length > 0 ? include : ["."]) {
