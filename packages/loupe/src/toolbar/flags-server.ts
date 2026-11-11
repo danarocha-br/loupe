@@ -26,7 +26,7 @@ export type OverridesResult = { ok: true; overrides: FlagOverrides } | { ok: fal
 const COOKIE = "vercel-flag-overrides";
 /** The Flags SDK's discovery endpoint, the one the Flags Explorer reads. */
 const ENDPOINT = "/.well-known/vercel/flags";
-/** Names Loupe's discovery request in the app's logs; `loupe doctor --build` also looks for it. */
+/** A string only this module holds: `loupe doctor --build` looks for it to prove the actions stayed out. */
 const MARKER = "loupe-flag-preview";
 
 const NO_SECRET =
@@ -39,10 +39,11 @@ export async function readFlags(): Promise<FlagsResult> {
   try {
     const { cookies, headers } = await import("next/headers");
     const incoming = await headers();
-    const host = incoming.get("host");
-    if (!host) return { ok: false, reason: "The request has no Host header, so the discovery endpoint can't be reached." };
-    const protocol = incoming.get("x-forwarded-proto") ?? "http";
-    const response = await fetch(`${protocol}://${host}${ENDPOINT}`, {
+    const port = portOf(incoming);
+    if (!port) return { ok: false, reason: "The request names no port, so the discovery endpoint can't be reached." };
+    // Loopback, never the Host header: a page that rebinds its own name to this
+    // server would otherwise receive the access proof and the session cookie.
+    const response = await fetch(`http://127.0.0.1:${port}${ENDPOINT}`, {
       headers: {
         authorization: `Bearer ${await accessProof(secret)}`,
         // The signed-in session goes along, so an auth proxy treats it like the page.
@@ -86,6 +87,18 @@ export async function writeFlagOverrides(set: FlagOverrides, clear: string[] | "
     return { ok: true, overrides: next };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** The port the dev server took this request on, from the Host header. */
+function portOf(incoming: Headers): string | null {
+  const host = incoming.get("host");
+  if (!host) return null;
+  try {
+    const url = new URL(`http://${host}`);
+    return url.port || "80";
+  } catch {
+    return null;
   }
 }
 

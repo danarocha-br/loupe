@@ -22,6 +22,11 @@ describe("flag tokens", () => {
     await expect(decryptOverrides(token, secret)).resolves.toEqual({ showBetaFeature: false });
   });
 
+  it("reads an override cookie whose purpose is a list, as the SDK does", async () => {
+    const token = await encryptJwe({ o: { a: 1 }, pur: ["overrides", "other"] }, secret, 60);
+    await expect(decryptOverrides(token, secret)).resolves.toEqual({ a: 1 });
+  });
+
   it("writes an access proof the discovery endpoint accepts", async () => {
     await expect(verifyAccess(`Bearer ${await accessProof(secret)}`, secret)).resolves.toBe(true);
     await expect(verifyAccess(`Bearer ${await accessProof(other)}`, secret)).resolves.toBe(false);

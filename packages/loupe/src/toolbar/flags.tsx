@@ -39,8 +39,12 @@ export function onFlagsChange(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Every override the cookie holds, declared by the app or not, sorted by key. */
-export function previewedFlags(): PreviewedFlag[] {
+/**
+ * The Proposal's record: every override the cookie holds, declared by the app or
+ * not, sorted by key. Read fresh, so it doesn't depend on the card having mounted.
+ */
+export async function previewedFlags(): Promise<PreviewedFlag[]> {
+  await loadFlags();
   if (view.status !== "ready") return [];
   const { definitions, overrides } = view;
   return Object.keys(overrides)
@@ -92,7 +96,8 @@ export function FlagsCard() {
   const current = useSyncExternalStore(onFlagsChange, flagsView);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    void loadFlags();
+    // Once per page load, not on every return from the inspector.
+    if (flagsView().status !== "ready") void loadFlags();
   }, []);
 
   const run = (set: FlagOverrides, clear: string[] | "all") => {

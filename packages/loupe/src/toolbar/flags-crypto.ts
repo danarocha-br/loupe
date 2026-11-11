@@ -16,7 +16,9 @@ export function encryptOverrides(overrides: Claims, secret: string, ttlSeconds =
 
 export async function decryptOverrides(token: string | undefined, secret: string): Promise<Claims | undefined> {
   const claims = token ? await decryptJwe(token, secret) : undefined;
-  if (!claims || claims.pur !== "overrides" || typeof claims.o !== "object" || claims.o === null) return undefined;
+  // The SDK accepts a purpose list as well as a single purpose.
+  const purposes = Array.isArray(claims?.pur) ? claims.pur : [claims?.pur];
+  if (!claims || !purposes.includes("overrides") || typeof claims.o !== "object" || claims.o === null) return undefined;
   return claims.o as Claims;
 }
 

@@ -10,7 +10,7 @@ import { encryptOverrides } from "./flags-crypto.js";
 
 // The Server Actions' only Next dependency: a cookie jar and the request's headers.
 const jar = new Map<string, string>();
-const requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
+let requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
@@ -36,6 +36,7 @@ beforeEach(() => {
   jar.clear();
   endpoint = { status: 200, body: DEFINITIONS };
   fetchMock.mockClear();
+  requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
   vi.stubGlobal("fetch", fetchMock);
   vi.stubEnv("FLAGS_SECRET", secret);
 });
@@ -63,10 +64,17 @@ describe("readFlags", () => {
       overrides: { showBetaFeature: true },
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:3131/.well-known/vercel/flags");
+    expect(url).toBe("http://127.0.0.1:3131/.well-known/vercel/flags");
     const sent = new Headers(init.headers);
     expect(sent.get("authorization")).toMatch(/^Bearer [\w-]+\.\.[\w-]+\.[\w-]+\.[\w-]+$/);
     expect(sent.get("cookie")).toBe("__session=abc");
+  });
+
+  it("sends the proof to the loopback port, never to the host the request names", async () => {
+    const { readFlags } = await import("./flags-server.js");
+    requestHeaders = new Headers({ host: "rebound.example:3131", "x-forwarded-proto": "https" });
+    await readFlags();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://127.0.0.1:3131/.well-known/vercel/flags");
   });
 
   it("says why when there is no secret, no endpoint, or the endpoint refuses the proof", async () => {
@@ -103,6 +111,8 @@ describe("the Feature flags card", () => {
   let root: Root;
 
   beforeEach(() => {
+    // Each test is a fresh page load: the card's store is module state.
+    vi.resetModules();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -128,7 +138,7 @@ describe("the Feature flags card", () => {
     expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("The app decides");
     // Declared without options: offered as on and off.
     expect(pill("showBetaFeature", "On")).toBeTruthy();
-    expect(previewedFlags()).toEqual([]);
+    expect(await previewedFlags()).toEqual([]);
 
     act(() => pill("showBetaFeature", "On").click());
     await settle();
@@ -138,20 +148,20 @@ describe("the Feature flags card", () => {
 
     act(() => pill("plan", "Pro").click());
     await settle();
-    expect(previewedFlags()).toEqual([
+    expect(await previewedFlags()).toEqual([
       { key: "plan", value: "pro", label: "Pro", description: "Pricing plan" },
       { key: "showBetaFeature", value: true },
     ]);
 
     act(() => (container.querySelector('[data-flag="plan"] .reset') as HTMLButtonElement).click());
     await settle();
-    expect(previewedFlags()).toEqual([{ key: "showBetaFeature", value: true }]);
+    expect(await previewedFlags()).toEqual([{ key: "showBetaFeature", value: true }]);
     expect(container.querySelector('[data-flag="plan"]')?.textContent).toContain("The app decides");
 
     act(() => button("Clear flag previews").click());
     await settle();
     expect(jar.has(COOKIE)).toBe(false);
-    expect(previewedFlags()).toEqual([]);
+    expect(await previewedFlags()).toEqual([]);
     expect(button("Clear flag previews").disabled).toBe(true);
   });
 
@@ -163,7 +173,13 @@ describe("the Feature flags card", () => {
 
     expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector('[data-flag="retired"]')?.textContent).toContain("Not declared");
-    expect(previewedFlags().map((flag) => flag.key)).toEqual(["retired", "showBetaFeature"]);
+    expect((await previewedFlags()).map((flag) => flag.key)).toEqual(["retired", "showBetaFeature"]);
+  });
+
+  it("gives the Proposal the cookie's previews without the card ever mounting", async () => {
+    jar.set(COOKIE, await encryptOverrides({ plan: "pro" }, secret));
+    const { previewedFlags } = await import("./flags.js");
+    expect(await previewedFlags()).toEqual([{ key: "plan", value: "pro", label: "Pro", description: "Pricing plan" }]);
   });
 
   it("explains why previews are unavailable", async () => {
