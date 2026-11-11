@@ -18,6 +18,7 @@ import { type Fiber, fiberOfNode, keyPathOf, rootFibers, walkFibers } from "./fi
 import {
   ANCHOR_PROP,
   currentRoute,
+  identityOf,
   instanceId,
   type MountedInstance,
   registry,
@@ -99,7 +100,7 @@ export function createDebug(): LoupeDebug {
       const sources = Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const]));
       return { id: instance.id, current, overrides: {}, rendered: current, sources };
     }
-    const resolved = reg.store.resolve({ ...keyOf(instance), current });
+    const resolved = reg.store.resolve({ ...identityOf(instance), current });
     return {
       id: instance.id,
       current,
@@ -108,13 +109,6 @@ export function createDebug(): LoupeDebug {
       sources: resolved.sources,
     };
   };
-
-  const keyOf = (instance: MountedInstance) => ({
-    id: instance.id,
-    anchor: instance.anchor,
-    component: instance.component,
-    route: currentRoute(),
-  });
 
   /** The record an Override on this Instance at this scope goes into. */
   const targetOf = (instance: MountedInstance, scope: Scope): ScopeTarget => {

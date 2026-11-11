@@ -1,15 +1,12 @@
-// The Override store: plain records, no React. Every scope rule lives here so it
-// can be tested without rendering anything (PER-90, Group Overrides).
+// The Override store: plain records, no React, so every scope rule is testable
+// without rendering.
 //
-// There is one record per scope target: an Instance, a call-site group (every
-// Instance rendered from one call site, on any route), or a page (every Instance
-// of a component on one route). Per prop, the narrowest scope wins: Instance >
-// group > page. A group or page record has its own exclusion list, keyed by
-// Instance id; an excluded Instance falls through to the next scope.
-//
-// Records are keyed by ids, not by mounted components, so they and their
-// exclusions outlive an unmount or a remount (Fast Refresh, `router.refresh()`),
-// and an Instance that mounts later joins its group and page without a word.
+// One record per scope target: an Instance, a call-site group (one call site, on
+// any route) or a page (one component on one route). Per prop the narrowest scope
+// wins: Instance > group > page. A group or page record has its own exclusions,
+// by Instance id; an excluded Instance falls through to the next scope. Records
+// are keyed by ids, not mounted components, so they outlive a remount and reach
+// Instances that mount later.
 
 export type Props = Record<string, unknown>;
 
@@ -26,13 +23,17 @@ export type ScopeTarget =
   /** `route` is the page's pathname. */
   | { scope: "page"; route: string; component: string };
 
-/** What the store needs to know about an Instance to resolve it. */
-export type InstanceKey = {
+/** Which records can reach an Instance. */
+export type InstanceIdentity = {
   id: string;
   anchor: string;
   component: string;
   /** The pathname of the page the Instance renders on. */
   route: string;
+};
+
+/** What the store needs to resolve an Instance. */
+export type InstanceKey = InstanceIdentity & {
   /** The props the app passes right now. */
   current: Props;
 };
@@ -53,7 +54,8 @@ export type OverrideRecord = {
   excluded: string[];
 };
 
-export type StoreListener = (changed: readonly ScopeTarget[]) => void;
+/** Called with the target a change was made to; `reaches` says which Instances it affects. */
+export type StoreListener = (changed: ScopeTarget) => void;
 
 export type OverrideStore = {
   /** Overrides one prop for a scope target. `undefined` is a real Override: the prop is unset. */
@@ -70,17 +72,17 @@ export type OverrideStore = {
   /** Props plus the scope each value came from. */
   resolve(instance: InstanceKey): Resolved;
   /** Whether any Override reaches this Instance. */
-  applies(instance: Omit<InstanceKey, "current">): boolean;
+  applies(instance: InstanceIdentity): boolean;
   /** Instance records first, then group, then page. */
   records(): OverrideRecord[];
   subscribe(listener: StoreListener): () => void;
 };
 
-/** Narrowest first: the order `resolve` looks for a value in. */
+/** Narrowest first, the order `records()` lists them in (`targetsOf` keeps the same order). */
 const PRECEDENCE: readonly Scope[] = ["instance", "group", "page"];
 
-/** Whether a change to `target` can change what this Instance renders. */
-export function covers(target: ScopeTarget, instance: Omit<InstanceKey, "current">): boolean {
+/** Whether a record for `target` reaches this Instance, exclusions aside. */
+export function reaches(target: ScopeTarget, instance: InstanceIdentity): boolean {
   switch (target.scope) {
     case "instance":
       return target.id === instance.id;
@@ -91,6 +93,7 @@ export function covers(target: ScopeTarget, instance: Omit<InstanceKey, "current
   }
 }
 
+/** The record's key within its scope. */
 function keyOf(target: ScopeTarget): string {
   switch (target.scope) {
     case "instance":
@@ -103,7 +106,7 @@ function keyOf(target: ScopeTarget): string {
 }
 
 /** The three targets that can reach an Instance, narrowest first. */
-function targetsOf(instance: Omit<InstanceKey, "current">): ScopeTarget[] {
+function targetsOf(instance: InstanceIdentity): ScopeTarget[] {
   return [
     { scope: "instance", id: instance.id },
     { scope: "group", anchor: instance.anchor },
@@ -122,7 +125,7 @@ export function createOverrideStore(): OverrideStore {
   const listeners = new Set<StoreListener>();
 
   const emit = (changed: ScopeTarget) => {
-    for (const listener of listeners) listener([changed]);
+    for (const listener of listeners) listener(changed);
   };
 
   const find = (target: ScopeTarget): Entry | undefined => scopes[target.scope].get(keyOf(target));
@@ -143,7 +146,7 @@ export function createOverrideStore(): OverrideStore {
   };
 
   /** The records that reach this Instance, narrowest first. */
-  const reaching = (instance: Omit<InstanceKey, "current">): Entry[] =>
+  const reaching = (instance: InstanceIdentity): Entry[] =>
     targetsOf(instance)
       .map(find)
       .filter((entry): entry is Entry => entry !== undefined && !entry.excluded.has(instance.id));

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { covers, createOverrideStore, type InstanceKey, type ScopeTarget } from "./store.js";
+import { createOverrideStore, reaches, type InstanceKey, type ScopeTarget } from "./store.js";
 
 const TRIGGER = "app/menu.tsx › MemberRowMenu › Button[1]";
 const OTHER_SITE = "app/invites.tsx › InvitationRowMenu › Button[1]";
@@ -336,12 +336,12 @@ describe("Override store: change notifications", () => {
     store.reset(instance(ROW_2));
     store.reset(instance(ROW_1), "size");
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(listener).toHaveBeenLastCalledWith([instance(ROW_1)]);
+    expect(listener).toHaveBeenLastCalledWith(instance(ROW_1));
 
     store.set(group(), "variant", "outline");
-    expect(listener).toHaveBeenLastCalledWith([group()]);
+    expect(listener).toHaveBeenLastCalledWith(group());
     store.set(page(), "size", "sm");
-    expect(listener).toHaveBeenLastCalledWith([page()]);
+    expect(listener).toHaveBeenLastCalledWith(page());
     expect(listener).toHaveBeenCalledTimes(3);
 
     unsubscribe();
@@ -358,7 +358,7 @@ describe("Override store: change notifications", () => {
     store.exclude(group(), ROW_1);
     store.exclude(group(), ROW_1);
     expect(listener).toHaveBeenCalledOnce();
-    expect(listener).toHaveBeenLastCalledWith([instance(ROW_1)]);
+    expect(listener).toHaveBeenLastCalledWith(instance(ROW_1));
 
     store.include(group(), ROW_1);
     store.include(group(), ROW_1);
@@ -372,7 +372,7 @@ describe("Override store: change notifications", () => {
     const listener = vi.fn();
     store.subscribe(listener);
     store.reset(group());
-    expect(listener).toHaveBeenCalledWith([group()]);
+    expect(listener).toHaveBeenCalledWith(group());
   });
 
   it("notifies when an Override changes from a value to undefined", () => {
@@ -384,13 +384,13 @@ describe("Override store: change notifications", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it("covers() says which Instances a change reaches", () => {
-    expect(covers(instance(ROW_1), row(1))).toBe(true);
-    expect(covers(instance(ROW_1), row(2))).toBe(false);
-    expect(covers(group(), row(2))).toBe(true);
-    expect(covers(group(), invite())).toBe(false);
-    expect(covers(page(), invite())).toBe(true);
-    expect(covers(page("Badge"), invite())).toBe(false);
-    expect(covers(page("Button", "/other"), invite())).toBe(false);
+  it("reaches() says which Instances a record reaches", () => {
+    expect(reaches(instance(ROW_1), row(1))).toBe(true);
+    expect(reaches(instance(ROW_1), row(2))).toBe(false);
+    expect(reaches(group(), row(2))).toBe(true);
+    expect(reaches(group(), invite())).toBe(false);
+    expect(reaches(page(), invite())).toBe(true);
+    expect(reaches(page("Badge"), invite())).toBe(false);
+    expect(reaches(page("Button", "/other"), invite())).toBe(false);
   });
 });

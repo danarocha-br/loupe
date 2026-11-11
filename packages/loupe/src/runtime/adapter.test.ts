@@ -276,7 +276,7 @@ describe("createAdapter", () => {
       expect(variants()).toEqual(["outline", "outline", "ghost"]);
     });
 
-    it("a page Override stops reaching an Instance that outlives a navigation to another route", () => {
+    it("a page Override stops reaching an Instance that outlives a navigation to another route", async () => {
       history.replaceState(null, "", "/members");
       render(rows(["m1"]));
       act(() => {
@@ -284,9 +284,30 @@ describe("createAdapter", () => {
       });
       expect(variants()).toEqual(["secondary", "secondary"]);
       try {
-        act(() => history.pushState(null, "", "/billing"));
+        await act(async () => history.pushState(null, "", "/billing"));
         expect(variants()).toEqual(["ghost", "ghost"]);
-        act(() => history.back());
+      } finally {
+        history.replaceState(null, "", "/");
+      }
+    });
+
+    it("a navigation from an insertion effect, as Next makes one, schedules no update inside it", async () => {
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+      history.replaceState(null, "", "/members");
+      function Navigate({ to }: { to: string }) {
+        React.useInsertionEffect(() => {
+          if (location.pathname !== to) history.pushState(null, "", to);
+        });
+        return null;
+      }
+      try {
+        render(rows(["m1"], h(Navigate, { to: "/members" })));
+        act(() => {
+          loupe.set(anchor(2), "variant", "secondary", "page");
+        });
+        await act(async () => root.render(rows(["m1"], h(Navigate, { to: "/billing" }))));
+        expect(variants()).toEqual(["ghost", "ghost"]);
+        expect(error).not.toHaveBeenCalledWith(expect.stringContaining("useInsertionEffect must not schedule updates"));
       } finally {
         history.replaceState(null, "", "/");
       }
