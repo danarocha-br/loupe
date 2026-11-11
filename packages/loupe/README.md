@@ -23,6 +23,28 @@ pnpm exec loupe check            # asks which app when there are several
 pnpm exec loupe check --app apps/app
 ```
 
+## Checking an install
+
+`doctor` checks an install against its ledger and writes nothing. It reruns the
+compatibility check, compares the Loupe version in the app's `package.json`, the
+ledger, `node_modules` and the CLI, checks each touch point and Product layer
+file against its recorded hash, lists generated files that are older than their
+sources, and checks that the Product layer resolves what it imports. A touch
+point or generated file changed by hand is listed as drift and left as it is.
+
+```bash
+pnpm exec loupe doctor           # exits 1 when something needs attention
+pnpm exec loupe doctor --build   # also runs next build under Node and scans .next
+```
+
+`--build` runs the app's own `next build` under Node (not the app's build
+script, which may run Bun) and fails if `.next` holds `data-ds-anchor`,
+`__loupe`, Loupe's `loader.cjs`, `@repo/loupe` or `@danarocha/loupe`, or if
+`required-server-files.json` names the loader. It skips `.next/cache`,
+`.next/dev` and source maps (they hold the app's own source, the layout's
+import of the mount included), and writes the app's `.next` as any build does (Next may also
+rewrite `next-env.d.ts`).
+
 ## Generating Adapters
 
 `generate` reads every component of the design system's `components/` and of the

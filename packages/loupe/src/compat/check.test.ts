@@ -387,3 +387,62 @@ describe("version recheck for generate", () => {
     expect(out.join("\n")).toContain("Nothing was written.");
   });
 });
+
+describe("report mode for doctor", () => {
+  const never = async (): Promise<string> => {
+    throw new Error("asked");
+  };
+  const twoDesignSystems = {
+    "apps/web/package.json": {
+      name: "web",
+      scripts: { dev: "next dev" },
+      dependencies: { next: "16.3.6", "@repo/design-system": "workspace:*", "@repo/ui": "workspace:*" },
+    },
+    "packages/ui/package.json": { name: "@repo/ui", dependencies: { "@base-ui/react": "^1.6.0" } },
+    "packages/ui/components.json": { aliases: { ui: "@repo/ui/components" } },
+    "packages/ui/components/card.tsx": "export function Card() {}\n",
+  };
+
+  it("grades every item, takes the named design system and never asks", async () => {
+    const root = makeRepo(twoDesignSystems);
+    const out: string[] = [];
+    const result = await checkCompatibility({
+      cwd: root,
+      app: "apps/web",
+      designSystem: "packages/ui",
+      mode: "report",
+      nodeVersion: "22.22.2",
+      io: { out: (l) => out.push(l), err: (l) => out.push(l), ask: never },
+    });
+    expect(result.ok).toBe(true);
+    expect(out.join("\n")).toMatch(/✓ Design system @repo\/ui \(shadcn on Base UI\)/);
+    expect(out.join("\n")).toMatch(/✓ pnpm workspace/);
+  });
+
+  it("refuses rather than asks without a design system named, and writes nothing on an untested item", async () => {
+    const out: string[] = [];
+    const several = await checkCompatibility({
+      cwd: makeRepo(twoDesignSystems),
+      app: "apps/web",
+      mode: "report",
+      nodeVersion: "22.22.2",
+      io: { out: (l) => out.push(l), err: (l) => out.push(l), ask: never },
+    });
+    expect(several.ok).toBe(false);
+    expect(out.join("\n")).toContain("Several design systems; pass the one to check.");
+    expect(out.join("\n")).not.toContain("Nothing was written.");
+
+    const root = makeRepo({ "apps/web/.babelrc": "{}\n" });
+    const before = snapshot(root);
+    const untested = await checkCompatibility({
+      cwd: root,
+      app: "apps/web",
+      mode: "report",
+      nodeVersion: "22.22.2",
+      io: { out: (l) => out.push(l), err: (l) => out.push(l), ask: never },
+    });
+    expect(untested.ok).toBe(false);
+    expect(out.join("\n")).toContain("1 not accepted yet");
+    expect(snapshot(root)).toEqual(before);
+  });
+});
