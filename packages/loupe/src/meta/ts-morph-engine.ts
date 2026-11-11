@@ -54,9 +54,13 @@ class ModuleReader {
     const exported = sf.getExportedDeclarations();
 
     for (const name of [...exported.keys()].sort()) {
-      const decl = exported.get(name)?.[0];
+      const decls = exported.get(name) ?? [];
+      const isType = (d: tsm.Node) => Node.isInterfaceDeclaration(d) || Node.isTypeAliasDeclaration(d);
+      // A name that is both a type and a value (`const X` plus `type X`) is a value:
+      // an Adapter re-exports it with `export { X }`, which carries both meanings.
+      const decl = decls.find((d) => !isType(d)) ?? decls[0];
       if (!decl) continue;
-      if (Node.isInterfaceDeclaration(decl) || Node.isTypeAliasDeclaration(decl)) {
+      if (isType(decl)) {
         exports[name] = { kind: "type" };
         continue;
       }

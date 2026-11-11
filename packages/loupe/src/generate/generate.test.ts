@@ -129,6 +129,10 @@ describe("what gets an Adapter", () => {
     expect(outcome("AliasedMemo")).toEqual({ outcome: "skipped-by-shape", reason: "alias" });
     expect(result.coverage.filter((c) => c.source === "edge/components/nested/reexport.tsx" && c.name === "Alert")[0]?.coverage)
       .toEqual({ outcome: "skipped-by-shape", reason: "re-export" });
+    // A name that is a value and a type is re-exported as a value, which keeps both.
+    const reexport = modules.find((m) => m.source === "components/nested/reexport.tsx");
+    expect(reexport?.exports.Size).toEqual({ kind: "other" });
+    expect(adapterModule(reexport as ModuleMeta, ["Plain"], "x")).toContain(`export { Alert, Size } from "x";`);
     // No package.json: the Adapter imports its original by relative path.
     expect(result.files.get("adapters/ds/shapes.tsx")).toContain('from "../../../edge/components/shapes"');
   });
