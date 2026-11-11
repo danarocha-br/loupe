@@ -1,8 +1,9 @@
 "use client";
 
-// Stand-in Product layer for the fixture. A pass-through until the runtime
-// (PER-120) gives Adapters `createAdapter`; it exists so the dev loader's import
-// swap has a real module to point at.
-import { Button, buttonVariants } from "@fixture/design-system/components/ui/button";
+// Hand-written stand-in for what `generate` (PER-121) will emit: the module's
+// exports, with the adapted ones replaced.
+import { createAdapter } from "@danarocha/loupe/runtime";
+import { Button as Original, buttonVariants } from "@fixture/design-system/components/ui/button";
 
-export { Button, buttonVariants };
+export const Button = createAdapter("Button", Original);
+export { buttonVariants };

@@ -1,0 +1,136 @@
+// `createAdapter(name, Original)`: the dev-only wrapper the loader swaps in at a
+// call site. It renders Original with the app's props, plus any Overrides, and
+// registers the Instance it renders. Everything else passes straight through:
+// `ref` (a plain prop in React 19), `children`, context, and the element's key.
+
+import {
+  createElement,
+  type ElementType,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+} from "react";
+import { currentFiber, keyPathOf } from "./fiber.js";
+import {
+  ANCHOR_PROP,
+  disableOverrides,
+  instanceId,
+  type MountedInstance,
+  register,
+  registry,
+  SOURCE_PROP,
+  UNANCHORED,
+  unregister,
+  withoutLoaderProps,
+} from "./registry.js";
+import type { Props } from "./store.js";
+
+const ADAPTER = Symbol.for("loupe.adapter");
+
+// React's own fields on memo, forwardRef and lazy objects, and a function's
+// built-ins. Copying `$$typeof` from a memo would turn the Adapter into one.
+const NOT_HOISTED = new Set([
+  "$$typeof",
+  "type",
+  "compare",
+  "render",
+  "_payload",
+  "_init",
+  "displayName",
+  "name",
+  "length",
+  "prototype",
+  "arguments",
+  "caller",
+  "propTypes",
+  "defaultProps",
+  "contextTypes",
+]);
+
+/** The component name an Adapter was created for, or null for anything else. */
+export function adaptedName(type: unknown): string | null {
+  if (typeof type !== "function") return null;
+  const name = (type as unknown as Record<symbol, unknown>)[ADAPTER];
+  return typeof name === "string" ? name : null;
+}
+
+export function createAdapter<C extends ElementType>(name: string, Original: C): C {
+  function Adapter(props: Props) {
+    const latest = useRef(props);
+    const [, force] = useReducer((n: number) => n + 1, 0);
+    const mounted = useRef<{ baseId: string; instance: MountedInstance } | null>(null);
+
+    const onClient = typeof window !== "undefined";
+    const reg = onClient ? registry() : null;
+    const fiber = onClient ? currentFiber() : null;
+    // The self-check (PER-98): React must name this component as the one rendering.
+    const identified = fiber !== null && adaptedName(fiber.type) === name;
+    if (reg?.status.overrides && !identified) {
+      const reason =
+        fiber === null
+          ? "React reported no fiber while an Adapter rendered."
+          : "React reported a different fiber than the Adapter rendering.";
+      // Not during render: it rerenders every other Instance.
+      queueMicrotask(() => disableOverrides(reason));
+    }
+
+    const anchor =
+      typeof props[ANCHOR_PROP] === "string" ? (props[ANCHOR_PROP] as string) : `${UNANCHORED} › ${name}`;
+    const keyPath = identified ? keyPathOf(fiber) : "";
+    const baseId = instanceId(anchor, keyPath);
+    // Overrides apply only once this Instance holds its id, so a duplicate never
+    // borrows another's for a render.
+    const registered = mounted.current?.baseId === baseId ? mounted.current.instance : null;
+
+    // Committed renders only: a discarded render must not reach `current()` or `pick()`.
+    useLayoutEffect(() => {
+      latest.current = props;
+      const instance = mounted.current?.instance;
+      if (instance) {
+        instance.fiber = fiber;
+        instance.hint = hintOf(props);
+        instance.renders++;
+      }
+    });
+
+    // A new id (the anchor changed under Fast Refresh) is a new registration.
+    useLayoutEffect(() => {
+      const instance = register(baseId, {
+        anchor,
+        hint: hintOf(latest.current),
+        component: name,
+        keyPath,
+        current: () => withoutLoaderProps(latest.current),
+        notify: force,
+        fiber,
+        renders: 1,
+      });
+      mounted.current = { baseId, instance };
+      // Before paint: an Override kept across a remount shows on the first frame.
+      if (registry().store.has(instance.id)) force();
+      return () => {
+        unregister(instance);
+        mounted.current = null;
+      };
+    }, [baseId]);
+
+    const rendered =
+      reg?.status.overrides && identified && registered
+        ? reg.store.resolve({ id: registered.id, current: props }).props
+        : props;
+    return createElement(Original as ElementType, rendered);
+  }
+
+  for (const key of Object.getOwnPropertyNames(Original)) {
+    if (NOT_HOISTED.has(key)) continue;
+    const descriptor = Object.getOwnPropertyDescriptor(Original, key);
+    if (descriptor) Object.defineProperty(Adapter, key, descriptor);
+  }
+  Adapter.displayName = `Loupe(${name})`;
+  Object.defineProperty(Adapter, ADAPTER, { value: name });
+  return Adapter as unknown as C;
+}
+
+function hintOf(props: Props): string | null {
+  return typeof props[SOURCE_PROP] === "string" ? (props[SOURCE_PROP] as string) : null;
+}
