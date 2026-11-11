@@ -40,6 +40,15 @@ const Dialog = createAdapter(
     props: {
       open: { editable: true, from: "@base-ui/react", kind: "options", status: "type-only", options: [false, true], state: true },
       onOpenChange: { editable: false, from: "@base-ui/react", reason: "FUNCTION" },
+      // The two sources of its default disagree: no pill may be guessed.
+      modal: {
+        editable: true,
+        from: "repo",
+        kind: "options",
+        status: "verified",
+        options: [false, true],
+        default: { source: "conflict", value: true, defaultVariants: false },
+      },
     },
   },
 );
@@ -329,6 +338,7 @@ describe("controls at This instance", () => {
     await mount();
     await select(DIALOG);
     expect(row("open").textContent).toContain("STATE");
+    expect(row("modal").querySelectorAll("button[aria-pressed=true]")).toHaveLength(0);
     await clickInPanel(inRow("open", "true"));
     expect(container.querySelector("[role=dialog]")).not.toBeNull();
     expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: false");
@@ -351,6 +361,36 @@ describe("controls at This instance", () => {
     await clickInPanel(inRow("open", "Reset"));
     expect(container.querySelector("[role=dialog]")).toBeNull();
     expect(row("open").querySelector("[data-testid=held]")).toBeNull();
+  });
+});
+
+describe("controls at This instance, edge cases", () => {
+  it("offers Reset this Instance for a selected Instance that isn't mounted, through discard", async () => {
+    await mount();
+    act(() => pageButton("Menu").click());
+    await settle();
+    const item = loupe.list("MenuItem")[0]?.id as string;
+    await select(item);
+    act(() => {
+      loupe.set(item, "children", "Sair");
+    });
+    act(() => pageButton("Menu").click());
+    await settle();
+    expect(panelText()).toContain("Not on the page now");
+    const reset = [...shadow().querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement;
+    await clickInPanel(reset);
+    expect(loupe.records()).toEqual([]);
+  });
+
+  it("shows a group Override as chosen, tagged, with no Instance Reset", async () => {
+    await mount();
+    act(() => {
+      loupe.set(BIA, "variant", "default", "group");
+    });
+    await select(BIA);
+    expect(row("variant").textContent).toContain("group override");
+    expect(inRow("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
+    expect(inRow("variant", "Reset")).toBeUndefined();
   });
 });
 

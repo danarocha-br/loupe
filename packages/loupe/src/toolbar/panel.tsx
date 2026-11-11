@@ -2,14 +2,13 @@
 // last card stretches, and either the component list (nothing selected) or the
 // inspector. Functional only; the visual pass is PER-140.
 
-import { type ReactNode, useState } from "react";
-import type { OptionValue } from "../meta/types.js";
-import type { InstanceProps, LoupeDebug } from "../runtime/debug.js";
-import type { Inspection, PropRow } from "../runtime/inspect.js";
+import type { LoupeDebug } from "../runtime/debug.js";
+import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
 import type { PageSnapshot } from "./page.js";
-import { safeInspect, safeProps } from "./page.js";
-import { formatCurrent, formatDefault } from "./format.js";
+import { type Editing, PropRowView } from "./controls.js";
+import { hasInstanceRecord, safeInspect, safeProps } from "./page.js";
+import { formatCurrent } from "./format.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -129,12 +128,26 @@ function instanceLabel(id: string, hint: string | null): string {
 
 function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
   const inspection = safeInspect(debug, id);
+  const recorded = debug.status.overrides && hasInstanceRecord(debug, id);
+  const resetInstance = (
+    <button
+      type="button"
+      disabled={!recorded}
+      onClick={() => {
+        // `discard` also drops the record of an Instance that isn't mounted, where `reset(id)` throws (PER-128).
+        debug.discard({ scope: "instance", id });
+      }}
+    >
+      Reset this Instance
+    </button>
+  );
   if (inspection === null) {
     return (
       <div className="card stretch">
         <h3>Not on the page now</h3>
         <p className="mono">{id}</p>
         <p className="muted">It shows here again when it mounts, for example when its menu or dialog opens.</p>
+        {recorded && resetInstance}
         <button type="button" onClick={() => onSelect(null)}>
           Back to the list
         </button>
@@ -142,10 +155,9 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
     );
   }
   const ancestors = debug.ancestors(id);
-  // Overrides and held states; null for a server-rendered Instance, which gets no controls.
-  const live = inspection.rendered === "client" ? safeProps(debug, id) : null;
-  const instanceOverrides = Object.values(live?.sources ?? {}).filter((source) => source === "instance").length;
-  const editOf = (row: PropRow): Edit | undefined => (live ? editFor(debug, id, row, live) : undefined);
+  // Null for a server-rendered Instance or while Overrides are off: no controls then.
+  const live = inspection.rendered === "client" && debug.status.overrides ? safeProps(debug, id) : null;
+  const editing: Editing | null = live ? { debug, id, live } : null;
   const editable = inspection.rows.filter((row) => row.editable);
   const inspectOnly = inspection.rows.filter((row) => !row.editable);
   const injected = Object.entries(inspection.injected);
@@ -165,18 +177,7 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
           )}{" "}
           <span className="tag">{inspection.rendered === "server" ? "On the server" : "In the browser"}</span>
         </div>
-        {live && (
-          <button
-            type="button"
-            disabled={instanceOverrides === 0}
-            onClick={() => {
-              // `discard` also drops the record if the Instance unmounted meanwhile (PER-128).
-              debug.discard({ scope: "instance", id });
-            }}
-          >
-            Reset this Instance
-          </button>
-        )}
+        {editing && resetInstance}
         <div className="mono" data-testid="instance-id">
           {inspection.id}
         </div>
@@ -206,11 +207,11 @@ function Inspector({ debug, id, onSelect }: PanelProps & { id: string }) {
       </div>
       <div className="card">
         <h3>Editable props</h3>
-        {editable.length === 0 ? <div className="muted">None</div> : editable.map((row) => <Row key={row.name} row={row} edit={editOf(row)} />)}
+        {editable.length === 0 ? <div className="muted">None</div> : editable.map((row) => <PropRowView key={row.name} row={row} editing={editing} />)}
       </div>
       <div className="card stretch">
         <h3>Inspect only</h3>
-        {inspectOnly.length === 0 ? <div className="muted">None</div> : inspectOnly.map((row) => <Row key={row.name} row={row} edit={editOf(row)} />)}
+        {inspectOnly.length === 0 ? <div className="muted">None</div> : inspectOnly.map((row) => <PropRowView key={row.name} row={row} editing={editing} />)}
         {injected.length > 0 && (
           <details>
             <summary>
@@ -243,120 +244,6 @@ function CallSiteCard({ inspection }: { inspection: Inspection }) {
       )}
       <div className="mono muted">{inspection.anchor}</div>
     </div>
-  );
-}
-
-/** What a row needs to edit at This instance. */
-type Edit = {
-  /** An Instance-scope Override holds the prop. */
-  overridden: boolean;
-  override: unknown;
-  /** A held State prop: `appTried` is present once the app wants another value (PER-96). */
-  held?: { value: unknown; appTried?: unknown };
-  set(value: unknown): void;
-  reset(): void;
-};
-
-function editFor(debug: LoupeDebug, id: string, row: PropRow, live: InstanceProps): Edit {
-  const overridden = live.sources[row.name] === "instance";
-  const held = live.states[row.name]?.held;
-  return {
-    overridden,
-    override: live.overrides[row.name],
-    ...(held ? { held } : {}),
-    set: (value) => debug.set(id, row.name, value),
-    reset: () => debug.reset(id, row.name),
-  };
-}
-
-/** The app's value as the row shows it: set, its default, or `not set`. */
-function currentValue(row: PropRow): ReactNode {
-  if (row.set) return formatCurrent(row.value);
-  if (row.default) return <span className="tag">{formatDefault(row.default)}</span>;
-  return <span className="muted">not set</span>;
-}
-
-/** The value the control shows as chosen: the Override, else the app's, else a known default. */
-function chosen(row: PropRow, edit: Edit): unknown {
-  if (edit.overridden) return edit.override;
-  if (row.set) return row.value;
-  if (row.default && "value" in row.default) return row.default.value;
-  return undefined;
-}
-
-function Row({ row, edit }: { row: PropRow; edit?: Edit }) {
-  const overridden = edit?.overridden ?? false;
-  const held = edit?.held;
-  const tried = held !== undefined && "appTried" in held;
-  const scoped = row.source === "group" || row.source === "page";
-  return (
-    <div className={overridden ? "row overridden" : "row"} data-prop={row.name}>
-      <div className="line">
-        <span className="name">
-          {row.label}
-          {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
-        </span>
-        {!overridden && <span className="value mono">{currentValue(row)}</span>}
-        {row.state && <span className="tag">STATE</span>}
-        {scoped && <span className="tag">{row.source} override</span>}
-        {row.reason && <span className="tag">{row.reason}</span>}
-        {overridden && !tried && edit && (
-          <button type="button" className="reset" onClick={edit.reset}>
-            Reset
-          </button>
-        )}
-      </div>
-      {row.editable && edit && <Control row={row} edit={edit} />}
-      {overridden && (
-        <div className="current mono" data-testid="current">
-          Current: {currentValue(row)}
-        </div>
-      )}
-      {tried && edit && (
-        <div className="notice" role="status" data-testid="held">
-          Your Override holds this at <code>{formatCurrent(held.value)}</code>; the app tried to set{" "}
-          <code>{formatCurrent(held.appTried)}</code>.{" "}
-          <button type="button" className="reset" onClick={edit.reset}>
-            Reset
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Pills for a closed set of options; a text field for label text (PER-113). */
-function Control({ row, edit }: { row: PropRow; edit: Edit }) {
-  const value = chosen(row, edit);
-  const [draft, setDraft] = useState<string | null>(null);
-  if (row.options) {
-    return (
-      <div className="pills" role="group" aria-label={row.label}>
-        {row.options.map((option: OptionValue) => (
-          <button
-            key={String(option)}
-            type="button"
-            aria-pressed={Object.is(value, option)}
-            onClick={() => edit.set(option)}
-          >
-            {formatCurrent(option)}
-          </button>
-        ))}
-      </div>
-    );
-  }
-  // The Toolbar redraws once a frame, so the field keeps its own text while it has focus.
-  return (
-    <input
-      className="text"
-      aria-label={row.label}
-      value={draft ?? (typeof value === "string" ? value : "")}
-      onChange={(event) => {
-        setDraft(event.target.value);
-        edit.set(event.target.value);
-      }}
-      onBlur={() => setDraft(null)}
-    />
   );
 }
 

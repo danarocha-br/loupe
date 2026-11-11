@@ -126,3 +126,10 @@ export function safeProps(debug: LoupeDebug, id: string): InstanceProps | null {
     return null;
   }
 }
+
+/** Whether an Instance-scope record holds an Override for this Instance, mounted or not. */
+export function hasInstanceRecord(debug: LoupeDebug, id: string): boolean {
+  return debug
+    .records()
+    .some((record) => record.target.scope === "instance" && record.target.id === id && Object.keys(record.values).length > 0);
+}
