@@ -1,5 +1,6 @@
 import { checkCompatibility } from "./compat/check.js";
 import { generateUsage, parseGenerateArgs, runGenerate } from "./generate/command.js";
+import { initUsage, parseInitArgs, runInit } from "./init/command.js";
 import { metaUsage, parseMetaArgs, runMeta, summarise } from "./meta/command.js";
 import { version } from "./version.js";
 
@@ -18,6 +19,7 @@ const usage = `Usage: loupe <command>
 Commands:
   check [--app <dir>]  Check this repo against Loupe's compatibility statement
   generate [--check]   Write Adapters, meta/ and adapt-list.json into the Product layer
+  init [--adopt]       Install Loupe into an app: the Product layer and four edits, recorded in a ledger
   meta                 Read prop metadata from the TypeScript checker and cva (headless)
 
 Options:
@@ -85,6 +87,26 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
       io.err(error instanceof Error ? error.message : String(error));
       return 1;
     }
+  }
+
+  if (first === "init") {
+    const options = parseInitArgs(rest);
+    if (typeof options === "string") {
+      io.err(options);
+      io.err(initUsage);
+      return 1;
+    }
+    if (options.help) {
+      io.out(initUsage);
+      return 0;
+    }
+    return runInit(options, {
+      out: io.out,
+      err: io.err,
+      ask: io.ask ?? (async () => ""),
+      cwd: io.cwd ?? process.cwd(),
+      nodeVersion: io.nodeVersion ?? process.versions.node,
+    });
   }
 
   if (first === "meta") {

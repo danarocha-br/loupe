@@ -1,0 +1,409 @@
+// The four existing files `init` edits (PER-93). Each edit goes through the AST
+// or a comment-preserving JSON parser; none touches a call site.
+//
+// `find` reads back what Loupe inserted, in the AST-normalised form the ledger
+// hashes. `edit` applies the insertion, or says why the file's shape is not one
+// it can edit safely, in which case `init` prints `snippet` instead.
+
+import { existsSync } from "node:fs";
+import path from "node:path";
+// jsonc-parser ships UMD as `main`, which Node can't read named exports from.
+import jsonc from "jsonc-parser";
+import ts from "typescript";
+import {
+  bindsName,
+  canonical,
+  findImport,
+  indentAt,
+  insertImport,
+  lineStart,
+  parse,
+  unwrap,
+} from "./syntax.js";
+
+export type TouchPointId = "biome-config" | "next-config" | "package-json" | "root-layout";
+
+/**
+ * `exact`: the insertion is exactly what `edit` writes, so it can be adopted
+ * without asking. Otherwise it is Loupe's, but shaped by someone else.
+ */
+export type Found = { canonical: string; exact: boolean };
+
+export type Edit = { text: string; summary: string } | { unexpected: string };
+
+export type TouchPoint = {
+  id: TouchPointId;
+  /** Repo-relative, POSIX. */
+  file: string;
+  find(text: string): Found | undefined;
+  /** `text` is undefined when the file doesn't exist. */
+  edit(text: string | undefined): Edit;
+  /** What to do by hand when the shape is unexpected. */
+  snippet: string[];
+};
+
+export const PRODUCT_LAYER = { name: "@repo/loupe", path: "packages/loupe" } as const;
+export const NPM_PACKAGE = "@danarocha/loupe";
+const EXCLUSION = `!${PRODUCT_LAYER.path}`;
+
+const NEXT_IMPORT = `import { withLoupe } from "${PRODUCT_LAYER.name}/next";`;
+const MOUNT_IMPORT = `import { LoupeMount } from "${PRODUCT_LAYER.name}/mount";`;
+const MOUNT_BLOCK = `{process.env.NODE_ENV === "development" && <LoupeMount />}`;
+
+export type TouchPointContext = {
+  root: string;
+  /** The app's directory, relative to the root. */
+  app: string;
+  version: string;
+  /** How the app's package.json names workspace packages ("workspace:*"). */
+  workspaceProtocol: string;
+};
+
+/** In the order `init` applies them; `remove` undoes them in reverse. */
+export function touchPoints(ctx: TouchPointContext): TouchPoint[] {
+  const biome = firstExisting(ctx.root, ["biome.jsonc", "biome.json"]);
+  return [
+    ...(biome ? [biomeConfig(biome)] : []),
+    packageJson(`${ctx.app}/package.json`, {
+      [NPM_PACKAGE]: ctx.version,
+      [PRODUCT_LAYER.name]: ctx.workspaceProtocol,
+    }),
+    nextConfig(
+      firstExisting(ctx.root, ["ts", "mts", "js", "mjs"].map((ext) => `${ctx.app}/next.config.${ext}`)) ??
+        `${ctx.app}/next.config.ts`,
+    ),
+    rootLayout(
+      firstExisting(ctx.root, [`${ctx.app}/app/layout.tsx`, `${ctx.app}/src/app/layout.tsx`]) ??
+        `${ctx.app}/app/layout.tsx`,
+    ),
+  ];
+}
+
+function firstExisting(root: string, files: string[]): string | undefined {
+  return files.find((f) => existsSync(path.join(root, f)));
+}
+
+// ── package.json ─────────────────────────────────────────────────────────────
+
+function packageJson(file: string, wanted: Record<string, string>): TouchPoint {
+  const names = Object.keys(wanted).sort();
+  const snippet = [
+    `In ${file}, add to "devDependencies", keeping its alphabetical order:`,
+    ...names.map((n) => `  "${n}": "${wanted[n]}",`),
+  ];
+  return {
+    id: "package-json",
+    file,
+    snippet,
+    find(text) {
+      const dev = readObject(text)?.devDependencies;
+      if (!isRecord(dev) || !names.every((n) => typeof dev[n] === "string")) return undefined;
+      const pairs = names.map((n) => [n, dev[n]]);
+      return { canonical: JSON.stringify(pairs), exact: names.every((n) => dev[n] === wanted[n]) };
+    },
+    edit(text) {
+      if (text === undefined) return { unexpected: `${file} doesn't exist.` };
+      const json = readObject(text);
+      if (!json) return { unexpected: `${file} isn't a JSON object.` };
+      if (json.devDependencies !== undefined && !isRecord(json.devDependencies)) {
+        return { unexpected: `"devDependencies" in ${file} isn't an object.` };
+      }
+      for (const field of ["dependencies", "devDependencies"] as const) {
+        const deps = json[field];
+        if (!isRecord(deps)) continue;
+        for (const name of names) {
+          if (deps[name] === undefined) continue;
+          if (field === "dependencies") return { unexpected: `${name} is already in "dependencies".` };
+          if (deps[name] !== wanted[name]) return { unexpected: `${name} is already "${String(deps[name])}".` };
+        }
+      }
+      const options = jsonFormatting(text);
+      let next = text;
+      const added: string[] = [];
+      for (const name of names) {
+        const dev = readObject(next)?.devDependencies;
+        if (isRecord(dev) && dev[name] !== undefined) continue;
+        const edits = jsonc.modify(next, ["devDependencies", name], wanted[name], {
+          formattingOptions: options,
+          getInsertionIndex: (keys) => {
+            const at = keys.findIndex((k) => k > name);
+            return at === -1 ? keys.length : at;
+          },
+        });
+        next = jsonc.applyEdits(next, edits);
+        added.push(name);
+      }
+      return { text: next, summary: `added ${added.join(" and ")} to devDependencies` };
+    },
+  };
+}
+
+// ── next.config.ts ───────────────────────────────────────────────────────────
+
+function nextConfig(file: string): TouchPoint {
+  const snippet = [
+    `In ${file}, import withLoupe:`,
+    `  ${NEXT_IMPORT}`,
+    "and make it the outermost wrapper of the default export:",
+    "  export default withLoupe(<your config>);",
+  ];
+  return {
+    id: "next-config",
+    file,
+    snippet,
+    find(text) {
+      const sf = parse(file, text);
+      const imp = findImport(sf, "withLoupe", `${PRODUCT_LAYER.name}/next`);
+      const call = findNode(sf, (n) => ts.isCallExpression(n) && isIdentifier(n.expression, "withLoupe"));
+      if (!imp && !call) return undefined;
+      const exported = defaultExportAssignment(sf);
+      const outer = exported ? unwrap(exported.expression) : undefined;
+      const exact =
+        imp !== undefined &&
+        canonical(imp, sf) === canonicalImport(NEXT_IMPORT) &&
+        outer !== undefined &&
+        outer === call &&
+        ts.isCallExpression(outer) &&
+        outer.arguments.length === 1;
+      return { canonical: join(sf, imp, call), exact };
+    },
+    edit(text) {
+      if (text === undefined) return { unexpected: `${file} doesn't exist.` };
+      if (!file.endsWith(".ts") && !file.endsWith(".mts")) return { unexpected: `${file} isn't TypeScript.` };
+      const sf = parse(file, text);
+      if (bindsName(sf, "withLoupe")) return { unexpected: `${file} already imports a withLoupe.` };
+      const assignments = sf.statements.filter((s) => ts.isExportAssignment(s) && !s.isExportEquals);
+      const otherDefaults = sf.statements.some(
+        (s) =>
+          hasDefaultModifier(s) ||
+          (ts.isExportDeclaration(s) &&
+            s.exportClause !== undefined &&
+            ts.isNamedExports(s.exportClause) &&
+            s.exportClause.elements.some((e) => e.name.text === "default")),
+      );
+      const [assignment] = assignments as ts.ExportAssignment[];
+      if (!assignment || assignments.length > 1 || otherDefaults) {
+        return { unexpected: `${file} doesn't have exactly one \`export default <expression>\`.` };
+      }
+      const value = unwrap(assignment.expression);
+      if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) {
+        return { unexpected: `${file} exports a function, not a config object.` };
+      }
+      const expr = assignment.expression;
+      const start = expr.getStart(sf);
+      const wrapped = `${text.slice(0, start)}withLoupe(${text.slice(start, expr.end)})${text.slice(expr.end)}`;
+      const withImport = insertImport(wrapped, parse(file, wrapped), NEXT_IMPORT, `${PRODUCT_LAYER.name}/next`);
+      return { text: withImport, summary: "wrapped the default export in withLoupe" };
+    },
+  };
+}
+
+function defaultExportAssignment(sf: ts.SourceFile): ts.ExportAssignment | undefined {
+  return sf.statements.find((s): s is ts.ExportAssignment => ts.isExportAssignment(s) && !s.isExportEquals);
+}
+
+// ── app/layout.tsx ───────────────────────────────────────────────────────────
+
+function rootLayout(file: string): TouchPoint {
+  const snippet = [
+    `In ${file}, import the mount:`,
+    `  ${MOUNT_IMPORT}`,
+    "and add it as the last child of <body>, after every other block:",
+    `  ${MOUNT_BLOCK}`,
+  ];
+  return {
+    id: "root-layout",
+    file,
+    snippet,
+    find(text) {
+      const sf = parse(file, text);
+      const imp = findImport(sf, "LoupeMount", `${PRODUCT_LAYER.name}/mount`);
+      const block = findNode(sf, (n) => ts.isJsxExpression(n) && containsMount(n));
+      if (!imp && !block) return undefined;
+      const fn = defaultExportFunction(sf);
+      const bodies = fn ? bodyElements(fn) : [];
+      const only = bodies.length === 1 ? bodies[0] : undefined;
+      const last = only && ts.isJsxElement(only) ? lastChild(only) : undefined;
+      const exact =
+        imp !== undefined &&
+        canonical(imp, sf) === canonicalImport(MOUNT_IMPORT) &&
+        block !== undefined &&
+        last === block &&
+        canonical(block, sf) === canonicalMount();
+      return { canonical: join(sf, imp, block), exact };
+    },
+    edit(text) {
+      if (text === undefined) return { unexpected: `${file} doesn't exist.` };
+      const sf = parse(file, text);
+      if (bindsName(sf, "LoupeMount")) return { unexpected: `${file} already imports a LoupeMount.` };
+      const fn = defaultExportFunction(sf);
+      if (!fn) return { unexpected: `${file} has no default-exported layout function.` };
+      const bodies = bodyElements(fn);
+      const [body] = bodies;
+      if (!body || bodies.length > 1 || !ts.isJsxElement(body)) {
+        return { unexpected: `${file} doesn't render exactly one <body> with children.` };
+      }
+
+      const close = body.closingElement.getStart(sf);
+      const closeIndent = indentAt(text, close);
+      const last = lastChild(body);
+      const at = last ? last.end : body.openingElement.end;
+      const childIndent = last && lineStart(text, last.getStart(sf)) > lineStart(text, body.getStart(sf))
+        ? indentAt(text, last.getStart(sf))
+        : `${closeIndent}  `;
+      // A closing tag on the same line as the last child gets a line of its own.
+      const sameLine = !text.slice(at, close).includes("\n");
+      const insertion = `\n${childIndent}${MOUNT_BLOCK}${sameLine ? `\n${closeIndent}` : ""}`;
+      const mounted = `${text.slice(0, at)}${insertion}${text.slice(at)}`;
+      const withImport = insertImport(mounted, parse(file, mounted), MOUNT_IMPORT, `${PRODUCT_LAYER.name}/mount`);
+      return { text: withImport, summary: "mounted <LoupeMount /> as the last child of <body>" };
+    },
+  };
+}
+
+type FunctionLike = ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression;
+
+function defaultExportFunction(sf: ts.SourceFile): FunctionLike | undefined {
+  for (const s of sf.statements) {
+    if (ts.isFunctionDeclaration(s) && hasDefaultModifier(s)) return s;
+  }
+  const assignment = defaultExportAssignment(sf);
+  if (!assignment) return undefined;
+  const value = unwrap(assignment.expression);
+  if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) return value;
+  if (!ts.isIdentifier(value)) return undefined;
+  for (const s of sf.statements) {
+    if (ts.isFunctionDeclaration(s) && s.name?.text === value.text) return s;
+    if (!ts.isVariableStatement(s)) continue;
+    for (const d of s.declarationList.declarations) {
+      if (!ts.isIdentifier(d.name) || d.name.text !== value.text || !d.initializer) continue;
+      const init = unwrap(d.initializer);
+      if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) return init;
+    }
+  }
+  return undefined;
+}
+
+/** Every `<body>`, self-closing ones included, so one of those makes the count wrong. */
+function bodyElements(fn: ts.Node): (ts.JsxElement | ts.JsxSelfClosingElement)[] {
+  const found: (ts.JsxElement | ts.JsxSelfClosingElement)[] = [];
+  const visit = (n: ts.Node) => {
+    if (ts.isJsxElement(n) && n.openingElement.tagName.getText() === "body") found.push(n);
+    if (ts.isJsxSelfClosingElement(n) && n.tagName.getText() === "body") found.push(n);
+    ts.forEachChild(n, visit);
+  };
+  visit(fn);
+  return found;
+}
+
+/** The last child that isn't whitespace-only text. */
+function lastChild(body: ts.JsxElement): ts.JsxChild | undefined {
+  return [...body.children].reverse().find((c) => !(ts.isJsxText(c) && c.containsOnlyTriviaWhiteSpaces));
+}
+
+function containsMount(n: ts.Node): boolean {
+  if ((ts.isJsxSelfClosingElement(n) || ts.isJsxOpeningElement(n)) && n.tagName.getText() === "LoupeMount") {
+    return true;
+  }
+  return ts.forEachChild(n, containsMount) ?? false;
+}
+
+// ── biome.jsonc ──────────────────────────────────────────────────────────────
+
+export function biomeConfig(file: string): TouchPoint {
+  return {
+    id: "biome-config",
+    file,
+    snippet: [`In ${file}, add to the "files.includes" array:`, `  "${EXCLUSION}"`],
+    find(text) {
+      const includes = includesNode(text);
+      const present = includes?.type === "array" && includes.children?.some((c) => c.value === EXCLUSION);
+      return present ? { canonical: JSON.stringify(EXCLUSION), exact: true } : undefined;
+    },
+    edit(text) {
+      if (text === undefined) return { unexpected: `${file} doesn't exist.` };
+      const errors: jsonc.ParseError[] = [];
+      jsonc.parseTree(text, errors, { allowTrailingComma: true });
+      if (errors.length > 0) return { unexpected: `${file} doesn't parse.` };
+      const includes = includesNode(text);
+      const last = includes?.type === "array" ? includes.children?.at(-1) : undefined;
+      if (!last) return { unexpected: `"files.includes" in ${file} isn't a non-empty array.` };
+
+      const indent = indentAt(text, last.offset);
+      let at = last.offset + last.length;
+      const trailingComma = /^\s*,/.exec(text.slice(at));
+      const lines = [`// Loupe's Product layer: generated by loupe init and loupe generate.`, `"${EXCLUSION}"`];
+      let insertion = lines.map((l) => `\n${indent}${l}`).join("");
+      if (trailingComma) {
+        at += trailingComma[0].length;
+        insertion += ",";
+      } else insertion = `,${insertion}`;
+      return { text: `${text.slice(0, at)}${insertion}${text.slice(at)}`, summary: `excluded ${PRODUCT_LAYER.path}` };
+    },
+  };
+}
+
+function includesNode(text: string): jsonc.Node | undefined {
+  const tree = jsonc.parseTree(text, [], { allowTrailingComma: true });
+  return tree ? jsonc.findNodeAtLocation(tree, ["files", "includes"]) : undefined;
+}
+
+// ── shared ───────────────────────────────────────────────────────────────────
+
+type JsonObject = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readObject(text: string): JsonObject | undefined {
+  const errors: jsonc.ParseError[] = [];
+  const value: unknown = jsonc.parse(text, errors);
+  return errors.length === 0 && isRecord(value) ? value : undefined;
+}
+
+function jsonFormatting(text: string): jsonc.FormattingOptions {
+  const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? "  ";
+  return indent.startsWith("\t")
+    ? { insertSpaces: false, tabSize: 1, eol: "\n" }
+    : { insertSpaces: true, tabSize: indent.length, eol: "\n" };
+}
+
+function hasDefaultModifier(node: ts.Node): boolean {
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) ?? false;
+}
+
+function isIdentifier(node: ts.Node, name: string): boolean {
+  return ts.isIdentifier(node) && node.text === name;
+}
+
+function findNode(root: ts.Node, test: (n: ts.Node) => boolean): ts.Node | undefined {
+  let found: ts.Node | undefined;
+  const visit = (n: ts.Node): void => {
+    if (found) return;
+    if (test(n)) found = n;
+    else ts.forEachChild(n, visit);
+  };
+  visit(root);
+  return found;
+}
+
+function join(sf: ts.SourceFile, ...nodes: (ts.Node | undefined)[]): string {
+  return nodes.map((n) => (n ? canonical(n, sf) : "")).join("\n");
+}
+
+function canonicalImport(line: string): string {
+  const sf = parse("import.ts", line);
+  return canonical(sf.statements[0] as ts.Statement, sf);
+}
+
+let mountCanonical: string | undefined;
+function canonicalMount(): string {
+  if (mountCanonical === undefined) {
+    const sf = parse("mount.tsx", `const mount = <body>${MOUNT_BLOCK}</body>;`);
+    const block = findNode(sf, ts.isJsxExpression);
+    mountCanonical = block ? canonical(block, sf) : "";
+  }
+  return mountCanonical;
+}
