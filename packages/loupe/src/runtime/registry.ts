@@ -87,11 +87,17 @@ export function instanceId(anchor: string, keyPath: string): string {
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
   const { instances } = registry();
-  let id = baseId;
-  for (let n = 2; instances.has(id); n++) id = `${baseId}~${n}`;
+  const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id };
   instances.set(id, instance);
   return instance;
+}
+
+/** `base`, or `base~2`, `~3`… when `taken` already holds it. */
+export function uniqueId(base: string, taken: { has(id: string): boolean }): string {
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}~${n}`;
+  return id;
 }
 
 export function unregister(instance: MountedInstance): void {

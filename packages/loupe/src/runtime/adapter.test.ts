@@ -215,6 +215,92 @@ describe("createAdapter", () => {
     expect(loupe.pick(icon)).toBe(`${anchor(1)}#a`);
   });
 
+  it("tells apart Instances from one call site with no key, and lends neither the other's Override", () => {
+    const row = () => h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps);
+    render(h("div", null, row()));
+    act(() => {
+      loupe.set(anchor(1), "variant", "destructive");
+    });
+    render(h("div", null, row(), h("span", null, row())));
+    expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), `${anchor(1)}~2`]);
+    expect(buttons().map((button) => button.dataset.variant)).toEqual(["destructive", "ghost"]);
+  });
+
+  it("lists server-rendered Instances from _debugInfo, inspect-only, with their key path", () => {
+    const fiber = (key: string | null, extra: object = {}) => ({
+      tag: 5,
+      key,
+      type: "span",
+      memoizedProps: {},
+      return: null,
+      child: null,
+      sibling: null,
+      alternate: null,
+      stateNode: null,
+      ...extra,
+    });
+    const badge = fiber(null, {
+      _debugInfo: [
+        { name: "MembersPage", env: "Server", props: {} },
+        {
+          name: "Badge",
+          env: "Server",
+          props: { variant: "muted", "data-ds-anchor": "app/page.tsx › MembersPage › Badge[1]", "data-ds-source": "app/page.tsx:26:13 1/1" },
+        },
+      ],
+    });
+    const row = fiber("m2", { child: badge });
+    badge.return = row as never;
+    const host = fiber(null, { tag: 3, child: row });
+    (host as { stateNode: unknown }).stateNode = { current: host };
+    row.return = host as never;
+    const doc = document as unknown as Record<string, unknown>;
+    doc.__reactContainer$test = host;
+    try {
+      expect(loupe.scan()).toEqual([
+        {
+          id: "app/page.tsx › MembersPage › Badge[1]#m2",
+          component: "Badge",
+          anchor: "app/page.tsx › MembersPage › Badge[1]",
+          hint: "app/page.tsx:26:13 1/1",
+          env: "Server",
+          props: { variant: "muted" },
+        },
+      ]);
+      expect(loupe.list()).toMatchObject([{ rendered: "server", editable: false }]);
+      expect(() => loupe.set("app/page.tsx › MembersPage › Badge[1]#m2", "variant", "default")).toThrow(
+        /Server Component/,
+      );
+    } finally {
+      delete doc.__reactContainer$test;
+    }
+  });
+
+  it("goes inspect-only when React names a different fiber than the rendering Adapter", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const internals = (React as unknown as Record<string, Record<string, unknown>>)
+      .__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE as Record<string, unknown>;
+    let dispatcher: unknown = internals.A;
+    const stranger = { tag: 0, key: null, type: () => null, memoizedProps: {}, return: null };
+    Object.defineProperty(internals, "A", {
+      configurable: true,
+      get: () => (dispatcher ? { ...(dispatcher as object), getOwner: () => stranger } : dispatcher),
+      set: (value) => {
+        dispatcher = value;
+      },
+    });
+    try {
+      render(h(Button, { "data-ds-anchor": anchor(1) } as ButtonProps));
+      await act(async () => {});
+      expect(loupe.status).toEqual({
+        overrides: false,
+        reason: "React reported a different fiber than the Adapter rendering.",
+      });
+    } finally {
+      Object.defineProperty(internals, "A", { configurable: true, writable: true, value: dispatcher });
+    }
+  });
+
   it("goes inspect-only when React's internals don't identify the rendering Adapter", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     // React installs its dispatcher only for the length of a render: break

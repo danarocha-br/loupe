@@ -17,6 +17,7 @@ import {
   registry,
   SOURCE_PROP,
   type Status,
+  uniqueId,
   withoutLoaderProps,
 } from "./registry.js";
 import type { Props, Source } from "./store.js";
@@ -73,7 +74,7 @@ const SERVER_REASON =
 export function createDebug(): LoupeDebug {
   const reg = registry();
 
-  const mounted = (id: string): MountedInstance => {
+  const requireMounted = (id: string): MountedInstance => {
     const instance = reg.instances.get(id);
     if (!instance) {
       const server = scan().find((entry) => entry.id === id);
@@ -84,10 +85,11 @@ export function createDebug(): LoupeDebug {
 
   const describe = (instance: MountedInstance): InstanceProps => {
     const current = instance.current();
-    const resolved = reg.store.resolve({ id: instance.id, current });
     if (!reg.status.overrides) {
-      return { id: instance.id, current, overrides: {}, rendered: current, sources: resolved.sources };
+      const sources = Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const]));
+      return { id: instance.id, current, overrides: {}, rendered: current, sources };
     }
+    const resolved = reg.store.resolve({ id: instance.id, current });
     return {
       id: instance.id,
       current,
@@ -97,7 +99,7 @@ export function createDebug(): LoupeDebug {
     };
   };
 
-  const editable = (): void => {
+  const assertEditable = (): void => {
     if (!reg.status.overrides) {
       throw new Error(`[loupe] Overrides are off, everything is inspect-only: ${reg.status.reason}`);
     }
@@ -116,9 +118,7 @@ export function createDebug(): LoupeDebug {
           const anchor = props[ANCHOR_PROP];
           // Page and layout components are not call sites the loader anchored.
           if (typeof info.name !== "string" || typeof anchor !== "string") continue;
-          const base = instanceId(anchor, keyPathOf(fiber));
-          let id = base;
-          for (let n = 2; found.has(id); n++) id = `${base}~${n}`;
+          const id = uniqueId(instanceId(anchor, keyPathOf(fiber)), found);
           found.set(id, {
             id,
             component: info.name,
@@ -150,7 +150,7 @@ export function createDebug(): LoupeDebug {
         rendered: "client",
         editable: status.overrides,
         ...(status.overrides ? {} : { reason: status.reason }),
-        overrides: status.overrides ? describe(instance).overrides : {},
+        overrides: describe(instance).overrides,
         renders: instance.renders,
       }));
       const server: InstanceRow[] = scan()
@@ -170,19 +170,19 @@ export function createDebug(): LoupeDebug {
     },
 
     props(id) {
-      return describe(mounted(id));
+      return describe(requireMounted(id));
     },
 
     set(id, prop, value) {
-      const instance = mounted(id);
-      editable();
+      const instance = requireMounted(id);
+      assertEditable();
       reg.store.set(instance.id, prop, value);
       return describe(instance);
     },
 
     reset(id, prop) {
-      const instance = mounted(id);
-      editable();
+      const instance = requireMounted(id);
+      assertEditable();
       reg.store.reset(instance.id, prop);
       return describe(instance);
     },

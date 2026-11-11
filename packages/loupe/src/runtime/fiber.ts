@@ -45,10 +45,9 @@ export function currentFiber(): Fiber | null {
 }
 
 /**
- * Why React's internals can't be used here, or null when they look usable so
- * far. Only the internals object can be checked up front: React installs its
- * dispatcher (`A`) for the length of a render, so whether `getOwner()` names the
- * rendering component is checked by each Adapter as it renders.
+ * Why React's internals can't be used, or null. Only their presence can be
+ * checked up front: `getOwner()` exists only during a render, so each Adapter
+ * checks it as it renders.
  */
 export function internalsProblem(): string | null {
   return internals() ? null : "React exposes no client internals.";
@@ -66,27 +65,18 @@ export function isFiber(value: unknown): value is Fiber {
   );
 }
 
-/**
- * Keys a library generated, never the app. Base UI keys the element it clones
- * from a `render` prop with its `useId` value (`base-ui-_R_…`).
- */
+/** Base UI keys an element cloned from a `render` prop with its `useId` (`base-ui-_R_…`). */
 function isLibraryKey(key: string): boolean {
   return key.startsWith("base-ui-");
 }
 
-/**
- * Keys the App Router puts on its own segment and boundary elements: `c-page`,
- * `__PAGE__…`, and segment paths such as `layout/c/…` or `/`.
- */
+// Keys the App Router puts on its segment and boundary elements, as seen on
+// Next 16.3: `c-page`, `c`, `layout`, `__PAGE__…`, and `layout/c/…` paths.
+const ROUTER_KEYS = new Set(["c-page", "c", "layout", "template"]);
+const ROUTER_KEY_PREFIXES = ["__PAGE__", "__DEFAULT__", "layout/", "template/"];
+
 function isRouterKey(key: string): boolean {
-  return (
-    key === "c-page" ||
-    key.startsWith("__PAGE__") ||
-    key.startsWith("__DEFAULT__") ||
-    key.includes("/c/") ||
-    key.startsWith("/") ||
-    /^(layout|page|template|c)(\/|$)/.test(key)
-  );
+  return ROUTER_KEYS.has(key) || ROUTER_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 /**

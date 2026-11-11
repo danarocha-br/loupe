@@ -57,15 +57,13 @@ export function adaptedName(type: unknown): string | null {
 export function createAdapter<C extends ElementType>(name: string, Original: C): C {
   function Adapter(props: Props) {
     const latest = useRef(props);
-    latest.current = props;
     const [, force] = useReducer((n: number) => n + 1, 0);
     const mounted = useRef<{ baseId: string; instance: MountedInstance } | null>(null);
 
     const onClient = typeof window !== "undefined";
     const reg = onClient ? registry() : null;
     const fiber = onClient ? currentFiber() : null;
-    // The self-check, on every render: React must name this very component as
-    // the one rendering. Anything else means its internals moved (PER-98).
+    // The self-check (PER-98): React must name this component as the one rendering.
     const identified = fiber !== null && adaptedName(fiber.type) === name;
     if (reg?.status.overrides && !identified) {
       const reason =
@@ -80,13 +78,22 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
       typeof props[ANCHOR_PROP] === "string" ? (props[ANCHOR_PROP] as string) : `${UNANCHORED} › ${name}`;
     const keyPath = identified ? keyPathOf(fiber) : "";
     const baseId = instanceId(anchor, keyPath);
-    const id = mounted.current?.baseId === baseId ? mounted.current.instance.id : baseId;
-    if (mounted.current) {
-      mounted.current.instance.fiber = fiber;
-      mounted.current.instance.hint = hintOf(props);
-      mounted.current.instance.renders++;
-    }
+    // Overrides apply only once this Instance holds its id, so a duplicate never
+    // borrows another's for a render.
+    const registered = mounted.current?.baseId === baseId ? mounted.current.instance : null;
 
+    // Committed renders only: a discarded render must not reach `current()` or `pick()`.
+    useLayoutEffect(() => {
+      latest.current = props;
+      const instance = mounted.current?.instance;
+      if (instance) {
+        instance.fiber = fiber;
+        instance.hint = hintOf(props);
+        instance.renders++;
+      }
+    });
+
+    // A new id (the anchor changed under Fast Refresh) is a new registration.
     useLayoutEffect(() => {
       const instance = register(baseId, {
         anchor,
@@ -99,18 +106,18 @@ export function createAdapter<C extends ElementType>(name: string, Original: C):
         renders: 1,
       });
       mounted.current = { baseId, instance };
-      // The first render used the base id; a suffixed id may hold Overrides of its own.
-      if (instance.id !== baseId) force();
+      // Before paint: an Override kept across a remount shows on the first frame.
+      if (registry().store.has(instance.id)) force();
       return () => {
         unregister(instance);
         mounted.current = null;
       };
-      // A new id (the call site's anchor changed under Fast Refresh) is a new
-      // registration; nothing else re-registers.
     }, [baseId]);
 
     const rendered =
-      reg?.status.overrides && identified ? reg.store.resolve({ id, current: props }).props : props;
+      reg?.status.overrides && identified && registered
+        ? reg.store.resolve({ id: registered.id, current: props }).props
+        : props;
     return createElement(Original as ElementType, rendered);
   }
 
