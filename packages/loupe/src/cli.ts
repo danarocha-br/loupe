@@ -1,4 +1,5 @@
 import { checkCompatibility } from "./compat/check.js";
+import { doctorUsage, parseDoctorArgs, runDoctor } from "./doctor/command.js";
 import { generateUsage, parseGenerateArgs, runGenerate } from "./generate/command.js";
 import { initUsage, parseInitArgs, runInit } from "./init/command.js";
 import { metaUsage, parseMetaArgs, runMeta, summarise } from "./meta/command.js";
@@ -21,6 +22,7 @@ const usage = `Usage: loupe <command>
 
 Commands:
   check [--app <dir>]  Check this repo against Loupe's compatibility statement
+  doctor [--build]     Check an install and write nothing; --build also scans a production build
   generate [--check]   Write Adapters, meta/ and adapt-list.json into the Product layer
   init [--adopt]       Install Loupe into an app: the Product layer and four edits, recorded in a ledger
   remove               Undo loupe init, never overwriting a hand edit
@@ -125,6 +127,25 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
       return 0;
     }
     return runRemove(options, { out: io.out, err: io.err, cwd: io.cwd ?? process.cwd(), install: io.install });
+  }
+
+  if (first === "doctor") {
+    const options = parseDoctorArgs(rest);
+    if (typeof options === "string") {
+      io.err(options);
+      io.err(doctorUsage);
+      return 1;
+    }
+    if (options.help) {
+      io.out(doctorUsage);
+      return 0;
+    }
+    return runDoctor(options, {
+      out: io.out,
+      err: io.err,
+      cwd: io.cwd ?? process.cwd(),
+      nodeVersion: io.nodeVersion ?? process.versions.node,
+    });
   }
 
   if (first === "meta") {
