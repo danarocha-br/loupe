@@ -359,7 +359,10 @@ function MembersCard({
                       for (const member of members) if (member.out !== allIn) toggle(member.id, member.out);
                     }}
                   />{" "}
-                  <span className="mono">{anchor || "No call site"}</span> · {members.length}
+                  <span className="mono" title={anchor}>
+                    {anchor ? anchor.split(" › ").slice(-2).join(" › ") : "No call site"}
+                  </span>{" "}
+                  · {members.length}
                 </label>
               </legend>
               <ul className="list">{members.map(memberItem)}</ul>
