@@ -1,10 +1,12 @@
 // `window.__loupe`: Stage 1's acceptance surface, before there is a Toolbar.
 //
 //   __loupe.list(filter?)          every Instance on the page, adapted and server-rendered
-//   __loupe.props(id)              Current value, Overrides, rendered props and each value's source
+//   __loupe.props(id)              Current value (the app's own props), what a library injected,
+//                                  Overrides, rendered props, each value's source, and State props
 //   __loupe.set(id, prop, value, scope?)   an Override; scope is "instance" (default),
 //                                          "group" (the Instance's call site) or "page"
-//                                          (its component on this route)
+//                                          (its component on this route). A State prop is
+//                                          Instance scope only.
 //   __loupe.reset(id, prop?, scope?)       undoes that scope's Override only
 //   __loupe.exclude(id, scope)             keeps a group or page Override off one Instance
 //   __loupe.include(id, scope)             undoes `exclude`
@@ -14,6 +16,7 @@
 //   __loupe.status                 whether Overrides are on (the React self-check)
 
 import { adaptedName } from "./adapter.js";
+import type { Authorship } from "./authored.js";
 import { type Fiber, fiberOfNode, keyPathOf, rootFibers, walkFibers } from "./fiber.js";
 import {
   ANCHOR_PROP,
@@ -28,6 +31,7 @@ import {
   uniqueId,
   withoutLoaderProps,
 } from "./registry.js";
+import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
 import type { OverrideRecord, Props, Scope, ScopeTarget, Source } from "./store.js";
 
 export type InstanceRow = {
@@ -45,16 +49,25 @@ export type InstanceRow = {
   overrides: Props;
   /** How many times an adapted Instance has rendered; 0 for a server-rendered one. */
   renders: number;
+  /** State props (`X` with `onXChange`): Instance scope only. Empty for a server-rendered one. */
+  stateProps: readonly string[];
 };
 
 export type InstanceProps = {
   id: string;
-  /** The props the app passes right now. */
+  /** The props the call site writes, live: the Current value. Only these reach Coverage or a Proposal. */
   current: Props;
+  /** What a library set on the Instance (handlers, ARIA, ids, `data-slot`), live, never editable. */
+  injected: Props;
+  /** Whether the two could be told apart; when not, every live prop is in `current`. */
+  authorship: Authorship;
   overrides: Props;
-  /** What the component renders with. */
+  /** What the component renders with: the app's and the library's props, with Overrides on top. */
   rendered: Props;
+  /** The source of every key in `current` and `overrides`. */
   sources: Record<string, Source>;
+  /** Each State prop: whether the app controls it, and whether an Override holds it against the app. */
+  states: Record<string, StateProp>;
 };
 
 export type ServerInstance = {
@@ -95,18 +108,25 @@ export function createDebug(): LoupeDebug {
   };
 
   const describe = (instance: MountedInstance): InstanceProps => {
-    const current = instance.current();
-    if (!reg.status.overrides) {
-      const sources = Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const]));
-      return { id: instance.id, current, overrides: {}, rendered: current, sources };
-    }
-    const resolved = reg.store.resolve({ ...identityOf(instance), current });
+    const { current, injected, authorship } = instance.live();
+    // Resolved over the app's props alone, so injected props get no source and
+    // never reach Coverage.
+    const resolved = reg.status.overrides
+      ? reg.store.resolve({ ...identityOf(instance), current })
+      : {
+          props: current,
+          overrides: {},
+          sources: Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const])),
+        };
     return {
       id: instance.id,
       current,
+      injected,
+      authorship,
       overrides: resolved.overrides,
-      rendered: resolved.props,
+      rendered: { ...injected, ...resolved.props },
       sources: resolved.sources,
+      states: describeStates(instance.stateProps, current, resolved.overrides, instance.attempts),
     };
   };
 
@@ -180,6 +200,7 @@ export function createDebug(): LoupeDebug {
         ...(status.overrides ? {} : { reason: status.reason }),
         overrides: describe(instance).overrides,
         renders: instance.renders,
+        stateProps: instance.stateProps,
       }));
       const server: InstanceRow[] = scan()
         .filter(matches)
@@ -193,6 +214,7 @@ export function createDebug(): LoupeDebug {
           reason: SERVER_REASON,
           overrides: {},
           renders: 0,
+          stateProps: [],
         }));
       return [...client, ...server];
     },
@@ -204,6 +226,9 @@ export function createDebug(): LoupeDebug {
     set(id, prop, value, scope = "instance") {
       const instance = requireMounted(id);
       assertEditable();
+      // A group `open` would open every dialog at that call site at once (PER-96).
+      const refusal = stateScopeRefusal(scope, instance.stateProps, prop);
+      if (refusal) throw new Error(`[loupe] ${prop} is a State prop: ${refusal}`);
       reg.store.set(targetOf(instance, scope), prop, value);
       return describe(instance);
     },

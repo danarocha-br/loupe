@@ -1,4 +1,5 @@
 import type * as tsm from "ts-morph";
+import { stateSiblingName } from "../state-prop.js";
 import { componentFunction, destructureDefaults, hasUseClient, shapeOf } from "./ast.js";
 import {
   combineDefaults,
@@ -9,7 +10,6 @@ import {
   judgeOptions,
   originOf,
   repoConfigFiles,
-  stateSiblingName,
   variantDefaults,
   variantLookup,
 } from "./policy.js";

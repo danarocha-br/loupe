@@ -138,9 +138,20 @@ export function adapterModule(module: ModuleMeta, adapted: readonly string[], or
   if (types.length > 0) lines.push(`export type { ${types.join(", ")} } from ${from};`);
   if (values.length > 0 || types.length > 0) lines.push("");
   for (const name of adapted) {
-    lines.push(`export const ${name} = createAdapter(${JSON.stringify(name)}, ${local(name)});`);
+    const entry = module.exports[name];
+    // State props (PER-96) are Instance-scope only; the runtime needs their names.
+    const state = entry?.kind === "component" ? stateProps(entry) : [];
+    const options = state.length > 0 ? `, { state: ${JSON.stringify(state)} }` : "";
+    lines.push(`export const ${name} = createAdapter(${JSON.stringify(name)}, ${local(name)}${options});`);
   }
   return `${lines.join("\n")}\n`;
+}
+
+/** The component's State props, sorted: those its metadata flags `state`. */
+function stateProps(entry: ComponentExport): string[] {
+  return Object.keys(entry.props)
+    .filter((name) => entry.props[name]?.state === true)
+    .sort(compare);
 }
 
 /**
