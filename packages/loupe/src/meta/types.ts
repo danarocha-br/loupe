@@ -71,6 +71,8 @@ export type ComponentExport = {
   kind: "component";
   shape: ComponentShape;
   generic?: true;
+  /** The name also declares a type (`interface X` beside `function X`). */
+  alsoType?: true;
   props: Record<string, PropMeta>;
 };
 

@@ -20,8 +20,8 @@ export type Side = "ds" | "app";
 export type PlanInput = {
   /** Product layer directory, POSIX and relative to the repo root. */
   outDir: string;
-  /** Import specifier of the Product layer, e.g. `@repo/loupe`. */
-  specifier: string;
+  /** Import specifier of the Product layer, e.g. `@repo/loupe`; needed once anything is adapted. */
+  specifier: string | undefined;
   designSystem: {
     /** Package root, relative to the repo root. Adapted modules live under `<root>/components/`. */
     root: string;
@@ -36,7 +36,8 @@ export type PlanInput = {
 export type Coverage =
   | { outcome: "adapter" }
   | { outcome: "inspect-only"; reason: "server component" | "no Editable prop" }
-  | { outcome: "skipped-by-shape"; reason: ComponentShape };
+  /** `type and value`: an Adapter's `export const X` cannot also carry the original's type `X`. */
+  | { outcome: "skipped-by-shape"; reason: ComponentShape | "type and value" };
 
 export type CoverageEntry = { source: string; name: string; side: Side; coverage: Coverage };
 
@@ -53,6 +54,7 @@ export type Plan = {
  */
 export function coverageOf(module: ModuleMeta, entry: ComponentExport, side: Side): Coverage {
   if (!SUPPORTED_SHAPES.has(entry.shape)) return { outcome: "skipped-by-shape", reason: entry.shape };
+  if (entry.alsoType) return { outcome: "skipped-by-shape", reason: "type and value" };
   // A product file without `'use client'` renders on the server: there is no client
   // import to swap (PER-86). Design-system modules are swapped from client files.
   if (side === "app" && !module.client) return { outcome: "inspect-only", reason: "server component" };
@@ -60,6 +62,10 @@ export function coverageOf(module: ModuleMeta, entry: ComponentExport, side: Sid
     return { outcome: "inspect-only", reason: "no Editable prop" };
   }
   return { outcome: "adapter" };
+}
+
+export class MissingSpecifierError extends Error {
+  override name = "MissingSpecifierError";
 }
 
 export function plan(input: PlanInput): Plan {
@@ -95,6 +101,7 @@ export function plan(input: PlanInput): Plan {
     }
     if (adapted.length === 0) continue;
 
+    if (input.specifier === undefined) throw new MissingSpecifierError();
     const adapterFile = `adapters/${mirrored}`;
     const original = originalSpecifier(input, side, module.source, adapterFile);
     files.set(adapterFile, stampModule(adapterModule(module, adapted, original)));

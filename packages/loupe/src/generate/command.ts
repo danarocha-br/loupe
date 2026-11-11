@@ -5,7 +5,8 @@ import { extract } from "../meta/command.js";
 import { collectSources, compare } from "../meta/sources.js";
 import type { ModuleMeta } from "../meta/types.js";
 import { apply, type Change, diff, type Refusal } from "./apply.js";
-import { type CoverageEntry, plan } from "./plan.js";
+import { readHeader } from "./header.js";
+import { type CoverageEntry, MissingSpecifierError, plan } from "./plan.js";
 
 export type GenerateOptions = {
   /** Product layer directory (default `packages/loupe` under the repo root). */
@@ -20,6 +21,7 @@ export type GenerateOptions = {
   root?: string;
   check: boolean;
   verbose: boolean;
+  help?: boolean;
 };
 
 export type GenerateResult = {
@@ -47,15 +49,23 @@ Options:
 
 export function parseGenerateArgs(argv: readonly string[]): GenerateOptions | string {
   const options: GenerateOptions = { check: false, verbose: false };
-  const valued = { "--out": "out", "--design-system": "designSystem", "--app": "app", "--specifier": "specifier", "--root": "root" } as const;
+  const valued = new Map<string, "out" | "designSystem" | "app" | "specifier" | "root">([
+    ["--out", "out"],
+    ["--design-system", "designSystem"],
+    ["--app", "app"],
+    ["--specifier", "specifier"],
+    ["--root", "root"],
+  ]);
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i] ?? "";
+    const key = valued.get(arg);
     if (arg === "--check") options.check = true;
     else if (arg === "--verbose") options.verbose = true;
-    else if (arg in valued) {
+    else if (arg === "-h" || arg === "--help") options.help = true;
+    else if (key) {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith("--")) return `Missing value for ${arg}`;
-      options[valued[arg as keyof typeof valued]] = value;
+      options[key] = value;
       i += 1;
     } else return `Unknown option: ${arg}`;
   }
@@ -69,14 +79,27 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
   const outDir = toRepo(outAbs);
   if (outDir.startsWith("..")) throw new Error(`--out ${options.out} is outside the repo at ${repoRoot}`);
 
-  const previous = readPreviousRoots(path.join(outAbs, "adapt-list.json"));
+  // A hand-edited adapt-list.json is refused before its roots are believed.
+  const listFile = path.join(outAbs, "adapt-list.json");
+  const listText = existsSync(listFile) ? readFileSync(listFile, "utf8") : undefined;
+  if (listText !== undefined && readHeader(listText).kind === "edited") {
+    const refusals: Refusal[] = [{ file: "adapt-list.json", why: "edited" }];
+    const lines = [refusalLine(outDir, refusals[0] as Refusal), "Nothing written: 1 file in the way."];
+    return { ok: false, changes: [], refusals, unchanged: 0, coverage: [], lines };
+  }
+  const notes: string[] = [];
+  const previous = listText === undefined ? undefined : readPrevious(listText, notes);
   const dsRoot = rootFlag(options.designSystem, cwd, toRepo) ?? previous?.designSystem;
   const appRoot = rootFlag(options.app, cwd, toRepo) ?? previous?.app;
   if (!dsRoot || !appRoot) {
     throw new Error("Name the design system and the app the first time: --design-system <dir> --app <dir>");
   }
+  for (const [flag, root] of [["--design-system", dsRoot], ["--app", appRoot]] as const) {
+    if (root === "" || root.startsWith("..")) {
+      throw new Error(`${flag} must be a directory inside the repo, below its root`);
+    }
+  }
   const specifier = options.specifier ?? previous?.specifier ?? packageName(outAbs);
-  if (!specifier) throw new Error(`${outDir}/package.json has no name; pass --specifier <name>`);
 
   const dsAbs = path.join(repoRoot, dsRoot);
   const appAbs = path.join(repoRoot, appRoot);
@@ -85,16 +108,25 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
     ...readModules(path.join(appAbs, "tsconfig.json"), ["."], [outAbs], repoRoot),
   ];
   const dsPackage = readPackage(dsAbs);
-  const { files, coverage } = plan({
-    outDir,
-    specifier,
-    designSystem: { root: dsRoot, packageName: dsPackage && !dsPackage.exports ? dsPackage.name : undefined },
-    app: { root: appRoot },
-    modules,
-  });
+  let planned: ReturnType<typeof plan>;
+  try {
+    planned = plan({
+      outDir,
+      specifier,
+      designSystem: { root: dsRoot, packageName: dsPackage && !dsPackage.exports ? dsPackage.name : undefined },
+      app: { root: appRoot },
+      modules,
+    });
+  } catch (error) {
+    if (error instanceof MissingSpecifierError) {
+      throw new Error(`${outDir}/package.json has no name; pass --specifier <name>`);
+    }
+    throw error;
+  }
+  const { files, coverage } = planned;
 
   const { changes, refusals, unchanged } = diff(outAbs, files);
-  const lines: string[] = [];
+  const lines: string[] = [...notes];
   if (options.verbose) lines.push(...coverageList(coverage));
   lines.push(...summary(coverage));
 
@@ -104,7 +136,9 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
     return { ok: false, changes, refusals, unchanged, coverage, lines };
   }
   if (options.check) {
-    for (const change of changes) lines.push(`${outDir}/${change.file}: ${checkReason(change)}. Run loupe generate.`);
+    for (const change of changes) {
+      lines.push(`${outDir}/${change.file}: ${checkReason(change)}. Run loupe generate.`);
+    }
     lines.push(
       changes.length === 0
         ? `Up to date: ${unchanged} files.`
@@ -122,7 +156,8 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
 function readModules(tsconfig: string, include: string[], exclude: string[], repoRoot: string): ModuleMeta[] {
   if (!existsSync(tsconfig)) throw new Error(`No tsconfig.json at ${path.relative(repoRoot, tsconfig)}`);
   const sources = collectSources(tsconfig, include, exclude);
-  const { modules } = extract(sources, "auto");
+  // Pinned: the docgen fallback reads differently, and output must not depend on the machine.
+  const { modules } = extract(sources, "ts-morph");
   const rebase = (relative: string) =>
     path.relative(repoRoot, path.resolve(sources.root, relative)).split(path.sep).join("/");
   return modules.map((module) => ({
@@ -149,7 +184,9 @@ function summary(coverage: readonly CoverageEntry[]): string[] {
   const adapters = count("adapter");
   const inspectOnly = count("inspect-only");
   const shape = count("skipped-by-shape");
-  const lines = [`Coverage: ${adapters.length} Adapters · ${inspectOnly.length} Inspect only · ${shape.length} skipped by shape`];
+  const lines = [
+    `Coverage: ${adapters.length} Adapters · ${inspectOnly.length} Inspect only · ${shape.length} skipped by shape`,
+  ];
   if (inspectOnly.length > 0) lines.push(`  Inspect only: ${reasons(inspectOnly)}`);
   if (shape.length > 0) lines.push(`  Skipped by shape: ${reasons(shape)}`);
   return lines;
@@ -157,21 +194,24 @@ function summary(coverage: readonly CoverageEntry[]): string[] {
 
 function coverageList(coverage: readonly CoverageEntry[]): string[] {
   return coverage.map(({ source, name, coverage: c }) => {
-    const what = c.outcome === "adapter" ? "Adapter" : c.outcome === "inspect-only" ? `Inspect only (${c.reason})` : `Skipped by shape (${c.reason})`;
-    return `${source}#${name}: ${what}`;
+    if (c.outcome === "adapter") return `${source}#${name}: Adapter`;
+    const label = c.outcome === "inspect-only" ? "Inspect only" : "Skipped by shape";
+    return `${source}#${name}: ${label} (${c.reason})`;
   });
 }
 
 function refusalLine(outDir: string, { file, why }: Refusal): string {
-  return why === "edited"
-    ? `${outDir}/${file}: edited by hand since loupe generate wrote it. Delete it or git restore it, then rerun loupe generate.`
-    : `${outDir}/${file}: not written by loupe generate, and generate needs this path. Move it away, then rerun loupe generate.`;
+  const fix = why === "edited"
+    ? "edited by hand since loupe generate wrote it. Delete it or git restore it"
+    : "not written by loupe generate, and generate needs this path. Move it away";
+  return `${outDir}/${file}: ${fix}, then rerun loupe generate.`;
 }
 
 function checkReason(change: Change): string {
   if (change.why === "missing") return "missing";
   if (change.why === "stale") return "no longer generated";
   if (change.why === "formatVersion") return "written by another formatVersion";
+  if (change.why === "leftover") return "left over from an interrupted run";
   return "out of date";
 }
 
@@ -183,14 +223,17 @@ function rootFlag(value: string | undefined, cwd: string, toRepo: (abs: string) 
 }
 
 /** What an earlier run was told: its roots, and the specifier its Adapter paths start with. */
-function readPreviousRoots(file: string): { designSystem?: string; app?: string; specifier?: string } | undefined {
-  if (!existsSync(file)) return undefined;
+type Previous = { designSystem?: string; app?: string; specifier?: string };
+
+function readPrevious(text: string, notes: string[]): Previous | undefined {
   try {
-    const list = parseAdaptList(readFileSync(file, "utf8"), file);
+    const list = parseAdaptList(text);
     const adapter = Object.values(list.modules)[0]?.adapter;
     const at = adapter?.search(/\/adapters\/(ds|app)\//) ?? -1;
-    return { designSystem: list.designSystem[0], app: list.app[0], specifier: at > 0 ? adapter?.slice(0, at) : undefined };
-  } catch {
+    const specifier = at > 0 ? adapter?.slice(0, at) : undefined;
+    return { designSystem: list.designSystem[0], app: list.app[0], specifier };
+  } catch (error) {
+    notes.push(`Ignoring the existing adapt-list.json: ${error instanceof Error ? error.message : String(error)}`);
     return undefined;
   }
 }

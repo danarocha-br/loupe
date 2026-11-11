@@ -73,6 +73,10 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
       io.err(generateUsage);
       return 1;
     }
+    if (options.help) {
+      io.out(generateUsage);
+      return 0;
+    }
     try {
       const result = runGenerate(options, io.cwd ?? process.cwd());
       for (const line of result.lines) (result.ok ? io.out : io.err)(line);

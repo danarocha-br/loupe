@@ -17,7 +17,11 @@ const SOURCE = /\.(ts|tsx)$/;
 const SKIPPED = /\.d\.ts$|\.(test|spec|stories)\.(ts|tsx)$/;
 
 /** `exclude`: absolute directories never read, e.g. the Product layer inside an app. */
-export function collectSources(tsconfig: string, include: readonly string[], exclude: readonly string[] = []): SourceSet {
+export function collectSources(
+  tsconfig: string,
+  include: readonly string[],
+  exclude: readonly string[] = [],
+): SourceSet {
   const tsconfigPath = path.resolve(tsconfig);
   const root = path.dirname(tsconfigPath);
   const relative = (absolute: string) => path.relative(root, absolute).split(path.sep).join("/");
@@ -30,8 +34,7 @@ export function collectSources(tsconfig: string, include: readonly string[], exc
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (!excluded.has(full)) walk(full);
-      }
-      else if (SOURCE.test(entry.name) && !SKIPPED.test(entry.name)) files.push(full);
+      } else if (SOURCE.test(entry.name) && !SKIPPED.test(entry.name)) files.push(full);
     }
   };
   for (const dir of include.length > 0 ? include : ["."]) {

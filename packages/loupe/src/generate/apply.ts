@@ -2,7 +2,16 @@
 // Any hand-edited or foreign file in the way stops the whole run before a byte
 // is written (PER-100 §6): there is no `--force`, deleting the file is the consent.
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { compare } from "../meta/sources.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./header.js";
@@ -10,12 +19,13 @@ import { GENERATE_FORMAT_VERSION, readHeader } from "./header.js";
 /** Everything `generate` owns inside the Product layer. Other files there are left alone. */
 const OWNED_DIRS = ["adapters", "meta"];
 const OWNED_FILES = ["adapt-list.json"];
+const TEMP = ".loupe-tmp";
 
 export type Change = {
   /** Relative to the Product layer, POSIX. */
   file: string;
   action: "write" | "delete";
-  why: "missing" | "changed" | "formatVersion" | "stale";
+  why: "missing" | "changed" | "formatVersion" | "stale" | "leftover";
 };
 
 export type Refusal = { file: string; why: "edited" | "foreign" };
@@ -29,6 +39,11 @@ export function diff(outDir: string, desired: ReadonlyMap<string, string>): Diff
   const existing = ownedFiles(outDir);
 
   for (const file of existing) {
+    // Staged bytes from a run that was interrupted between staging and renaming.
+    if (file.endsWith(TEMP)) {
+      changes.push({ file, action: "delete", why: "leftover" });
+      continue;
+    }
     const content = readFileSync(path.join(outDir, file), "utf8");
     const want = desired.get(file);
     if (want === content) {
@@ -66,7 +81,7 @@ export function apply(outDir: string, desired: ReadonlyMap<string, string>, chan
     for (const change of changes) {
       if (change.action !== "write") continue;
       const target = path.join(outDir, change.file);
-      const temp = `${target}.loupe-tmp`;
+      const temp = `${target}${TEMP}`;
       mkdirSync(path.dirname(target), { recursive: true });
       writeFileSync(temp, desired.get(change.file) ?? "");
       staged.push([temp, target]);
@@ -75,12 +90,14 @@ export function apply(outDir: string, desired: ReadonlyMap<string, string>, chan
     for (const [temp] of staged) rmSync(temp, { force: true });
     throw error;
   }
-  for (const [temp, target] of staged) renameSync(temp, target);
+  // Deletes before renames: on a case-insensitive disk, `Badge.tsx` replacing a
+  // stale `badge.tsx` is the same file, and deleting after would remove the new one.
   for (const change of changes) {
     if (change.action !== "delete") continue;
     rmSync(path.join(outDir, change.file));
     pruneEmptyDirs(outDir, path.dirname(change.file));
   }
+  for (const [temp, target] of staged) renameSync(temp, target);
 }
 
 function ownedFiles(outDir: string): string[] {
@@ -89,7 +106,7 @@ function ownedFiles(outDir: string): string[] {
     for (const entry of readdirSync(path.join(outDir, relative), { withFileTypes: true })) {
       const child = `${relative}/${entry.name}`;
       if (entry.isDirectory()) walk(child);
-      else if (entry.isFile() && !entry.name.endsWith(".loupe-tmp")) found.push(child);
+      else if (entry.isFile()) found.push(child);
     }
   };
   for (const dir of OWNED_DIRS) if (existsSync(path.join(outDir, dir))) walk(dir);

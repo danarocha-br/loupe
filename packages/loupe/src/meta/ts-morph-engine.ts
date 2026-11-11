@@ -64,7 +64,9 @@ class ModuleReader {
         exports[name] = { kind: "type" };
         continue;
       }
-      exports[name] = this.exportEntry(name, decl, sf, readFiles);
+      const entry = this.exportEntry(name, decl, sf, readFiles);
+      if (entry.kind === "component" && decls.some(isType)) entry.alsoType = true;
+      exports[name] = entry;
     }
 
     if (!Object.values(exports).some((e) => e.kind === "component")) return undefined;
