@@ -79,7 +79,7 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/playground:
+  packages/loupe:
     devDependencies:
       '@types/node':
         specifier: ^22.19.0

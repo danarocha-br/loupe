@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Packs @danarocha/playground, installs the tarball into a throwaway project and
+# Packs @danarocha/loupe, installs the tarball into a throwaway project and
 # runs its bin: the path a product takes, which tests against `src` never do.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-pkg="$root/packages/playground"
+pkg="$root/packages/loupe"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -16,9 +16,9 @@ cd "$work/consumer"
 npm init -y >/dev/null
 npm install --no-audit --no-fund "$work/$tarball" >/dev/null
 
-actual="$(./node_modules/.bin/playground --version)"
+actual="$(./node_modules/.bin/loupe --version)"
 if [ "$actual" != "$expected" ]; then
-  echo "playground --version printed '$actual', expected '$expected'" >&2
+  echo "loupe --version printed '$actual', expected '$expected'" >&2
   exit 1
 fi
 echo "packed bin prints $actual"

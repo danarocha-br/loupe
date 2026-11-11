@@ -5,10 +5,10 @@ export type Io = {
   err: (line: string) => void;
 };
 
-const usage = `Usage: playground <command>
+const usage = `Usage: loupe <command>
 
 Options:
-  -v, --version  Print the installed Playground version`;
+  -v, --version  Print the installed Loupe version`;
 
 export function run(argv: readonly string[], io: Io): number {
   const [first] = argv;

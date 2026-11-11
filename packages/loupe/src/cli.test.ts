@@ -16,7 +16,7 @@ function capture(argv: string[]) {
   return { code, out, err };
 }
 
-describe("playground CLI", () => {
+describe("loupe CLI", () => {
   it.each([["--version"], ["-v"]])("%s prints the package version alone", (flag) => {
     expect(capture([flag])).toEqual({ code: 0, out: [version], err: [] });
   });
@@ -24,7 +24,7 @@ describe("playground CLI", () => {
   it("prints usage with no arguments", () => {
     const { code, out } = capture([]);
     expect(code).toBe(0);
-    expect(out.join("\n")).toContain("Usage: playground");
+    expect(out.join("\n")).toContain("Usage: loupe");
   });
 
   it("refuses an unknown command", () => {

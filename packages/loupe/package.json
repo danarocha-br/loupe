@@ -1,11 +1,11 @@
 {
-  "name": "@danarocha/playground",
+  "name": "@danarocha/loupe",
   "version": "0.0.1",
-  "description": "Dev-only component playground for Next.js apps.",
+  "description": "Inspect and override the props of real components in a running Next.js app.",
   "license": "UNLICENSED",
   "type": "module",
   "bin": {
-    "playground": "./dist/bin.js"
+    "loupe": "./dist/bin.js"
   },
   "files": [
     "dist"
@@ -18,8 +18,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danarocha-br/component-preview-skill.git",
-    "directory": "packages/playground"
+    "url": "git+https://github.com/danarocha-br/loupe.git",
+    "directory": "packages/loupe"
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
