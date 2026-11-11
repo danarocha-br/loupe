@@ -354,9 +354,9 @@ function protectedPaths(root: string, app: string | undefined, version: string):
   return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...known.map((t) => t.file)];
 }
 
-type Dirty = { blocking: string[]; other: string[] };
+export type Dirty = { blocking: string[]; other: string[] };
 
-function dirtyPaths(root: string, git: string, guarded: string[]): Dirty {
+export function dirtyPaths(root: string, git: string, guarded: string[]): Dirty {
   const out = execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
     cwd: root,
     encoding: "utf8",
@@ -404,7 +404,7 @@ function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: Ini
   return true;
 }
 
-function gitTop(root: string): string | undefined {
+export function gitTop(root: string): string | undefined {
   try {
     return execFileSync("git", ["rev-parse", "--show-toplevel"], {
       cwd: root,
