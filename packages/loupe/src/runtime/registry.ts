@@ -15,6 +15,8 @@ import {
   type OverrideStore,
   type Props,
   reaches,
+  type Scope,
+  type ScopeTarget,
 } from "./store.js";
 
 export const ANCHOR_PROP = "data-ds-anchor";
@@ -131,6 +133,21 @@ export function identityOf(
     route: currentRoute(),
     total: hintTotal(instance.hint),
   };
+}
+
+/** The record an Override on this Instance at `scope` goes into; null for a group with no call site. */
+export function scopeTarget(
+  instance: Pick<MountedInstance, "id" | "anchor" | "component">,
+  scope: Scope,
+): ScopeTarget | null {
+  switch (scope) {
+    case "instance":
+      return { scope, id: instance.id };
+    case "group":
+      return instance.anchor.startsWith(UNANCHORED) ? null : { scope, anchor: instance.anchor };
+    case "page":
+      return { scope, route: currentRoute(), component: instance.component };
+  }
 }
 
 const WRAPPED = Symbol.for("loupe.historyWrapped");

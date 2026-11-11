@@ -104,7 +104,7 @@ export type OverrideStore = {
 };
 
 /** Narrowest first, the order `records()` lists them in (`targetsOf` keeps the same order). */
-const PRECEDENCE: readonly Scope[] = ["instance", "group", "page"];
+export const PRECEDENCE: readonly Scope[] = ["instance", "group", "page"];
 
 /** Whether a record for `target` reaches this Instance, exclusions aside. */
 export function reaches(target: ScopeTarget, instance: InstanceIdentity): boolean {
@@ -119,7 +119,7 @@ export function reaches(target: ScopeTarget, instance: InstanceIdentity): boolea
 }
 
 /** The record's key within its scope. */
-function keyOf(target: ScopeTarget): string {
+export function keyOf(target: ScopeTarget): string {
   switch (target.scope) {
     case "instance":
       return target.id;

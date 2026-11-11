@@ -8,7 +8,7 @@ import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
 import type { Scope } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
-import { type Editing, PropRowView, ScopeRowView } from "./controls.js";
+import { attempt, type Editing, PropRowView, ScopeRowView } from "./controls.js";
 import { hasInstanceRecord, safeInspect, safeProps } from "./page.js";
 import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
@@ -164,7 +164,7 @@ function Inspector(props: PanelProps & { id: string }) {
     );
   }
   const ancestors = debug.ancestors(id);
-  const rows = pageRows(page);
+  const rows = page.rows;
   const row = rows.find((candidate) => candidate.id === id) ?? null;
   // Null for a server-rendered Instance or while Overrides are off: no controls then.
   const live = inspection.rendered === "client" && debug.status.overrides ? safeProps(debug, id) : null;
@@ -215,8 +215,8 @@ function Inspector(props: PanelProps & { id: string }) {
           </div>
         )}
       </div>
-      {editing && row && <ScopePicker {...props} row={row} rows={rows} />}
-      {scoped && <MembersCard {...props} view={view} rows={rows} />}
+      {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
+      {scoped && <MembersCard debug={debug} id={id} view={view} rows={rows} onHover={props.onHover} />}
       <CallSiteCard inspection={inspection} />
       {inspection.note && (
         <div className="banner" role="note">
@@ -236,7 +236,7 @@ function Inspector(props: PanelProps & { id: string }) {
           <div className="muted">None</div>
         ) : scoped ? (
           editable.map((candidate) => (
-            <ScopeRowView key={candidate.name} row={candidate} editing={editing} view={view} onSelect={(next) => onSelect(next)} />
+            <ScopeRowView key={candidate.name} row={candidate} editing={editing} view={view} onSelect={onSelect} onHover={props.onHover} />
           ))
         ) : (
           editable.map((candidate) => <PropRowView key={candidate.name} row={candidate} editing={editing} />)
@@ -267,16 +267,17 @@ function Inspector(props: PanelProps & { id: string }) {
   );
 }
 
-/** Every Instance on the page, in list order. */
-function pageRows(page: PageSnapshot): InstanceRow[] {
-  return page.groups.flatMap((group) => group.instances);
-}
-
 /** This instance, every Instance from this call site, every Instance on this page: each with its size. */
-function ScopePicker({ debug, page, scope, onScope, row, rows }: PanelProps & { row: InstanceRow; rows: InstanceRow[] }) {
+function ScopePicker({
+  debug,
+  page,
+  scope,
+  onScope,
+  row,
+}: Pick<PanelProps, "debug" | "page" | "scope" | "onScope"> & { row: InstanceRow }) {
   const options = (["instance", "group", "page"] as const).map((option) => ({
     option,
-    view: scopeView(debug, rows, page.records, row, option),
+    view: scopeView(debug, page.rows, page.records, row, option),
   }));
   return (
     <div className="card">
@@ -304,17 +305,18 @@ function ScopePicker({ debug, page, scope, onScope, row, rows }: PanelProps & { 
  * Who a group or page change reaches, with a box to leave each one out. A page
  * scope groups them by call site, so one box leaves a whole call site out.
  */
-function MembersCard({ debug, id, view, rows, onHover }: PanelProps & { id: string; view: ScopeView; rows: InstanceRow[] }) {
+function MembersCard({
+  debug,
+  id,
+  view,
+  rows,
+  onHover,
+}: Pick<PanelProps, "debug" | "onHover"> & { id: string; view: ScopeView; rows: InstanceRow[] }) {
   const scope = view.scope as "group" | "page";
   const anchorOf = new Map(rows.map((candidate) => [candidate.id, candidate.anchor]));
-  const toggle = (memberId: string, out: boolean) => {
-    try {
-      if (out) debug.include(memberId, scope);
-      else debug.exclude(memberId, scope);
-    } catch {
-      // It unmounted between a frame and the click; the next frame drops it.
-    }
-  };
+  const toggle = (memberId: string, out: boolean) =>
+    attempt(() => (out ? debug.include(memberId, scope) : debug.exclude(memberId, scope)));
+  const suspended = view.record?.suspended != null;
   const bySite = new Map<string, ScopeView["members"]>();
   for (const member of view.members) {
     const anchor = anchorOf.get(member.id) ?? "";
@@ -323,7 +325,13 @@ function MembersCard({ debug, id, view, rows, onHover }: PanelProps & { id: stri
   const memberItem = (member: ScopeView["members"][number]) => (
     <li key={member.id} onMouseEnter={() => onHover([member.id])} onMouseLeave={() => onHover([])}>
       <label>
-        <input type="checkbox" data-member={member.id} checked={!member.out} onChange={() => toggle(member.id, member.out)} />{" "}
+        <input
+          type="checkbox"
+          data-member={member.id}
+          checked={!member.out}
+          disabled={suspended}
+          onChange={() => toggle(member.id, member.out)}
+        />{" "}
         <span className="mono">{member.id === id ? "This instance" : keyOf(member.id)}</span>
         {member.out && <span className="tag">Left out</span>}
       </label>
@@ -346,11 +354,12 @@ function MembersCard({ debug, id, view, rows, onHover }: PanelProps & { id: stri
                     type="checkbox"
                     data-site={anchor}
                     checked={allIn}
+                    disabled={suspended}
                     onChange={() => {
                       for (const member of members) if (member.out !== allIn) toggle(member.id, member.out);
                     }}
                   />{" "}
-                  <span className="mono">{anchor}</span> · {members.length}
+                  <span className="mono">{anchor || "No call site"}</span> · {members.length}
                 </label>
               </legend>
               <ul className="list">{members.map(memberItem)}</ul>
@@ -379,13 +388,7 @@ function MembersCard({ debug, id, view, rows, onHover }: PanelProps & { id: stri
       <button
         type="button"
         disabled={view.record === null}
-        onClick={() => {
-          try {
-            debug.discard(view.target);
-          } catch {
-            // Overrides went off: the banner says so.
-          }
-        }}
+        onClick={() => attempt(() => debug.discard(view.target))}
       >
         Reset this scope
       </button>

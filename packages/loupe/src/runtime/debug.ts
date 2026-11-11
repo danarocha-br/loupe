@@ -27,14 +27,13 @@ import type { Authorship } from "./authored.js";
 import { type Fiber, fiberOfNode, keyPathOf, rootFibers, walkFibers } from "./fiber.js";
 import {
   ANCHOR_PROP,
-  currentRoute,
   identityOf,
   instanceId,
   type MountedInstance,
   registry,
   SOURCE_PROP,
+  scopeTarget,
   type Status,
-  UNANCHORED,
   uniqueId,
   withoutLoaderProps,
 } from "./registry.js";
@@ -168,19 +167,12 @@ export function createDebug(): LoupeDebug {
 
   /** The record an Override on this Instance at this scope goes into. */
   const targetOf = (instance: MountedInstance, scope: Scope): ScopeTarget => {
-    switch (scope) {
-      case "instance":
-        return { scope, id: instance.id };
-      case "group":
-        if (instance.anchor.startsWith(UNANCHORED)) {
-          throw new Error(`[loupe] ${instance.id}: no call site was anchored here, so it has no group.`);
-        }
-        return { scope, anchor: instance.anchor };
-      case "page":
-        return { scope, route: currentRoute(), component: instance.component };
-      default:
-        throw new Error(`[loupe] Unknown scope ${JSON.stringify(scope)}: use "instance", "group" or "page".`);
+    if (!["instance", "group", "page"].includes(scope)) {
+      throw new Error(`[loupe] Unknown scope ${JSON.stringify(scope)}: use "instance", "group" or "page".`);
     }
+    const target = scopeTarget(instance, scope);
+    if (!target) throw new Error(`[loupe] ${instance.id}: no call site was anchored here, so it has no group.`);
+    return target;
   };
 
   const assertEditable = (): void => {

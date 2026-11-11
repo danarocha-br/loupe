@@ -5,14 +5,13 @@
 
 import { useEffect, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
+import type { Member } from "./scopes.js";
 
 /** `hover`: dashed grey; `out`: left out of the scope, dashed. */
 type Kind = "ring" | "hover" | "out";
 type Target = { id: string; node: Element; label: string | null; kind: Kind };
 type Ring = { key: string; top: number; left: number; width: number; height: number; label: string | null; kind: Kind };
 
-/** A scope's member: `out` when it was left out. */
-export type RingMember = { id: string; out: boolean };
 
 function targetsFor(debug: LoupeDebug, id: string, kind: Kind, label: string | null): Target[] {
   return debug.nodes(id).map((node, index) => ({ id, node, label: index === 0 ? label : null, kind }));
@@ -39,7 +38,7 @@ export function Highlight({
   selectedLabel: string | null;
   hovered: readonly string[];
   /** At a group or page scope, every Instance it reaches; null at This instance. */
-  members: readonly RingMember[] | null;
+  members: readonly Member[] | null;
 }) {
   const [rings, setRings] = useState<Ring[]>([]);
   const hoveredKey = hovered.join("\n");
@@ -49,8 +48,9 @@ export function Highlight({
     const scoped = membersKey === null ? null : membersKey.split("\n").filter((entry) => entry !== "");
     let targets: Target[];
     if (scoped !== null && hoveredIds.length > 0) {
-      // Hovering a row of the scope's Instances list rings only that one.
-      targets = hoveredIds.flatMap((id) => targetsFor(debug, id, "ring", id === selected ? selectedLabel : null));
+      // Hovering a row of the scope's Instances list rings only that one, dashed if it is left out.
+      const out = new Set(scoped.filter((entry) => entry.startsWith("-")).map((entry) => entry.slice(1)));
+      targets = hoveredIds.flatMap((id) => targetsFor(debug, id, out.has(id) ? "out" : "ring", id === selected ? selectedLabel : null));
     } else if (scoped !== null) {
       targets = scoped.flatMap((entry) => {
         const id = entry.slice(1);

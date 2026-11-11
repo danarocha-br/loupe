@@ -34,3 +34,14 @@ export function formatDefault(value: DefaultValue): string {
   if (value.source === "unknown" || value.value === null) return "DEFAULT";
   return `DEFAULT ${formatCurrent(value.value)}`;
 }
+
+/**
+ * The app's value as a control starts from it: set, else a known default. A
+ * `conflict` or `unknown` default is no value at all: we never guess (PER-84).
+ */
+export function appValue(row: { set: boolean; value: unknown; default?: DefaultValue }): unknown {
+  if (row.set) return row.value;
+  const known = row.default;
+  if (known && (known.source === "destructure" || known.source === "defaultVariants")) return known.value ?? undefined;
+  return undefined;
+}

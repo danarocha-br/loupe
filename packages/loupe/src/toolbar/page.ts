@@ -21,6 +21,8 @@ export type ComponentGroup = {
 
 export type PageSnapshot = {
   status: Status;
+  /** Every Instance on the page, browser- and server-rendered. */
+  rows: InstanceRow[];
   groups: ComponentGroup[];
   /** Components seen earlier on this page with no Instance mounted now, such as a closed menu's. */
   interaction: string[];
@@ -102,6 +104,7 @@ export function snapshot(debug: LoupeDebug, seen: SeenComponents): PageSnapshot 
   const records = debug.records();
   return {
     status,
+    rows,
     groups,
     interaction: [...seen.components].filter((component) => !byComponent.has(component)).sort(),
     records,

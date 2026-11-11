@@ -430,8 +430,10 @@ describe("group and page scopes", () => {
     expect(ringKinds()).toEqual(["ring", "ring", "ring", "ring"]);
     expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe("SAME ON ALL 4");
     expect(pill("variant", '"ghost"').getAttribute("aria-pressed")).toBe("true");
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from the app");
 
     await clickInPanel(pill("variant", '"default"'));
+    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe(`from ${GROUP}`);
     expect(variants()).toEqual(["default", "default", "default", "default"]);
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "group", anchor: "app/members.tsx › Members › Button[1]" }]);
     expect(loupe.props(MENU).overrides).toEqual({});
@@ -462,6 +464,10 @@ describe("group and page scopes", () => {
     expect(variants()).toEqual(["default", "ghost", "default", "default"]);
     expect(ringKinds().filter((kind) => kind === "out")).toHaveLength(1);
     expect(pill("variant", '"ghost"').textContent).toBe('"ghost" 3');
+    // Hovering the left-out row rings it alone, still dashed.
+    act(() => member(BIA).closest("li")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true })));
+    await settle();
+    expect(ringKinds()).toEqual(["out"]);
 
     // Ana gets her own value on top of the group's.
     await backToList();
@@ -493,6 +499,32 @@ describe("group and page scopes", () => {
     expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe(ANA);
     expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
     expect(inRow("children", "Reset to group value")).toBeTruthy();
+  });
+
+  it("notes a narrower value only where this scope overrides the prop", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+    });
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    expect(row("variant").querySelector(".keeping")).toBeNull();
+    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe("SAME ON ALL 4");
+  });
+
+  it("opens at This instance again when a scoped Instance comes back after unmounting", async () => {
+    await mount();
+    act(() => pageButton("Menu").click());
+    await settle();
+    const item = loupe.list("MenuItem")[0]?.id as string;
+    await select(item);
+    await clickInPanel(scopeButton("group"));
+    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    act(() => pageButton("Menu").click());
+    await settle();
+    act(() => pageButton("Menu").click());
+    await settle();
+    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
   });
 
   it("counts differing Current values at page scope and leaves a whole call site out in one click", async () => {
