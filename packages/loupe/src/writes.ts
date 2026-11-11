@@ -73,8 +73,9 @@ export function readCallSiteWrites(
 
   let children = classifyChildren((element.children as Node[] | undefined) ?? []);
   // React keeps a `children` attribute only when the element has no children of its own.
-  if (children === "none" && childrenAttribute !== undefined) {
-    children = childrenAttribute === null ? "from-code" : classifyChildren([childrenAttribute]);
+  if (childrenAttribute !== undefined) {
+    if (children !== "none") written.delete("children");
+    else children = childrenAttribute === null ? "from-code" : classifyChildren([childrenAttribute]);
   }
 
   return { attributes: [...written.values()], spreads, children };
@@ -98,16 +99,17 @@ export function parseCallSiteWrites(value: unknown): CallSiteWrites | null {
   const { attributes, spreads, children } = data as Record<string, unknown>;
   if (!Array.isArray(attributes) || typeof spreads !== "boolean") return null;
   if (!CHILDREN_KINDS.includes(children as ChildrenKind)) return null;
-  const valid = attributes.every((attribute: unknown) => {
-    if (typeof attribute !== "object" || attribute === null) return false;
+  const written: AttributeWrite[] = [];
+  for (const attribute of attributes as unknown[]) {
+    if (typeof attribute !== "object" || attribute === null) return null;
     const { name, writtenAs, expression } = attribute as Record<string, unknown>;
-    return (
-      typeof name === "string" &&
-      (writtenAs === "literal" || writtenAs === "expression") &&
-      (expression === undefined || typeof expression === "string")
-    );
-  });
-  return valid ? (data as CallSiteWrites) : null;
+    if (typeof name !== "string" || name === "") return null;
+    if (writtenAs === "literal" && expression === undefined) written.push({ name, writtenAs });
+    else if (writtenAs === "expression" && typeof expression === "string") {
+      written.push({ name, writtenAs, expression });
+    } else return null;
+  }
+  return { attributes: written, spreads, children: children as ChildrenKind };
 }
 
 function attributeName(name: Node): string {
@@ -121,8 +123,23 @@ function attributeName(name: Node): string {
 function describeValue(name: string, value: Node | null, source: string): AttributeWrite {
   if (value === null || value.type === "StringLiteral") return { name, writtenAs: "literal" };
   const expression = value.type === "JSXExpressionContainer" ? (value.expression as Node) : value;
-  if (isLiteral(expression)) return { name, writtenAs: "literal" };
+  if (isLiteral(unwrap(expression))) return { name, writtenAs: "literal" };
   return { name, writtenAs: "expression", expression: shorten(source.slice(expression.start, expression.end)) };
+}
+
+// `"ghost" as const` and friends: still the literal, as far as a source edit goes.
+const TYPE_WRAPPERS = new Set([
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSNonNullExpression",
+  "TSTypeAssertion",
+  "ParenthesizedExpression",
+]);
+
+function unwrap(node: Node): Node {
+  let inner = node;
+  while (TYPE_WRAPPERS.has(inner.type)) inner = inner.expression as Node;
+  return inner;
 }
 
 function isLiteral(node: Node): boolean {
@@ -146,8 +163,11 @@ function isLiteral(node: Node): boolean {
 }
 
 function shorten(text: string): string {
-  const line = text.replace(/\s+/g, " ").trim();
-  return line.length <= EXPRESSION_LENGTH ? line : `${line.slice(0, EXPRESSION_LENGTH - 1)}…`;
+  // By code point, so an emoji is never cut in half.
+  const line = [...text.replace(/\s+/g, " ").trim()];
+  return line.length <= EXPRESSION_LENGTH
+    ? line.join("")
+    : `${line.slice(0, EXPRESSION_LENGTH - 1).join("")}…`;
 }
 
 type Piece = "text" | "space" | "code" | "elements";
@@ -155,7 +175,8 @@ type Piece = "text" | "space" | "code" | "elements";
 function classifyChildren(nodes: readonly Node[]): ChildrenKind {
   const pieces = nodes.flatMap(piece);
   const kinds = new Set(pieces.filter((kind) => kind !== "space"));
-  // A space between elements is not a label; a space alone is the whole text.
+  // A plain space beside other content is not a label (`<Icon /> <Icon />` is
+  // elements, not mixed); a space alone is the whole text.
   if (kinds.size === 0) return pieces.length > 0 ? "text" : "none";
   if (kinds.size > 1) return "mixed";
   const [kind] = kinds;
@@ -178,15 +199,18 @@ function piece(node: Node): Piece[] {
       return ["elements"];
     case "JSXExpressionContainer": {
       const expression = node.expression as Node;
-      return expression.type === "JSXEmptyExpression" ? [] : piece(expression);
+      return expression.type === "JSXEmptyExpression" ? [] : piece(unwrap(expression));
     }
     default:
       return ["code"];
   }
 }
 
+// Only what React's JSX cleanup trims: a non-breaking space is text.
+const BLANK = /^[ \t\r\n]*$/;
+
 function textPiece(value: string, isJsxText: boolean): Piece[] {
-  if (value.trim() !== "") return ["text"];
+  if (!BLANK.test(value)) return ["text"];
   // React drops JSXText that is only whitespace across lines.
   if (isJsxText && value.includes("\n")) return [];
   return ["space"];

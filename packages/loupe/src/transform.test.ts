@@ -280,6 +280,10 @@ describe("transform: what each call site writes", () => {
     ["text split by a literal space", '<Button>Remover{" "}membro</Button>'],
     ["a lone space", "<Button> </Button>"],
     ["a string-literal children attribute", '<Button children="Cancelar" />'],
+    ["a string literal with a type assertion", '<Button>{"Cancelar" as const}</Button>'],
+    ["text beside a comment", "<Button>{/* copy */}Cancelar</Button>"],
+    ["a non-breaking space on its own line", "<Button>\n      &nbsp;\n    </Button>"],
+    ["a children attribute with a comment-only body", '<Button children="Cancelar">{/* later */}</Button>'],
   ])("classifies %s as text", (_, jsx) => {
     expect(childrenOf(jsx)).toBe("text");
   });
@@ -294,6 +298,7 @@ describe("transform: what each call site writes", () => {
     ["a call", "<Button>{t(\"remove\")}</Button>"],
     ["a number", "<Button>{3}</Button>"],
     ["an expression children attribute", "<Button children={label} />"],
+    ["a spread child", "<Button>{...parts}</Button>"],
   ])("classifies %s as from-code", (_, jsx) => {
     expect(childrenOf(jsx)).toBe("from-code");
   });
@@ -304,6 +309,7 @@ describe("transform: what each call site writes", () => {
     ["text plus an element on its own line", "<Button>\n      Enviando…\n      <Icon />\n    </Button>"],
     ["an element plus an expression", "<Button><Icon />{label}</Button>"],
     ["a conditional element plus text", "<Button>{ok && <Icon />}Enviando…</Button>"],
+    ["a non-breaking space plus an element", "<Button>&nbsp;<Icon /></Button>"],
   ])("classifies %s as mixed", (_, jsx) => {
     expect(childrenOf(jsx)).toBe("mixed");
   });
@@ -314,6 +320,8 @@ describe("transform: what each call site writes", () => {
     ["two elements separated by a space", "<Button><Icon /> <Icon /></Button>"],
     ["a fragment", "<Button><><Icon /></></Button>"],
     ["an element children attribute", "<Button children={<Icon />} />"],
+    // The text sits inside another element, so it is not the call site's own literal.
+    ["a fragment holding text", "<Button><>Cancelar</></Button>"],
   ])("classifies %s as elements", (_, jsx) => {
     expect(childrenOf(jsx)).toBe("elements");
   });
@@ -328,7 +336,10 @@ describe("transform: what each call site writes", () => {
   });
 
   it("lets JSX children win over a children attribute, as React does", () => {
-    expect(childrenOf("<Button children={label}>Cancelar</Button>")).toBe("text");
+    const writes = writesOf("<Button children={label} variant=\"ghost\">Cancelar</Button>");
+    expect(writes.children).toBe("text");
+    // React discards the attribute, so it is not a prop the call site passes.
+    expect(writes.attributes.map((attribute) => attribute.name)).toEqual(["variant"]);
   });
 
   it("records the attribute names the call site writes, in source order", () => {
@@ -362,6 +373,14 @@ describe("transform: what each call site writes", () => {
     ]);
   });
 
+  it("counts a literal behind a type assertion as a literal", () => {
+    const writes = writesOf('<Button variant={"ghost" as const} size={-1 satisfies number} />');
+    expect(writes.attributes).toEqual([
+      { name: "variant", writtenAs: "literal" },
+      { name: "size", writtenAs: "literal" },
+    ]);
+  });
+
   it("keeps an expression's text short and on one line", () => {
     const writes = writesOf(
       "<Button onClick={() => {\n        startTransition(async () => {\n          await removeMemberFromOrganization(member.id, organization.id);\n        });\n      }} />",
@@ -371,6 +390,20 @@ describe("transform: what each call site writes", () => {
     expect(expression.length).toBeLessThanOrEqual(80);
     expect(expression.startsWith("() => { startTransition(async () => {")).toBe(true);
     expect(expression.endsWith("…")).toBe(true);
+  });
+
+  it("never cuts a character in half when truncating", () => {
+    const writes = writesOf(`<Button onClick={() => "${"x".repeat(71)}😀😀😀tail"} />`);
+    const expression = writes.attributes[0]?.expression ?? "";
+    expect(expression.endsWith("😀…")).toBe(true);
+    expect(expression).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/); // no lone high surrogate
+  });
+
+  it("emits code that parses whatever the expression text holds", () => {
+    const source = `import { Button } from "@ds/button";\nexport const X = () => <Button title={'a "q" \\\\ \u2028 </script>' + x} />;\n`;
+    const { code, callSites } = run(source);
+    expect(() => parse(code, { sourceType: "module", plugins: ["typescript", "jsx"] })).not.toThrow();
+    expect(callSites[0]?.writes.attributes[0]?.expression).toContain("</script>");
   });
 
   it("leaves out key and Loupe's own attributes, and keeps the last of a repeated name", () => {
@@ -423,8 +456,16 @@ describe("parseCallSiteWrites", () => {
     ["the wrong shape", JSON.stringify({ attributes: "variant", spreads: false, children: "text" })],
     ["an unknown children kind", JSON.stringify({ attributes: [], spreads: false, children: "words" })],
     ["an unknown writtenAs", JSON.stringify({ attributes: [{ name: "a", writtenAs: "maybe" }], spreads: false, children: "none" })],
+    ["an empty name", JSON.stringify({ attributes: [{ name: "", writtenAs: "literal" }], spreads: false, children: "none" })],
+    ["an expression with no text", JSON.stringify({ attributes: [{ name: "a", writtenAs: "expression" }], spreads: false, children: "none" })],
+    ["a literal with expression text", JSON.stringify({ attributes: [{ name: "a", writtenAs: "literal", expression: "x" }], spreads: false, children: "none" })],
   ])("returns null for %s", (_, value) => {
     expect(parseCallSiteWrites(value)).toBeNull();
+  });
+
+  it("keeps only the fields a record has", () => {
+    const value = JSON.stringify({ attributes: [{ name: "a", writtenAs: "literal", extra: 1 }], spreads: false, children: "none", extra: 1 });
+    expect(parseCallSiteWrites(value)).toEqual({ attributes: [{ name: "a", writtenAs: "literal" }], spreads: false, children: "none" });
   });
 });
 
