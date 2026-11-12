@@ -54,12 +54,25 @@ export type MountedInstance = {
   renders: number;
 };
 
+/** An Instance as it last rendered before it unmounted: what the Toolbar shows for a record it holds. */
+export type LastSeen = {
+  component: string;
+  anchor: string;
+  hint: string | null;
+  /** The pathname it rendered on. */
+  route: string;
+  /** Its Current value (the app's own props) at its last commit. */
+  current: Props;
+};
+
 /** Overrides are disabled and everything is inspect-only while this is set. */
 export type Status = { overrides: true } | { overrides: false; reason: string };
 
 export type Registry = {
   store: OverrideStore;
   instances: Map<string, MountedInstance>;
+  /** Every Instance that unmounted and has not mounted again, by id. */
+  departed: Map<string, LastSeen>;
   status: Status;
   /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
   listeners: Set<() => void>;
@@ -72,11 +85,13 @@ export function registry(): Registry {
   let value = host[GLOBAL_KEY];
   // One made by an earlier version of this module, kept across a Fast Refresh.
   if (value && !value.listeners) value.listeners = new Set();
+  if (value && !value.departed) value.departed = new Map();
   if (!value) {
     const problem = internalsProblem();
     value = {
       store: createOverrideStore(),
       instances: new Map(),
+      departed: new Map(),
       status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
       listeners: new Set(),
     };
@@ -209,10 +224,11 @@ export function instanceId(anchor: string, keyPath: string): string {
  * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
-  const { instances, store } = registry();
+  const { instances, departed, store } = registry();
   const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id };
   instances.set(id, instance);
+  departed.delete(id);
   // Also when this one took the free base id while a `~n` is still mounted.
   const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
   if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
@@ -233,9 +249,16 @@ export function uniqueId(base: string, taken: { has(id: string): boolean }): str
 }
 
 export function unregister(instance: MountedInstance): void {
-  const { instances } = registry();
+  const { instances, departed } = registry();
   if (instances.get(instance.id) !== instance) return;
   instances.delete(instance.id);
+  departed.set(instance.id, {
+    component: instance.component,
+    anchor: instance.anchor,
+    hint: instance.hint,
+    route: currentRoute(),
+    current: instance.live().current,
+  });
   emitChange();
 }
 

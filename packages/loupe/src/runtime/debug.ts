@@ -15,6 +15,7 @@
 //                                          the mounted Instances it names (none: "No Instance mounted")
 //   __loupe.reapply(target)                a "code changed" record applies again (target: a record's `target`)
 //   __loupe.discard(target)                drops a record, mounted or not
+//   __loupe.lastSeen(id)                   an unmounted Instance as it last rendered, or null
 //   __loupe.pick(element)          the Instance that rendered a DOM node
 //   __loupe.scan()                 server-rendered Instances, from React's `_debugInfo`
 //   __loupe.inspect(id)            the inspector's rows: every prop, Editable or inspect-only
@@ -30,6 +31,7 @@ import {
   ANCHOR_PROP,
   identityOf,
   instanceId,
+  type LastSeen,
   type MountedInstance,
   registry,
   SOURCE_PROP,
@@ -105,6 +107,8 @@ export type LoupeDebug = {
   records(): RecordRow[];
   reapply(target: ScopeTarget): RecordRow[];
   discard(target: ScopeTarget): RecordRow[];
+  /** An Instance that unmounted, as it last rendered: null while it is mounted or was never seen. */
+  lastSeen(id: string): LastSeen | null;
   pick(element: Element): string | null;
   scan(): ServerInstance[];
   inspect(id: string): Inspection;
@@ -359,6 +363,12 @@ export function createDebug(): LoupeDebug {
       assertEditable();
       reg.store.reset(target);
       return records();
+    },
+
+    lastSeen(id) {
+      const seen = reg.departed.get(id);
+      // Shallow: a Current value can hold functions and elements, which can't be cloned.
+      return seen && !reg.instances.has(id) ? { ...seen, current: { ...seen.current } } : null;
     },
 
     pick(element) {
