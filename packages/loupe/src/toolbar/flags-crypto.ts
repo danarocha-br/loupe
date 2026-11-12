@@ -4,13 +4,15 @@
 // format, and the discovery endpoint accepts an access proof in it. Server only:
 // the secret never leaves the dev server.
 
+import { PREVIEW_SECONDS } from "./flags-lifetime.js";
+
 const HEADER = base64url(new TextEncoder().encode(JSON.stringify({ alg: "dir", enc: "A256GCM" })));
 const TAG_BYTES = 16;
 
 export type Claims = Record<string, unknown>;
 
-/** Overrides as `flags/next` decrypts them: `{ o, pur: "overrides" }`. */
-export function encryptOverrides(overrides: Claims, secret: string, ttlSeconds = 7 * 24 * 3600): Promise<string> {
+/** Overrides as `flags/next` decrypts them: `{ o, pur: "overrides" }`. Expires with the preview cookie. */
+export function encryptOverrides(overrides: Claims, secret: string, ttlSeconds = PREVIEW_SECONDS): Promise<string> {
   return encryptJwe({ o: overrides, pur: "overrides" }, secret, ttlSeconds);
 }
 

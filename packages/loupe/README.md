@@ -213,3 +213,11 @@ missing. The discovery request goes to the dev server's loopback address, never
 to the host a request names. The preview lives in the cookie, so it survives a
 reload, and the Proposal builder reads it back with `previewedFlags()`.
 
+A preview lasts 8 hours from the last flag you change, and then the cookie
+expires. Cookies ignore the port, so until then the cookie reaches every app on
+`localhost`, and `flags/next` answers 500 (`flags: Missing FLAGS_SECRET`) in one
+that has no `FLAGS_SECRET`. Press **Clear flag previews** before you switch
+projects. If another app already fails that way, delete the
+`vercel-flag-overrides` cookie for `localhost` in the browser (in Chrome,
+DevTools → Application → Cookies) and reload.
+

@@ -13,6 +13,7 @@ import {
   readFlags,
   writeFlagOverrides,
 } from "./flags-server.js";
+import { PREVIEW_HOURS } from "./flags-lifetime.js";
 
 export type FlagsView =
   | { status: "loading" }
@@ -152,6 +153,10 @@ export function FlagsCard() {
           >
             Clear flag previews
           </button>
+          <div className="muted">
+            A preview lasts {PREVIEW_HOURS} hours, in a cookie every app on localhost shares. Clear it before
+            switching projects.
+          </div>
         </>
       )}
     </div>
