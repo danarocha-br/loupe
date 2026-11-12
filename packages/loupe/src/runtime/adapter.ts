@@ -29,7 +29,7 @@ import {
   unregister,
   withoutLoaderProps,
 } from "./registry.js";
-import { createHoldTracker, formatValue, holdStateHandlers, trackHeldStates } from "./state.js";
+import { createHoldTracker, formatValue, holdStateHandlers, statesOnly, trackHeldStates } from "./state.js";
 import type { Props } from "./store.js";
 
 export type AdapterOptions = {
@@ -108,10 +108,11 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
     // borrows another's for a render.
     const registered = mounted.current?.baseId === baseId ? mounted.current.instance : null;
 
-    const resolved =
+    const all =
       reg?.status.overrides && identified && registered
         ? reg.store.resolve({ ...identityOf(registered), current: props })
         : null;
+    const resolved = all && reg?.view === "before" ? statesOnly(all, props, stateProps) : all;
     const overrides = resolved?.overrides ?? {};
 
     // Says once per attempt that an Override holds a State prop the app wants to

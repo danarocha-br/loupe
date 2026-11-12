@@ -72,6 +72,34 @@ export type ProposalInput = {
   currentRoute: string;
   /** Previewed flags; the override cookie is site-wide, so every route group carries them. */
   flags: Readonly<Record<string, JsonValue>>;
+  /** Snapshots to export (PER-138), oldest first; outdated ones already left out. */
+  snapshots?: readonly SnapshotInput[];
+};
+
+/** A before/after pair of images, as data URLs. */
+export type ImagePair = {
+  before: string;
+  after: string;
+  /** Images the rasterizer couldn't read (cross-origin, say), drawn as a labelled placeholder. */
+  failedImages: number;
+};
+
+/**
+ * One Snapshot as the builder takes it: a viewport pair and a crop pair per change
+ * it showed. Ids (`s1`…) and captions are given at export, when changes have ids.
+ */
+export type SnapshotInput = {
+  /** The pathname it was captured on. */
+  route: string;
+  viewport: ImagePair;
+  crops: (ImagePair & {
+    /** The change's record, as `setOnKey` names it. */
+    change: string;
+    /** Set when the crop shows one Instance of a change too tall to crop whole. */
+    keyPath: string | null;
+    /** On the last per-Instance crop: Instances on screen that got no crop of their own. */
+    more: number;
+  })[];
 };
 
 const NOT_SET = "not set";
@@ -350,6 +378,8 @@ export function buildProposal(input: ProposalInput): Proposal {
       };
     });
 
+  attachSnapshots(input.snapshots ?? [], drafts, routes);
+
   const heldForReview: ProposalHeld[] = input.records
     .filter((record) => record.suspended)
     .map((record) => {
@@ -403,6 +433,65 @@ export function buildProposal(input: ProposalInput): Proposal {
     if (same) return first.expression === undefined ? { writtenAs: first.writtenAs } : { writtenAs: first.writtenAs, expression: first.expression };
     return { writtenAs: "varies", perCallSite: sites };
   }
+}
+
+/**
+ * Gives every kept Snapshot's images an id and a caption. A viewport pair goes to
+ * the route group it was captured on, or, when that route has no changes, to the
+ * group of the first change it cropped. A crop goes to its change's group, and the
+ * change lists it. A crop whose change is gone is dropped.
+ */
+function attachSnapshots(
+  snapshots: readonly SnapshotInput[],
+  drafts: readonly { record: OverrideRecord; change: ProposalChange; route: string }[],
+  routes: ProposalRoute[],
+): void {
+  const byKey = new Map(drafts.map((draft) => [setOnKey(draft.record.target), draft]));
+  const groupOf = (route: string) => routes.find((group) => group.route === route);
+  let next = 1;
+  snapshots.forEach((snapshot, index) => {
+    const crops = snapshot.crops.flatMap((crop) => {
+      const draft = byKey.get(crop.change);
+      return draft ? [{ crop, draft }] : [];
+    });
+    const home = groupOf(snapshot.route) ?? (crops[0] ? groupOf(crops[0].draft.route) : undefined);
+    if (!home) return;
+    home.screenshots.push({
+      id: `s${next++}`,
+      kind: "viewport",
+      caption: `Screen ${index + 1}: ${snapshot.route}${failedNote(snapshot.viewport.failedImages)}`,
+      before: snapshot.viewport.before,
+      after: snapshot.viewport.after,
+    });
+    for (const { crop, draft } of crops) {
+      const id = `s${next++}`;
+      const instance = crop.keyPath ? `, Instance ${crop.keyPath}` : "";
+      const more = crop.more > 0 ? ` (+${crop.more} more)` : "";
+      groupOf(draft.route)?.screenshots.push({
+        id,
+        kind: "crop",
+        caption: `${draft.change.id}: ${changeInWords(draft.change)}${instance}${more}, screen ${index + 1}${failedNote(crop.failedImages)}`,
+        before: crop.before,
+        after: crop.after,
+      });
+      draft.change.screenshots.push(id);
+    }
+  });
+}
+
+function failedNote(count: number): string {
+  return count === 0 ? "" : ` (${count} image${count === 1 ? "" : "s"} could not be captured, shown as a placeholder)`;
+}
+
+/** "variant on 1st of 4 <Button> in MemberRowMenu", plain text for a caption. */
+function changeInWords(change: ProposalChange): string {
+  const props = change.props.map((prop) => (prop.name === "children" ? "text" : prop.name)).join(", ");
+  if (change.scope === "page") return `${props} on every <${change.component}> on the page`;
+  const site = change.callSites[0];
+  if (!site) return `${props} on <${change.component}>`;
+  const count = site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
+  const where = site.enclosing ? ` in ${site.enclosing}` : "";
+  return `${props} on ${count} <${site.component}>${where}${change.scope === "call-site" ? ", every Instance" : ""}`;
 }
 
 /** The covered Instances' Current value for a prop: one value, or counts when they differ. */

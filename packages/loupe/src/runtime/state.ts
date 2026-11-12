@@ -3,7 +3,7 @@
 // only has to say when the app and the Override disagree. Pure, like the store.
 
 import { stateSiblingName } from "../state-prop.js";
-import type { Props, Scope } from "./store.js";
+import type { Props, Resolved, Scope, Source } from "./store.js";
 
 export const STATE_SCOPE_REASON = "Change it on one Instance.";
 
@@ -147,6 +147,25 @@ export function holdStateHandlers(
     };
   }
   return result;
+}
+
+/**
+ * What an Instance renders with in the "before" view (PER-138): the app's own
+ * props, with only the State-prop Overrides on top. A forced state is context,
+ * not a change, so the "before" image shows the same dialog open.
+ */
+export function statesOnly(resolved: Resolved, current: Props, stateProps: readonly string[]): Resolved {
+  const props: Props = { ...current };
+  const sources: Record<string, Source> = {};
+  for (const key of Object.keys(current)) sources[key] = "app";
+  const overrides: Props = {};
+  for (const prop of stateProps) {
+    if (!(prop in resolved.overrides)) continue;
+    props[prop] = resolved.overrides[prop];
+    overrides[prop] = resolved.overrides[prop];
+    sources[prop] = resolved.sources[prop] ?? "instance";
+  }
+  return { props, sources, overrides };
 }
 
 export function formatValue(value: unknown): string {

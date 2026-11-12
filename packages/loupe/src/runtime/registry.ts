@@ -76,7 +76,14 @@ export type Registry = {
   status: Status;
   /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
   listeners: Set<() => void>;
+  /**
+   * `before` renders every Instance as the app has it, keeping only State-prop
+   * Overrides, for a Snapshot's "before" image (PER-138). The store is untouched.
+   */
+  view: View;
 };
+
+export type View = "proposed" | "before";
 
 const GLOBAL_KEY = "__loupeRegistry";
 
@@ -86,6 +93,7 @@ export function registry(): Registry {
   // One made by an earlier version of this module, kept across a Fast Refresh.
   if (value && !value.listeners) value.listeners = new Set();
   if (value && !value.departed) value.departed = new Map();
+  if (value && !value.view) value.view = "proposed";
   if (!value) {
     const problem = internalsProblem();
     value = {
@@ -94,6 +102,7 @@ export function registry(): Registry {
       departed: new Map(),
       status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
       listeners: new Set(),
+      view: "proposed",
     };
     const created = value;
     created.store.subscribe((target) => {
@@ -197,6 +206,18 @@ function watchRoute(onChange: () => void): void {
   }
   window.addEventListener(HISTORY_EVENT, check);
   window.addEventListener("popstate", check);
+}
+
+/**
+ * Switches every Instance between its Overrides and the app's own props (State-prop
+ * Overrides kept, so an open dialog stays open). Rerenders are scheduled, not
+ * flushed: wrap the call in `flushSync` to commit them at once.
+ */
+export function setView(view: View): void {
+  const value = registry();
+  if (value.view === view) return;
+  value.view = view;
+  for (const instance of value.instances.values()) instance.notify();
 }
 
 /** Drops to inspect-only for the rest of the page's life. Fails closed. */
