@@ -1,16 +1,48 @@
 # @danarocha/loupe
 
 A dev-only toolbar for inspecting and overriding the props of real components in
-a running Next.js app. Pre-release: this version ships the CLI, its compatibility
-check, `init`, the dev loader and the Adapter runtime.
+a running Next.js app, then exporting a Proposal for engineering. This package
+holds the Toolbar, the dev loader, the Adapter runtime and the `loupe` CLI,
+which makes every write to the product.
 
-Install it exact-pinned, as a dev dependency of the app, and run the CLI from
-that copy so the generator and runtime versions stay paired:
+**Designers: install it with the Installer plugin, not by hand.** The
+[guide](https://github.com/danarocha-br/loupe#readme) covers installing, using,
+removing and upgrading Loupe, and troubleshooting. This README is the CLI
+reference.
+
+## Compatibility
+
+> Loupe 0.x supports: Next.js 16.3 with the App Router and Turbopack in
+> development, on Node 22 or Bun; a pnpm workspace; TypeScript; one design
+> system kept as a workspace package with its source (shadcn on Base UI).
+
+`loupe check` grades each part of a repo as supported, not tested yet (needs a
+yes) or not supported (nothing is installed). The
+[guide](https://github.com/danarocha-br/loupe#is-your-setup-supported) has the
+full table.
+
+## Running the CLI
+
+The product pins Loupe exactly, as a dev dependency of the app, so the CLI that
+writes the Product layer always matches the runtime that reads it. `loupe init`
+adds that dependency itself, so before the install, run the exact release with
+`pnpm dlx`:
 
 ```bash
-pnpm add -D -E @danarocha/loupe
-pnpm exec loupe --version
+pnpm dlx @danarocha/loupe@<version> check --app apps/app
+pnpm dlx @danarocha/loupe@<version> init --app apps/app
+pnpm install                          # init never writes the lockfile
 ```
+
+Once installed, the CLI lives in the app, not at the repo root. Run it from the
+app's folder, or from the root with `pnpm -C`:
+
+```bash
+pnpm -C apps/app exec loupe --version
+```
+
+The examples below are run from the app's folder (`cd apps/app`). Every command
+finds the repo root on its own.
 
 ## The compatibility check
 
@@ -18,10 +50,36 @@ Check the repo against the compatibility statement before anything else.
 It writes nothing, except a yes to untested items, which it keeps in
 `packages/loupe/loupe.ledger.json` so a rerun doesn't ask again:
 
+Before the install the app has no copy yet, so run it from the repo root with
+`pnpm dlx`. `--app` is relative to the repo root:
+
 ```bash
-pnpm exec loupe check            # asks which app when there are several
-pnpm exec loupe check --app apps/app
+pnpm dlx @danarocha/loupe@<version> check            # asks which app when there are several
+pnpm dlx @danarocha/loupe@<version> check --app apps/app
 ```
+
+Once installed, `pnpm exec loupe check` in the app's folder reruns it.
+
+## Installing
+
+`init` runs the check, creates the Product layer (`packages/loupe`), makes the
+four edits (the app's `package.json`, `next.config.ts`, the root layout and the
+Biome config), then runs `generate`. Each edit is recorded in
+`packages/loupe/loupe.ledger.json`. A rerun writes only what is missing.
+
+The first run goes through `pnpm dlx`, as above. Once the app has its copy:
+
+```bash
+pnpm exec loupe init                  # a rerun: reapplies what is missing, lists what was edited by hand
+pnpm exec loupe init --adopt          # after a "manual step": record the edit you made by hand
+pnpm exec loupe init --allow-dirty    # proceed although a file it would change has uncommitted changes
+```
+
+`--adopt` and `--allow-dirty` work on the first run too.
+
+Exit codes: 0 done · 1 refused or something needs attention · 2 a manual step is
+needed. On 2 it prints the file and the exact snippet; make that edit, then run
+`init --adopt`.
 
 ## Checking an install
 
@@ -59,11 +117,15 @@ app with the TypeScript checker, and writes the Product layer's generated files:
 - `adapt-list.json`: what the dev loader reads.
 
 ```bash
-pnpm exec loupe generate --out packages/loupe \
-  --design-system packages/design-system --app apps/app --specifier @repo/loupe
-pnpm exec loupe generate          # later runs read the roots back from adapt-list.json
+pnpm exec loupe generate          # reads the roots back from adapt-list.json
 pnpm exec loupe generate --check  # for CI: writes nothing, exits 1 when out of date
+pnpm exec loupe generate --verbose  # lists every component and what it became
 ```
+
+`init` runs the first `generate`. Its other options (`--out`, `--design-system`,
+`--app`, `--specifier`, `--root`) are for running it outside an install, as this
+repo's CI does on the fixture; `loupe generate --help` lists them. Relative
+paths are read from the folder you run it in.
 
 It writes only files whose bytes differ, deletes generated files that left the
 set, and prints a Coverage summary (Adapters, Inspect only, skipped by shape).
@@ -97,15 +159,30 @@ It refuses when a file it would change has uncommitted changes (the lockfile
 counts when the dependencies go), and outside a git repository. If `pnpm install`
 fails, it puts the dependencies back so the next run retries.
 
+## Upgrading
+
+The intended upgrade is a version bump of the app's `@danarocha/loupe`, then
+`pnpm install` and `loupe generate`. In 0.0.x only part of that works:
+`generate` rewrites the Adapters and `meta/` for the new version, but only
+`init` writes the ledger, and it refuses once the installed version differs from
+the ledger's. So the ledger and `packages/loupe/package.json` (whose
+`peerDependencies` pins the old version) keep the old version, and `doctor`
+reports "Loupe versions differ".
+
+Until that's fixed, upgrade by removing and reinstalling: `loupe remove` with the
+installed version, then `init` with the new one through `pnpm dlx`.
+
 ## The dev loader
 
-Wrap the app's `next.config.ts`. The loader is added for `next dev` only; every
-other phase, `next build` included, gets the config back untouched.
+`init` wraps the app's `next.config.ts` with the Product layer's `withLoupe`
+(`@repo/loupe/next`), which passes its own `adapt-list.json` to this package's.
+The loader is added for `next dev` only; every other phase, `next build`
+included, gets the config back untouched. By hand, it looks like this:
 
 ```ts
 import { withLoupe } from "@danarocha/loupe/next";
 
-export default withLoupe(nextConfig, { adaptList: "../../packages/playground/adapt-list.json" });
+export default withLoupe(nextConfig, { adaptList: "../../packages/loupe/adapt-list.json" });
 ```
 
 Under `next dev` it tags each JSX call site of a design-system or app component
@@ -213,8 +290,9 @@ missing. The discovery request goes to the dev server's loopback address, never
 to the host a request names. The preview lives in the cookie, so it survives a
 reload, and the Proposal builder reads it back with `previewedFlags()`.
 
-A preview lasts 8 hours from the last flag you change, and then the cookie
-expires. Cookies ignore the port, so until then the cookie reaches every app on
+From the release after 0.0.3, a preview lasts 8 hours from the last flag you
+change, and then the cookie expires. In 0.0.3 the cookie has no expiry date and
+stays until it is cleared or the browser session ends. Cookies ignore the port, so until then the cookie reaches every app on
 `localhost`, and `flags/next` answers 500 (`flags: Missing FLAGS_SECRET`) in one
 that has no `FLAGS_SECRET`. Press **Clear flag previews** before you switch
 projects. If another app already fails that way, delete the

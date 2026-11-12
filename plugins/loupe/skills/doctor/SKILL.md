@@ -20,7 +20,9 @@ Run every command from the repo root (the folder with `pnpm-workspace.yaml`). `L
    - a touch point or generated file **changed by hand** (drift): restore it with git, or keep it and know that
      `loupe remove` will leave it behind;
    - **stale** generated files: run `LOUPE generate`, which rewrites only what changed;
-   - a version that doesn't match: install the version the ledger names, or run `LOUPE generate` after an upgrade;
+   - a version that doesn't match: install the version the ledger names. An upgrade by version bump plus
+     `generate` isn't finished in 0.0.x and ends here; the README's Upgrade section says how to undo it and
+     upgrade by removing and reinstalling instead;
    - an **untested** item not accepted yet: the install skill asks about it.
    Run a fix only when the designer says yes to it.
 4. Run `LOUPE doctor --build` only when the designer asks for a production check. Say first that it runs
