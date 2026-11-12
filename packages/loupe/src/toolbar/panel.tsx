@@ -16,6 +16,7 @@ import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 import { FlagsCard } from "./flags.js";
 import { copyProposalMarkdown } from "./proposal.js";
+import { CaptureButton, SnapshotsCard } from "./snapshots-card.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -43,6 +44,7 @@ export function Panel(props: PanelProps) {
         <button type="button" aria-pressed={props.picking} onClick={props.onPick} title="Click an Instance on the page (Esc cancels)">
           Pick
         </button>
+        <CaptureButton disabled={props.picking} />
         <button type="button" onClick={props.onHide}>
           Hide
         </button>
@@ -75,6 +77,7 @@ function ComponentList({ debug, page, onSelect, onHover }: PanelProps) {
         </div>
       </div>
       <FlagsCard />
+      <SnapshotsCard />
       <HeldForReviewCard debug={debug} records={page.records} />
       <div className={page.interaction.length === 0 ? "card stretch" : "card"}>
         <h3>On this page</h3>

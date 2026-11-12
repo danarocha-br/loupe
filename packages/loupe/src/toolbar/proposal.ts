@@ -5,7 +5,8 @@
 //
 // Nothing here writes to the store or the repo: exporting clears nothing.
 // Once the Toolbar loads, `__loupe.proposal(options?)` returns the JSON and
-// `__loupe.proposalMarkdown(options?)` the Copy as Markdown text.
+// `__loupe.proposalMarkdown(options?)` the Copy as Markdown text. Snapshots that
+// aren't Outdated ride along (PER-138); `{ capture: true }` takes one first.
 
 import { buildProposal, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
 import { proposalMarkdown } from "../proposal/markdown.js";
@@ -14,8 +15,18 @@ import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
 import { previewedFlags } from "./flags.js";
 import { readProjectContext } from "./project-server.js";
+import { captureScreen, exportableSnapshots, exposeSnapshots } from "./snapshots.js";
 
-export type ProposalOptions = { title?: string; designer?: string | null };
+export type ProposalOptions = {
+  title?: string;
+  designer?: string | null;
+  /**
+   * Take a Snapshot of the screen in view first, as an export does (PER-99 §3).
+   * It replaces the previous export's Snapshot of this route. A failed capture
+   * leaves the Proposal without it rather than failing.
+   */
+  capture?: boolean;
+};
 
 type Tracker = {
   /** The registry it watches: a new one (only ever in tests) starts a new tracker. */
@@ -136,6 +147,11 @@ export function suggestedTitle(proposal: Proposal): string {
 
 /** The Proposal for the whole Override store, every route. */
 export async function collectProposal(options: ProposalOptions = {}): Promise<Proposal> {
+  if (options.capture) {
+    await captureScreen({ auto: true }).catch((error: unknown) => {
+      console.warn("[loupe] The export's Snapshot failed; exporting without it.", error);
+    });
+  }
   const tracker = startTracking();
   refresh(tracker);
   const reg = registry();
@@ -176,6 +192,7 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
     routes: tracker.routes,
     currentRoute: route,
     flags: Object.fromEntries(flags.map((flag) => [flag.key, flag.value as JsonValue])),
+    snapshots: exportableSnapshots(),
   };
   const proposal = buildProposal(input);
   return options.title?.trim() ? proposal : { ...proposal, title: suggestedTitle(proposal) };
@@ -224,4 +241,5 @@ export function exposeProposal(): void {
 if (typeof window !== "undefined") {
   startTracking();
   exposeProposal();
+  exposeSnapshots();
 }

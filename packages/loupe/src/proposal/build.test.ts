@@ -348,6 +348,93 @@ describe("buildProposal", () => {
   });
 });
 
+describe("Snapshots in a Proposal (PER-138)", () => {
+  const pair = (name: string, failedImages = 0) => ({
+    before: `data:image/webp;base64,${name}-before`,
+    after: `data:image/webp;base64,${name}-after`,
+    failedImages,
+  });
+  const group = record({ scope: "group", anchor: TRIGGER }, { size: "sm" });
+  const invite = record({ scope: "instance", id: INVITE }, { variant: "ghost" });
+
+  it("gives each image an id, puts the viewport pair on its route and links each crop from its change", () => {
+    const proposal = buildProposal(
+      input([group, invite], {
+        snapshots: [
+          {
+            route: ROUTE,
+            viewport: pair("v1"),
+            crops: [
+              { ...pair("c-trigger"), change: setOnKey(group.target), keyPath: null, more: 0 },
+              { ...pair("c-invite"), change: setOnKey(invite.target), keyPath: null, more: 0 },
+            ],
+          },
+          {
+            route: ROUTE,
+            viewport: pair("v2", 1),
+            crops: [{ ...pair("c-tall", 1), change: setOnKey(group.target), keyPath: "user_4", more: 2 }],
+          },
+        ],
+      }),
+    );
+    expectValid(proposal);
+    const [route] = proposal.routes;
+    expect(route?.screenshots.map((shot) => [shot.id, shot.kind, shot.caption])).toEqual([
+      ["s1", "viewport", `Screen 1: ${ROUTE}`],
+      ["s2", "crop", "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"],
+      ["s3", "crop", "c2: variant on 1st of 1 <Button> in MembersHeader, screen 1"],
+      ["s4", "viewport", `Screen 2: ${ROUTE} (1 image could not be captured, shown as a placeholder)`],
+      [
+        "s5",
+        "crop",
+        "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, Instance user_4 (+2 more), screen 2 (1 image could not be captured, shown as a placeholder)",
+      ],
+    ]);
+    expect(route?.screenshots[1]).toMatchObject({ before: "data:image/webp;base64,c-trigger-before", after: "data:image/webp;base64,c-trigger-after" });
+    expect(changesOf(proposal).map((change) => [change.id, change.screenshots])).toEqual([
+      ["c1", ["s2", "s5"]],
+      ["c2", ["s3"]],
+    ]);
+  });
+
+  it("drops a crop whose change is gone, and leaves an entry with none as without a screenshot", () => {
+    const proposal = buildProposal(
+      input([invite], {
+        snapshots: [
+          {
+            route: ROUTE,
+            viewport: pair("v1"),
+            crops: [{ ...pair("gone"), change: setOnKey(group.target), keyPath: null, more: 0 }],
+          },
+        ],
+      }),
+    );
+    expect(proposal.routes[0]?.screenshots.map((shot) => shot.id)).toEqual(["s1"]);
+    expect(changesOf(proposal)[0]?.screenshots).toEqual([]);
+  });
+
+  it("files a viewport pair from a route with no changes under the first change it cropped", () => {
+    const proposal = buildProposal(
+      input([group], {
+        setOn: { [setOnKey(group.target)]: ROUTE },
+        snapshots: [
+          {
+            route: "/org/acme/configuracoes/organizacao",
+            viewport: pair("elsewhere"),
+            crops: [{ ...pair("c"), change: setOnKey(group.target), keyPath: null, more: 0 }],
+          },
+          { route: "/nowhere", viewport: pair("dropped"), crops: [] },
+        ],
+      }),
+    );
+    expect(proposal.routes.map((route) => route.route)).toEqual([ROUTE]);
+    expect(proposal.routes[0]?.screenshots.map((shot) => [shot.id, shot.caption])).toEqual([
+      ["s1", "Screen 1: /org/acme/configuracoes/organizacao"],
+      ["s2", "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"],
+    ]);
+  });
+});
+
 describe("the published schema", () => {
   it("accepts a Proposal with every scope, label text, a State prop and held records", () => {
     const proposal = buildProposal(

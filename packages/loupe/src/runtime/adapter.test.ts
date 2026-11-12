@@ -16,6 +16,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug } from "./debug.js";
+import { setView } from "./registry.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -324,6 +325,32 @@ describe("createAdapter", () => {
       const [row] = loupe.list();
       expect(() => loupe.set(row?.id ?? "", "variant", "outline", "group")).toThrow(/no group/);
     });
+  });
+
+  it("renders the app's own props in the before view, keeping State-prop Overrides only (PER-138)", () => {
+    type DialogProps = { open?: boolean; onOpenChange?: (open: boolean) => void; tone?: string };
+    const Dialog = createAdapter(
+      "Dialog",
+      ({ open, tone }: DialogProps) => h("div", { "data-open": String(open), "data-tone": tone }),
+      { state: ["open"] },
+    );
+    const id = "app/page.tsx › Page › Dialog[1]";
+    render(h(Dialog, { open: false, onOpenChange: () => {}, tone: "calm", "data-ds-anchor": id } as DialogProps));
+    act(() => {
+      loupe.set(id, "open", true);
+      loupe.set(id, "tone", "loud");
+    });
+    const shown = () => {
+      const node = container.querySelector("div") as HTMLElement;
+      return [node.dataset.open, node.dataset.tone];
+    };
+    expect(shown()).toEqual(["true", "loud"]);
+    act(() => setView("before"));
+    expect(shown()).toEqual(["true", "calm"]);
+    // The store is untouched: the Toolbar still reads both Overrides.
+    expect(loupe.props(id).overrides).toEqual({ open: true, tone: "loud" });
+    act(() => setView("proposed"));
+    expect(shown()).toEqual(["true", "loud"]);
   });
 
   it("names a picked DOM node's Instance", () => {

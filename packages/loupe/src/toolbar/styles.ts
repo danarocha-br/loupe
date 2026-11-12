@@ -53,5 +53,8 @@ details summary { cursor: pointer; }
 .pills .count { opacity: .6; }
 fieldset.site { border: 0; padding: 0; margin: 4px 0; }
 .ring .label { position: absolute; top: -18px; left: -2px; background: #a343f5; color: #fff; font: 11px/16px ui-monospace, monospace; padding: 0 4px; border-radius: 3px; white-space: nowrap; }
+.snapshots { list-style: none; margin: 0; padding: 0; }
+.snapshots .thumb { flex: none; border-radius: 3px; }
+.snapshots .thumb.outdated { opacity: .5; }
 .dock { position: fixed; bottom: 16px; right: 16px; z-index: 2147483647; font: 13px system-ui, sans-serif; }
 `;
