@@ -232,6 +232,14 @@ describe("Capture screen", () => {
 
     removeSnapshot(2);
     expect(snapshots().map((snapshot) => snapshot.id)).toEqual([1, 3]);
+
+    // A Retake on another page would replace it with a picture of the wrong page.
+    history.pushState(null, "", "/elsewhere");
+    try {
+      await expect(captureScreen({ replace: 1 })).rejects.toThrow("Snapshot 1 was taken on /: open that page to retake it.");
+    } finally {
+      history.pushState(null, "", "/");
+    }
   });
 
   it("runs one capture at a time", async () => {

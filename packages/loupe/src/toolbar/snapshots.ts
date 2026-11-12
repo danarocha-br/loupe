@@ -122,11 +122,15 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
     throw new Error("[loupe] The page has no viewport to capture: is its tab hidden?");
   }
   const reg = registry();
-  if (reg.view !== "proposed") throw new Error("[loupe] A capture is already running.");
   const debug = debugOf();
   const dpr = window.devicePixelRatio || 1;
   const route = currentRoute();
   const url = location.href;
+  const state = store();
+  const replaced = options.replace === undefined ? undefined : state.list.find((s) => s.id === options.replace);
+  if (replaced && replaced.route !== route) {
+    throw new Error(`[loupe] Snapshot ${replaced.id} was taken on ${replaced.route}: open that page to retake it.`);
+  }
 
   const mounted = [...reg.instances.values()];
   const boxes = new Map<string, Rect>();
@@ -174,18 +178,11 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   const crops = changes.flatMap((change) =>
     cropRects(change.covered, width, height).map((crop) => {
       const pair = { before: cut(before.canvas, crop.rect, dpr), after: cut(after.canvas, crop.rect, dpr) };
-      return {
-        change: change.key,
-        keyPath: crop.keyPath,
-        more: crop.more,
-        ...pair,
-        failedImages: viewport.failedImages,
-      };
+      // Which crop holds a failed image isn't known: the viewport pair says it.
+      return { change: change.key, keyPath: crop.keyPath, more: crop.more, ...pair, failedImages: 0 };
     }),
   );
 
-  const state = store();
-  const replaced = options.replace === undefined ? undefined : state.list.find((s) => s.id === options.replace);
   const previousAuto = options.auto
     ? state.list.find((snapshot) => snapshot.auto && snapshot.route === route)
     : undefined;
@@ -203,9 +200,9 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
     shown,
     bytes: [viewport, ...crops].reduce((sum, pair) => sum + pair.before.length + pair.after.length, 0),
   };
-  const slot = state.list.findIndex((entry) => entry.id === id);
-  if (slot === -1) state.list = [...state.list, snapshot];
-  else state.list = state.list.map((entry, index) => (index === slot ? snapshot : entry));
+  state.list = state.list.some((entry) => entry.id === id)
+    ? state.list.map((entry) => (entry.id === id ? snapshot : entry))
+    : [...state.list, snapshot];
   emitChange();
   return snapshot;
 }

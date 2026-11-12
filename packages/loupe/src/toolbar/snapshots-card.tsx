@@ -3,6 +3,7 @@
 // panel, which redraws on every registry change, so Outdated is re-read then.
 
 import { useState } from "react";
+import { currentRoute } from "../runtime/registry.js";
 import { captureScreen, isOutdated, removeSnapshot, type Snapshot, snapshots } from "./snapshots.js";
 
 type Busy = { capturing: number | "new" | null; error: string | null };
@@ -52,20 +53,21 @@ export function SnapshotsCard() {
   const { busy, run } = useCapture();
   const list = snapshots();
   if (list.length === 0) return null;
+  const route = currentRoute();
   return (
     <div className="card">
       <h3>Snapshots</h3>
-      <ul aria-label="Snapshots" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+      <ul className="snapshots" aria-label="Snapshots">
         {list.map((snapshot) => {
           const outdated = isOutdated(snapshot);
           return (
             <li key={snapshot.id} className="row" data-snapshot={snapshot.id}>
               <div className="line">
                 <img
+                  className={outdated ? "thumb outdated" : "thumb"}
                   src={snapshot.viewport.after}
                   alt={`Snapshot ${snapshot.id}, after`}
                   width={64}
-                  style={{ flex: "none", borderRadius: 3, opacity: outdated ? 0.5 : 1 }}
                 />
                 <span className="value">
                   Snapshot {snapshot.id}
@@ -80,7 +82,12 @@ export function SnapshotsCard() {
                 </span>
               </div>
               <div className="chips">
-                <button type="button" disabled={busy.capturing !== null} onClick={() => run(snapshot.id)}>
+                <button
+                  type="button"
+                  disabled={busy.capturing !== null || snapshot.route !== route}
+                  title={snapshot.route === route ? undefined : `Taken on ${snapshot.route}: open that page to retake it`}
+                  onClick={() => run(snapshot.id)}
+                >
                   {busy.capturing === snapshot.id ? "Retaking…" : "Retake"}
                 </button>
                 <button type="button" disabled={busy.capturing !== null} onClick={() => removeSnapshot(snapshot.id)}>
