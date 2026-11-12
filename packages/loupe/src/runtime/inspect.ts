@@ -67,6 +67,8 @@ export type InspectInput = {
   anchor: string;
   hint: string | null;
   rendered: "client" | "server";
+  /** False for a client Instance found by the fiber walk: no Adapter, so no Overrides (PER-100 §1). */
+  adapted?: boolean;
   /** The app's own props, live. */
   current: Props;
   injected: Props;
@@ -82,6 +84,8 @@ export type InspectInput = {
 
 export const SERVER_NOTE = "Rendered on the server: it can't be previewed in the MVP.";
 export const SPREADS_NOTE = "This call site spreads props, so library props can't be separated from the app's here.";
+export const UNADAPTED_NOTE =
+  "This component has no Adapter, so it is inspect-only: `loupe generate` writes one only for a component with a prop that can be Editable.";
 export const NO_META_NOTE =
   "No prop metadata for this component: run `loupe generate` to see which props are editable.";
 
@@ -184,6 +188,7 @@ export function inspect(input: InspectInput): Inspection {
   let note: string | null = null;
   if (server) note = SERVER_NOTE;
   else if (!input.overridesOn) note = overridesOffNote(input.overridesOffReason);
+  else if (input.adapted === false) note = UNADAPTED_NOTE;
   else if (input.authorship === "spreads") note = SPREADS_NOTE;
   else if (meta === null) note = NO_META_NOTE;
 

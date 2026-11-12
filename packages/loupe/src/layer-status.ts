@@ -1,6 +1,7 @@
 // What the Toolbar warns about in the Product layer (PER-133), read from disk on
 // the dev server: components whose source changed since `loupe generate` hashed
-// it (PER-100 §5), and a `formatVersion` this Loupe doesn't write (PER-85).
+// it (PER-100 §5), the names it has read, so a component it hasn't is "not
+// generated yet" (PER-179), and a `formatVersion` this Loupe doesn't write (PER-85).
 // Read-only: regeneration stays explicit, so nothing here writes.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -26,6 +27,11 @@ export type LayerStatus = {
   format: FormatNotice | null;
   /** Empty while `format` is set: an older or newer `meta/` can't be trusted. */
   stale: StaleModule[];
+  /**
+   * Every export name `meta/` holds, of any kind, sorted. A component on the page
+   * that isn't here is new since the last `generate`. Null while `format` is set.
+   */
+  generated: string[] | null;
 };
 
 export type LayerPaths = {
@@ -53,18 +59,20 @@ export function generateCommand({ root, adaptList, app }: LayerPaths): string {
 export function readLayerStatus(paths: LayerPaths): LayerStatus {
   const command = generateCommand(paths);
   const format = formatOf(readFileSync(paths.adaptList, "utf8"));
-  if (format !== null) return { command, format, stale: [] };
+  if (format !== null) return { command, format, stale: [], generated: null };
   const stale: StaleModule[] = [];
+  const generated = new Set<string>();
   for (const file of metaFiles(path.join(path.dirname(paths.adaptList), "meta"))) {
     const meta = readMeta(file);
     if (meta === null) continue;
+    for (const name of meta.exports) generated.add(name);
     const changed = Object.entries(meta.files)
       .filter(([relative, hash]) => hashOf(path.join(paths.root, relative)) !== hash)
       .map(([relative]) => relative);
     if (changed.length > 0) stale.push({ source: meta.source, components: meta.components, changed });
   }
   stale.sort((a, b) => compare(a.source, b.source));
-  return { command, format: null, stale };
+  return { command, format: null, stale, generated: [...generated].sort(compare) };
 }
 
 /**
@@ -107,7 +115,7 @@ function metaFiles(dir: string): string[] {
   return found;
 }
 
-type Meta = { source: string; files: Record<string, string>; components: string[] };
+type Meta = { source: string; files: Record<string, string>; components: string[]; exports: string[] };
 
 // Keyed by path and stat, so a check after the first reads and hashes only what changed.
 // Never evicted: they live as long as one dev server.
@@ -139,6 +147,7 @@ function readMeta(file: string): Meta | null {
           .filter(([, entry]) => entry?.kind === "component")
           .map(([name]) => name)
           .sort(),
+        exports: Object.keys(raw.exports ?? {}),
       };
     }
   } catch {

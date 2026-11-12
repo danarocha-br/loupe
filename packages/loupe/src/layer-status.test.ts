@@ -55,7 +55,33 @@ function touch(file: string) {
 describe("readLayerStatus", () => {
   it("reports nothing while every source matches its hash", () => {
     const { paths } = repo();
-    expect(readLayerStatus(paths)).toEqual({ command: "pnpm -C apps/app exec loupe generate", format: null, stale: [] });
+    expect(readLayerStatus(paths)).toEqual({
+      command: "pnpm -C apps/app exec loupe generate",
+      format: null,
+      stale: [],
+      generated: ["Badge", "Button", "ButtonGroup", "helper"],
+    });
+  });
+
+  it("knows every export generate read, and a module it writes later", () => {
+    const { root, write, paths } = repo();
+    expect(readLayerStatus(paths).generated).not.toContain("Card");
+    write("ds/components/ui/card.tsx", `export function Card() { return null; }\n`);
+    // As the next `generate` writes it.
+    write(
+      "packages/loupe/meta/ds/ui/card.tsx.json",
+      stampJson(
+        stableJson({
+          client: false,
+          engine: "ts-morph",
+          exports: { Card: { kind: "component", props: {}, shape: "function" } },
+          files: { "ds/components/ui/card.tsx": hashFile(path.join(root, "ds/components/ui/card.tsx")) },
+          formatVersion: 1,
+          source: "ds/components/ui/card.tsx",
+        }),
+      ),
+    );
+    expect(readLayerStatus(paths).generated).toEqual(["Badge", "Button", "ButtonGroup", "Card", "helper"]);
   });
 
   it("flags every component of a module whose source changed, and names the file", () => {
@@ -97,6 +123,7 @@ describe("readLayerStatus", () => {
       command: "pnpm -C apps/app exec loupe generate",
       format: { layer: 0, runtime: 1, newer: false },
       stale: [],
+      generated: null,
     });
   });
 });

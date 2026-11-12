@@ -32,7 +32,7 @@ export type ComponentGroup = {
 
 export type PageSnapshot = {
   status: Status;
-  /** Every Instance on the page, browser- and server-rendered. */
+  /** Every Instance on the page: adapted, browser-rendered with no Adapter, and server-rendered. */
   rows: InstanceRow[];
   groups: ComponentGroup[];
   /** Components seen earlier on this page with no Instance mounted now, such as a closed menu's. */
@@ -115,7 +115,9 @@ export function snapshot(debug: LoupeDebug, seen: SeenComponents): PageSnapshot 
               ? "Rendered on the server"
               : !status.overrides
                 ? "Overrides are off"
-                : "No props with fixed options",
+                : client.every((row) => !row.adapted)
+                  ? "No Adapter"
+                  : "No props with fixed options",
         overrides:
           instances.reduce((sum, row) => sum + Object.keys(row.overrides).length, 0) +
           heldHere.reduce((sum, entry) => sum + Object.keys(entry.record.values).length, 0),
