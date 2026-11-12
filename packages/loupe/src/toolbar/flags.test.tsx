@@ -11,12 +11,17 @@ import { encryptOverrides } from "./flags-crypto.js";
 // The Server Actions' only Next dependency: a cookie jar and the request's headers.
 const jar = new Map<string, string>();
 let requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
+// Each request takes real time, as on a slow CI runner: no test may count ticks to wait for a write.
+const slow = () => new Promise((resolve) => setTimeout(resolve, 20));
 vi.mock("next/headers", () => ({
-  cookies: async () => ({
-    get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
-    set: (name: string, value: string) => void jar.set(name, value),
-    delete: (name: string) => void jar.delete(name),
-  }),
+  cookies: async () => {
+    await slow();
+    return {
+      get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
+      set: (name: string, value: string) => void jar.set(name, value),
+      delete: (name: string) => void jar.delete(name),
+    };
+  },
   headers: async () => requestHeaders,
 }));
 
@@ -123,9 +128,25 @@ describe("the Feature flags card", () => {
     container.remove();
   });
 
-  const settle = async () => {
-    for (let i = 0; i < 5; i++) await act(async () => {});
-  };
+  /** Waits until `check` passes; each try first lets React commit what has settled. */
+  const until = (check: () => unknown) =>
+    vi.waitFor(
+      async () => {
+        await act(async () => {});
+        check();
+      },
+      { timeout: 2000, interval: 10 },
+    );
+  /**
+   * Waits until the card is loaded and no write is in flight. A write disables every
+   * pill, so a click made before it ends is dropped: that is how a fixed number of
+   * ticks failed on CI.
+   */
+  const idle = () =>
+    until(() => {
+      const pills = container.querySelectorAll(".pills button");
+      if (pills.length === 0 || container.querySelector(".pills button:disabled")) throw new Error("card busy");
+    });
   const pill = (flag: string, text: string) =>
     [...container.querySelectorAll(`[data-flag="${flag}"] .pills button`)].find((b) => b.textContent === text) as HTMLButtonElement;
   const button = (text: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === text) as HTMLButtonElement;
@@ -133,7 +154,7 @@ describe("the Feature flags card", () => {
   it("previews a flag, records it for the Proposal, and clearing gives the app its value back", async () => {
     const { FlagsCard, previewedFlags } = await import("./flags.js");
     act(() => root.render(<FlagsCard />));
-    await settle();
+    await idle();
 
     expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("The app decides");
     // Declared without options: offered as on and off.
@@ -141,25 +162,25 @@ describe("the Feature flags card", () => {
     expect(await previewedFlags()).toEqual([]);
 
     act(() => pill("showBetaFeature", "On").click());
-    await settle();
+    await idle();
     await expect(overridesInCookie()).resolves.toEqual({ showBetaFeature: true });
     expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("Previewing true");
 
     act(() => pill("plan", "Pro").click());
-    await settle();
+    await idle();
     expect(await previewedFlags()).toEqual([
       { key: "plan", value: "pro", label: "Pro", description: "Pricing plan" },
       { key: "showBetaFeature", value: true },
     ]);
 
     act(() => (container.querySelector('[data-flag="plan"] .reset') as HTMLButtonElement).click());
-    await settle();
+    await idle();
     expect(await previewedFlags()).toEqual([{ key: "showBetaFeature", value: true }]);
     expect(container.querySelector('[data-flag="plan"]')?.textContent).toContain("The app decides");
 
     act(() => button("Clear flag previews").click());
-    await settle();
+    await idle();
     expect(jar.has(COOKIE)).toBe(false);
     expect(await previewedFlags()).toEqual([]);
     expect(button("Clear flag previews").disabled).toBe(true);
@@ -169,7 +190,7 @@ describe("the Feature flags card", () => {
     jar.set(COOKIE, await encryptOverrides({ showBetaFeature: true, retired: 1 }, secret));
     const { FlagsCard, previewedFlags } = await import("./flags.js");
     act(() => root.render(<FlagsCard />));
-    await settle();
+    await idle();
 
     expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector('[data-flag="retired"]')?.textContent).toContain("Not declared");
@@ -186,7 +207,6 @@ describe("the Feature flags card", () => {
     vi.stubEnv("FLAGS_SECRET", "");
     const { FlagsCard } = await import("./flags.js");
     act(() => root.render(<FlagsCard />));
-    await settle();
-    expect(container.textContent).toContain("FLAGS_SECRET isn't set");
+    await until(() => expect(container.textContent).toContain("FLAGS_SECRET isn't set"));
   });
 });
