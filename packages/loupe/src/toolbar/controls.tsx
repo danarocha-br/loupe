@@ -2,7 +2,8 @@
 // a closed set of options, a field for label text, the app's Current value beside
 // an Override, Reset, and the holding notice for a State prop (PER-96). At This
 // instance a row edits one Instance; at a group or page scope it edits that
-// scope's record, with its members' Current values counted on the pills.
+// scope's record, with its members' Current values counted on the pills. Each
+// Editable row is its own card, with a purple dot while it holds an Override (PER-140).
 
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { OptionValue } from "../meta/types.js";
@@ -12,6 +13,7 @@ import { singleLine, textScopeRefusal } from "../runtime/label-text.js";
 import { STATE_SCOPE_REASON } from "../runtime/state.js";
 import type { Scope, Source } from "../runtime/store.js";
 import { appValue, formatCurrent, formatDefault } from "./format.js";
+import { LockIcon, ResetIcon } from "./icons.js";
 import { keepingOwn, NOT_SET, type ScopeLabels, type ScopeView, valueCounts } from "./scopes.js";
 
 /** A mounted, browser-rendered Instance while Overrides are on: what its rows can edit. */
@@ -51,6 +53,23 @@ function scopeName(source: Source, labels: ScopeLabels): string {
 
 const RESET_TO: Record<Scope, string> = { instance: "Reset", group: "Reset to group value", page: "Reset to page value" };
 
+/** One line under a label-text row the call site writes in a way no field can change (PER-113). */
+const EXPLAIN: Partial<Record<string, string>> = {
+  "FROM CODE": "Written as an expression here, so it changes in code.",
+  MIXED: "Text and code together: no single string to change.",
+  CONTENT: "Elements, or nothing, between the tags.",
+};
+
+function explanation(row: PropRow): string | undefined {
+  if (row.name !== "children" || !row.reason) return undefined;
+  return EXPLAIN[row.reason];
+}
+
+/** The Override dot: purple while the row holds one, an empty slot otherwise so names line up. */
+function Dot({ on }: { on: boolean }) {
+  return <span className={on ? "dot purple" : "dot"} aria-hidden="true" />;
+}
+
 export function PropRowView({ row, editing }: { row: PropRow; editing: Editing | null }) {
   // Only an Instance-scope Override is this scope's to reset; a group or page one says where it comes from.
   const source = editing?.live.sources[row.name];
@@ -62,7 +81,8 @@ export function PropRowView({ row, editing }: { row: PropRow; editing: Editing |
   const fallback = editing?.fallback[row.name];
   const reset = editing && overridden ? () => attempt(() => editing.debug.reset(editing.id, row.name)) : null;
   const resetButton = reset && (
-    <button type="button" className="reset" onClick={reset}>
+    <button type="button" className="btn small reset" onClick={reset}>
+      <ResetIcon />
       {RESET_TO[fallback ?? "instance"]}
     </button>
   );
@@ -70,16 +90,18 @@ export function PropRowView({ row, editing }: { row: PropRow; editing: Editing |
   return (
     <div className={overridden ? "row overridden" : "row"} data-prop={row.name}>
       <div className="line">
+        {row.editable && <Dot on={overridden} />}
         <span className="name">
           {row.label}
-          {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
+          {row.label !== row.name && <span className="mono"> {row.name}</span>}
         </span>
-        {!fromOverride && <span className="value mono">{currentValue(row)}</span>}
         {row.text && value === "" && <EmptyTag />}
         {row.state && <span className="tag">STATE</span>}
+        {!fromOverride && <span className="value">{currentValue(row)}</span>}
         {row.reason && <span className="tag">{row.reason}</span>}
         {!tried && resetButton}
       </div>
+      {explanation(row) && <div className="explain">{explanation(row)}</div>}
       {editing && source && (
         <div className="source muted" data-testid="source">
           from {scopeName(source, editing.labels)}
@@ -96,8 +118,8 @@ export function PropRowView({ row, editing }: { row: PropRow; editing: Editing |
         />
       )}
       {fromOverride && (
-        <div className="current mono" data-testid="current">
-          Current: {currentValue(row)}
+        <div className="current" data-testid="current">
+          <span className="meta">Current:</span> {currentValue(row)}
         </div>
       )}
       {tried && (
@@ -155,21 +177,27 @@ export function ScopeRowView({
   return (
     <div className={overridden ? "row overridden" : "row"} data-prop={row.name}>
       <div className="line">
+        {row.editable && <Dot on={overridden} />}
         <span className="name">
           {row.label}
-          {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
+          {row.label !== row.name && <span className="mono"> {row.name}</span>}
         </span>
-        <span className="value mono" data-testid="counts">
+        {row.state && <span className="tag">STATE</span>}
+        <span className="value" data-testid="counts">
           {/* Text with no control here still shows what it says, not only that it matches. */}
           {sole !== null && !textRefusal
             ? `SAME ON ALL ${inScope}`
             : [...counts].map(([key, count]) => `${key} ${count}`).join(" · ")}
         </span>
         {row.text && overridden && values[row.name] === "" && <EmptyTag />}
-        {row.state && <span className="tag">STATE</span>}
         {row.reason && <span className="tag">{row.reason}</span>}
         {overridden && !suspended && (
-          <button type="button" className="reset" onClick={() => attempt(() => debug.reset(id, row.name, scope))}>
+          <button
+            type="button"
+            className="btn small reset"
+            onClick={() => attempt(() => debug.reset(id, row.name, scope))}
+          >
+            <ResetIcon />
             Reset
           </button>
         )}
@@ -178,7 +206,8 @@ export function ScopeRowView({
         from {overridden ? view.name : "the app"}
       </div>
       {refusal ? (
-        <div className="muted" data-testid={refusal.testId}>
+        <div className="refusal" data-testid={refusal.testId}>
+          <LockIcon />
           {refusal.reason}
         </div>
       ) : (
@@ -212,7 +241,7 @@ export function ScopeRowView({
 /** Label text left empty: the row says so, as the field shows nothing. */
 function EmptyTag() {
   return (
-    <span className="tag" data-testid="empty">
+    <span className="tag empty" data-testid="empty">
       empty
     </span>
   );

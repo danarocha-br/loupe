@@ -178,7 +178,7 @@ describe("components that are new since the last generate", () => {
 
     const instance = shadow().querySelector(`[data-instance="${site("NewCard")["data-ds-anchor"]}"]`) as HTMLElement;
     act(() => instance.click());
-    const coverage = shadow().querySelector("[data-testid=coverage]")?.parentElement?.textContent ?? "";
+    const coverage = shadow().querySelector("[data-testid=coverage]")?.closest(".card")?.textContent ?? "";
     expect(coverage).toContain("Not generated yet");
     expect(coverage).toContain(COMMAND);
     // Not "no prop can be Editable": generate hasn't judged its props yet.

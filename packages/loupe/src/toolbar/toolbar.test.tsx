@@ -199,7 +199,7 @@ describe("the Toolbar", () => {
     await clickInPanel(bia);
 
     expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe("app/members.tsx › Members › Button[1]#bia");
-    expect(panelText()).toContain("app/members.tsx:11:9 · use 1 of 2");
+    expect(panelText()).toContain("members.tsx:11 · use 1 of 2");
     expect(shadow().querySelector("[data-testid=coverage]")?.textContent).toBe("2 editable props · 2 inspect only");
     const onClick = shadow().querySelector("[data-prop=onClick]")?.textContent ?? "";
     expect(onClick).toContain("FUNCTION");
@@ -267,11 +267,20 @@ describe("the Toolbar", () => {
     await mount();
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
     await settle();
-    expect(shadow().querySelector(".banner")?.textContent).toContain("everything is inspect-only");
+    expect(shadow().querySelector(".banner")?.textContent).toContain("Everything is inspect-only");
     const reset = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Reset all") as HTMLButtonElement;
     expect(reset.disabled).toBe(true);
     await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
     expect(shadow().querySelector("[data-testid=coverage]")?.textContent).toBe("0 editable props · 4 inspect only");
+  });
+
+  it("says Overrides are off once, in the panel's banner, with an Instance selected (PER-184)", async () => {
+    await mount();
+    act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
+    await settle();
+    await select(BIA);
+    const said = panelText().match(/everything is inspect-only/gi)?.length ?? 0;
+    expect(said).toBe(1);
   });
 
   it("Reset all drops every record, including one whose Instance isn't mounted", async () => {
@@ -286,12 +295,12 @@ describe("the Toolbar", () => {
     act(() => pageButton("Menu").click());
     await settle();
     expect(() => loupe.reset(item)).toThrow(/No mounted Instance/);
-    expect(panelText()).toContain("2 overrides");
+    expect(panelText()).toContain("2 Overrides on this page");
 
     const reset = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Reset all") as HTMLButtonElement;
     await clickInPanel(reset);
     expect(loupe.records()).toEqual([]);
-    expect(panelText()).toContain("0 overrides");
+    expect(panelText()).toContain("0 Overrides on this page");
   });
 
   it("rings the selected Instance on the page", async () => {
@@ -433,7 +442,7 @@ const panelButton = (text: string) =>
   [...shadow().querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
 const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>(".ring")].map((ring) => ring.dataset.ring);
 const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
-const backToList = async () => clickInPanel(panelButton("← All components"));
+const backToList = async () => clickInPanel(panelButton("All components"));
 
 describe("group and page scopes", () => {
   beforeEach(() => {

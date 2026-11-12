@@ -172,7 +172,7 @@ afterEach(() => {
 
 describe("the export dialog", () => {
   it("opens from the footer, prefilled with a title, and counts what the file will hold", async () => {
-    expect(button("Export…")?.disabled).toBe(true);
+    expect(button("Export Proposal")?.disabled).toBe(true);
     act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
     await settle();
     await openDialog();

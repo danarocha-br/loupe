@@ -14,6 +14,8 @@ import {
   writeFlagOverrides,
 } from "./flags-server.js";
 import { PREVIEW_HOURS } from "./flags-lifetime.js";
+import { ClockIcon, ResetIcon } from "./icons.js";
+import { Command } from "./command.js";
 
 export type FlagsView =
   | { status: "loading" }
@@ -106,13 +108,30 @@ export function FlagsCard() {
     void previewFlags(set, clear).finally(() => setBusy(false));
   };
 
+  const meta =
+    current.status === "ready"
+      ? `${current.definitions.length} declared · ${Object.keys(current.overrides).length} previewing`
+      : current.status === "unavailable"
+        ? "Unavailable"
+        : null;
   return (
-    <div className="card" aria-label="Feature flags">
-      <h3>Feature flags</h3>
+    <div className="card flags" aria-label="Feature flags">
+      <div className="head">
+        <h3>Feature flags</h3>
+        {meta && <span className="meta">{meta}</span>}
+      </div>
       {current.status === "loading" && <div className="muted">Reading the app's flags…</div>}
       {current.status === "unavailable" && (
-        <div className="muted" role="status">
-          {current.reason}
+        <div className="row off" role="status">
+          <div className="head">
+            <div className="title">
+              <span className="dot amber small" />
+              Flag previews are off
+            </div>
+          </div>
+          <div className="muted">{current.reason}</div>
+          {/* The one fix the reader makes in a file: say which and where. */}
+          {current.reason.startsWith("FLAGS_SECRET isn't set") && <Command text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} />}
         </div>
       )}
       {current.status === "ready" && (
@@ -142,21 +161,27 @@ export function FlagsCard() {
               />
             ))}
           {current.error && (
-            <div className="notice" role="alert">
+            <div className="warn" role="alert">
+              <span className="dot" />
               {current.error}
             </div>
           )}
+          <div className="lasts">
+            <ClockIcon />
+            <span>
+              A preview lasts {PREVIEW_HOURS} hours, in a cookie every app on localhost shares. Clear it before
+              switching projects.
+            </span>
+          </div>
           <button
             type="button"
+            className="btn clear"
             disabled={busy || Object.keys(current.overrides).length === 0}
             onClick={() => run({}, "all")}
           >
+            <ResetIcon />
             Clear flag previews
           </button>
-          <div className="muted">
-            A preview lasts {PREVIEW_HOURS} hours, in a cookie every app on localhost shares. Clear it before
-            switching projects.
-          </div>
         </>
       )}
     </div>
@@ -181,34 +206,41 @@ function FlagRow({
   const previewing = Object.hasOwn(overrides, definition.key);
   const value = overrides[definition.key];
   const options = definition.options ?? (undeclared ? [] : ON_OFF);
+  const shown = options.find((option) => same(option.value, value));
   return (
-    <div className={previewing ? "row overridden" : "row"} data-flag={definition.key}>
+    <div className={previewing ? "row flag overridden" : "row flag"} data-flag={definition.key}>
       <div className="line">
-        <span className="name mono">{definition.key}</span>
+        <span className={previewing ? "dot small purple" : "dot small hollow"} />
+        <span className="name">{definition.key}</span>
         {previewing && (
-          <button type="button" className="reset" disabled={busy} onClick={onClear}>
+          <button type="button" className="btn small reset" disabled={busy} onClick={onClear}>
+            <ResetIcon />
             Clear
           </button>
         )}
       </div>
       {definition.description && <div className="muted">{definition.description}</div>}
-      {options.length > 0 && (
-        <div className="pills" role="group" aria-label={definition.key}>
-          {options.map((option) => (
-            <button
-              key={JSON.stringify(option.value)}
-              type="button"
-              aria-pressed={previewing && same(option.value, value)}
-              disabled={busy}
-              onClick={() => onPreview(option.value)}
-            >
-              {option.label ?? formatCurrent(option.value)}
-            </button>
-          ))}
-        </div>
-      )}
       {!definition.options && !undeclared && <div className="muted">No options declared: offered as on and off.</div>}
-      <div className="current">{previewing ? `Previewing ${formatCurrent(value)}` : "The app decides"}</div>
+      <div className="foot">
+        {options.length > 0 && (
+          <div className="pills" role="group" aria-label={definition.key}>
+            {options.map((option) => (
+              <button
+                key={JSON.stringify(option.value)}
+                type="button"
+                aria-pressed={previewing && same(option.value, value)}
+                disabled={busy}
+                onClick={() => onPreview(option.value)}
+              >
+                {option.label ?? formatCurrent(option.value)}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="state">
+          {previewing ? `PREVIEWING ${(shown?.label ?? formatCurrent(value)).toUpperCase()}` : "APP DECIDES"}
+        </div>
+      </div>
     </div>
   );
 }
