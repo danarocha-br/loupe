@@ -51,7 +51,9 @@ function propLine(prop: ProposalProp): string {
   const proposed = prop.proposedUnset ? "unset" : value(prop.proposed, text);
   const how =
     prop.writtenAs === "expression"
-      ? ` (written as an expression: \`${prop.expression}\`)`
+      ? prop.expression
+        ? ` (written as an expression: \`${prop.expression}\`)`
+        : " (written as an expression)"
       : prop.writtenAs === "spread"
         ? " (the call site spreads props)"
         : prop.writtenAs === "varies"

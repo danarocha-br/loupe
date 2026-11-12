@@ -155,6 +155,34 @@ describe("the Proposal from the page", () => {
     vi.unstubAllGlobals();
   });
 
+  it("leaves the Markdown in the console when the browser refuses the clipboard", async () => {
+    vi.stubGlobal("ClipboardItem", class {});
+    Object.defineProperty(navigator, "clipboard", {
+      value: { write: vi.fn(async () => Promise.reject(new Error("Write permission denied."))) },
+      configurable: true,
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    await settle();
+    act(() => footerButton("Copy as Markdown")?.click());
+    await settle();
+    expect(footerButton("Copy failed")?.title).toBe("Write permission denied. The Markdown is in the console.");
+    expect(info.mock.calls[0]?.[0]).toContain("`variant`: \"ghost\" → \"outline\"");
+    vi.unstubAllGlobals();
+  });
+
+  it("places a record set again after a reset on the route it is set on now", async () => {
+    const start = location.pathname;
+    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.reset(`${ROW}#ana`, undefined, "group"));
+    act(() => history.pushState(null, "", "/elsewhere"));
+    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    const proposal = await collectProposal({ title: "Moved" });
+    expect(proposal.routes.map((route) => route.route)).toEqual(["/elsewhere"]);
+    act(() => history.pushState(null, "", start));
+  });
+
   it("reads the theme the app set", () => {
     const html = document.createElement("html");
     html.className = "dark";

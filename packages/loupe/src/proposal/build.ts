@@ -51,7 +51,7 @@ export type Sighting = {
 /** What a route looked like when last seen. */
 export type RouteContext = {
   url: string;
-  viewport: [number, number];
+  viewport: [number, number] | null;
   dpr: number;
   theme: "light" | "dark" | null;
   capturedAt: string;
@@ -89,14 +89,21 @@ export function ordinal(n: number): string {
 }
 
 /** A value as JSON: functions, elements and other non-JSON values become how the Toolbar shows them. */
-export function toJson(value: unknown): JsonValue {
+export function toJson(value: unknown, seen: WeakSet<object> = new WeakSet()): JsonValue {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
-  if (Array.isArray(value)) return value.map(toJson);
-  if (typeof value === "object" && !("$$typeof" in value) && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, toJson(inner)]));
-  }
-  return formatCurrent(value);
+  const plain =
+    Array.isArray(value) ||
+    (typeof value === "object" && !("$$typeof" in value) && Object.getPrototypeOf(value) === Object.prototype);
+  if (!plain) return formatCurrent(value);
+  const object = value as object;
+  if (seen.has(object)) return "[Circular]";
+  seen.add(object);
+  const result: JsonValue = Array.isArray(object)
+    ? object.map((inner) => toJson(inner, seen))
+    : Object.fromEntries(Object.entries(object).map(([key, inner]) => [key, toJson(inner, seen)]));
+  seen.delete(object);
+  return result;
 }
 
 function proposedOf(value: unknown): Pick<ProposalProp, "proposed" | "proposedUnset"> {
@@ -143,7 +150,12 @@ export function buildProposal(input: ProposalInput): Proposal {
 
   const byId = new Map(input.sightings.map((sighting) => [sighting.id, sighting]));
   const byAnchor = (anchor: string) => input.sightings.filter((sighting) => sighting.anchor === anchor);
-  const anySightingOf = (anchor: string) => byAnchor(anchor).find((sighting) => sighting.rendered === "client") ?? byAnchor(anchor)[0];
+  /** The call site's freshest sighting: a mounted one, else the last seen. */
+  const anySightingOf = (anchor: string): Sighting | undefined => {
+    const all = byAnchor(anchor);
+    const client = all.filter((sighting) => sighting.rendered === "client");
+    return client.find((sighting) => sighting.mounted) ?? client.at(-1) ?? all.at(-1);
+  };
 
   const live = input.records.filter((record) => !record.suspended);
   const routeOf = (record: OverrideRecord): string => {
@@ -154,21 +166,31 @@ export function buildProposal(input: ProposalInput): Proposal {
     return seen?.routes[seen.routes.length - 1] ?? input.currentRoute;
   };
 
-  /** The sighted Instances a record reaches, left-out ones included. */
+  /**
+   * The sighted Instances a record reaches, left-out ones included. Per call site,
+   * only the mounted ones while any is: the rest are rows from another page of a
+   * list, and would count twice. A call site with nothing mounted, such as a
+   * closed dialog's, keeps what it last showed.
+   */
   function coverage(record: OverrideRecord): Sighting[] {
     const { target } = record;
+    let all: Sighting[];
     switch (target.scope) {
       case "instance": {
         const sighting = byId.get(target.id);
         return sighting ? [sighting] : [];
       }
       case "group":
-        return byAnchor(target.anchor);
+        all = byAnchor(target.anchor);
+        break;
       case "page":
-        return input.sightings.filter(
+        all = input.sightings.filter(
           (sighting) => sighting.component === target.component && sighting.routes.includes(target.route),
         );
+        break;
     }
+    const anchors = new Set(all.filter((sighting) => sighting.mounted).map((sighting) => sighting.anchor));
+    return all.filter((sighting) => sighting.mounted || !anchors.has(sighting.anchor));
   }
 
   const stateProps = (record: OverrideRecord): Set<string> => {
@@ -222,9 +244,12 @@ export function buildProposal(input: ProposalInput): Proposal {
       included: !excluded.has(sighting.id),
       onScreenAtExport: sighting.mounted,
     }));
-    // A left-out Instance that was never seen still belongs on the record.
+    // A left-out Instance that isn't covered now still belongs on the record.
+    const listed = new Set(instances.map((instance) => instance.id));
     for (const id of record.excluded) {
-      if (!byId.has(id)) instances.push({ id, keyPath: keyPathOfId(id, anchorOfId(id)), included: false, onScreenAtExport: false });
+      if (listed.has(id)) continue;
+      const seen = byId.get(id);
+      instances.push({ id, keyPath: seen?.keyPath ?? keyPathOfId(id, anchorOfId(id)), included: false, onScreenAtExport: seen?.mounted ?? false });
     }
 
     const props: ProposalProp[] = changed.map((name) => ({
@@ -271,8 +296,8 @@ export function buildProposal(input: ProposalInput): Proposal {
   /** How many Instances the call site rendered: those mounted now, else every one seen. */
   function siblingsOf(anchor: string): Sighting[] {
     const all = byAnchor(anchor).filter((sighting) => sighting.rendered === "client");
-    const mounted = all.filter((sighting) => sighting.mounted);
-    return mounted.length > 0 ? mounted : all;
+    const anchors = new Set(all.filter((sighting) => sighting.mounted).map((sighting) => sighting.anchor));
+    return all.filter((sighting) => sighting.mounted || !anchors.has(sighting.anchor));
   }
 
   function conditionOf(record: OverrideRecord, instances: readonly ProposalInstance[]): string | null {
@@ -383,12 +408,25 @@ export function buildProposal(input: ProposalInput): Proposal {
 /** The covered Instances' Current value for a prop: one value, or counts when they differ. */
 function currentOf(covered: readonly Sighting[], prop: string): Pick<ProposalProp, "current" | "currentCounts"> {
   if (covered.length === 0) return {};
-  const counts = new Map<string, number>();
+  // Compared in full, labelled as the Toolbar shows them: two values that read the same get a number.
+  const counts = new Map<string, { label: string; count: number }>();
   for (const sighting of covered) {
-    const label = prop in sighting.current ? formatCurrent(sighting.current[prop]) : NOT_SET;
-    counts.set(label, (counts.get(label) ?? 0) + 1);
+    const set = prop in sighting.current;
+    const value = sighting.current[prop];
+    const key = set ? `${typeof value}:${JSON.stringify(toJson(value))}` : "unset";
+    const entry = counts.get(key) ?? { label: set ? formatCurrent(value) : NOT_SET, count: 0 };
+    entry.count += 1;
+    counts.set(key, entry);
   }
-  if (counts.size > 1) return { currentCounts: Object.fromEntries(counts) };
+  if (counts.size > 1) {
+    const labelled: Record<string, number> = {};
+    for (const { label, count } of counts.values()) {
+      let shown = label;
+      for (let n = 2; shown in labelled; n++) shown = `${label} (${n})`;
+      labelled[shown] = count;
+    }
+    return { currentCounts: labelled };
+  }
   const [one] = covered;
   return one && prop in one.current ? { current: toJson(one.current[prop]) } : {};
 }

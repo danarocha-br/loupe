@@ -28,6 +28,7 @@ type Tracker = {
 };
 
 const GLOBAL_KEY = "__loupeProposalTracker";
+const REFRESH_MS = 100;
 
 /** Starts remembering what the page shows, once per page; kept on `globalThis` across a Fast Refresh. */
 export function startTracking(): Tracker {
@@ -37,24 +38,29 @@ export function startTracking(): Tracker {
   if (existing?.registry === reg) return existing;
   existing?.stop();
   const tracker: Tracker = { registry: reg, sightings: new Map(), setOn: {}, routes: {}, stop: () => {} };
-  let scheduled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  // Registry listeners run inside a commit: read after it, and at most every
+  // REFRESH_MS, so a page that rerenders often doesn't pay for a walk each commit.
   const schedule = () => {
-    if (scheduled) return;
-    scheduled = true;
-    // Registry listeners run inside a commit: read after it.
-    queueMicrotask(() => {
-      scheduled = false;
+    if (timer !== null) return;
+    timer = setTimeout(() => {
+      timer = null;
       refresh(tracker);
-    });
+    }, REFRESH_MS);
   };
   const unsubscribe = reg.store.subscribe((target) => {
+    if (target.scope === "page") return;
     const key = setOnKey(target);
-    if (target.scope !== "page" && !(key in tracker.setOn)) tracker.setOn[key] = currentRoute();
+    const exists = reg.store.records().some((record) => setOnKey(record.target) === key);
+    // A record set again after it was dropped belongs to the route it is set on now.
+    if (!exists) delete tracker.setOn[key];
+    else if (!(key in tracker.setOn)) tracker.setOn[key] = currentRoute();
   });
   const unwatch = onRegistryChange(schedule);
   tracker.stop = () => {
     unsubscribe();
     unwatch();
+    if (timer !== null) clearTimeout(timer);
   };
   refresh(tracker);
   host[GLOBAL_KEY] = tracker;
@@ -101,9 +107,12 @@ export function pageTheme(root: Element = document.documentElement): "light" | "
 }
 
 function routeContext(): RouteContext {
+  // A hidden tab can report 0×0: no viewport rather than a wrong one.
+  const viewport: [number, number] | null =
+    window.innerWidth > 0 && window.innerHeight > 0 ? [window.innerWidth, window.innerHeight] : null;
   return {
     url: location.href,
-    viewport: [window.innerWidth, window.innerHeight],
+    viewport,
     dpr: window.devicePixelRatio,
     theme: pageTheme(),
     capturedAt: new Date().toISOString(),
@@ -178,12 +187,23 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
  */
 export async function copyProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
   const text = collectProposal(options).then(proposalMarkdown);
-  if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function") {
-    await navigator.clipboard.write([
-      new ClipboardItem({ "text/plain": text.then((markdown) => new Blob([markdown], { type: "text/plain" })) }),
-    ]);
-  } else {
-    await navigator.clipboard.writeText(await text);
+  try {
+    if (typeof navigator.clipboard === "undefined") {
+      throw new Error("The clipboard is only available on a secure origin, localhost or HTTPS.");
+    }
+    if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function") {
+      await navigator.clipboard.write([
+        new ClipboardItem({ "text/plain": text.then((markdown) => new Blob([markdown], { type: "text/plain" })) }),
+      ]);
+    } else {
+      await navigator.clipboard.writeText(await text);
+    }
+  } catch (error) {
+    // A browser that refuses the clipboard still leaves the summary somewhere to copy from.
+    const markdown = await text;
+    console.info(`[loupe] Proposal as Markdown:\n\n${markdown}`);
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`${reason} The Markdown is in the console.`);
   }
   return text;
 }

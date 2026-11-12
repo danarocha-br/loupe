@@ -432,3 +432,52 @@ describe("helpers", () => {
     ).toBe("3rd of 4 `<Button>` in `MemberRowMenu` (member-row-menu.tsx)");
   });
 });
+
+describe("what the page last showed", () => {
+  it("counts only the mounted Instances while any is mounted, and keeps a left-out one that isn't", () => {
+    const old = USERS.map((user) =>
+      sighting({ id: `${TRIGGER}#old_${user}`, anchor: TRIGGER, component: "Button", keyPath: `old_${user}`, current: { size: "lg" }, mounted: false }),
+    );
+    const proposal = buildProposal(
+      input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [`${TRIGGER}#old_user_1`] })], {
+        // Rows of an earlier page of the list, seen first.
+        sightings: [...old, ...membros()],
+      }),
+    );
+    const [change] = changesOf(proposal);
+    expect(change?.props[0]).toMatchObject({ current: "icon" });
+    expect(change?.instances.filter((instance) => instance.included).map((instance) => instance.keyPath)).toEqual(USERS);
+    expect(change?.instances.find((instance) => !instance.included)).toMatchObject({ keyPath: "old_user_1", onScreenAtExport: false });
+    expect(change?.callSites[0]?.lineHint).toBe("80:13");
+  });
+
+  it("tells apart values that the Toolbar shows the same", () => {
+    const long = "x".repeat(130);
+    const sightings = membros().map((entry, index) =>
+      entry.anchor === TRIGGER ? { ...entry, current: { title: index === 0 ? `${long}a` : `${long}b` } } : entry,
+    );
+    const proposal = buildProposal(input([record({ scope: "group", anchor: TRIGGER }, { title: "short" })], { sightings }));
+    const counts = changesOf(proposal)[0]?.props[0]?.currentCounts ?? {};
+    expect(Object.values(counts).sort()).toEqual([1, 3]);
+    expect(Object.keys(counts)).toHaveLength(2);
+    expectValid(proposal);
+  });
+
+  it("survives a value that refers to itself", () => {
+    const cyclic: Record<string, unknown> = { a: 1 };
+    cyclic.self = cyclic;
+    expect(toJson(cyclic)).toEqual({ a: 1, self: "[Circular]" });
+    expect(toJson({ left: [1], right: [1] })).toEqual({ left: [1], right: [1] });
+  });
+
+  it("says a value comes from code even when there is no expression text", () => {
+    const sightings = membros().map((entry) =>
+      entry.anchor === CANCEL ? { ...entry, writes: { attributes: [], spreads: false, children: "from-code" as const } } : entry,
+    );
+    const proposal = buildProposal(input([record({ scope: "group", anchor: CANCEL }, { children: "Voltar" })], { sightings }));
+    expect(changesOf(proposal)[0]?.props[0]?.writtenAs).toBe("expression");
+    const markdown = proposalMarkdown(proposal);
+    expect(markdown).toContain("(written as an expression)");
+    expect(markdown).not.toContain("undefined");
+  });
+});

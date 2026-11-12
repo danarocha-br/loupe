@@ -3,6 +3,7 @@
 // inspector, at This instance or a group or page scope (PER-134). Functional
 // only; the visual pass is PER-140.
 
+import { useEffect, useState } from "react";
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
@@ -14,7 +15,6 @@ import { hasInstanceRecord, instanceRecord, safeInspect, safeProps } from "./pag
 import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 import { FlagsCard } from "./flags.js";
-import { useState } from "react";
 import { copyProposalMarkdown } from "./proposal.js";
 
 type PanelProps = {
@@ -541,24 +541,30 @@ function Footer({ page, debug }: PanelProps) {
 
 /** Copy as Markdown (PER-135): the Proposal's summary, for a ticket. Clears nothing. */
 function CopyMarkdown({ disabled }: { disabled: boolean }) {
-  const [done, setDone] = useState<"copied" | "failed" | null>(null);
+  const [state, setState] = useState<"idle" | "copying" | "copied" | { failed: string }>("idle");
+  useEffect(() => {
+    if (state === "idle" || state === "copying") return;
+    const timer = setTimeout(() => setState("idle"), 2500);
+    return () => clearTimeout(timer);
+  }, [state]);
+  const failed = typeof state === "object" ? state.failed : null;
   return (
     <button
       type="button"
-      disabled={disabled}
-      title="A short summary of every Override, to paste into a ticket"
+      disabled={disabled || state === "copying"}
+      title={failed ?? "A short summary of every Override, to paste into a ticket"}
       onClick={() => {
-        setDone(null);
+        setState("copying");
         copyProposalMarkdown().then(
-          () => setDone("copied"),
+          () => setState("copied"),
           (error: unknown) => {
             console.warn("[loupe] Copy as Markdown failed:", error);
-            setDone("failed");
+            setState({ failed: error instanceof Error ? error.message : String(error) });
           },
         );
       }}
     >
-      {done === "copied" ? "Copied" : done === "failed" ? "Copy failed" : "Copy as Markdown"}
+      {state === "copied" ? "Copied" : failed !== null ? "Copy failed" : "Copy as Markdown"}
     </button>
   );
 }

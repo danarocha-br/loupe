@@ -21,7 +21,7 @@ function git(args: string[]): Promise<string | null> {
     execFile(
       "git",
       args,
-      { cwd: process.cwd(), timeout: 5000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LOUPE_CALLER: MARKER } },
+      { cwd: process.cwd(), timeout: 5000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LOUPE_CALLER: MARKER } },
       (error, stdout) => resolve(error ? null : stdout.trim()),
     );
   });
@@ -48,7 +48,8 @@ function loupeVersion(): string | null {
 export async function readProjectContext(): Promise<ProposalProject> {
   const [commit, status, remote, top] = await Promise.all([
     git(["rev-parse", "HEAD"]),
-    git(["status", "--porcelain"]),
+    // No optional locks: a click must never collide with the user's own `git commit`.
+    git(["--no-optional-locks", "status", "--porcelain"]),
     git(["config", "--get", "remote.origin.url"]),
     git(["rev-parse", "--show-toplevel"]),
   ]);
