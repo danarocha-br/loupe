@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/danarocha-br/loupe/blob/main/packages/loupe/proposal.schema.json",
+  "title": "Loupe Proposal",
+  "description": "What a designer's Overrides ask engineering to change (formatVersion 1). Nothing in it has been applied to the repo.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatVersion", "title", "createdAt", "designer", "project", "howToApply", "routes", "heldForReview"],
+  "properties": {
+    "formatVersion": { "const": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "designer": { "type": ["string", "null"], "minLength": 1 },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repo", "commit", "dirty", "playgroundVersion"],
+      "properties": {
+        "repo": { "type": ["string", "null"] },
+        "commit": { "type": ["string", "null"] },
+        "dirty": { "type": ["boolean", "null"] },
+        "playgroundVersion": { "type": ["string", "null"] }
+      }
+    },
+    "howToApply": { "type": "string", "minLength": 1 },
+    "routes": { "type": "array", "items": { "$ref": "#/$defs/route" } },
+    "heldForReview": { "type": "array", "items": { "$ref": "#/$defs/held" } }
+  },
+  "$defs": {
+    "json": {
+      "description": "Any JSON value."
+    },
+    "scope": { "enum": ["instance", "call-site", "page"] },
+    "writtenAs": { "enum": ["literal", "expression", "spread", "unset", "unknown"] },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "route", "viewport", "dpr", "theme", "flags", "capturedAt", "changes", "statesShown", "screenshots"],
+      "properties": {
+        "url": { "type": ["string", "null"] },
+        "route": { "type": "string" },
+        "viewport": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "array", "prefixItems": [{ "type": "number" }, { "type": "number" }], "items": false, "minItems": 2 }
+          ]
+        },
+        "dpr": { "type": ["number", "null"] },
+        "theme": { "enum": ["light", "dark", null] },
+        "flags": { "type": "object", "additionalProperties": { "$ref": "#/$defs/json" } },
+        "capturedAt": { "type": ["string", "null"], "format": "date-time" },
+        "changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
+        "statesShown": { "type": "array", "items": { "$ref": "#/$defs/stateShown" } },
+        "screenshots": { "type": "array", "items": { "$ref": "#/$defs/screenshot" } }
+      }
+    },
+    "callSite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "enclosing", "component", "nth", "total", "anchor", "lineHint"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "enclosing": { "type": "string" },
+        "component": { "type": "string", "minLength": 1 },
+        "nth": { "type": "integer", "minimum": 1 },
+        "total": { "type": ["integer", "null"], "minimum": 1 },
+        "anchor": { "type": "string", "minLength": 1 },
+        "lineHint": { "type": ["string", "null"], "pattern": "^\\d+:\\d+$" }
+      }
+    },
+    "prop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "writtenAs"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "current": { "$ref": "#/$defs/json" },
+        "currentCounts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 }, "minProperties": 2 },
+        "proposed": { "$ref": "#/$defs/json" },
+        "proposedUnset": { "const": true },
+        "writtenAs": { "anyOf": [{ "$ref": "#/$defs/writtenAs" }, { "const": "varies" }] },
+        "expression": { "type": "string" },
+        "perCallSite": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["anchor", "writtenAs"],
+            "properties": {
+              "anchor": { "type": "string" },
+              "writtenAs": { "$ref": "#/$defs/writtenAs" },
+              "expression": { "type": "string" }
+            }
+          }
+        }
+      },
+      "allOf": [
+        { "oneOf": [{ "required": ["proposed"] }, { "required": ["proposedUnset"] }] },
+        { "not": { "required": ["current", "currentCounts"] } },
+        {
+          "if": { "properties": { "writtenAs": { "const": "varies" } } },
+          "then": { "required": ["perCallSite"] },
+          "else": { "not": { "required": ["perCallSite"] } }
+        }
+      ]
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "scope",
+        "component",
+        "origin",
+        "callSites",
+        "props",
+        "instances",
+        "needsCondition",
+        "serverRendered",
+        "overriddenBy",
+        "alsoRendersOn",
+        "onScreenAtExport",
+        "note",
+        "screenshots"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^c\\d+$" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "component": { "type": "string" },
+        "origin": { "type": ["string", "null"] },
+        "callSites": { "type": "array", "items": { "$ref": "#/$defs/callSite" } },
+        "props": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/prop" } },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "keyPath", "included", "onScreenAtExport"],
+            "properties": {
+              "id": { "type": "string" },
+              "keyPath": { "type": "string" },
+              "included": { "type": "boolean" },
+              "onScreenAtExport": { "type": "boolean" }
+            }
+          }
+        },
+        "needsCondition": { "type": ["string", "null"] },
+        "serverRendered": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "anchor", "keyPath"],
+            "properties": { "id": { "type": "string" }, "anchor": { "type": "string" }, "keyPath": { "type": "string" } }
+          }
+        },
+        "overriddenBy": { "type": "array", "items": { "type": "string", "pattern": "^c\\d+$" } },
+        "alsoRendersOn": { "type": "array", "items": { "type": "string" } },
+        "onScreenAtExport": { "type": "boolean" },
+        "note": { "type": ["string", "null"] },
+        "screenshots": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "stateShown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anchor", "component", "keyPath", "prop", "forced", "controlled", "appControlsVia", "onScreenAtExport"],
+      "properties": {
+        "anchor": { "type": "string" },
+        "component": { "type": "string" },
+        "keyPath": { "type": "string" },
+        "prop": { "type": "string", "minLength": 1 },
+        "forced": { "$ref": "#/$defs/json" },
+        "controlled": { "type": "boolean" },
+        "appControlsVia": { "type": "string", "pattern": "^on[A-Z]\\w*Change$" },
+        "onScreenAtExport": { "type": "boolean" }
+      }
+    },
+    "screenshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "caption", "before", "after"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["viewport", "crop"] },
+        "caption": { "type": "string" },
+        "before": { "type": "string" },
+        "after": { "type": "string" }
+      }
+    },
+    "held": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "component", "anchor", "route", "reason", "detail", "props"],
+      "properties": {
+        "scope": { "$ref": "#/$defs/scope" },
+        "component": { "type": "string" },
+        "anchor": { "type": "string" },
+        "route": { "type": "string" },
+        "reason": { "enum": ["code-changed", "ambiguous"] },
+        "detail": { "type": "string" },
+        "props": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "proposed": { "$ref": "#/$defs/json" },
+              "proposedUnset": { "const": true }
+            }
+          }
+        }
+      }
+    }
+  }
+}
