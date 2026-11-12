@@ -236,8 +236,25 @@ describe("the HTML report", () => {
     const { doc, downloads } = open(proposalReport(proposal, { fileName: "proposal-quieter-member-menus-20261112-1031.html" }));
     (doc.querySelector("[data-download-json]") as HTMLButtonElement).click();
     expect(downloads.map((download) => download.name)).toEqual(["proposal-quieter-member-menus-20261112-1031.json"]);
-    const json = await downloads[0]?.text;
-    expect(JSON.parse(json ?? "")).toEqual(proposal);
+    // The file itself is plain JSON: `<Button>` reads as written, not as the block's escape.
+    expect(await downloads[0]?.text).toBe(`${JSON.stringify(proposal, null, 2)}\n`);
+  });
+
+  it("escapes every field that came from the session, not only the note", () => {
+    const proposal = sample();
+    proposal.title = "<img src=x onerror=window.pwned=1>";
+    proposal.designer = "<b>Dana</b>";
+    proposal.createdAt = "<i>not a date</i>";
+    const change = proposal.routes[0]?.changes[0];
+    const prop = change?.props[0];
+    if (!change || !prop) throw new Error("sample changed");
+    prop.expression = "a < b && <script>window.pwned=1</script>";
+    (change.callSites[0] as { anchor: string }).anchor = "x › <svg onload=window.pwned=1> › Button[1]";
+    const { win, doc } = open(proposalReport(proposal));
+    expect(win.pwned).toBeUndefined();
+    expect(doc.querySelectorAll("img:not([data-shot]), b, i, svg")).toHaveLength(0);
+    expect(text(doc.querySelector("h1"))).toBe("<img src=x onerror=window.pwned=1>");
+    expect(text(doc.querySelector("header"))).toContain("<i>not a date</i>");
   });
 
   it("orders its sections as PER-99 lays them out", () => {

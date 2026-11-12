@@ -57,8 +57,9 @@ fieldset.site { border: 0; padding: 0; margin: 4px 0; }
 .snapshots { list-style: none; margin: 0; padding: 0; }
 .snapshots .thumb { flex: none; border-radius: 3px; }
 .snapshots .thumb.outdated { opacity: .5; }
-.dialog-backdrop { position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-start; padding: 12px; background: rgba(17, 17, 17, .25); border-radius: 12px; }
-.dialog { width: 100%; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 8px; padding: 12px; }
+.dialog { width: 360px; max-height: min(720px, calc(100vh - 32px)); overflow-y: auto; border: 1px solid #d5d9da; border-radius: 12px; padding: 12px; background: #fff; color: #111; font: 13px/1.4 system-ui, sans-serif; }
+.dialog::backdrop { background: rgba(17, 17, 17, .25); }
+.dialog form { display: flex; flex-direction: column; gap: 8px; }
 .dialog h2 { margin: 0; font-size: 15px; }
 .dialog .field { display: flex; flex-direction: column; gap: 2px; }
 .dialog .field input, .dialog .field textarea { font: inherit; width: 100%; }

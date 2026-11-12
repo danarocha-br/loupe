@@ -7,6 +7,7 @@
 // file holds each image once rather than once in the JSON and again in the markup.
 // Without scripts the text still reads in full.
 
+import { plural } from "../toolbar/format.js";
 import { ordinal } from "./build.js";
 import type {
   JsonValue,
@@ -33,7 +34,7 @@ export type ReportOptions = {
 export function reportFileName(title: string, date: Date): string {
   const slug = title
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -44,7 +45,7 @@ export function reportFileName(title: string, date: Date): string {
   return `proposal-${slug ? `${slug}-` : ""}${stamp}.html`;
 }
 
-function escape(text: string): string {
+function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
@@ -53,16 +54,12 @@ function scriptSafeJson(value: unknown): string {
   return JSON.stringify(value, null, 2).replace(/</g, "\\u003c");
 }
 
-const code = (text: string) => `<code>${escape(text)}</code>`;
-
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
+const code = (text: string) => `<code>${escapeHtml(text)}</code>`;
 
 /** "2026-11-12 10:31 UTC" from an ISO time; the text as given when it isn't one. */
 function when(iso: string): string {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
+  if (Number.isNaN(date.getTime())) return escapeHtml(iso);
   return `${date.toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
@@ -97,7 +94,7 @@ function capitalize(html: string): string {
 
 function writtenCell(prop: ProposalProp): string {
   if (prop.writtenAs !== "varies") return capitalize(howWritten(prop.writtenAs, prop.expression));
-  const sites = (prop.perCallSite ?? []).map((site) => `${escape(lastSegment(site.anchor))} ${howWritten(site.writtenAs, site.expression)}`);
+  const sites = (prop.perCallSite ?? []).map((site) => `${escapeHtml(lastSegment(site.anchor))} ${howWritten(site.writtenAs, site.expression)}`);
   return `Differs per call site: ${sites.join("; ")}`;
 }
 
@@ -110,14 +107,14 @@ function propRow(prop: ProposalProp): string {
     : value(prop.current, text);
   const proposed = prop.proposedUnset ? "Not set (remove it)" : value(prop.proposed, text);
   const name = text ? "Text" : code(prop.name);
-  return `<tr><th scope="row">${name}</th><td>${escape(current)}</td><td>${escape(proposed)}</td><td>${writtenCell(prop)}</td></tr>`;
+  return `<tr><th scope="row">${name}</th><td>${escapeHtml(current)}</td><td>${escapeHtml(proposed)}</td><td>${writtenCell(prop)}</td></tr>`;
 }
 
 /** "1st of 2 <Button> in MemberRowMenu", the path, the anchor and the line hint. */
 function siteHtml(site: ProposalCallSite): string {
   const count = site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
   const where = site.enclosing ? ` in ${code(site.enclosing)}` : "";
-  const hint = site.lineHint ? ` · line ${escape(site.lineHint)} at export, a hint` : "";
+  const hint = site.lineHint ? ` · line ${escapeHtml(site.lineHint)} at export, a hint` : "";
   return (
     `<strong>${count} ${code(`<${site.component}>`)}${where}</strong>` +
     `<div class="muted">${code(site.path)}${hint}</div>` +
@@ -132,7 +129,7 @@ function scopeText(change: ProposalChange): string {
     case "call-site":
       return "Every Instance at this call site";
     case "page":
-      return `Every ${escape(`<${change.component}>`)} on the page: ${plural(change.callSites.length, "call site")}`;
+      return `Every ${escapeHtml(`<${change.component}>`)} on the page: ${plural(change.callSites.length, "call site")}`;
   }
 }
 
@@ -156,8 +153,8 @@ function instancesHtml(change: ProposalChange): string {
 
 function pairHtml(shot: ProposalScreenshot): string {
   const side = (label: "Before" | "After") =>
-    `<figure><figcaption>${label}</figcaption><img data-shot="${escape(shot.id)}" data-side="${label.toLowerCase()}" alt="${escape(`${label}: ${shot.caption}`)}"></figure>`;
-  return `<div class="pair" id="${escape(shot.id)}"><p class="caption">${escape(shot.id)} · ${escape(shot.caption)}</p><div class="sides">${side("Before")}${side("After")}</div></div>`;
+    `<figure><figcaption>${label}</figcaption><img data-shot="${escapeHtml(shot.id)}" data-side="${label.toLowerCase()}" alt="${escapeHtml(`${label}: ${shot.caption}`)}"></figure>`;
+  return `<div class="pair" id="${escapeHtml(shot.id)}"><p class="caption">${escapeHtml(shot.id)} · ${escapeHtml(shot.caption)}</p><div class="sides">${side("Before")}${side("After")}</div></div>`;
 }
 
 function changeHtml(change: ProposalChange, route: ProposalRoute): string {
@@ -165,30 +162,30 @@ function changeHtml(change: ProposalChange, route: ProposalRoute): string {
     .map((id) => route.screenshots.find((shot) => shot.id === id))
     .filter((shot): shot is ProposalScreenshot => shot !== undefined);
   const facts: string[] = [];
-  if (change.needsCondition) facts.push(`<p class="condition"><strong>Needs a condition:</strong> ${escape(change.needsCondition)}</p>`);
+  if (change.needsCondition) facts.push(`<p class="condition"><strong>Needs a condition:</strong> ${escapeHtml(change.needsCondition)}</p>`);
   if (!change.onScreenAtExport) facts.push('<p class="muted">Not on screen at export: Current values are as last seen.</p>');
   if (change.overriddenBy.length > 0) {
-    facts.push(`<p>Overridden by ${change.overriddenBy.map((id) => `<a href="#${escape(id)}">${escape(id)}</a>`).join(", ")} on some Instances: that narrower change wins there.</p>`);
+    facts.push(`<p>Overridden by ${change.overriddenBy.map((id) => `<a href="#${escapeHtml(id)}">${escapeHtml(id)}</a>`).join(", ")} on some Instances: that narrower change wins there.</p>`);
   }
   if (change.alsoRendersOn.length > 0) facts.push(`<p class="muted">Also renders on ${change.alsoRendersOn.map(code).join(", ")}.</p>`);
   const where =
     change.callSites.length === 1
       ? `<div class="where">${siteHtml(change.callSites[0] as ProposalCallSite)}</div>`
       : `<ol class="where">${change.callSites.map((site) => `<li>${siteHtml(site)}</li>`).join("")}</ol>`;
-  return `<article class="change" id="${escape(change.id)}" data-change="${escape(change.id)}">
-<h4>${escape(change.id)} · ${code(`<${change.component}>`)} <span class="scope">${scopeText(change)}</span></h4>
+  return `<article class="change" id="${escapeHtml(change.id)}" data-change="${escapeHtml(change.id)}">
+<h4>${escapeHtml(change.id)} · ${code(`<${change.component}>`)} <span class="scope">${scopeText(change)}</span></h4>
 ${where}
 <table><thead><tr><th>Prop</th><th>Current</th><th>Proposed</th><th>How the call site writes it</th></tr></thead>
 <tbody>${change.props.map(propRow).join("")}</tbody></table>
 ${facts.join("\n")}
 ${instancesHtml(change)}
-${change.note ? `<blockquote class="note"><strong>Note:</strong> ${escape(change.note)}</blockquote>` : ""}
+${change.note ? `<blockquote class="note"><strong>Note:</strong> ${escapeHtml(change.note)}</blockquote>` : ""}
 <div class="shots">${shots.length > 0 ? shots.map(pairHtml).join("") : '<p class="muted">No screenshot: not captured on this route.</p>'}</div>
 </article>`;
 }
 
 function routeHeading(route: ProposalRoute): string {
-  return `<h3>${code(route.route)}</h3>${route.url ? `<p class="muted">${escape(route.url)}</p>` : ""}`;
+  return `<h3>${code(route.route)}</h3>${route.url ? `<p class="muted">${escapeHtml(route.url)}</p>` : ""}`;
 }
 
 function changesSection(proposal: Proposal): string {
@@ -221,7 +218,7 @@ function heldSection(proposal: Proposal): string {
     const props = held.props
       .map((prop) => `${code(prop.name)} → ${prop.proposedUnset ? "not set" : code(JSON.stringify(prop.proposed))}`)
       .join(", ");
-    return `<li><strong>Do not apply.</strong> ${code(`<${held.component}>`)} on ${code(held.route)}: ${escape(held.detail)}.<div>Was proposing: ${props}</div><div class="muted">Anchor: ${code(held.anchor)}</div></li>`;
+    return `<li><strong>Do not apply.</strong> ${code(`<${held.component}>`)} on ${code(held.route)}: ${escapeHtml(held.detail)}.<div>Was proposing: ${props}</div><div class="muted">Anchor: ${code(held.anchor)}</div></li>`;
   });
   return `<section id="held"><h2>Held for review, do not apply</h2><p class="muted">Loupe couldn't place these on the code as it is now. The designer needs to review them first.</p><ul>${items.join("")}</ul></section>`;
 }
@@ -243,11 +240,11 @@ function contextHtml(route: ProposalRoute): string {
   );
   if (route.statesShown.length > 0) {
     const states = route.statesShown.map(
-      (state) => `${code(`${state.prop} = ${JSON.stringify(state.forced)}`)} on ${code(`<${state.component}>`)}${state.keyPath ? ` (${escape(state.keyPath)})` : ""}`,
+      (state) => `${code(`${state.prop} = ${JSON.stringify(state.forced)}`)} on ${code(`<${state.component}>`)}${state.keyPath ? ` (${escapeHtml(state.keyPath)})` : ""}`,
     );
     parts.push(`<li>States held: ${states.join(", ")}</li>`);
   }
-  if (route.capturedAt) parts.push(`<li>Read at ${when(route.capturedAt)}</li>`);
+  if (route.capturedAt) parts.push(`<li>Page last read at ${when(route.capturedAt)}; each screen's caption gives its own viewport</li>`);
   return `<ul class="context">${parts.join("")}</ul>`;
 }
 
@@ -256,7 +253,7 @@ function screensSection(proposal: Proposal): string {
     .map((route) => {
       const viewports = route.screenshots.filter((shot) => shot.kind === "viewport");
       const shots = viewports.length > 0 ? viewports.map(pairHtml).join("") : '<p class="muted">No screen captured on this route.</p>';
-      return `<div class="route" data-route="${escape(route.route)}">${routeHeading(route)}${contextHtml(route)}${shots}</div>`;
+      return `<div class="route" data-route="${escapeHtml(route.route)}">${routeHeading(route)}${contextHtml(route)}${shots}</div>`;
     })
     .join("\n");
   return `<section id="screens"><h2>Screens</h2><p class="muted">Each screen as the designer saw it: before is the app as it is, after has the proposed changes.</p>${body}</section>`;
@@ -270,14 +267,14 @@ function headerHtml(proposal: Proposal, jsonName: string): string {
   const dirty = project.dirty
     ? '<p class="warning">The working tree had uncommitted changes at export: totals and line hints may describe code that was never committed.</p>'
     : "";
-  const by = proposal.designer ? ` by ${escape(proposal.designer)}` : "";
+  const by = proposal.designer ? ` by ${escapeHtml(proposal.designer)}` : "";
   return `<header>
 <p class="muted">Loupe Proposal</p>
-<h1>${escape(proposal.title)}</h1>
-<p>${when(proposal.createdAt)}${by} · ${code(`${project.repo ?? "repo"}@${commit}`)} · Loupe ${escape(project.playgroundVersion ?? "unknown")} · format ${proposal.formatVersion}</p>
+<h1>${escapeHtml(proposal.title)}</h1>
+<p>${when(proposal.createdAt)}${by} · ${code(`${project.repo ?? "repo"}@${commit}`)} · Loupe ${escapeHtml(project.playgroundVersion ?? "unknown")} · format ${proposal.formatVersion}</p>
 ${dirty}
 <p>${plural(changes, "change")} · ${plural(states, "State shown", "States shown")} · ${proposal.heldForReview.length} held for review</p>
-<p><button type="button" data-download-json="${escape(jsonName)}">Download the changes file (${escape(jsonName)})</button></p>
+<p><button type="button" data-download-json="${escapeHtml(jsonName)}">Download the changes file (${escapeHtml(jsonName)})</button></p>
 <noscript><p class="warning">Screenshots and the download need JavaScript. The changes file is in this page's source, in the script block with id ${REPORT_DATA_ID}.</p></noscript>
 </header>`;
 }
@@ -314,8 +311,7 @@ button { font: inherit; cursor: pointer; padding: 6px 12px; border-radius: 6px; 
 /** Draws the images from the embedded JSON and downloads the JSON alone. Runs once, inline. */
 const SCRIPT = `(function () {
   var block = document.getElementById(${JSON.stringify(REPORT_DATA_ID)});
-  var text = block.textContent;
-  var proposal = JSON.parse(text);
+  var proposal = JSON.parse(block.textContent);
   var shots = {};
   proposal.routes.forEach(function (route) {
     route.screenshots.forEach(function (shot) { shots[shot.id] = shot; });
@@ -326,14 +322,16 @@ const SCRIPT = `(function () {
   });
   document.querySelectorAll("[data-download-json]").forEach(function (button) {
     button.addEventListener("click", function () {
-      var url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      // The block escapes "<" to stay a script block; the file itself is plain JSON.
+      var json = JSON.stringify(proposal, null, 2) + "\\n";
+      var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
       var link = document.createElement("a");
       link.href = url;
       link.download = button.getAttribute("data-download-json");
       document.body.appendChild(link);
       link.click();
       link.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
     });
   });
 })();`;
@@ -346,7 +344,7 @@ export function proposalReport(proposal: Proposal, options: ReportOptions = {}):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(proposal.title)} · Loupe Proposal</title>
+<title>${escapeHtml(proposal.title)} · Loupe Proposal</title>
 <style>${CSS}</style>
 </head>
 <body>
@@ -356,7 +354,7 @@ ${changesSection(proposal)}
 ${statesSection(proposal)}
 ${heldSection(proposal)}
 ${screensSection(proposal)}
-<section id="apply"><h2>How to apply</h2><p>${escape(proposal.howToApply)}</p></section>
+<section id="apply"><h2>How to apply</h2><p>${escapeHtml(proposal.howToApply)}</p></section>
 </main>
 <script type="application/json" id="${REPORT_DATA_ID}">${scriptSafeJson(proposal)}</script>
 <script>${SCRIPT}</script>

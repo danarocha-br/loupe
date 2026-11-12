@@ -276,7 +276,7 @@ describe("in the Proposal and the Toolbar", () => {
       proposal = await collectProposal({ title: "t", capture: true });
     });
     expect(proposal.routes[0]?.screenshots.map((shot) => shot.caption)).toEqual([
-      "Screen 1: /",
+      "Screen 1: /, 1024×768 at 1x",
       "c1: variant on 1st <Button> in MemberRowMenu, every Instance, screen 1",
     ]);
     expect(snapshots().map((snapshot) => [snapshot.id, snapshot.auto])).toEqual([

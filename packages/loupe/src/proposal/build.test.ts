@@ -385,6 +385,8 @@ describe("Snapshots in a Proposal (PER-138)", () => {
           },
           {
             route: ROUTE,
+            size: [1280, 800],
+            dpr: 2,
             viewport: pair("v2", 1),
             crops: [{ ...pair("c-tall", 1), change: setOnKey(group.target), keyPath: "user_4", more: 2 }],
           },
@@ -397,7 +399,7 @@ describe("Snapshots in a Proposal (PER-138)", () => {
       ["s1", "viewport", `Screen 1: ${ROUTE}`],
       ["s2", "crop", "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"],
       ["s3", "crop", "c2: variant on 1st of 1 <Button> in MembersHeader, screen 1"],
-      ["s4", "viewport", `Screen 2: ${ROUTE} (1 image could not be captured, shown as a placeholder)`],
+      ["s4", "viewport", `Screen 2: ${ROUTE}, 1280×800 at 2x (1 image could not be captured, shown as a placeholder)`],
       [
         "s5",
         "crop",

@@ -63,7 +63,7 @@ let downloads: { name: string; blob: Blob }[] = [];
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-const dialog = () => shadow().querySelector<HTMLFormElement>('[role="dialog"]');
+const dialog = () => shadow().querySelector<HTMLDialogElement>("dialog");
 const button = (text: string, scope: ParentNode = shadow()) =>
   [...scope.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent === text);
 const field = <T extends HTMLInputElement | HTMLTextAreaElement>(selector: string) => dialog()?.querySelector<T>(selector) as T;
@@ -165,7 +165,8 @@ describe("the export dialog", () => {
     await settle();
     await openDialog();
 
-    expect(dialog()?.getAttribute("aria-modal")).toBe("true");
+    expect(dialog()?.open).toBe(true);
+    expect(dialog()?.getAttribute("aria-labelledby")).toBe("loupe-export-title");
     expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Button variant in MemberRow");
     expect(dialog()?.querySelector(".counts")?.textContent).toBe(
       "1 change · 1 without a screenshot · 0 held for review · 0 outdated Snapshots",
@@ -180,7 +181,7 @@ describe("the export dialog", () => {
     act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
     await settle();
     await openDialog();
-    const submit = button("Export", dialog() as HTMLFormElement);
+    const submit = button("Export", dialog() as HTMLDialogElement);
     expect(submit?.disabled).toBe(false);
     type(field('input[name="title"]'), "   ");
     expect(submit?.disabled).toBe(true);
@@ -196,7 +197,7 @@ describe("the export dialog", () => {
     type(field('input[name="title"]'), "Calmer rows");
     type(field('input[name="designer"]'), "Dana");
     type(field('[data-entry="c1"] textarea'), "Ghost reads as disabled on the dark theme.");
-    act(() => button("Export", dialog() as HTMLFormElement)?.click());
+    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
     await settle();
     await settle();
 
@@ -215,6 +216,8 @@ describe("the export dialog", () => {
 
     expect(dialog()).toBeNull();
     expect(button("Exported")).toBeDefined();
+    // Focus goes back to what opened the dialog.
+    expect(shadow().activeElement).toBe(shadow().querySelector("[data-export]"));
     expect(registry().store.records()).toEqual(records);
     expect(snapshots()).toHaveLength(1);
 
@@ -230,7 +233,7 @@ describe("the export dialog", () => {
     act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
     await settle();
     await openDialog();
-    act(() => button("Cancel", dialog() as HTMLFormElement)?.click());
+    act(() => button("Cancel", dialog() as HTMLDialogElement)?.click());
     expect(dialog()).toBeNull();
     await openDialog();
     act(() => {
@@ -257,8 +260,24 @@ describe("the export dialog", () => {
     expect(dialog()?.querySelector(".counts")?.textContent).toBe(
       "1 change · 0 without a screenshot · 0 held for review · 2 outdated Snapshots",
     );
-    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toMatch(/about 4\d\.\d MB, over 25 MB/);
-    expect(button("Export", dialog() as HTMLFormElement)?.disabled).toBe(false);
+    // Two kept pairs of 7 MB images; the export's own Snapshot would replace or repeat one, so it adds nothing.
+    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toMatch(/about 28\.\d MB, over 25 MB/);
+    expect(button("Export", dialog() as HTMLDialogElement)?.disabled).toBe(false);
+  });
+
+  it("exports without its own Snapshot when the capture fails, and says so", async () => {
+    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    await settle();
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(0);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await openDialog();
+    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
+    await settle();
+    await settle();
+    expect(downloads).toHaveLength(1);
+    const exported = shadow().querySelector<HTMLButtonElement>("[data-export]");
+    expect(exported?.textContent).toBe("Exported, no new screen");
+    expect(exported?.title).toMatch(/without a screenshot of the screen in view: .*no viewport to capture/);
   });
 
   it("drops its own Snapshot when it repeats a manual one of the same screen", async () => {
@@ -266,7 +285,7 @@ describe("the export dialog", () => {
     await settle();
     await capture();
     await openDialog();
-    act(() => button("Export", dialog() as HTMLFormElement)?.click());
+    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
     await settle();
     await settle();
     expect(snapshots().map((snapshot) => [snapshot.id, snapshot.auto])).toEqual([[1, false]]);
@@ -275,7 +294,7 @@ describe("the export dialog", () => {
     // A different screen is kept: the report shows both.
     pixels = "scrolled";
     await openDialog();
-    act(() => button("Export", dialog() as HTMLFormElement)?.click());
+    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
     await settle();
     await settle();
     expect(snapshots().map((snapshot) => snapshot.auto)).toEqual([false, true]);

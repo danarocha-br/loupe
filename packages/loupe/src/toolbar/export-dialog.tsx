@@ -2,12 +2,10 @@
 // the rest of the Toolbar; the visual pass is PER-140. The counts and the size
 // warning inform and never block; only an empty title holds Export back.
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { type ExportPreview, exportForm, exportProposal, megabytes, previewExport, REPORT_WARN_BYTES } from "./export.js";
-
-function plural(count: number, one: string, many = `${one}s`): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
+import { type KeyboardEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
+import { REPORT_WARN_BYTES } from "../proposal/report.js";
+import { type ExportPreview, type ExportResult, exportForm, exportProposal, previewExport } from "./export.js";
+import { megabytes, plural } from "./format.js";
 
 /** "3 changes · 1 without a screenshot · 1 held for review · 0 outdated Snapshots". */
 export function countsLine(preview: ExportPreview): string {
@@ -19,30 +17,45 @@ export function countsLine(preview: ExportPreview): string {
   ].join(" · ");
 }
 
+type Done = { label: string; title: string };
+
+/** What the button says after an export: a failed screen capture is said, not only logged. */
+function doneOf(result: ExportResult): Done {
+  if (result.captureFailed === null) return { label: "Exported", title: `Downloaded ${result.fileName}` };
+  return {
+    label: "Exported, no new screen",
+    title: `Downloaded ${result.fileName}, without a screenshot of the screen in view: ${result.captureFailed}`,
+  };
+}
+
 export function ExportButton({ disabled }: { disabled: boolean }) {
   const [open, setOpen] = useState(false);
-  const [exported, setExported] = useState<string | null>(null);
+  const [done, setDone] = useState<Done | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (exported === null) return;
-    const timer = setTimeout(() => setExported(null), 2500);
+    if (done === null) return;
+    const timer = setTimeout(() => setDone(null), done.label === "Exported" ? 2500 : 8000);
     return () => clearTimeout(timer);
-  }, [exported]);
+  }, [done]);
   return (
     <>
       <button
+        ref={trigger}
         type="button"
         data-export=""
-        disabled={disabled || open}
-        title={exported ?? "Download the HTML report for engineering"}
+        disabled={disabled}
+        title={done?.title ?? "Download the HTML report for engineering"}
         onClick={() => setOpen(true)}
       >
-        {exported !== null ? "Exported" : "Export…"}
+        {done?.label ?? "Export…"}
       </button>
       {open && (
         <ExportDialog
-          onClose={(fileName) => {
+          onClose={(result) => {
             setOpen(false);
-            if (fileName) setExported(`Downloaded ${fileName}`);
+            if (result) setDone(doneOf(result));
+            // The modal held focus: hand it back to what opened it.
+            trigger.current?.focus();
           }}
         />
       )}
@@ -50,15 +63,26 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
   );
 }
 
-function ExportDialog({ onClose }: { onClose(fileName?: string): void }) {
+function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
   const form = exportForm();
   const [preview, setPreview] = useState<ExportPreview | { failed: string } | null>(null);
   const [title, setTitle] = useState(form.title ?? "");
   const [designer, setDesigner] = useState(form.designer);
   const [notes, setNotes] = useState<Record<string, string>>({ ...form.notes });
   const [busy, setBusy] = useState(false);
+  // State lags a second Enter in the same frame; the ref doesn't.
+  const running = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const titleInput = useRef<HTMLInputElement>(null);
+  const element = useRef<HTMLDialogElement>(null);
+
+  // Modal where the browser can: the rest of the page goes inert and Tab stays inside.
+  useEffect(() => {
+    const dialog = element.current;
+    if (!dialog || dialog.open) return;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -80,32 +104,35 @@ function ExportDialog({ onClose }: { onClose(fileName?: string): void }) {
   const ready = preview !== null && !("failed" in preview);
   const estimate = ready ? preview.bytes + preview.captureBytes : 0;
   const run = () => {
-    if (title.trim() === "" || busy) return;
+    if (title.trim() === "" || running.current) return;
+    running.current = true;
     setBusy(true);
     setError(null);
     exportProposal({ title, designer, notes }).then(
-      (result) => onClose(result.fileName),
+      (result) => onClose(result),
       (failure: unknown) => {
         console.warn("[loupe] Export failed:", failure);
+        running.current = false;
         setBusy(false);
         setError(failure instanceof Error ? failure.message : String(failure));
       },
     );
   };
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || busy) return;
+  const cancel = (event: KeyboardEvent | SyntheticEvent) => {
+    event.preventDefault();
     event.stopPropagation();
-    onClose();
+    if (!running.current) onClose();
   };
 
   return (
-    <div className="dialog-backdrop">
+    <dialog
+      ref={element}
+      className="dialog"
+      aria-labelledby="loupe-export-title"
+      onCancel={cancel}
+      onKeyDown={(event) => event.key === "Escape" && cancel(event)}
+    >
       <form
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="loupe-export-title"
-        onKeyDown={onKeyDown}
         onSubmit={(event) => {
           event.preventDefault();
           run();
@@ -139,7 +166,11 @@ function ExportDialog({ onClose }: { onClose(fileName?: string): void }) {
           />
         </label>
         {preview === null && <p className="muted">Counting…</p>}
-        {preview !== null && "failed" in preview && <div className="notice">{preview.failed}</div>}
+        {preview !== null && "failed" in preview && (
+          <div className="notice" role="alert">
+            {preview.failed}
+          </div>
+        )}
         {ready && (
           <>
             <p className="counts" role="status">
@@ -179,7 +210,11 @@ function ExportDialog({ onClose }: { onClose(fileName?: string): void }) {
             )}
           </>
         )}
-        {error !== null && <div className="notice">{error}</div>}
+        {error !== null && (
+          <div className="notice" role="alert">
+            {error}
+          </div>
+        )}
         <div className="actions">
           <button type="button" disabled={busy} onClick={() => onClose()}>
             Cancel
@@ -189,6 +224,6 @@ function ExportDialog({ onClose }: { onClose(fileName?: string): void }) {
           </button>
         </div>
       </form>
-    </div>
+    </dialog>
   );
 }

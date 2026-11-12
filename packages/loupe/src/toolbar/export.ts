@@ -11,10 +11,10 @@ import { changeInWords } from "../proposal/build.js";
 import { proposalReport, REPORT_WARN_BYTES, reportFileName } from "../proposal/report.js";
 import type { Proposal } from "../proposal/types.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { currentRoute } from "../runtime/registry.js";
+import { megabytes } from "./format.js";
 import { collectProposalKeyed, suggestedTitle } from "./proposal.js";
 import { captureScreen, isOutdated, removeSnapshot, type Snapshot, snapshots } from "./snapshots.js";
-
-export { REPORT_WARN_BYTES };
 
 /** What the designer typed; `title` stays null until they edit it, so it follows the suggestion. */
 export type ExportForm = { title: string | null; designer: string; notes: Record<string, string> };
@@ -40,7 +40,10 @@ export type ExportPreview = {
   outdatedSnapshots: number;
   /** The report's size as things stand, before the export's own Snapshot. */
   bytes: number;
-  /** Roughly what the export's own Snapshot adds: the newest kept Snapshot's size. */
+  /**
+   * Roughly what the export's own Snapshot adds: the newest kept Snapshot's size,
+   * and nothing when this route already has one, which it replaces or repeats.
+   */
   captureBytes: number;
 };
 
@@ -48,12 +51,13 @@ function utf8Bytes(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 
-/** Counts and entries for the dialog, from the store as it is now. Reads only. */
+/** Counts and entries for the dialog, from the store as it is now. Captures and downloads nothing. */
 export async function previewExport(): Promise<ExportPreview> {
   const form = exportForm();
   const { proposal, keys } = await collectProposalKeyed({ notes: form.notes });
   const changes = proposal.routes.flatMap((route) => route.changes);
   const kept = snapshots().filter((snapshot) => !isOutdated(snapshot));
+  const route = currentRoute();
   return {
     suggestedTitle: suggestedTitle(proposal),
     entries: changes.map((change) => ({ id: change.id, key: keys[change.id] ?? change.id, label: changeInWords(change) })),
@@ -62,7 +66,7 @@ export async function previewExport(): Promise<ExportPreview> {
     held: proposal.heldForReview.length,
     outdatedSnapshots: snapshots().length - kept.length,
     bytes: utf8Bytes(proposalReport(proposal)),
-    captureBytes: kept.at(-1)?.bytes ?? 0,
+    captureBytes: kept.some((snapshot) => snapshot.route === route) ? 0 : (kept.at(-1)?.bytes ?? 0),
   };
 }
 
@@ -84,21 +88,30 @@ export function duplicateOf(taken: Snapshot, list: readonly Snapshot[]): Snapsho
 
 export type ExportOptions = { title: string; designer?: string | null; notes?: Readonly<Record<string, string>> };
 
-export type ExportResult = { fileName: string; html: string; bytes: number; proposal: Proposal };
+export type ExportResult = {
+  fileName: string;
+  html: string;
+  bytes: number;
+  proposal: Proposal;
+  /** Why the export's own Snapshot failed; the report went out without it. Null when it didn't. */
+  captureFailed: string | null;
+};
 
 /** Takes the export's Snapshot, then builds the report. Downloads nothing. */
 export async function buildExport(options: ExportOptions): Promise<ExportResult> {
   const title = options.title.trim();
   if (title === "") throw new Error("A Proposal needs a title.");
+  let captureFailed: string | null = null;
   const taken = await captureScreen({ auto: true }).catch((error: unknown) => {
     console.warn("[loupe] The export's Snapshot failed; exporting without it.", error);
+    captureFailed = error instanceof Error ? error.message : String(error);
     return null;
   });
   if (taken && duplicateOf(taken, snapshots())) removeSnapshot(taken.id);
   const { proposal } = await collectProposalKeyed({ title, designer: options.designer ?? null, notes: options.notes ?? {} });
   const fileName = reportFileName(title, new Date(proposal.createdAt));
   const html = proposalReport(proposal, { fileName });
-  return { fileName, html, bytes: utf8Bytes(html), proposal };
+  return { fileName, html, bytes: utf8Bytes(html), proposal, captureFailed };
 }
 
 /** Hands a file to the browser's downloads. */
@@ -111,7 +124,8 @@ export function download(text: string, fileName: string, type: string): void {
   document.body.append(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // A large file can still be streaming to disk after the click returns.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /** Export: the report, downloaded. Clears nothing. */
@@ -122,10 +136,6 @@ export async function exportProposal(options: ExportOptions): Promise<ExportResu
   }
   download(result.html, result.fileName, "text/html");
   return result;
-}
-
-export function megabytes(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** Adds `report` and `exportProposal` to `window.__loupe`, the acceptance surface. */

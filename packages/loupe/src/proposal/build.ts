@@ -93,6 +93,9 @@ export type ImagePair = {
 export type SnapshotInput = {
   /** The pathname it was captured on. */
   route: string;
+  /** The viewport it was captured at, in CSS pixels, and its density: the caption states them. */
+  size?: [number, number];
+  dpr?: number;
   viewport: ImagePair;
   crops: (ImagePair & {
     /** The change's record, as `setOnKey` names it. */
@@ -467,7 +470,7 @@ function attachSnapshots(
     home.screenshots.push({
       id: `s${next++}`,
       kind: "viewport",
-      caption: `Screen ${index + 1}: ${snapshot.route}${failedNote(snapshot.viewport.failedImages)}`,
+      caption: `Screen ${index + 1}: ${snapshot.route}${screenSize(snapshot)}${failedNote(snapshot.viewport.failedImages)}`,
       before: snapshot.viewport.before,
       after: snapshot.viewport.after,
     });
@@ -485,6 +488,13 @@ function attachSnapshots(
       draft.change.screenshots.push(id);
     }
   });
+}
+
+/** ", 1440×900 at 2x": the screen's own viewport, which may differ from the route's last reading. */
+function screenSize(snapshot: SnapshotInput): string {
+  if (!snapshot.size) return "";
+  const [width, height] = snapshot.size;
+  return `, ${width}×${height}${snapshot.dpr ? ` at ${snapshot.dpr}x` : ""}`;
 }
 
 function failedNote(count: number): string {
