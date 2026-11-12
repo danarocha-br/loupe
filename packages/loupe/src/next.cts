@@ -20,7 +20,7 @@ export type LoupeOptions = {
 };
 
 // Structural, so Next's own `NextConfig` interface fits without Loupe importing it.
-type Config = { turbopack?: { rules?: object } };
+type Config = { turbopack?: { rules?: object }; env?: Record<string, string | undefined> };
 type ConfigFunction<C> = (phase: string, context: unknown) => C | Promise<C>;
 
 export function withLoupe<C extends Config>(
@@ -32,10 +32,28 @@ export function withLoupe<C extends Config>(
     if (phase !== PHASE_DEVELOPMENT_SERVER || process.env.LOUPE === "0") return base;
 
     const adaptList = path.resolve(options.adaptList);
-    // Fail at startup, once, rather than on every file the loader sees.
-    const { parseAdaptList } = await import("./adapt-list.js");
-    parseAdaptList(readFileSync(adaptList, "utf8"), adaptList);
     const root = realpathSync(path.resolve(options.root ?? findWorkspaceRoot(path.dirname(adaptList))));
+    // The Toolbar's notices read the Product layer through a Server Action (PER-133).
+    const env = { ...base.env, LOUPE_ROOT: root, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() };
+
+    // A Product layer in another format names the command that rewrites it (PER-85).
+    // When the loader can still read adapt-list.json the app starts, and the Toolbar
+    // repeats the notice. When it can't, startup fails, as for any broken adapt list:
+    // starting without the rule, or with a loader handing every file back untouched,
+    // left Turbopack's persistent cache hung or mixing up modules on orbix-ai (PER-133).
+    const text = readFileSync(adaptList, "utf8");
+    const { formatOf, generateCommand } = await import("./layer-status.js");
+    const format = formatOf(text);
+    const { formatNotice } = await import("./format-notice.js");
+    const notice = format && `${formatNotice(format)} ${generateCommand({ root, adaptList, app: env.LOUPE_APP })}`;
+    const { parseAdaptList } = await import("./adapt-list.js");
+    try {
+      parseAdaptList(text, adaptList);
+    } catch (error) {
+      if (notice) throw new Error(`withLoupe: ${notice}`, { cause: error });
+      throw error;
+    }
+    if (notice) console.error(`[loupe] ${notice}`);
 
     const rules = base.turbopack?.rules ?? {};
     if (LOADER_RULE in rules) {
@@ -45,6 +63,7 @@ export function withLoupe<C extends Config>(
     }
     return {
       ...base,
+      env,
       turbopack: {
         ...base.turbopack,
         rules: {

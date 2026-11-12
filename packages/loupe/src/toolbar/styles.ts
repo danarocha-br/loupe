@@ -27,6 +27,7 @@ button[aria-pressed="true"] { background: #111; color: #fff; }
 .mono { font-family: ui-monospace, monospace; font-size: 11px; }
 .tag { font-family: ui-monospace, monospace; font-size: 10px; text-transform: uppercase; background: #f1f3f3; border-radius: 4px; padding: 1px 4px; }
 .tag.supported { background: #d9f5df; }
+.tag.stale { background: #fff4d6; }
 .row { padding: 3px 0; }
 .row .line { display: flex; gap: 8px; align-items: baseline; }
 .row .name { flex: none; min-width: 96px; }

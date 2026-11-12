@@ -26,6 +26,7 @@ export const BUILD_NEEDLES = [
   "data-loupe-toolbar",
   "loupe-flag-preview",
   "loupe-proposal-context",
+  "loupe-layer-status",
 ] as const;
 
 /**
