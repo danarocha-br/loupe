@@ -147,8 +147,12 @@ null stub: the Toolbar's dynamic import sits inside the `NODE_ENV` condition, so
 the bundler drops it, and `doctor --build` fails if it ever leaks.
 
 The Toolbar is one right-hand panel in its own shadow root. With nothing
-selected it lists every Instance on the page by component, server-rendered ones
-included, and updates as menus and dialogs mount. **Pick** selects by clicking
+selected it lists every Instance on the page by component, and updates as menus
+and dialogs mount. That includes server-rendered Instances and anchored client
+ones with no Adapter, both inspect-only. A component on the page that the next
+`generate` would add (exported by a file it reads, missing from `meta/`) is
+tagged **Not generated yet**, with the command; it clears once the command has
+run. Nothing regenerates on its own. **Pick** selects by clicking
 the page (Esc cancels); only while Pick is on does the Toolbar stop the page's
 pointer events. The inspector shows the Instance, its call site, Coverage as
 "N editable props · M inspect only", each prop's Current value with a reason per
@@ -157,7 +161,7 @@ inspect-only prop, and what a library injected in one collapsed line.
 The same is on the console:
 
 ```js
-__loupe.list()                         // adapted Instances, and server-rendered ones (inspect-only)
+__loupe.list()                         // adapted Instances; client ones with no Adapter and server-rendered ones (inspect-only)
 __loupe.props(id)                      // Current value, injected props, Overrides, rendered props, sources, State props
 __loupe.set(id, "variant", "outline")  // an Instance Override
 __loupe.reset(id)                      // back to the Current value

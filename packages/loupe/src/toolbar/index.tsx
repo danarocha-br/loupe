@@ -96,7 +96,7 @@ function ToolbarOpen({
   const selectedLabel = selected === null ? null : (safeInspect(debug, selected)?.component ?? null);
   const view = useMemo(() => {
     if (selected === null || scope === "instance" || !debug.status.overrides) return null;
-    const row = page.rows.find((candidate) => candidate.id === selected && candidate.rendered === "client");
+    const row = page.rows.find((candidate) => candidate.id === selected && candidate.adapted);
     return row ? scopeView(debug, page.rows, page.records, row, scope) : null;
   }, [debug, page, selected, scope]);
   // The Instance left (its dialog closed, say): when it comes back it opens at This instance.

@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { overridesOffNote } from "../runtime/inspect.js";
+import { overridesOffNote, UNADAPTED_NOTE } from "../runtime/inspect.js";
 import type { LastSeen } from "../runtime/registry.js";
 import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
@@ -18,7 +18,22 @@ import { FlagsCard } from "./flags.js";
 import { ExportButton } from "./export-dialog.js";
 import { copyProposalMarkdown } from "./proposal.js";
 import { CaptureButton, SnapshotsCard } from "./snapshots-card.js";
-import { LayerNotices, staleComponents, useLayerStatus } from "./notices.js";
+import {
+  LayerNotices,
+  NotGeneratedNotice,
+  notGeneratedComponents,
+  staleComponents,
+  useLayerStatus,
+} from "./notices.js";
+
+/** What the list and the inspector flag from the Product layer's status (PER-133, PER-179). */
+type LayerFlags = {
+  stale: Set<string>;
+  /** Components on the page `generate` hasn't read yet. */
+  notGenerated: string[];
+  /** The command that rewrites the Product layer; empty while it can't be read. */
+  command: string;
+};
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -40,7 +55,11 @@ type PanelProps = {
 export function Panel(props: PanelProps) {
   const { page, selected } = props;
   const layer = useLayerStatus(props.version);
-  const stale = staleComponents(layer);
+  const flags: LayerFlags = {
+    stale: staleComponents(layer),
+    notGenerated: notGeneratedComponents(layer, page.groups),
+    command: layer?.command ?? "",
+  };
   return (
     <section className="panel" aria-label="Loupe">
       <header className="header">
@@ -61,9 +80,9 @@ export function Panel(props: PanelProps) {
           </div>
         )}
         {selected === null ? (
-          <ComponentList {...props} stale={stale} />
+          <ComponentList {...props} flags={flags} />
         ) : (
-          <Inspector {...props} id={selected} stale={stale} />
+          <Inspector {...props} id={selected} flags={flags} />
         )}
       </div>
       <Footer {...props} />
@@ -71,7 +90,7 @@ export function Panel(props: PanelProps) {
   );
 }
 
-function ComponentList({ debug, page, onSelect, onHover, stale }: PanelProps & { stale: Set<string> }) {
+function ComponentList({ debug, page, onSelect, onHover, flags }: PanelProps & { flags: LayerFlags }) {
   const instances = page.groups.reduce((sum, group) => sum + group.instances.length, 0);
   return (
     <>
@@ -81,6 +100,7 @@ function ComponentList({ debug, page, onSelect, onHover, stale }: PanelProps & {
           {instances} Instances of {page.groups.length} components on this page. Pick one on the page or below.
         </div>
       </div>
+      <NotGeneratedNotice names={flags.notGenerated} command={flags.command} />
       <FlagsCard />
       <SnapshotsCard />
       <HeldForReviewCard debug={debug} records={page.records} />
@@ -96,16 +116,22 @@ function ComponentList({ debug, page, onSelect, onHover, stale }: PanelProps & {
                 >
                   {group.component} ×{group.instances.length}
                   {group.held.length > 0 && ` · ${group.held.length} not mounted`}{" "}
-                  {stale.has(group.component) && <span className="tag stale">Source changed</span>}{" "}
+                  {flags.stale.has(group.component) && <span className="tag stale">Source changed</span>}{" "}
                   {group.overrides > 0 && <span className="tag">{group.overrides} override{group.overrides === 1 ? "" : "s"}</span>}{" "}
-                  {group.instances.length === 0 ? null : group.supported ? (
+                  {group.instances.length === 0 ? null : flags.notGenerated.includes(group.component) ? (
+                    <span className="tag stale" title={flags.command}>
+                      Not generated yet
+                    </span>
+                  ) : group.supported ? (
                     <span className="tag supported">Supported</span>
                   ) : (
                     <span className="tag" title={group.reason ?? undefined}>
                       Inspect only
                     </span>
                   )}
-                  {!group.supported && group.reason && <span className="muted"> · {group.reason}</span>}
+                  {!group.supported && group.reason && !flags.notGenerated.includes(group.component) && (
+                    <span className="muted"> · {group.reason}</span>
+                  )}
                 </summary>
                 <ul className="list">
                   {group.instances.map((row) => (
@@ -231,7 +257,7 @@ function instanceLabel(id: string, hint: string | null): string {
   return `${where}${key}`;
 }
 
-function Inspector(props: PanelProps & { id: string; stale: Set<string> }) {
+function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
   const { debug, id, onSelect, page, scope, onScope, view } = props;
   const inspection = safeInspect(debug, id);
   const recorded = debug.status.overrides && hasInstanceRecord(debug, id);
@@ -294,7 +320,7 @@ function Inspector(props: PanelProps & { id: string; stale: Set<string> }) {
             <span className="tag">Inspect only</span>
           )}{" "}
           <span className="tag">{inspection.rendered === "server" ? "On the server" : "In the browser"}</span>
-          {props.stale.has(inspection.component) && <span className="tag stale">Source changed</span>}
+          {props.flags.stale.has(inspection.component) && <span className="tag stale">Source changed</span>}
         </div>
         {editing && resetInstance}
         <div className="mono" data-testid="instance-id">
@@ -323,7 +349,8 @@ function Inspector(props: PanelProps & { id: string; stale: Set<string> }) {
       {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
       {scoped && <MembersCard debug={debug} id={id} view={view} rows={rows} onHover={props.onHover} />}
       <CallSiteCard inspection={inspection} />
-      {inspection.note && (
+      {/* Never generated: its Coverage line says so; the note's "no Editable prop" would be a guess. */}
+      {inspection.note && !(inspection.note === UNADAPTED_NOTE && props.flags.notGenerated.includes(inspection.component)) && (
         <div className="banner" role="note">
           {inspection.note}
         </div>
@@ -334,6 +361,12 @@ function Inspector(props: PanelProps & { id: string; stale: Set<string> }) {
           {inspection.coverage.editable} editable prop{inspection.coverage.editable === 1 ? "" : "s"} ·{" "}
           {inspection.coverage.inspectOnly} inspect only
         </div>
+        {props.flags.notGenerated.includes(inspection.component) && (
+          <div data-testid="not-generated">
+            <span className="tag stale">Not generated yet</span> Run <span className="mono">{props.flags.command}</span> to
+            read its props.
+          </div>
+        )}
       </div>
       <div className="card">
         <h3>Editable props</h3>
