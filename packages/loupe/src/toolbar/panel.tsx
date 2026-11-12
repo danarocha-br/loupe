@@ -349,8 +349,11 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
       {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
       {scoped && <MembersCard debug={debug} id={id} view={view} rows={rows} onHover={props.onHover} />}
       <CallSiteCard inspection={inspection} />
-      {/* Never generated: its Coverage line says so; the note's "no Editable prop" would be a guess. */}
-      {inspection.note && !(inspection.note === UNADAPTED_NOTE && props.flags.notGenerated.includes(inspection.component)) && (
+      {/* Never generated: its Coverage line says so; the note's "no Editable prop" would be a guess.
+          Overrides off: the panel's banner already says it (PER-184). */}
+      {inspection.note &&
+        !(inspection.note === UNADAPTED_NOTE && props.flags.notGenerated.includes(inspection.component)) &&
+        !(!page.status.overrides && inspection.note === overridesOffNote(page.status.reason)) && (
         <div className="banner" role="note">
           {inspection.note}
         </div>

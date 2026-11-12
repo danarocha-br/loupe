@@ -274,6 +274,15 @@ describe("the Toolbar", () => {
     expect(shadow().querySelector("[data-testid=coverage]")?.textContent).toBe("0 editable props · 4 inspect only");
   });
 
+  it("says Overrides are off once, in the panel's banner, with an Instance selected (PER-184)", async () => {
+    await mount();
+    act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
+    await settle();
+    await select(BIA);
+    const said = panelText().split("Overrides are off, everything is inspect-only").length - 1;
+    expect(said).toBe(1);
+  });
+
   it("Reset all drops every record, including one whose Instance isn't mounted", async () => {
     await mount();
     act(() => pageButton("Menu").click());
