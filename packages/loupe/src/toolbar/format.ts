@@ -45,3 +45,12 @@ export function appValue(row: { set: boolean; value: unknown; default?: DefaultV
   if (known && (known.source === "destructure" || known.source === "defaultVariants")) return known.value ?? undefined;
   return undefined;
 }
+
+/** "1 change", "3 changes". */
+export function plural(count: number, one: string, many = `${one}s`): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+export function megabytes(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}

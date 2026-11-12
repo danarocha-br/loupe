@@ -8,7 +8,7 @@
 // `__loupe.proposalMarkdown(options?)` the Copy as Markdown text. Snapshots that
 // aren't Outdated ride along (PER-138); `{ capture: true }` takes one first.
 
-import { buildProposal, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
+import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
 import { proposalMarkdown } from "../proposal/markdown.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
@@ -26,6 +26,8 @@ export type ProposalOptions = {
    * leaves the Proposal without it rather than failing.
    */
   capture?: boolean;
+  /** Per record (`setOnKey`), the designer's note for its entry (PER-139). */
+  notes?: Readonly<Record<string, string>>;
 };
 
 type Tracker = {
@@ -147,6 +149,11 @@ export function suggestedTitle(proposal: Proposal): string {
 
 /** The Proposal for the whole Override store, every route. */
 export async function collectProposal(options: ProposalOptions = {}): Promise<Proposal> {
+  return (await collectProposalKeyed(options)).proposal;
+}
+
+/** The Proposal, and per change id the record it reads: what the export dialog keeps notes against. */
+export async function collectProposalKeyed(options: ProposalOptions = {}): Promise<{ proposal: Proposal; keys: Record<string, string> }> {
   if (options.capture) {
     await captureScreen({ auto: true }).catch((error: unknown) => {
       console.warn("[loupe] The export's Snapshot failed; exporting without it.", error);
@@ -193,9 +200,10 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
     currentRoute: route,
     flags: Object.fromEntries(flags.map((flag) => [flag.key, flag.value as JsonValue])),
     snapshots: exportableSnapshots(),
+    notes: options.notes ?? {},
   };
-  const proposal = buildProposal(input);
-  return options.title?.trim() ? proposal : { ...proposal, title: suggestedTitle(proposal) };
+  const { proposal, keys } = buildProposalKeyed(input);
+  return { proposal: options.title?.trim() ? proposal : { ...proposal, title: suggestedTitle(proposal) }, keys };
 }
 
 /**

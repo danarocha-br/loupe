@@ -74,6 +74,8 @@ export type ProposalInput = {
   flags: Readonly<Record<string, JsonValue>>;
   /** Snapshots to export (PER-138), oldest first; outdated ones already left out. */
   snapshots?: readonly SnapshotInput[];
+  /** Per record (`setOnKey`), the designer's note: the "why" (PER-139). Blank is none. */
+  notes?: Readonly<Record<string, string>>;
 };
 
 /** A before/after pair of images, as data URLs. */
@@ -91,6 +93,9 @@ export type ImagePair = {
 export type SnapshotInput = {
   /** The pathname it was captured on. */
   route: string;
+  /** The viewport it was captured at, in CSS pixels, and its density: the caption states them. */
+  size?: [number, number];
+  dpr?: number;
   viewport: ImagePair;
   crops: (ImagePair & {
     /** The change's record, as `setOnKey` names it. */
@@ -173,6 +178,11 @@ function writtenAsOf(writes: CallSiteWrites | null, prop: string): { writtenAs: 
 }
 
 export function buildProposal(input: ProposalInput): Proposal {
+  return buildProposalKeyed(input).proposal;
+}
+
+/** The Proposal, and per change id the record it reads (`setOnKey`): what a note is kept against. */
+export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; keys: Record<string, string> } {
   const title = input.title.trim();
   if (title === "") throw new Error("[loupe] A Proposal needs a title.");
 
@@ -310,7 +320,7 @@ export function buildProposal(input: ProposalInput): Proposal {
         overriddenBy: [],
         alsoRendersOn: record.target.scope === "page" ? [] : [...routes].sort(),
         onScreenAtExport: client.some((sighting) => sighting.mounted),
-        note: null,
+        note: input.notes?.[setOnKey(record.target)]?.trim() || null,
         screenshots: [],
       },
     });
@@ -404,7 +414,7 @@ export function buildProposal(input: ProposalInput): Proposal {
       };
     });
 
-  return {
+  const proposal: Proposal = {
     formatVersion: FORMAT_VERSION,
     title,
     createdAt: input.createdAt,
@@ -414,6 +424,7 @@ export function buildProposal(input: ProposalInput): Proposal {
     routes,
     heldForReview,
   };
+  return { proposal, keys: Object.fromEntries(drafts.map((draft) => [draft.change.id, setOnKey(draft.record.target)])) };
 
   /** Each call site a record covers: its own, or every one a page change reached. */
   function callSiteAnchors(record: OverrideRecord, client: readonly Sighting[]): string[] {
@@ -459,7 +470,7 @@ function attachSnapshots(
     home.screenshots.push({
       id: `s${next++}`,
       kind: "viewport",
-      caption: `Screen ${index + 1}: ${snapshot.route}${failedNote(snapshot.viewport.failedImages)}`,
+      caption: `Screen ${index + 1}: ${snapshot.route}${screenSize(snapshot)}${failedNote(snapshot.viewport.failedImages)}`,
       before: snapshot.viewport.before,
       after: snapshot.viewport.after,
     });
@@ -479,12 +490,19 @@ function attachSnapshots(
   });
 }
 
+/** ", 1440×900 at 2x": the screen's own viewport, which may differ from the route's last reading. */
+function screenSize(snapshot: SnapshotInput): string {
+  if (!snapshot.size) return "";
+  const [width, height] = snapshot.size;
+  return `, ${width}×${height}${snapshot.dpr ? ` at ${snapshot.dpr}x` : ""}`;
+}
+
 function failedNote(count: number): string {
   return count === 0 ? "" : ` (${count} image${count === 1 ? "" : "s"} could not be captured, shown as a placeholder)`;
 }
 
 /** "variant on 1st of 4 <Button> in MemberRowMenu", plain text for a caption. */
-function changeInWords(change: ProposalChange): string {
+export function changeInWords(change: ProposalChange): string {
   const props = change.props.map((prop) => (prop.name === "children" ? "text" : prop.name)).join(", ");
   if (change.scope === "page") return `${props} on every <${change.component}> on the page`;
   const site = change.callSites[0];

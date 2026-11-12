@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { currentRoute } from "../runtime/registry.js";
+import { megabytes } from "./format.js";
 import { captureScreen, isOutdated, removeSnapshot, type Snapshot, snapshots } from "./snapshots.js";
 
 type Busy = { capturing: number | "new" | null; error: string | null };
@@ -36,10 +37,6 @@ export function CaptureButton({ disabled }: { disabled: boolean }) {
       {busy.capturing !== null ? "Capturing…" : busy.error !== null ? "Capture failed" : "Capture screen"}
     </button>
   );
-}
-
-function megabytes(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function summary(snapshot: Snapshot): string {

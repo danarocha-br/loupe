@@ -82,7 +82,7 @@ export function isOutdated(snapshot: Pick<Snapshot, "shown">): boolean {
 export function exportableSnapshots(): SnapshotInput[] {
   return snapshots()
     .filter((snapshot) => !isOutdated(snapshot))
-    .map(({ route, viewport, crops }) => ({ route, viewport, crops }));
+    .map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
 }
 
 /** What the kept Snapshots add to a report, in bytes. The export dialog warns past 25 MB (PER-139). */

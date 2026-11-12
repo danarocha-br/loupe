@@ -15,6 +15,7 @@ import { hasInstanceRecord, instanceRecord, safeInspect, safeProps } from "./pag
 import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 import { FlagsCard } from "./flags.js";
+import { ExportButton } from "./export-dialog.js";
 import { copyProposalMarkdown } from "./proposal.js";
 import { CaptureButton, SnapshotsCard } from "./snapshots-card.js";
 import { LayerNotices, staleComponents, useLayerStatus } from "./notices.js";
@@ -544,6 +545,7 @@ function Footer({ page, debug }: PanelProps) {
         Reset all
       </button>
       <CopyMarkdown disabled={page.records.length === 0} />
+      <ExportButton disabled={page.records.length === 0} />
     </footer>
   );
 }

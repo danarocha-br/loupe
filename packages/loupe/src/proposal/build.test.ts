@@ -4,7 +4,7 @@ import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import type { OverrideRecord } from "../runtime/store.js";
 import type { CallSiteWrites } from "../writes.js";
-import { buildProposal, ordinal, type ProposalInput, type Sighting, setOnKey, toJson } from "./build.js";
+import { buildProposal, buildProposalKeyed, ordinal, type ProposalInput, type Sighting, setOnKey, toJson } from "./build.js";
 import { locationInWords, proposalMarkdown, REPORT_LINE } from "./markdown.js";
 import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
@@ -340,6 +340,20 @@ describe("buildProposal", () => {
     expect(() => buildProposal(input([], { title: "   " }))).toThrow(/needs a title/);
   });
 
+  it("carries each entry's note, keyed by its record, and names each entry's record (PER-139)", () => {
+    const group = record({ scope: "group", anchor: TRIGGER }, { size: "sm" });
+    const invite = record({ scope: "instance", id: INVITE }, { variant: "ghost" });
+    const { proposal, keys } = buildProposalKeyed(
+      input([group, invite], { notes: { [setOnKey(group.target)]: "  Rows feel heavy at icon size.  ", [setOnKey(invite.target)]: "   " } }),
+    );
+    expect(changesOf(proposal).map((change) => [change.id, change.note])).toEqual([
+      ["c1", "Rows feel heavy at icon size."],
+      ["c2", null],
+    ]);
+    expect(keys).toEqual({ c1: setOnKey(group.target), c2: setOnKey(invite.target) });
+    expectValid(proposal);
+  });
+
   it("reads the store without changing it", () => {
     const records = [record({ scope: "group", anchor: TRIGGER }, { variant: "outline" }, { excluded: [`${TRIGGER}#user_4`] })];
     const before = structuredClone(records);
@@ -371,6 +385,8 @@ describe("Snapshots in a Proposal (PER-138)", () => {
           },
           {
             route: ROUTE,
+            size: [1280, 800],
+            dpr: 2,
             viewport: pair("v2", 1),
             crops: [{ ...pair("c-tall", 1), change: setOnKey(group.target), keyPath: "user_4", more: 2 }],
           },
@@ -383,7 +399,7 @@ describe("Snapshots in a Proposal (PER-138)", () => {
       ["s1", "viewport", `Screen 1: ${ROUTE}`],
       ["s2", "crop", "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"],
       ["s3", "crop", "c2: variant on 1st of 1 <Button> in MembersHeader, screen 1"],
-      ["s4", "viewport", `Screen 2: ${ROUTE} (1 image could not be captured, shown as a placeholder)`],
+      ["s4", "viewport", `Screen 2: ${ROUTE}, 1280×800 at 2x (1 image could not be captured, shown as a placeholder)`],
       [
         "s5",
         "crop",
