@@ -1,5 +1,5 @@
-// A prop row of the inspector and its control (PER-131, PER-134): pills for a
-// closed set of options, a field for label text (PER-137), the app's Current value beside
+// A prop row of the inspector and its control (PER-131, PER-134, PER-137): pills for
+// a closed set of options, a field for label text, the app's Current value beside
 // an Override, Reset, and the holding notice for a State prop (PER-96). At This
 // instance a row edits one Instance; at a group or page scope it edits that
 // scope's record, with its members' Current values counted on the pills.
@@ -140,11 +140,10 @@ export function ScopeRowView({
   const keeping = keepingOwn(view, row.name);
   // Instance scope only for a State prop (a group `open` would open every dialog at that
   // call site at once, PER-96); never page scope for label text (PER-113).
+  const textRefusal = row.text ? textScopeRefusal(scope, row.name) : null;
   const refusal = row.state
     ? { testId: "state-only", reason: STATE_SCOPE_REASON }
-    : row.text && textScopeRefusal(scope, row.name)
-      ? { testId: "per-call-site", reason: textScopeRefusal(scope, row.name) }
-      : null;
+    : textRefusal && { testId: "per-call-site", reason: textRefusal };
   // The pressed pill: this scope's Override, else the one value every member shares.
   const value: unknown = overridden
     ? values[row.name]
@@ -161,7 +160,10 @@ export function ScopeRowView({
           {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
         </span>
         <span className="value mono" data-testid="counts">
-          {sole !== null ? `SAME ON ALL ${inScope}` : [...counts].map(([key, count]) => `${key} ${count}`).join(" · ")}
+          {/* Text with no control here still shows what it says, not only that it matches. */}
+          {sole !== null && !textRefusal
+            ? `SAME ON ALL ${inScope}`
+            : [...counts].map(([key, count]) => `${key} ${count}`).join(" · ")}
         </span>
         {row.text && overridden && values[row.name] === "" && <EmptyTag />}
         {row.state && <span className="tag">STATE</span>}
@@ -268,18 +270,14 @@ function Control({
  * may be left empty. It wraps and grows to its text rather than scrolling.
  */
 function TextField({ label, value, set }: { label: string; value: string; set(next: string): void }) {
-  // The Toolbar redraws once a frame, so the field keeps its own text while it has focus.
-  const [draft, setDraft] = useState<string | null>(null);
-  // The value the last keystroke started from and the one it sent: the frame after it shows either.
-  const [typed, setTyped] = useState<{ from: string; to: string } | null>(null);
+  // The Toolbar redraws once a frame, so the field keeps its own text while it has focus,
+  // with the value that text was typed over.
+  const [draft, setDraft] = useState<{ text: string; from: string } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  // Anything else moved the value (a reset, another scope): the draft is stale.
-  const stale = draft !== null && typed !== null && value !== typed.from && value !== typed.to;
-  if (stale) {
-    setDraft(null);
-    setTyped(null);
-  }
-  const text = stale ? value : (draft ?? value);
+  // Something else moved the value (a reset, another scope): drop the draft.
+  const stale = draft !== null && value !== draft.from && value !== draft.text;
+  if (stale) setDraft(null);
+  const text = draft === null || stale ? value : draft.text;
   useLayoutEffect(() => {
     const field = ref.current;
     if (!field) return;
@@ -299,14 +297,10 @@ function TextField({ label, value, set }: { label: string; value: string; set(ne
       }}
       onChange={(event) => {
         const next = singleLine(event.target.value);
-        setTyped({ from: value, to: next });
-        setDraft(next);
+        setDraft({ text: next, from: value });
         set(next);
       }}
-      onBlur={() => {
-        setDraft(null);
-        setTyped(null);
-      }}
+      onBlur={() => setDraft(null)}
     />
   );
 }

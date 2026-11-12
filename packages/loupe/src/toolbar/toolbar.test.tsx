@@ -615,6 +615,8 @@ describe("the Text row (PER-137)", () => {
     await clickInPanel(scopeButton("page"));
     expect(textField()).toBeNull();
     expect(row("children").querySelector("[data-testid=per-call-site]")?.textContent).toBe("Change it per call site.");
+    // The row still shows the text each Button says.
+    expect(row("children").querySelector("[data-testid=counts]")?.textContent).toBe('"ana" 1 · "bia" 1 · "caio" 1 · "dani" 1 · "Menu" 1');
     // Other props keep their page-scope control.
     expect(row("variant").querySelectorAll(".pills")).toHaveLength(1);
   });
