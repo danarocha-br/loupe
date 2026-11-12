@@ -36,7 +36,7 @@ button[aria-pressed="true"] { background: #111; color: #fff; }
 .row .current { color: #666; padding-left: 4px; }
 .pills { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0; }
 .row.overridden .pills button[aria-pressed="true"] { background: #a343f5; }
-.row .text { width: 100%; font: inherit; }
+.row .text { width: 100%; font: inherit; resize: none; overflow: hidden; }
 .notice { background: #f3e8fe; border-radius: 6px; padding: 4px 6px; margin-top: 2px; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list button { all: unset; cursor: pointer; display: block; width: 100%; padding: 3px 4px; border-radius: 4px; }

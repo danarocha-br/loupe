@@ -1,13 +1,14 @@
-// A prop row of the inspector and its control (PER-131, PER-134): pills for a
-// closed set of options, a field for label text, the app's Current value beside
+// A prop row of the inspector and its control (PER-131, PER-134, PER-137): pills for
+// a closed set of options, a field for label text, the app's Current value beside
 // an Override, Reset, and the holding notice for a State prop (PER-96). At This
 // instance a row edits one Instance; at a group or page scope it edits that
 // scope's record, with its members' Current values counted on the pills.
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { OptionValue } from "../meta/types.js";
 import type { InstanceProps, LoupeDebug } from "../runtime/debug.js";
 import type { PropRow } from "../runtime/inspect.js";
+import { singleLine, textScopeRefusal } from "../runtime/label-text.js";
 import { STATE_SCOPE_REASON } from "../runtime/state.js";
 import type { Scope, Source } from "../runtime/store.js";
 import { appValue, formatCurrent, formatDefault } from "./format.js";
@@ -74,6 +75,7 @@ export function PropRowView({ row, editing }: { row: PropRow; editing: Editing |
           {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
         </span>
         {!fromOverride && <span className="value mono">{currentValue(row)}</span>}
+        {row.text && value === "" && <EmptyTag />}
         {row.state && <span className="tag">STATE</span>}
         {row.reason && <span className="tag">{row.reason}</span>}
         {!tried && resetButton}
@@ -84,9 +86,10 @@ export function PropRowView({ row, editing }: { row: PropRow; editing: Editing |
         </div>
       )}
       {row.editable && editing && (
-        // Keyed so a reset or another Instance drops the field's unsent text.
+        // Keyed so another Instance drops the field's unsent text. Not on the source: the
+        // first keystroke makes an Override, and a remount would take the field's focus.
         <Control
-          key={`${editing.id}:${source}`}
+          key={editing.id}
           row={row}
           value={value}
           set={(next) => attempt(() => editing.debug.set(editing.id, row.name, next))}
@@ -135,6 +138,12 @@ export function ScopeRowView({
   const counts = valueCounts(view, row.name);
   const sole = counts.size === 1 && inScope > 0 ? ([...counts.keys()][0] as string) : null;
   const keeping = keepingOwn(view, row.name);
+  // Instance scope only for a State prop (a group `open` would open every dialog at that
+  // call site at once, PER-96); never page scope for label text (PER-113).
+  const textRefusal = row.text ? textScopeRefusal(scope, row.name) : null;
+  const refusal = row.state
+    ? { testId: "state-only", reason: STATE_SCOPE_REASON }
+    : textRefusal && { testId: "per-call-site", reason: textRefusal };
   // The pressed pill: this scope's Override, else the one value every member shares.
   const value: unknown = overridden
     ? values[row.name]
@@ -151,8 +160,12 @@ export function ScopeRowView({
           {row.label !== row.name && <span className="mono muted"> {row.name}</span>}
         </span>
         <span className="value mono" data-testid="counts">
-          {sole !== null ? `SAME ON ALL ${inScope}` : [...counts].map(([key, count]) => `${key} ${count}`).join(" · ")}
+          {/* Text with no control here still shows what it says, not only that it matches. */}
+          {sole !== null && !textRefusal
+            ? `SAME ON ALL ${inScope}`
+            : [...counts].map(([key, count]) => `${key} ${count}`).join(" · ")}
         </span>
+        {row.text && overridden && values[row.name] === "" && <EmptyTag />}
         {row.state && <span className="tag">STATE</span>}
         {row.reason && <span className="tag">{row.reason}</span>}
         {overridden && !suspended && (
@@ -164,16 +177,16 @@ export function ScopeRowView({
       <div className="source muted" data-testid="source">
         from {overridden ? view.name : "the app"}
       </div>
-      {row.state ? (
-        // Instance scope only: a group `open` would open every dialog at that call site at once (PER-96).
-        <div className="muted" data-testid="state-only">
-          {STATE_SCOPE_REASON}
+      {refusal ? (
+        <div className="muted" data-testid={refusal.testId}>
+          {refusal.reason}
         </div>
       ) : (
         row.editable &&
         !suspended && (
+          // Not keyed on `overridden`: the first keystroke sets this scope's value.
           <Control
-            key={`${scope}:${overridden}`}
+            key={scope}
             row={row}
             value={value}
             counts={counts}
@@ -193,6 +206,15 @@ export function ScopeRowView({
         </button>
       )}
     </div>
+  );
+}
+
+/** Label text left empty: the row says so, as the field shows nothing. */
+function EmptyTag() {
+  return (
+    <span className="tag" data-testid="empty">
+      empty
+    </span>
   );
 }
 
@@ -218,7 +240,6 @@ function Control({
   set(next: unknown): void;
   counts?: Map<string, number>;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
   if (row.options) {
     return (
       <div className="pills" role="group" aria-label={row.label}>
@@ -241,15 +262,43 @@ function Control({
       </div>
     );
   }
-  // The Toolbar redraws once a frame, so the field keeps its own text while it has focus.
+  return <TextField label={row.label} value={typeof value === "string" ? value : ""} set={set} />;
+}
+
+/**
+ * Label text (PER-113): one line, no length limit, applied while typing, and it
+ * may be left empty. It wraps and grows to its text rather than scrolling.
+ */
+function TextField({ label, value, set }: { label: string; value: string; set(next: string): void }) {
+  // The Toolbar redraws once a frame, so the field keeps its own text while it has focus,
+  // with the value that text was typed over.
+  const [draft, setDraft] = useState<{ text: string; from: string } | null>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  // Something else moved the value (a reset, another scope): drop the draft.
+  const stale = draft !== null && value !== draft.from && value !== draft.text;
+  if (stale) setDraft(null);
+  const text = draft === null || stale ? value : draft.text;
+  useLayoutEffect(() => {
+    const field = ref.current;
+    if (!field) return;
+    field.style.height = "auto";
+    // scrollHeight leaves out the borders, which border-box sizing counts.
+    field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+  }, [text]);
   return (
-    <input
+    <textarea
+      ref={ref}
       className="text"
-      aria-label={row.label}
-      value={draft ?? (typeof value === "string" ? value : "")}
+      rows={1}
+      aria-label={label}
+      value={text}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.preventDefault();
+      }}
       onChange={(event) => {
-        setDraft(event.target.value);
-        set(event.target.value);
+        const next = singleLine(event.target.value);
+        setDraft({ text: next, from: value });
+        set(next);
       }}
       onBlur={() => setDraft(null)}
     />

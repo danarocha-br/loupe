@@ -285,6 +285,14 @@ const DIALOG = "app/members.tsx › Members › Dialog[1]";
 const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
 const inRow = (prop: string, text: string) =>
   [...row(prop).querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+const textField = () => row("children").querySelector("textarea") as HTMLTextAreaElement;
+const type = async (field: HTMLTextAreaElement, text: string) => {
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await settle();
+};
 const select = async (id: string) =>
   clickInPanel(instanceButtons().find((button) => button.dataset.instance === id) as HTMLButtonElement);
 
@@ -313,14 +321,9 @@ describe("controls at This instance", () => {
   it("edits label text in a field and resets the whole Instance", async () => {
     await mount();
     await select(BIA);
-    const field = row("children").querySelector("input") as HTMLInputElement;
+    const field = textField();
     expect(field.value).toBe("bia");
-    act(() => {
-      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-      setValue?.call(field, "Bianca");
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await settle();
+    await type(field, "Bianca");
     await clickInPanel(inRow("variant", '"default"'));
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca", variant: "default" });
     expect(container.textContent).toContain("Bianca");
@@ -554,6 +557,89 @@ describe("group and page scopes", () => {
     expect(row("open").querySelectorAll(".pills")).toHaveLength(0);
     // `modal` isn't a State prop: it keeps its pills, and its conflicting default selects none.
     expect(row("modal").querySelectorAll(".pills")).toHaveLength(1);
+  });
+});
+
+describe("the Text row (PER-137)", () => {
+  it("is a single-line field that grows, applies live, and may be left empty", async () => {
+    await mount();
+    await select(BIA);
+    expect(row("children").querySelector(".name")?.textContent).toBe("Text children");
+    const field = textField();
+    // It grows to its text: the height follows the content.
+    Object.defineProperty(field, "scrollHeight", { configurable: true, get: () => 42 });
+    await type(field, "Bianca Souza");
+    expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca Souza" });
+    // The same field: the first keystroke makes an Override, and typing must not lose focus to a remount.
+    expect(textField()).toBe(field);
+    expect(pageButton("Bianca Souza")).toBeTruthy();
+    expect(textField().style.height).toBe("42px");
+
+    // Enter inserts no line break, and a pasted one becomes a space.
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    act(() => textField().dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    await type(textField(), "Bianca\nSouza");
+    expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca Souza" });
+
+    await type(textField(), "");
+    expect(loupe.props(BIA).overrides).toEqual({ children: "" });
+    expect(row("children").querySelector("[data-testid=empty]")?.textContent).toBe("empty");
+    expect(row("children").querySelector("[data-testid=current]")?.textContent).toBe('Current: "bia"');
+
+    await clickInPanel(inRow("children", "Reset"));
+    expect(loupe.props(BIA).overrides).toEqual({});
+    expect(textField().value).toBe("bia");
+    expect(row("children").querySelector("[data-testid=empty]")).toBeNull();
+  });
+
+  it("is changed for a whole call site, and reset", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    const field = textField();
+    await type(field, "Membro");
+    expect(textField()).toBe(field);
+    expect(loupe.records().map((record) => [record.target, record.values])).toEqual([
+      [{ scope: "group", anchor: "app/members.tsx › Members › Button[1]" }, { children: "Membro" }],
+    ]);
+    expect([...container.querySelectorAll("li button")].map((button) => button.textContent)).toEqual(["Membro", "Membro", "Membro", "Membro"]);
+    await clickInPanel(inRow("children", "Reset"));
+    expect(loupe.records()).toEqual([]);
+    expect(pageButton("ana")).toBeTruthy();
+  });
+
+  it("is not offered at page scope", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("page"));
+    expect(textField()).toBeNull();
+    expect(row("children").querySelector("[data-testid=per-call-site]")?.textContent).toBe("Change it per call site.");
+    // The row still shows the text each Button says.
+    expect(row("children").querySelector("[data-testid=counts]")?.textContent).toBe('"ana" 1 · "bia" 1 · "caio" 1 · "dani" 1 · "Menu" 1');
+    // Other props keep their page-scope control.
+    expect(row("variant").querySelectorAll(".pills")).toHaveLength(1);
+  });
+
+  it.each([
+    ["from-code", "FROM CODE"],
+    ["mixed", "MIXED"],
+  ])("shows text a call site writes as %s inspect-only, tagged %s, with no field", async (children, tag) => {
+    act(() =>
+      root.render(
+        <>
+          <Button {...(site(1, [], children) as object)}>{"Remover"}</Button>
+          <LoupeMount />
+        </>,
+      ),
+    );
+    await settle();
+    await settle();
+    await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
+    expect(row("children").querySelector(".tag")?.textContent).toBe(tag);
+    expect(textField()).toBeNull();
+    // Coverage counts it as inspect only.
+    expect(row("children").closest(".card")?.querySelector("h3")?.textContent).toBe("Inspect only");
   });
 });
 

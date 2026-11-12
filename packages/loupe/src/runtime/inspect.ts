@@ -18,6 +18,8 @@ export type PropRow = {
   name: string;
   /** What the row is called: `Text` for label text (PER-113), otherwise the prop's name. */
   label: string;
+  /** Label text: `children` the component accepts as a string. Never page scope (PER-113). */
+  text?: true;
   /** Whether the call site writes it. Unset rows show `not set`, or their default. */
   set: boolean;
   /** The Current value; meaningful only when `set`. */
@@ -144,7 +146,9 @@ export function inspect(input: InspectInput): Inspection {
   const rows: PropRow[] = names.map((name) => {
     const declared = meta?.[name];
     const set = name in current;
-    const row: PropRow = { name, label: name === "children" && declared?.editable && declared.kind === "text" ? "Text" : name, set, value: current[name], editable: false };
+    const text = name === "children" && declared?.editable === true && declared.kind === "text";
+    const row: PropRow = { name, label: text ? "Text" : name, set, value: current[name], editable: false };
+    if (text) row.text = true;
     if (!set && declared?.default) row.default = declared.default;
     if (declared?.state || input.stateProps.includes(name)) row.state = true;
     const write = written.get(name);

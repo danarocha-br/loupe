@@ -6,7 +6,8 @@
 //   __loupe.set(id, prop, value, scope?)   an Override; scope is "instance" (default),
 //                                          "group" (the Instance's call site) or "page"
 //                                          (its component on this route). A State prop is
-//                                          Instance scope only.
+//                                          Instance scope only. Label text
+//                                          (`children`) is never page scope.
 //   __loupe.reset(id, prop?, scope?)       undoes that scope's Override only
 //   __loupe.exclude(id, scope)             keeps a group or page Override off one Instance
 //   __loupe.include(id, scope)             undoes `exclude`
@@ -38,6 +39,7 @@ import {
   withoutLoaderProps,
 } from "./registry.js";
 import { type Inspection, inspect } from "./inspect.js";
+import { textScopeRefusal } from "./label-text.js";
 import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
 import { writesOf } from "./authored.js";
 import { type OverrideRecord, type Props, reaches, type Scope, type ScopeTarget, type Source } from "./store.js";
@@ -317,6 +319,9 @@ export function createDebug(): LoupeDebug {
       // A group `open` would open every dialog at that call site at once (PER-96).
       const refusal = stateScopeRefusal(scope, instance.stateProps, prop);
       if (refusal) throw new Error(`[loupe] ${prop} is a State prop: ${refusal}`);
+      // A page-wide text would rename every Instance of the component at once (PER-113).
+      const textRefusal = textScopeRefusal(scope, prop);
+      if (textRefusal) throw new Error(`[loupe] ${prop} is label text: ${textRefusal}`);
       reg.store.set(targetOf(instance, scope), prop, value);
       return describe(instance);
     },
