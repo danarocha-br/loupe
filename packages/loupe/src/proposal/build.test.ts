@@ -4,7 +4,7 @@ import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import type { OverrideRecord } from "../runtime/store.js";
 import type { CallSiteWrites } from "../writes.js";
-import { buildProposal, ordinal, type ProposalInput, type Sighting, setOnKey, toJson } from "./build.js";
+import { buildProposal, buildProposalKeyed, ordinal, type ProposalInput, type Sighting, setOnKey, toJson } from "./build.js";
 import { locationInWords, proposalMarkdown, REPORT_LINE } from "./markdown.js";
 import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
@@ -338,6 +338,20 @@ describe("buildProposal", () => {
 
   it("requires a title", () => {
     expect(() => buildProposal(input([], { title: "   " }))).toThrow(/needs a title/);
+  });
+
+  it("carries each entry's note, keyed by its record, and names each entry's record (PER-139)", () => {
+    const group = record({ scope: "group", anchor: TRIGGER }, { size: "sm" });
+    const invite = record({ scope: "instance", id: INVITE }, { variant: "ghost" });
+    const { proposal, keys } = buildProposalKeyed(
+      input([group, invite], { notes: { [setOnKey(group.target)]: "  Rows feel heavy at icon size.  ", [setOnKey(invite.target)]: "   " } }),
+    );
+    expect(changesOf(proposal).map((change) => [change.id, change.note])).toEqual([
+      ["c1", "Rows feel heavy at icon size."],
+      ["c2", null],
+    ]);
+    expect(keys).toEqual({ c1: setOnKey(group.target), c2: setOnKey(invite.target) });
+    expectValid(proposal);
   });
 
   it("reads the store without changing it", () => {

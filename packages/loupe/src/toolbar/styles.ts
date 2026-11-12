@@ -57,5 +57,14 @@ fieldset.site { border: 0; padding: 0; margin: 4px 0; }
 .snapshots { list-style: none; margin: 0; padding: 0; }
 .snapshots .thumb { flex: none; border-radius: 3px; }
 .snapshots .thumb.outdated { opacity: .5; }
+.dialog-backdrop { position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-start; padding: 12px; background: rgba(17, 17, 17, .25); border-radius: 12px; }
+.dialog { width: 100%; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 8px; padding: 12px; }
+.dialog h2 { margin: 0; font-size: 15px; }
+.dialog .field { display: flex; flex-direction: column; gap: 2px; }
+.dialog .field input, .dialog .field textarea { font: inherit; width: 100%; }
+.dialog .notes { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.dialog .counts { margin: 0; font-weight: 600; }
+.dialog p { margin: 0; }
+.dialog .actions { display: flex; justify-content: flex-end; gap: 8px; }
 .dock { position: fixed; bottom: 16px; right: 16px; z-index: 2147483647; font: 13px system-ui, sans-serif; }
 `;
