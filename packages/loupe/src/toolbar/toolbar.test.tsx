@@ -63,7 +63,23 @@ const site = (n: number, names: string[], children = "text") => ({
 
 const LoupeMount = devMount(Toolbar);
 
-function Page({ onRowClick }: { onRowClick: (member: string) => void }) {
+// The dialog's confirm Button: `total` is the call site's use count, which an edit
+// above it changes; `twice` renders it twice with no key, so one id names both.
+const confirmSite = (total: number) => ({
+  "data-ds-anchor": "app/members.tsx › Members › Button[3]",
+  "data-ds-source": `app/members.tsx:40:11 3/${total}`,
+  "data-ds-writes": JSON.stringify({ attributes: [{ name: "variant", writtenAs: "literal" }], spreads: false, children: "text" }),
+});
+
+function Page({
+  onRowClick,
+  confirmTotal = 3,
+  twice = false,
+}: {
+  onRowClick: (member: string) => void;
+  confirmTotal?: number;
+  twice?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   return (
@@ -102,6 +118,14 @@ function Page({ onRowClick }: { onRowClick: (member: string) => void }) {
         onOpenChange={setConfirming}
       >
         Remover membro?
+        <Button {...(confirmSite(confirmTotal) as object)} variant="ghost">
+          Confirmar
+        </Button>
+        {twice && (
+          <Button {...(confirmSite(confirmTotal) as object)} variant="ghost">
+            Confirmar
+          </Button>
+        )}
       </Dialog>
     </main>
   );
@@ -131,11 +155,11 @@ afterEach(() => {
 /** Lets the lazy Toolbar, its effects and its once-a-frame refresh settle. */
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 
-async function mount(onRowClick: (member: string) => void = () => {}) {
+async function mount(onRowClick: (member: string) => void = () => {}, page: { confirmTotal?: number; twice?: boolean } = {}) {
   act(() =>
     root.render(
       <>
-        <Page onRowClick={onRowClick} />
+        <Page onRowClick={onRowClick} {...page} />
         <LoupeMount />
       </>,
     ),
@@ -640,6 +664,129 @@ describe("the Text row (PER-137)", () => {
     expect(textField()).toBeNull();
     // Coverage counts it as inspect only.
     expect(row("children").closest(".card")?.querySelector("h3")?.textContent).toBe("Inspect only");
+  });
+});
+
+const CONFIRM = "app/members.tsx › Members › Button[3]";
+const card = (heading: string) =>
+  [...shadow().querySelectorAll<HTMLElement>(".card")].find((candidate) => candidate.querySelector("h3")?.textContent === heading);
+const toggleDialog = async () => {
+  const open = container.querySelector("[role=dialog]");
+  act(() => (open ? pageButton("Fechar") : pageButton("Abrir")).click());
+  await settle();
+};
+
+describe("closed and held-for-review Overrides", () => {
+  it("lists a closed dialog's Button as No Instance mounted while it holds an Override, with its Current value last seen", async () => {
+    await mount();
+    await toggleDialog();
+    act(() => {
+      loupe.set(CONFIRM, "variant", "default");
+    });
+    await toggleDialog();
+    expect(loupe.list().some((candidate) => candidate.id === CONFIRM)).toBe(false);
+
+    const held = shadow().querySelector<HTMLElement>(`[data-instance="${CONFIRM}"]`) as HTMLElement;
+    expect(held.closest("li")?.textContent).toContain("No Instance mounted");
+    expect(held.closest("li")?.textContent).toContain('variant "default" · Current "ghost" (last seen)');
+    // Nothing in the Toolbar opens the dialog: the Instance applies again only when the app opens it.
+    expect(container.querySelector("[role=dialog]")).toBeNull();
+
+    await toggleDialog();
+    expect(pageButton("Confirmar").dataset.variant).toBe("default");
+    // Mounted again: one ordinary row, no held one beside it.
+    expect(shadow().querySelectorAll(`[data-instance="${CONFIRM}"]`)).toHaveLength(1);
+    expect(panelText()).not.toContain("No Instance mounted");
+  });
+
+  it("does not list a closed Instance that holds nothing", async () => {
+    await mount();
+    await toggleDialog();
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).not.toBeNull();
+    await toggleDialog();
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).toBeNull();
+    expect(panelText()).not.toContain("No Instance mounted");
+    // Nothing is kept for it either.
+    expect(loupe.lastSeen(CONFIRM)).toBeNull();
+  });
+
+  it("lists a held Instance on the route it mounted on, even when it unmounts after a navigation", async () => {
+    await mount();
+    await toggleDialog();
+    act(() => {
+      loupe.set(CONFIRM, "variant", "default");
+    });
+    // The URL moves before the old page's Instances unmount.
+    act(() => history.pushState(null, "", "/outro"));
+    await toggleDialog();
+    expect(loupe.lastSeen(CONFIRM)?.route).toBe("/");
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).toBeNull();
+
+    act(() => history.pushState(null, "", "/"));
+    act(() => pageButton("Menu").click());
+    await settle();
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("No Instance mounted");
+  });
+
+  it("holds a record for review when its call site's total changes, says why, and Discard clears it", async () => {
+    await mount();
+    await toggleDialog();
+    act(() => {
+      loupe.set(CONFIRM, "variant", "default");
+    });
+    await toggleDialog();
+    // A same-component call was added above it: the call site now has four uses.
+    await mount(() => {}, { confirmTotal: 4 });
+    await toggleDialog();
+    expect(pageButton("Confirmar").dataset.variant).toBe("ghost");
+
+    const review = card("Held for review") as HTMLElement;
+    expect(review.textContent).toContain("Members › Button[3]");
+    expect(review.textContent).toContain("Code changed here: this call site had 3 uses, now 4.");
+
+    // Closed again: its row says it is held, and its values show once, on the card.
+    await toggleDialog();
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("Held for review");
+    expect(shadow().querySelectorAll("[data-testid=held-values]")).toHaveLength(1);
+    const discard = [...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement;
+    await clickInPanel(discard);
+    expect(loupe.records()).toEqual([]);
+    expect(card("Held for review")).toBeUndefined();
+  });
+
+  it("holds a record for review when its id matches more than one Instance", async () => {
+    await mount();
+    await toggleDialog();
+    act(() => {
+      loupe.set(CONFIRM, "variant", "default");
+    });
+    await toggleDialog();
+    await mount(() => {}, { twice: true });
+    await toggleDialog();
+
+    const review = card("Held for review") as HTMLElement;
+    expect(review.textContent).toContain(`Matches more than one Instance (${CONFIRM}): discard it and set it again on the one you mean.`);
+    // Its id is mounted, on two elements: there is no last-seen Current value to show.
+    expect(review.querySelector("[data-testid=held-values]")?.textContent).toBe('variant "default"');
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("Held for review");
+    await clickInPanel([...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement);
+    expect(loupe.records()).toEqual([]);
+  });
+
+  it("shows a held value with its last-seen Current value on the selected Instance's card", async () => {
+    await mount();
+    await toggleDialog();
+    await select(CONFIRM);
+    act(() => {
+      loupe.set(CONFIRM, "variant", "default");
+    });
+    await toggleDialog();
+    const missing = card("Not on the page now") as HTMLElement;
+    expect(missing.textContent).toContain("No Instance mounted");
+    expect(missing.textContent).toContain('variant "default" · Current "ghost" (last seen)');
+
+    await clickInPanel([...missing.querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement);
+    expect(loupe.lastSeen(CONFIRM)).toBeNull();
   });
 });
 

@@ -3,13 +3,14 @@
 // inspector, at This instance or a group or page scope (PER-134). Functional
 // only; the visual pass is PER-140.
 
-import type { InstanceRow, LoupeDebug } from "../runtime/debug.js";
+import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
-import type { Scope } from "../runtime/store.js";
+import type { LastSeen } from "../runtime/registry.js";
+import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
 import { attempt, type Editing, PropRowView, ScopeRowView } from "./controls.js";
-import { hasInstanceRecord, safeInspect, safeProps } from "./page.js";
+import { hasInstanceRecord, instanceRecord, safeInspect, safeProps } from "./page.js";
 import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 import { FlagsCard } from "./flags.js";
@@ -61,7 +62,7 @@ export function Panel(props: PanelProps) {
   );
 }
 
-function ComponentList({ page, onSelect, onHover }: PanelProps) {
+function ComponentList({ debug, page, onSelect, onHover }: PanelProps) {
   const instances = page.groups.reduce((sum, group) => sum + group.instances.length, 0);
   return (
     <>
@@ -72,6 +73,7 @@ function ComponentList({ page, onSelect, onHover }: PanelProps) {
         </div>
       </div>
       <FlagsCard />
+      <HeldForReviewCard debug={debug} records={page.records} />
       <div className={page.interaction.length === 0 ? "card stretch" : "card"}>
         <h3>On this page</h3>
         <ul className="list" aria-label="Components on this page">
@@ -82,9 +84,10 @@ function ComponentList({ page, onSelect, onHover }: PanelProps) {
                   onMouseEnter={() => onHover(group.instances.map((row) => row.id))}
                   onMouseLeave={() => onHover([])}
                 >
-                  {group.component} ×{group.instances.length}{" "}
+                  {group.component} ×{group.instances.length}
+                  {group.held.length > 0 && ` · ${group.held.length} not mounted`}{" "}
                   {group.overrides > 0 && <span className="tag">{group.overrides} override{group.overrides === 1 ? "" : "s"}</span>}{" "}
-                  {group.supported ? (
+                  {group.instances.length === 0 ? null : group.supported ? (
                     <span className="tag supported">Supported</span>
                   ) : (
                     <span className="tag" title={group.reason ?? undefined}>
@@ -105,7 +108,18 @@ function ComponentList({ page, onSelect, onHover }: PanelProps) {
                       >
                         <span className="mono">{instanceLabel(row.id, row.hint)}</span>
                         {row.rendered === "server" && <span className="tag">On the server</span>}
+                        {instanceRecord(page.records, row.id)?.suspended && <span className="tag">Held for review</span>}
                       </button>
+                    </li>
+                  ))}
+                  {group.held.map((entry) => (
+                    <li key={entry.id}>
+                      <button type="button" data-instance={entry.id} onClick={() => onSelect(entry.id)}>
+                        <span className="mono">{instanceLabel(entry.id, entry.lastSeen?.hint ?? null)}</span>{" "}
+                        <span className="tag">{entry.record.suspended ? "Held for review" : "No Instance mounted"}</span>
+                      </button>
+                      {/* A held-for-review record's values are on its card above. */}
+                      {!entry.record.suspended && <HeldValues record={entry.record} lastSeen={entry.lastSeen} />}
                     </li>
                   ))}
                 </ul>
@@ -127,6 +141,76 @@ function ComponentList({ page, onSelect, onHover }: PanelProps) {
       )}
     </>
   );
+}
+
+/**
+ * A held record's values, each beside the Current value its Instance last
+ * rendered with: an unmounted Instance's Current value is only ever last seen.
+ */
+function HeldValues({ record, lastSeen }: { record: RecordRow; lastSeen: LastSeen | null }) {
+  return (
+    <ul className="list muted" data-testid="held-values">
+      {Object.entries(record.values).map(([prop, value]) => (
+        <li key={prop} className="mono">
+          {`${prop} ${formatCurrent(value)}${currentLastSeen(lastSeen, prop)}`}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Nothing when there is no last-seen value: the id may be mounted again, on another element. */
+function currentLastSeen(lastSeen: LastSeen | null, prop: string): string {
+  if (lastSeen === null) return "";
+  const value = prop in lastSeen.current ? formatCurrent(lastSeen.current[prop]) : "not set";
+  return ` · Current ${value} (last seen)`;
+}
+
+/**
+ * Records suspended for review (PER-95): the call site's total changed, or the id
+ * names more than one Instance. They apply to nothing until discarded. Nothing
+ * here opens a menu or dialog to reach one.
+ */
+function HeldForReviewCard({ debug, records }: { debug: LoupeDebug; records: RecordRow[] }) {
+  const held = records.filter((record) => record.suspended !== null);
+  if (held.length === 0) return null;
+  return (
+    <div className="card" data-testid="held-for-review">
+      <h3>Held for review</h3>
+      <ul className="list">
+        {held.map((record) => (
+          <li key={JSON.stringify(record.target)}>
+            <div className="mono">{targetLabel(record.target)}</div>
+            <div className="muted">{suspensionReason(record.suspended as Suspension)}</div>
+            <HeldValues record={record} lastSeen={record.target.scope === "instance" ? debug.lastSeen(record.target.id) : null} />
+            <button type="button" onClick={() => attempt(() => debug.discard(record.target))}>
+              Discard
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Why a record is held, in the words of PER-95's decision. */
+function suspensionReason(suspended: Suspension): string {
+  return suspended.reason === "ambiguous"
+    ? `Matches more than one Instance (${suspended.ids.join(", ")}): discard it and set it again on the one you mean.`
+    : `Code changed here: this call site had ${suspended.was} uses, now ${suspended.now}.`;
+}
+
+/** What a record names: an Instance, every Instance from a call site, or a component on a page. */
+function targetLabel(target: ScopeTarget): string {
+  const short = (anchor: string) => anchor.split(" › ").slice(-2).join(" › ");
+  switch (target.scope) {
+    case "instance":
+      return short(target.id);
+    case "group":
+      return `All from ${short(target.anchor)}`;
+    case "page":
+      return `${target.component} on ${target.route}`;
+  }
 }
 
 /** The call site's file and line, then the key path that tells repeated Instances apart. */
@@ -153,10 +237,17 @@ function Inspector(props: PanelProps & { id: string }) {
     </button>
   );
   if (inspection === null) {
+    const record = instanceRecord(page.records, id);
     return (
       <div className="card stretch">
         <h3>Not on the page now</h3>
         <p className="mono">{id}</p>
+        {record && Object.keys(record.values).length > 0 && (
+          <>
+            <span className="tag">{record.suspended ? "Held for review" : "No Instance mounted"}</span>
+            <HeldValues record={record} lastSeen={debug.lastSeen(id)} />
+          </>
+        )}
         <p className="muted">It shows here again when it mounts, for example when its menu or dialog opens.</p>
         {recorded && resetInstance}
         <button type="button" onClick={() => onSelect(null)}>

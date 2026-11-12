@@ -4,14 +4,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { createDebug, type InstanceProps, type InstanceRow, type LoupeDebug, type RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { currentRoute, onRegistryChange, registry, type Status } from "../runtime/registry.js";
+import { currentRoute, type LastSeen, onRegistryChange, registry, type Status } from "../runtime/registry.js";
 
 /** Components seen on the current route, for "Appears on interaction". */
 export type SeenComponents = { route: string; components: Set<string> };
 
+/** An Instance that isn't mounted but still holds an Instance-scope record: listed as "No Instance mounted". */
+export type HeldInstance = {
+  id: string;
+  record: RecordRow;
+  /** How it last rendered; null when it unmounted before the registry kept track. */
+  lastSeen: LastSeen | null;
+};
+
 export type ComponentGroup = {
   component: string;
+  /** Mounted Instances. */
   instances: InstanceRow[];
+  /** Unmounted Instances that still hold something (PER-136); one that holds nothing isn't listed. */
+  held: HeldInstance[];
   /** Supported: at least one Editable prop on a browser-rendered Instance (PER-84). */
   supported: boolean;
   /** Why not, when it isn't. */
@@ -82,34 +93,72 @@ export function snapshot(debug: LoupeDebug, seen: SeenComponents): PageSnapshot 
     seen.components.add(row.component);
   }
   const status = registry().status;
-  const groups: ComponentGroup[] = [...byComponent.entries()]
-    .map(([component, instances]) => {
+  const records = debug.records();
+  const held = heldInstances(debug, records);
+  const components = new Set([...byComponent.keys(), ...held.keys()]);
+  const groups: ComponentGroup[] = [...components]
+    .map((component) => {
+      const instances = byComponent.get(component) ?? [];
+      const heldHere = held.get(component) ?? [];
       const client = instances.filter((row) => row.rendered === "client");
       const supported = client.some((row) => safeInspect(debug, row.id)?.coverage.editable);
       return {
         component,
         instances,
+        held: heldHere,
         supported,
         reason: supported
           ? null
-          : client.length === 0
-            ? "Rendered on the server"
-            : !status.overrides
-              ? "Overrides are off"
-              : "No props with fixed options",
-        overrides: instances.reduce((sum, row) => sum + Object.keys(row.overrides).length, 0),
+          : instances.length === 0
+            ? "No Instance mounted"
+            : client.length === 0
+              ? "Rendered on the server"
+              : !status.overrides
+                ? "Overrides are off"
+                : "No props with fixed options",
+        overrides:
+          instances.reduce((sum, row) => sum + Object.keys(row.overrides).length, 0) +
+          heldHere.reduce((sum, entry) => sum + Object.keys(entry.record.values).length, 0),
       };
     })
     .sort((a, b) => a.component.localeCompare(b.component));
-  const records = debug.records();
   return {
     status,
     rows,
     groups,
-    interaction: [...seen.components].filter((component) => !byComponent.has(component)).sort(),
+    interaction: [...seen.components].filter((component) => !components.has(component)).sort(),
     records,
     overrideCount: records.reduce((sum, record) => sum + Object.keys(record.values).length, 0),
   };
+}
+
+/**
+ * Unmounted Instances with an Instance-scope record, by component, on this route
+ * only: a record for an Instance on another page is listed there.
+ */
+function heldInstances(debug: LoupeDebug, records: RecordRow[]): Map<string, HeldInstance[]> {
+  const held = new Map<string, HeldInstance[]>();
+  for (const record of records) {
+    if (record.target.scope !== "instance" || record.mounted.length > 0) continue;
+    if (Object.keys(record.values).length === 0) continue;
+    const id = record.target.id;
+    const lastSeen = debug.lastSeen(id);
+    if (lastSeen && lastSeen.route !== currentRoute()) continue;
+    const component = lastSeen?.component ?? componentOfAnchor(id);
+    held.set(component, [...(held.get(component) ?? []), { id, record, lastSeen }]);
+  }
+  return held;
+}
+
+/** `path › Enclosing › Button[2]~2#key` → `Button`. */
+function componentOfAnchor(id: string): string {
+  const last = id.split("#")[0]?.split(" › ").at(-1) ?? id;
+  return last.replace(/~\d+$/, "").replace(/\[\d+\]$/, "");
+}
+
+/** The record holding an Instance-scope Override for this id, whether it applies or is held for review. */
+export function instanceRecord(records: RecordRow[], id: string): RecordRow | null {
+  return records.find((record) => record.target.scope === "instance" && record.target.id === id) ?? null;
 }
 
 /** The Instance's inspection, or null once it is no longer on the page. */

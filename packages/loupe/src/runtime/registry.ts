@@ -54,12 +54,25 @@ export type MountedInstance = {
   renders: number;
 };
 
+/** An Instance as it last rendered before it unmounted: what the Toolbar shows for a record it holds. */
+export type LastSeen = {
+  component: string;
+  anchor: string;
+  hint: string | null;
+  /** The pathname it mounted on. */
+  route: string;
+  /** Its Current value (the app's own props) at its last commit. */
+  current: Props;
+};
+
 /** Overrides are disabled and everything is inspect-only while this is set. */
 export type Status = { overrides: true } | { overrides: false; reason: string };
 
 export type Registry = {
   store: OverrideStore;
   instances: Map<string, MountedInstance>;
+  /** Unmounted Instances an Instance-scope record still names, by id; pruned as records go. */
+  departed: Map<string, LastSeen>;
   status: Status;
   /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
   listeners: Set<() => void>;
@@ -72,11 +85,13 @@ export function registry(): Registry {
   let value = host[GLOBAL_KEY];
   // One made by an earlier version of this module, kept across a Fast Refresh.
   if (value && !value.listeners) value.listeners = new Set();
+  if (value && !value.departed) value.departed = new Map();
   if (!value) {
     const problem = internalsProblem();
     value = {
       store: createOverrideStore(),
       instances: new Map(),
+      departed: new Map(),
       status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
       listeners: new Set(),
     };
@@ -85,6 +100,8 @@ export function registry(): Registry {
       for (const instance of created.instances.values()) {
         if (reaches(target, identityOf(instance))) instance.notify();
       }
+      const named = recordedIds(created.store);
+      for (const id of created.departed.keys()) if (!named.has(id)) created.departed.delete(id);
       emitChange();
     });
     watchRoute(() => {
@@ -198,6 +215,19 @@ function warnInspectOnly(reason: string): void {
   );
 }
 
+/** Ids an Instance-scope record holds. */
+function recordedIds(store: OverrideStore): Set<string> {
+  const ids = new Set<string>();
+  for (const record of store.records()) if (record.target.scope === "instance") ids.add(record.target.id);
+  return ids;
+}
+
+/**
+ * The route each Instance mounted on. Read at unmount, `location` may already
+ * be the next page's: a client navigation changes it before the old page's cleanups run.
+ */
+const mountedOn = new WeakMap<MountedInstance, string>();
+
 export function instanceId(anchor: string, keyPath: string): string {
   return keyPath === "" ? anchor : `${anchor}#${keyPath}`;
 }
@@ -209,10 +239,12 @@ export function instanceId(anchor: string, keyPath: string): string {
  * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
-  const { instances, store } = registry();
+  const { instances, departed, store } = registry();
   const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id };
   instances.set(id, instance);
+  mountedOn.set(instance, currentRoute());
+  departed.delete(id);
   // Also when this one took the free base id while a `~n` is still mounted.
   const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
   if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
@@ -233,9 +265,19 @@ export function uniqueId(base: string, taken: { has(id: string): boolean }): str
 }
 
 export function unregister(instance: MountedInstance): void {
-  const { instances } = registry();
+  const { instances, departed, store } = registry();
   if (instances.get(instance.id) !== instance) return;
   instances.delete(instance.id);
+  // Kept only while a record holds it: the Toolbar lists nothing else that isn't mounted.
+  if (recordedIds(store).has(instance.id)) {
+    departed.set(instance.id, {
+      component: instance.component,
+      anchor: instance.anchor,
+      hint: instance.hint,
+      route: mountedOn.get(instance) ?? currentRoute(),
+      current: instance.live().current,
+    });
+  }
   emitChange();
 }
 
