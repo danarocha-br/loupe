@@ -766,6 +766,8 @@ describe("closed and held-for-review Overrides", () => {
 
     const review = card("Held for review") as HTMLElement;
     expect(review.textContent).toContain(`Matches more than one Instance (${CONFIRM}): discard it and set it again on the one you mean.`);
+    // Its id is mounted, on two elements: there is no last-seen Current value to show.
+    expect(review.querySelector("[data-testid=held-values]")?.textContent).toBe('variant "default"');
     expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("Held for review");
     await clickInPanel([...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement);
     expect(loupe.records()).toEqual([]);

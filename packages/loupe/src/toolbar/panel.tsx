@@ -152,16 +152,18 @@ function HeldValues({ record, lastSeen }: { record: RecordRow; lastSeen: LastSee
     <ul className="list muted" data-testid="held-values">
       {Object.entries(record.values).map(([prop, value]) => (
         <li key={prop} className="mono">
-          {`${prop} ${formatCurrent(value)} · Current ${currentLastSeen(lastSeen, prop)}`}
+          {`${prop} ${formatCurrent(value)}${currentLastSeen(lastSeen, prop)}`}
         </li>
       ))}
     </ul>
   );
 }
 
+/** Nothing when there is no last-seen value: the id may be mounted again, on another element. */
 function currentLastSeen(lastSeen: LastSeen | null, prop: string): string {
-  if (lastSeen === null) return "unknown";
-  return prop in lastSeen.current ? `${formatCurrent(lastSeen.current[prop])} (last seen)` : "not set (last seen)";
+  if (lastSeen === null) return "";
+  const value = prop in lastSeen.current ? formatCurrent(lastSeen.current[prop]) : "not set";
+  return ` · Current ${value} (last seen)`;
 }
 
 /**
