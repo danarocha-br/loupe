@@ -89,6 +89,52 @@ describe("anchored client Instances without an Adapter", () => {
     expect(loupe.scan()).toEqual([]);
   });
 
+  it("never lists an Instance an Adapter registered, also when an anchored wrapper sits between (PER-181)", () => {
+    // Base UI's Tooltip.Trigger, as the design system's SidebarMenuButton uses it: the
+    // call site's props (anchor included) go to the element handed in as `render`, and
+    // the wrapper is itself a call site in the design system, so it carries its own anchor.
+    function Trigger({ render }: { render: ReactNode; [key: string]: unknown }) {
+      return render;
+    }
+    function Link(props: Props) {
+      return h("a", props);
+    }
+    function MenuButton(props: Props) {
+      return h(Trigger, { "data-ds-anchor": "ui/sidebar.tsx › SidebarMenuButton › Trigger[1]", render: h(Link, props) });
+    }
+    const MenuAdapter = createAdapter("MenuButton", MenuButton);
+    render(
+      h(
+        "ul",
+        null,
+        ["Agentes", "Conversas"].map((key) => h("li", { key }, h(MenuAdapter, loader("MenuButton"), key))),
+      ),
+    );
+    // The wrapper is a call site of its own, so it is listed; the Instance the Adapter
+    // registered is listed once, adapted, and not again as the Link carrying its anchor.
+    const menuRows = loupe.list().filter((row) => row.anchor === at("MenuButton"));
+    expect(menuRows.map((row) => [row.id, row.adapted])).toEqual([
+      [`${at("MenuButton")}#Agentes`, true],
+      [`${at("MenuButton")}#Conversas`, true],
+    ]);
+  });
+
+  it("lists an unadapted Instance once when an anchored wrapper sits between its fibers (PER-181)", () => {
+    function Trigger({ render }: { render: ReactNode; [key: string]: unknown }) {
+      return render;
+    }
+    function Inner(props: Props) {
+      return h("a", props);
+    }
+    function Outer(props: Props) {
+      return h(Trigger, { "data-ds-anchor": "ui/outer.tsx › Outer › Trigger[1]", render: h(Inner, props) });
+    }
+    render(h(Outer, loader("Outer")));
+    expect(loupe.list().filter((row) => row.anchor === at("Outer")).map((row) => [row.id, row.adapted])).toEqual([
+      [at("Outer"), false],
+    ]);
+  });
+
   it("names the component as the call site imports it, and keys repeated ones like Adapters", () => {
     render(
       h(
