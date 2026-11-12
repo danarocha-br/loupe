@@ -165,7 +165,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 /* The identity card: the page, or the selected Instance */
 .identity { padding: 5px 5px 14px 12px; gap: 4px; }
 .identity .head { padding-left: 8px; }
-.identity .name { font-size: 18px; line-height: 40px; letter-spacing: -.035em; color: var(--ink); }
+.identity .name { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; line-height: 40px; letter-spacing: -.035em; color: var(--ink); }
+.identity .chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .identity .id { padding: 0 8px; font: 400 12px/16px ${MONO}; color: var(--muted); }
 .identity .body { padding: 0 8px; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

@@ -121,10 +121,16 @@ function OverridesOff({ reason }: { reason: string }) {
   );
 }
 
-/** What the page calls itself, before the app's name: `Billing | Acme` reads Billing. */
+/**
+ * The page's name from its route's last segment: `/org/acme/settings/billing`
+ * reads Billing. Titles put the app's name first as often as last, so the route
+ * is the steadier source.
+ */
 function pageName(): string {
-  const title = document.title.split(/\s+[|·–—-]\s+/)[0]?.trim();
-  return title || "This page";
+  const segment = decodeURIComponent(location.pathname.split("/").filter(Boolean).at(-1) ?? "");
+  if (segment === "") return "Home";
+  const words = segment.replace(/[-_]+/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function ComponentList({ debug, page, onSelect, onHover, flags, notices }: BodyProps) {
