@@ -62,6 +62,11 @@ let loupe: LoupeDebug;
 let downloads: { name: string; blob: Blob }[] = [];
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
+/** Settles until `done` holds: an export's capture and build take longer on a loaded machine. */
+async function until(done: () => boolean, tries = 100): Promise<void> {
+  for (let i = 0; i < tries && !done(); i++) await settle();
+  expect(done()).toBe(true);
+}
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
 const dialog = () => shadow().querySelector<HTMLDialogElement>("dialog");
 const button = (text: string, scope: ParentNode = shadow()) =>
@@ -94,7 +99,8 @@ async function exportedProposal(): Promise<Proposal> {
 
 async function openDialog(): Promise<void> {
   act(() => shadow().querySelector<HTMLButtonElement>("[data-export]")?.click());
-  await settle();
+  // Open once the preview has counted.
+  await until(() => dialog()?.querySelector(".counts") != null);
 }
 
 async function capture(options?: Parameters<typeof captureScreen>[0]) {
@@ -197,9 +203,14 @@ describe("the export dialog", () => {
     type(field('input[name="title"]'), "Calmer rows");
     type(field('input[name="designer"]'), "Dana");
     type(field('[data-entry="c1"] textarea'), "Ghost reads as disabled on the dark theme.");
+    // As in a browser: while a modal dialog is open, nothing outside it takes focus.
+    const focus = HTMLElement.prototype.focus;
+    vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement) {
+      if (dialog()?.open && !dialog()?.contains(this)) return;
+      focus.call(this);
+    });
     act(() => button("Export", dialog() as HTMLDialogElement)?.click());
-    await settle();
-    await settle();
+    await until(() => dialog() === null);
 
     expect(downloads.map((download) => download.name)).toEqual([expect.stringMatching(/^proposal-calmer-rows-\d{8}-\d{4}\.html$/)]);
     expect(downloads[0]?.blob.type).toBe("text/html");
@@ -272,8 +283,7 @@ describe("the export dialog", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     await openDialog();
     act(() => button("Export", dialog() as HTMLDialogElement)?.click());
-    await settle();
-    await settle();
+    await until(() => dialog() === null);
     expect(downloads).toHaveLength(1);
     const exported = shadow().querySelector<HTMLButtonElement>("[data-export]");
     expect(exported?.textContent).toBe("Exported, no new screen");
@@ -286,8 +296,7 @@ describe("the export dialog", () => {
     await capture();
     await openDialog();
     act(() => button("Export", dialog() as HTMLDialogElement)?.click());
-    await settle();
-    await settle();
+    await until(() => dialog() === null);
     expect(snapshots().map((snapshot) => [snapshot.id, snapshot.auto])).toEqual([[1, false]]);
     expect((await exportedProposal()).routes[0]?.screenshots.filter((shot) => shot.kind === "viewport")).toHaveLength(1);
 
@@ -295,8 +304,7 @@ describe("the export dialog", () => {
     pixels = "scrolled";
     await openDialog();
     act(() => button("Export", dialog() as HTMLDialogElement)?.click());
-    await settle();
-    await settle();
+    await until(() => dialog() === null);
     expect(snapshots().map((snapshot) => snapshot.auto)).toEqual([false, true]);
     expect((await exportedProposal()).routes[0]?.screenshots.filter((shot) => shot.kind === "viewport")).toHaveLength(2);
     expect(exportForm().title).toBeNull();

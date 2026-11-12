@@ -133,19 +133,21 @@ function scopeText(change: ProposalChange): string {
   }
 }
 
+/** ": user_1, user_2", or nothing when no Instance has a key path to tell it apart. */
 function keyList(keys: readonly string[]): string {
-  return keys.map((key) => code(key || "(no key)")).join(", ");
+  if (keys.every((key) => key === "")) return "";
+  return `: ${keys.map((key) => code(key || "(no key)")).join(", ")}`;
 }
 
 function instancesHtml(change: ProposalChange): string {
   const covered = change.instances.filter((instance) => instance.included);
   const left = change.instances.filter((instance) => !instance.included);
   const lines: string[] = [];
-  if (covered.length > 0) lines.push(`<li>Covers ${covered.length}: ${keyList(covered.map((instance) => instance.keyPath))}</li>`);
-  if (left.length > 0) lines.push(`<li>Left out ${left.length}: ${keyList(left.map((instance) => instance.keyPath || instance.id))}</li>`);
+  if (covered.length > 0) lines.push(`<li>Covers ${covered.length}${keyList(covered.map((instance) => instance.keyPath))}</li>`);
+  if (left.length > 0) lines.push(`<li>Left out ${left.length}${keyList(left.map((instance) => instance.keyPath || instance.id))}</li>`);
   if (change.serverRendered.length > 0) {
     lines.push(
-      `<li>Not previewed (server-rendered) ${change.serverRendered.length}: ${keyList(change.serverRendered.map((entry) => entry.keyPath || entry.anchor))}</li>`,
+      `<li>Not previewed (server-rendered) ${change.serverRendered.length}${keyList(change.serverRendered.map((entry) => entry.keyPath || entry.anchor))}</li>`,
     );
   }
   return lines.length === 0 ? "" : `<ul class="instances">${lines.join("")}</ul>`;

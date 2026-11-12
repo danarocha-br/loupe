@@ -318,6 +318,16 @@ describe("the HTML report", () => {
     const c3 = doc.querySelector('[data-change="c3"]');
     expect(text(c3?.querySelector(".instances"))).toContain("Not previewed (server-rendered) 1: user_1");
     expect(text(doc.querySelector('[data-change="c2"]'))).toContain("Not on screen at export: Current values are as last seen");
+    expect(text(doc.querySelector('[data-change="c3"] .instances'))).toBe("Not previewed (server-rendered) 1: user_1");
+  });
+
+  it("lists no key paths when the Instances have none", () => {
+    const proposal = sample();
+    const instance = proposal.routes[0]?.changes[1]?.instances[0];
+    if (!instance) throw new Error("sample changed");
+    instance.keyPath = "";
+    const { doc } = open(proposalReport(proposal));
+    expect(text(doc.querySelector('[data-change="c2"] .instances'))).toBe("Covers 1");
   });
 
   it("shows a change's crop pair, or says it has none", () => {

@@ -37,6 +37,13 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
     const timer = setTimeout(() => setDone(null), done.label === "Exported" ? 2500 : 8000);
     return () => clearTimeout(timer);
   }, [done]);
+  // The modal held focus: hand it back once it has gone. While it is still open,
+  // everything outside it is inert and refuses focus.
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (wasOpen.current && !open) trigger.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
   return (
     <>
       <button
@@ -54,8 +61,6 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
           onClose={(result) => {
             setOpen(false);
             if (result) setDone(doneOf(result));
-            // The modal held focus: hand it back to what opened it.
-            trigger.current?.focus();
           }}
         />
       )}
