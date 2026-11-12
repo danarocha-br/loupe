@@ -4,12 +4,14 @@ import { decryptOverrides as sdkDecryptOverrides } from "flags";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { encryptOverrides } from "./flags-crypto.js";
+import { decryptJwe, encryptOverrides } from "./flags-crypto.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // The Server Actions' only Next dependency: a cookie jar and the request's headers.
 const jar = new Map<string, string>();
+/** The options each cookie was last set with. */
+const cookieOptions = new Map<string, unknown>();
 let requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
 // Each request takes real time, as on a slow CI runner: no test may count ticks to wait for a write.
 const slow = () => new Promise((resolve) => setTimeout(resolve, 20));
@@ -18,7 +20,10 @@ vi.mock("next/headers", () => ({
     await slow();
     return {
       get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
-      set: (name: string, value: string) => void jar.set(name, value),
+      set: (name: string, value: string, options?: unknown) => {
+        jar.set(name, value);
+        cookieOptions.set(name, options);
+      },
       delete: (name: string) => void jar.delete(name),
     };
   },
@@ -39,6 +44,7 @@ const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response
 
 beforeEach(() => {
   jar.clear();
+  cookieOptions.clear();
   endpoint = { status: 200, body: DEFINITIONS };
   fetchMock.mockClear();
   requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
@@ -108,6 +114,20 @@ describe("writeFlagOverrides", () => {
     await writeFlagOverrides({ a: true, b: false }, []);
     expect(await writeFlagOverrides({}, "all")).toEqual({ ok: true, overrides: {} });
     expect(jar.has(COOKIE)).toBe(false);
+  });
+
+  it("lets a preview expire after 8 hours, so it can't outlive the app that set it (PER-182)", async () => {
+    // Cookies ignore the port: one left on localhost reaches every other app there, and
+    // flags/next throws on it when that app has no FLAGS_SECRET.
+    const { writeFlagOverrides } = await import("./flags-server.js");
+    const before = Math.floor(Date.now() / 1000);
+    await writeFlagOverrides({ plan: "pro" }, []);
+
+    expect(cookieOptions.get(COOKIE)).toEqual({ path: "/", sameSite: "lax", maxAge: 8 * 3600 });
+    // The token expires with the cookie, so a cookie kept past its Max-Age reads as no preview.
+    const exp = (await decryptJwe(jar.get(COOKIE) as string, secret))?.exp as number;
+    expect(exp - before).toBeGreaterThanOrEqual(8 * 3600);
+    expect(exp - before).toBeLessThanOrEqual(8 * 3600 + 5);
   });
 });
 
@@ -201,6 +221,15 @@ describe("the Feature flags card", () => {
     jar.set(COOKIE, await encryptOverrides({ plan: "pro" }, secret));
     const { previewedFlags } = await import("./flags.js");
     expect(await previewedFlags()).toEqual([{ key: "plan", value: "pro", label: "Pro", description: "Pricing plan" }]);
+  });
+
+  it("says a preview lasts 8 hours in a cookie every app on localhost shares (PER-182)", async () => {
+    const { FlagsCard } = await import("./flags.js");
+    act(() => root.render(<FlagsCard />));
+    await idle();
+    expect(container.querySelector('[aria-label="Feature flags"]')?.textContent).toContain(
+      "A preview lasts 8 hours, in a cookie every app on localhost shares. Clear it before switching projects.",
+    );
   });
 
   it("explains why previews are unavailable", async () => {

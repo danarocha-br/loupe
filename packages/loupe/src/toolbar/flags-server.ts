@@ -10,6 +10,7 @@
 // `<LoupeMount />`'s development-only import, so a production build holds neither.
 
 import { accessProof, decryptOverrides, encryptOverrides } from "./flags-crypto.js";
+import { PREVIEW_SECONDS } from "./flags-lifetime.js";
 
 export type FlagValue = string | number | boolean | null | FlagValue[] | { [key: string]: FlagValue };
 export type FlagOption = { value: FlagValue; label?: string };
@@ -70,7 +71,8 @@ export async function readFlags(): Promise<FlagsResult> {
 
 /**
  * Sets some overrides and clears others ("all": every override in the cookie), then
- * writes the cookie back, or deletes it once nothing is overridden.
+ * writes the cookie back, or deletes it once nothing is overridden. Each write
+ * restarts the cookie's PREVIEW_SECONDS, and the token inside expires with it.
  */
 export async function writeFlagOverrides(set: FlagOverrides, clear: string[] | "all"): Promise<OverridesResult> {
   const secret = process.env.FLAGS_SECRET;
@@ -83,7 +85,13 @@ export async function writeFlagOverrides(set: FlagOverrides, clear: string[] | "
     if (clear !== "all") for (const key of clear) delete next[key];
     Object.assign(next, set);
     if (Object.keys(next).length === 0) jar.delete(COOKIE);
-    else jar.set(COOKIE, await encryptOverrides(next, secret), { path: "/", sameSite: "lax" });
+    else {
+      jar.set(COOKIE, await encryptOverrides(next, secret, PREVIEW_SECONDS), {
+        path: "/",
+        sameSite: "lax",
+        maxAge: PREVIEW_SECONDS,
+      });
+    }
     return { ok: true, overrides: next };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
