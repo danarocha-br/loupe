@@ -1,10 +1,13 @@
 // The Toolbar's look (PER-140), from the 2e sketch and the PER-140 gap screens.
 // Lives in the Toolbar's shadow root, so the app's CSS can't reach it and none of
 // it reaches the app. Every colour is a token on the host, light by default and
-// dark under `data-theme="dark"`, which the Toolbar sets from the OS preference or
+// dark under `data-loupe-theme="dark"`, which the Toolbar sets from the OS preference or
 // the header's toggle.
 
 export const HOST_ATTRIBUTE = "data-loupe-toolbar";
+
+/** On the host: `light` or `dark`. Loupe's own name, so an app's `[data-theme]` CSS never matches it. */
+export const THEME_ATTRIBUTE = "data-loupe-theme";
 
 /** Where the reader's choice of light or dark is kept; absent, the OS preference decides. */
 export const THEME_KEY = "loupe:theme";
@@ -23,7 +26,6 @@ const LIGHT: Tokens = {
   faint: "#8A8F91",
   border: "#D5D9DA",
   divider: "#F0F0EE",
-  check: "#BFC4C6",
   "tag-fg": "#3A3F41",
   purple: "#A343F5",
   "on-purple": "#FFFFFF",
@@ -55,7 +57,6 @@ const DARK: Tokens = {
   faint: "#6F7476",
   border: "#303435",
   divider: "#1F1F1D",
-  check: "#45494A",
   "tag-fg": "#C2C6C8",
   purple: "#CD7AFF",
   "on-purple": "#121212",
@@ -83,7 +84,7 @@ const MONO = `"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace`;
 
 export const CSS = `
 :host { all: initial; ${declare(LIGHT)} color-scheme: light; }
-:host([data-theme="dark"]) { ${declare(DARK)} color-scheme: dark; }
+:host([data-loupe-theme="dark"]) { ${declare(DARK)} color-scheme: dark; }
 * { box-sizing: border-box; }
 .icon { display: block; flex: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -112,7 +113,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .btn.round.tall { width: 40px; height: 40px; }
 .btn.circle { width: 36px; height: 36px; padding: 0; }
 .btn:not(:disabled):hover { filter: brightness(.96); }
-:host([data-theme="dark"]) .btn:not(:disabled):hover { filter: brightness(1.25); }
+:host([data-loupe-theme="dark"]) .btn:not(:disabled):hover { filter: brightness(1.25); }
 
 /* The panel: a pinned header and footer, and a scrolling middle */
 .panel {
@@ -249,6 +250,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   align-items: center; column-gap: 10px; min-height: 44px; padding: 6px 10px 6px 14px; border-radius: 14px;
 }
 .group summary:hover, .group details[open] > summary { background: var(--chip); }
+.group summary:hover .tag.status:not(.supported):not(.stale), .group details[open] > summary .tag.status:not(.supported):not(.stale) { background: var(--card); }
 .group summary .cname { grid-area: name; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 18px; }
 .group summary .times { grid-area: n; text-align: right; font: 400 12px/16px ${MONO}; }
 .group summary .status { grid-area: tag; justify-self: end; }
@@ -275,7 +277,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 /* Scope members */
 .members .list > li, .members legend > label { display: flex; align-items: center; gap: 10px; min-height: 40px; border-top: 1px solid var(--divider); font: 400 13px/16px ${SANS}; }
 .members label { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
-.members input[type="checkbox"] { appearance: none; flex: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--check); display: grid; place-content: center; cursor: pointer; }
+.members input[type="checkbox"] { appearance: none; flex: none; width: 18px; height: 18px; margin: 0; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--faint); display: grid; place-content: center; cursor: pointer; }
 .members input[type="checkbox"]:checked { background: var(--ink); box-shadow: none; }
 .members input[type="checkbox"]:checked::after { content: ""; width: 9px; height: 5px; margin-top: -2px; border: solid var(--on-ink); border-width: 0 0 2px 2px; transform: rotate(-45deg); }
 .members input:disabled { opacity: .4; cursor: default; }
@@ -286,7 +288,7 @@ fieldset.site .list { padding-left: 28px; }
 /* Feature flags */
 .flag { padding: 12px 14px; border-radius: 14px; margin: 0 -14px; gap: 8px; }
 .flag.overridden { background: var(--chip); }
-.flag.overridden .pills button:not([aria-pressed="true"]) { background: var(--card); }
+.flag.overridden .pills button:not([aria-pressed="true"]), .flag.overridden .btn { background: var(--card); }
 .flag .line { min-height: 28px; }
 .flag .name { font: 500 13px/16px ${MONO}; }
 .flag .foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
@@ -302,6 +304,7 @@ fieldset.site .list { padding-left: 28px; }
 .snapshots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .snapshots li { display: flex; gap: 14px; padding: 10px; margin: 0 -10px; border-radius: 14px; }
 .snapshots li:hover { background: var(--chip); }
+.snapshots li:hover .btn { background: var(--card); }
 .snapshots .thumb { flex: none; width: 64px; height: 44px; object-fit: cover; border-radius: 8px; box-shadow: 0 0 0 1px var(--border); }
 .snapshots .thumb.outdated { opacity: .5; }
 .snapshots .info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

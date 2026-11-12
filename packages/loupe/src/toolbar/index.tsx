@@ -5,7 +5,7 @@
 // (PER-140). It reaches the page only through `<LoupeMount />`'s development-only
 // dynamic import, so a production build never holds this module.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Scope } from "../runtime/store.js";
 import { Highlight } from "./highlight.js";
@@ -16,7 +16,7 @@ import { usePicker } from "./picker.js";
 import { type SeenComponents, safeInspect, snapshot, useDebug, usePageVersion } from "./page.js";
 import { scopeView } from "./scopes.js";
 import { useCapture } from "./snapshots-card.js";
-import { CSS, HOST_ATTRIBUTE, THEME_KEY } from "./styles.js";
+import { CSS, HOST_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
 
 export type Theme = "light" | "dark";
 
@@ -74,7 +74,8 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
     return () => query.removeEventListener?.("change", change);
   }, []);
   const theme = chosen ?? system;
-  useEffect(() => host.setAttribute("data-theme", theme), [host, theme]);
+  // Before paint, so a dark system never sees one light frame.
+  useLayoutEffect(() => host.setAttribute(THEME_ATTRIBUTE, theme), [host, theme]);
   const toggle = useCallback(() => {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setChosen(next);

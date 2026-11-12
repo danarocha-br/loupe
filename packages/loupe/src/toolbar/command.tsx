@@ -22,10 +22,13 @@ export function Command({ text, copy = text, prompt = true }: { text: string; co
         type="button"
         className="btn"
         onClick={() =>
-          navigator.clipboard.writeText(copy).then(
-            () => setCopied(true),
-            () => setCopied(false),
-          )
+          // Inside the promise: on an insecure origin `navigator.clipboard` is undefined and throws.
+          Promise.resolve()
+            .then(() => navigator.clipboard.writeText(copy))
+            .then(
+              () => setCopied(true),
+              () => setCopied(false),
+            )
         }
       >
         <CopyIcon size={12} />

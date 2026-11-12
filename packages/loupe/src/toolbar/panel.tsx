@@ -104,7 +104,10 @@ export function Panel(props: PanelProps) {
 
 /** The React self-check failed (PER-184: said here once, not again on the Instance). */
 function OverridesOff({ reason }: { reason: string }) {
-  const sentence = overridesOffNote(reason).replace(/^Overrides are off, e/, "E");
+  // The title says "Overrides are off"; the body is the rest of the note, whatever its wording.
+  const note = overridesOffNote(reason);
+  const rest = note.replace(/^Overrides are off,\s*/, "");
+  const sentence = rest === note ? note : rest.charAt(0).toUpperCase() + rest.slice(1);
   return (
     <div className="card notice-card banner" role="status">
       <div className="head">
