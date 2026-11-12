@@ -59,14 +59,35 @@ describe("readLayerStatus", () => {
       command: "pnpm -C apps/app exec loupe generate",
       format: null,
       stale: [],
-      generated: ["Badge", "Button", "ButtonGroup", "helper"],
+      notGenerated: [],
     });
   });
 
-  it("knows every export generate read, and a module it writes later", () => {
+  it("names what the next generate would add, and only from files it reads", () => {
     const { root, write, paths } = repo();
-    expect(readLayerStatus(paths).generated).not.toContain("Card");
+    write("ds/components/ui/card.tsx", `"use client";\nexport function Card() { return null; }\nexport const CardTitle = () => null;\nfunction Local() { return null; }\nexport { Local as CardBody };\nexport type CardProps = { a: 1 };\nexport default function Ignored() { return null; }\nexport type { Local as CardType };\n`);
+    write("ds/components/ui/index.ts", `export { Button } from "./button";\n`);
+    write("ds/components/ui/card.test.tsx", `export function CardTest() { return null; }\n`);
+    write("ds/providers/theme.tsx", `export function ThemeProvider() { return null; }\n`);
+    write("apps/app/components/members-summary.tsx", `export function MembersSummary() { return null; }\n`);
+    write("packages/loupe/adapters/ds/ui/card.tsx", `export function CardAdapter() { return null; }\n`);
+    // A component added to a module generate already read.
+    write("ds/components/ui/badge.tsx", `export function Badge() { return null; }\nexport function BadgeDot() { return null; }\n`);
+    touch(path.join(root, "ds/components/ui/badge.tsx"));
+    expect(readLayerStatus(paths).notGenerated).toEqual(["BadgeDot", "Card", "CardBody", "CardTitle", "MembersSummary"]);
+  });
+
+  it("never reads the Product layer when it sits inside the app", () => {
+    const { write, paths } = repo("apps/app/loupe");
+    write("apps/app/loupe/adapters/ds/ui/badge.tsx", `export function Badge() { return null; }\nexport function BadgeAdapter() { return null; }\n`);
+    write("apps/app/page.tsx", `export function Shell() { return null; }\n`);
+    expect(readLayerStatus(paths).notGenerated).toEqual(["Shell"]);
+  });
+
+  it("clears a name once generate has written its metadata", () => {
+    const { root, write, paths } = repo();
     write("ds/components/ui/card.tsx", `export function Card() { return null; }\n`);
+    expect(readLayerStatus(paths).notGenerated).toEqual(["Card"]);
     // As the next `generate` writes it.
     write(
       "packages/loupe/meta/ds/ui/card.tsx.json",
@@ -81,7 +102,13 @@ describe("readLayerStatus", () => {
         }),
       ),
     );
-    expect(readLayerStatus(paths).generated).toEqual(["Badge", "Button", "ButtonGroup", "Card", "helper"]);
+    expect(readLayerStatus(paths).notGenerated).toEqual([]);
+  });
+
+  it("reads a file that doesn't parse as exporting nothing", () => {
+    const { write, paths } = repo();
+    write("ds/components/ui/broken.tsx", `export function Broken( {\n`);
+    expect(readLayerStatus(paths).notGenerated).toEqual([]);
   });
 
   it("flags every component of a module whose source changed, and names the file", () => {
@@ -123,7 +150,7 @@ describe("readLayerStatus", () => {
       command: "pnpm -C apps/app exec loupe generate",
       format: { layer: 0, runtime: 1, newer: false },
       stale: [],
-      generated: null,
+      notGenerated: null,
     });
   });
 });

@@ -149,9 +149,10 @@ the bundler drops it, and `doctor --build` fails if it ever leaks.
 The Toolbar is one right-hand panel in its own shadow root. With nothing
 selected it lists every Instance on the page by component, and updates as menus
 and dialogs mount. That includes server-rendered Instances and anchored client
-ones with no Adapter, both inspect-only. A component on the page that `meta/`
-doesn't name is tagged **Not generated yet**, with the `generate` command; it
-clears once the command has run. Nothing regenerates on its own. **Pick** selects by clicking
+ones with no Adapter, both inspect-only. A component on the page that the next
+`generate` would add (exported by a file it reads, missing from `meta/`) is
+tagged **Not generated yet**, with the command; it clears once the command has
+run. Nothing regenerates on its own. **Pick** selects by clicking
 the page (Esc cancels); only while Pick is on does the Toolbar stop the page's
 pointer events. The inspector shows the Instance, its call site, Coverage as
 "N editable props · M inspect only", each prop's Current value with a reason per

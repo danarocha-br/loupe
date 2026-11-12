@@ -1,15 +1,16 @@
 // What the Toolbar warns about in the Product layer (PER-133), read from disk on
 // the dev server: components whose source changed since `loupe generate` hashed
-// it (PER-100 §5), the names it has read, so a component it hasn't is "not
-// generated yet" (PER-179), and a `formatVersion` this Loupe doesn't write (PER-85).
+// it (PER-100 §5), components it would add if it ran now ("not generated yet",
+// PER-179), and a `formatVersion` this Loupe doesn't write (PER-85).
 // Read-only: regeneration stays explicit, so nothing here writes.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { ADAPT_LIST_FORMAT_VERSION } from "./adapt-list.js";
+import { parse } from "@babel/parser";
+import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "./adapt-list.js";
 import type { FormatNotice } from "./format-notice.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./generate/header.js";
-import { compare, hashFile } from "./meta/sources.js";
+import { compare, DESIGN_SYSTEM_INCLUDE, hashFile, sourceFiles } from "./meta/sources.js";
 
 export type StaleModule = {
   /** Repo-relative path of the module `generate` read. */
@@ -28,10 +29,10 @@ export type LayerStatus = {
   /** Empty while `format` is set: an older or newer `meta/` can't be trusted. */
   stale: StaleModule[];
   /**
-   * Every export name `meta/` holds, of any kind, sorted. A component on the page
-   * that isn't here is new since the last `generate`. Null while `format` is set.
+   * Component-cased names exported by a file `generate` reads that `meta/` doesn't
+   * list, sorted: what the next run would add. Null while `format` is set or the roots can't be read.
    */
-  generated: string[] | null;
+  notGenerated: string[] | null;
 };
 
 export type LayerPaths = {
@@ -58,21 +59,22 @@ export function generateCommand({ root, adaptList, app }: LayerPaths): string {
 
 export function readLayerStatus(paths: LayerPaths): LayerStatus {
   const command = generateCommand(paths);
-  const format = formatOf(readFileSync(paths.adaptList, "utf8"));
-  if (format !== null) return { command, format, stale: [], generated: null };
+  const text = readFileSync(paths.adaptList, "utf8");
+  const format = formatOf(text);
+  if (format !== null) return { command, format, stale: [], notGenerated: null };
   const stale: StaleModule[] = [];
-  const generated = new Set<string>();
+  const bySource = new Map<string, Meta>();
   for (const file of metaFiles(path.join(path.dirname(paths.adaptList), "meta"))) {
     const meta = readMeta(file);
     if (meta === null) continue;
-    for (const name of meta.exports) generated.add(name);
+    bySource.set(meta.source, meta);
     const changed = Object.entries(meta.files)
       .filter(([relative, hash]) => hashOf(path.join(paths.root, relative)) !== hash)
       .map(([relative]) => relative);
     if (changed.length > 0) stale.push({ source: meta.source, components: meta.components, changed });
   }
   stale.sort((a, b) => compare(a.source, b.source));
-  return { command, format: null, stale, generated: [...generated].sort(compare) };
+  return { command, format: null, stale, notGenerated: notGenerated(paths, text, bySource) };
 }
 
 /**
@@ -94,6 +96,78 @@ export function formatOf(text: string): FormatNotice | null {
   }
   if (typeof field !== "number" || field === ADAPT_LIST_FORMAT_VERSION) return null;
   return { layer: field, runtime: ADAPT_LIST_FORMAT_VERSION, newer: field > ADAPT_LIST_FORMAT_VERSION };
+}
+
+/** Names `generate` would add: exports of an in-scope file with no `meta/`, or new in one whose source changed. */
+function notGenerated(paths: LayerPaths, adaptListText: string, bySource: ReadonlyMap<string, Meta>): string[] | null {
+  let roots: { designSystem: string[]; app: string[] };
+  try {
+    roots = parseAdaptList(adaptListText, paths.adaptList);
+  } catch {
+    return null;
+  }
+  const layer = path.dirname(paths.adaptList);
+  const files = sourceFiles([
+    ...roots.designSystem.map((root) => path.join(paths.root, root, DESIGN_SYSTEM_INCLUDE)),
+    ...roots.app.map((root) => path.join(paths.root, root)),
+  ], [layer]);
+  const found = new Set<string>();
+  for (const file of files) {
+    const relative = toPosix(path.relative(paths.root, file));
+    const meta = bySource.get(relative);
+    // Unchanged since `generate` read it: nothing new can be exported.
+    if (meta && meta.files[relative] === hashOf(file)) continue;
+    const known = new Set(meta?.exports ?? []);
+    for (const name of exportedNames(file)) if (COMPONENT_CASE.test(name) && !known.has(name)) found.add(name);
+  }
+  return [...found].sort(compare);
+}
+
+/** A component's name starts upper-case; `buttonVariants` or `useSidebar` never names an Instance. */
+const COMPONENT_CASE = /^[A-Z]/;
+
+// Keyed by path and stat, like the caches below.
+const exportCache = new Map<string, { stamp: string; names: string[] }>();
+
+/**
+ * A module's named value exports, read with the loader's parser: `export function X`,
+ * `export const X`, `export class X` and `export { X }`. Types, re-exports from
+ * another module and the default export are left out; an Instance of a default
+ * export is named by its import, never "default". A file that doesn't parse has none.
+ */
+export function exportedNames(file: string): string[] {
+  const stamp = stampOf(file);
+  if (stamp === null) return [];
+  const cached = exportCache.get(file);
+  if (cached?.stamp === stamp) return cached.names;
+  const names: string[] = [];
+  try {
+    const program = parse(readFileSync(file, "utf8"), {
+      sourceType: "module",
+      plugins: ["typescript", "jsx"],
+      errorRecovery: true,
+    }).program;
+    for (const node of program.body) {
+      if (node.type !== "ExportNamedDeclaration" || node.exportKind === "type" || node.source) continue;
+      const declaration = node.declaration;
+      if (declaration?.type === "FunctionDeclaration" || declaration?.type === "ClassDeclaration") {
+        if (declaration.id) names.push(declaration.id.name);
+      } else if (declaration?.type === "VariableDeclaration") {
+        for (const declarator of declaration.declarations) {
+          if (declarator.id.type === "Identifier") names.push(declarator.id.name);
+        }
+      }
+      for (const specifier of node.specifiers) {
+        if (specifier.type !== "ExportSpecifier" || specifier.exportKind === "type") continue;
+        const exported = specifier.exported;
+        names.push(exported.type === "Identifier" ? exported.name : exported.value);
+      }
+    }
+  } catch {
+    names.length = 0;
+  }
+  exportCache.set(file, { stamp, names });
+  return names;
 }
 
 function metaFiles(dir: string): string[] {

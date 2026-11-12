@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseAdaptList } from "../adapt-list.js";
 import { extract } from "../meta/command.js";
-import { collectSources, compare } from "../meta/sources.js";
+import { collectSources, compare, DESIGN_SYSTEM_INCLUDE } from "../meta/sources.js";
 import type { ModuleMeta } from "../meta/types.js";
 import { apply, type Change, diff, type Refusal } from "./apply.js";
 import { readHeader } from "./header.js";
@@ -104,7 +104,7 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
   const dsAbs = path.join(repoRoot, dsRoot);
   const appAbs = path.join(repoRoot, appRoot);
   const modules = [
-    ...readModules(path.join(dsAbs, "tsconfig.json"), ["components"], [], repoRoot),
+    ...readModules(path.join(dsAbs, "tsconfig.json"), [DESIGN_SYSTEM_INCLUDE], [], repoRoot),
     ...readModules(path.join(appAbs, "tsconfig.json"), ["."], [outAbs], repoRoot),
   ];
   const dsPackage = readPackage(dsAbs);

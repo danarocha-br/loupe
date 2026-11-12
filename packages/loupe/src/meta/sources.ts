@@ -16,16 +16,15 @@ export type SourceSet = {
 const SOURCE = /\.(ts|tsx)$/;
 const SKIPPED = /\.d\.ts$|\.(test|spec|stories)\.(ts|tsx)$/;
 
-/** `exclude`: absolute directories never read, e.g. the Product layer inside an app. */
-export function collectSources(
-  tsconfig: string,
-  include: readonly string[],
-  exclude: readonly string[] = [],
-): SourceSet {
-  const tsconfigPath = path.resolve(tsconfig);
-  const root = path.dirname(tsconfigPath);
-  const relative = (absolute: string) => path.relative(root, absolute).split(path.sep).join("/");
+/** The directory `generate` reads under the design system's root; it reads the whole app (PER-100 §1). */
+export const DESIGN_SYSTEM_INCLUDE = "components";
 
+/**
+ * Every `.ts`/`.tsx` file `meta` reads under `dirs` (absolute), unordered. Skips
+ * declarations, tests, stories, `node_modules`, dot directories, the `exclude`d
+ * directories (absolute), and a directory in `dirs` that doesn't exist.
+ */
+export function sourceFiles(dirs: readonly string[], exclude: readonly string[] = []): string[] {
   const excluded = new Set(exclude.map((dir) => path.resolve(dir)));
   const files: string[] = [];
   const walk = (dir: string) => {
@@ -37,13 +36,31 @@ export function collectSources(
       } else if (SOURCE.test(entry.name) && !SKIPPED.test(entry.name)) files.push(full);
     }
   };
-  for (const dir of include.length > 0 ? include : ["."]) {
+  for (const dir of dirs) {
+    const full = path.resolve(dir);
+    if (statSync(full, { throwIfNoEntry: false })?.isDirectory()) walk(full);
+  }
+  return files;
+}
+
+/** `exclude`: absolute directories never read, e.g. the Product layer inside an app. */
+export function collectSources(
+  tsconfig: string,
+  include: readonly string[],
+  exclude: readonly string[] = [],
+): SourceSet {
+  const tsconfigPath = path.resolve(tsconfig);
+  const root = path.dirname(tsconfigPath);
+  const relative = (absolute: string) => path.relative(root, absolute).split(path.sep).join("/");
+
+  const dirs = (include.length > 0 ? include : ["."]).map((dir) => {
     const full = path.resolve(root, dir);
     if (!statSync(full, { throwIfNoEntry: false })?.isDirectory()) {
       throw new Error(`Not a directory: ${dir} (resolved against ${root})`);
     }
-    walk(full);
-  }
+    return full;
+  });
+  const files = sourceFiles(dirs, exclude);
 
   const unique = [...new Set(files)].sort((a, b) => compare(relative(a), relative(b)));
   return {
