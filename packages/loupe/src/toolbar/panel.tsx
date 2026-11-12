@@ -17,6 +17,7 @@ import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView 
 import { FlagsCard } from "./flags.js";
 import { copyProposalMarkdown } from "./proposal.js";
 import { CaptureButton, SnapshotsCard } from "./snapshots-card.js";
+import { LayerNotices, staleComponents, useLayerStatus } from "./notices.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -37,6 +38,8 @@ type PanelProps = {
 
 export function Panel(props: PanelProps) {
   const { page, selected } = props;
+  const layer = useLayerStatus(props.version);
+  const stale = staleComponents(layer);
   return (
     <section className="panel" aria-label="Loupe">
       <header className="header">
@@ -50,15 +53,16 @@ export function Panel(props: PanelProps) {
         </button>
       </header>
       <div className="middle">
+        <LayerNotices status={layer} />
         {!page.status.overrides && (
           <div className="banner" role="status">
             {overridesOffNote(page.status.reason)}
           </div>
         )}
         {selected === null ? (
-          <ComponentList {...props} />
+          <ComponentList {...props} stale={stale} />
         ) : (
-          <Inspector {...props} id={selected} />
+          <Inspector {...props} id={selected} stale={stale} />
         )}
       </div>
       <Footer {...props} />
@@ -66,7 +70,7 @@ export function Panel(props: PanelProps) {
   );
 }
 
-function ComponentList({ debug, page, onSelect, onHover }: PanelProps) {
+function ComponentList({ debug, page, onSelect, onHover, stale }: PanelProps & { stale: Set<string> }) {
   const instances = page.groups.reduce((sum, group) => sum + group.instances.length, 0);
   return (
     <>
@@ -91,6 +95,7 @@ function ComponentList({ debug, page, onSelect, onHover }: PanelProps) {
                 >
                   {group.component} ×{group.instances.length}
                   {group.held.length > 0 && ` · ${group.held.length} not mounted`}{" "}
+                  {stale.has(group.component) && <span className="tag stale">Source changed</span>}{" "}
                   {group.overrides > 0 && <span className="tag">{group.overrides} override{group.overrides === 1 ? "" : "s"}</span>}{" "}
                   {group.instances.length === 0 ? null : group.supported ? (
                     <span className="tag supported">Supported</span>
@@ -225,7 +230,7 @@ function instanceLabel(id: string, hint: string | null): string {
   return `${where}${key}`;
 }
 
-function Inspector(props: PanelProps & { id: string }) {
+function Inspector(props: PanelProps & { id: string; stale: Set<string> }) {
   const { debug, id, onSelect, page, scope, onScope, view } = props;
   const inspection = safeInspect(debug, id);
   const recorded = debug.status.overrides && hasInstanceRecord(debug, id);
@@ -288,6 +293,7 @@ function Inspector(props: PanelProps & { id: string }) {
             <span className="tag">Inspect only</span>
           )}{" "}
           <span className="tag">{inspection.rendered === "server" ? "On the server" : "In the browser"}</span>
+          {props.stale.has(inspection.component) && <span className="tag stale">Source changed</span>}
         </div>
         {editing && resetInstance}
         <div className="mono" data-testid="instance-id">

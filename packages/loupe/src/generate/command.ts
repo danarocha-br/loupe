@@ -228,12 +228,34 @@ type Previous = { designSystem?: string; app?: string; specifier?: string };
 function readPrevious(text: string, notes: string[]): Previous | undefined {
   try {
     const list = parseAdaptList(text);
-    const adapter = Object.values(list.modules)[0]?.adapter;
-    const at = adapter?.search(/\/adapters\/(ds|app)\//) ?? -1;
-    const specifier = at > 0 ? adapter?.slice(0, at) : undefined;
+    const specifier = specifierOf(Object.values(list.modules)[0]?.adapter);
     return { designSystem: list.designSystem[0], app: list.app[0], specifier };
   } catch (error) {
+    // Another formatVersion fails to parse, and rewriting it is this run's job
+    // (PER-100 §6): its roots are still the ones the designer gave.
+    const roots = rootsOf(text);
+    if (roots) return roots;
     notes.push(`Ignoring the existing adapt-list.json: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
+/** `@repo/loupe` from `@repo/loupe/adapters/ds/ui/button`. */
+function specifierOf(adapter: unknown): string | undefined {
+  const at = typeof adapter === "string" ? adapter.search(/\/adapters\/(ds|app)\//) : -1;
+  return at > 0 ? (adapter as string).slice(0, at) : undefined;
+}
+
+/** The roots and specifier of an adapt-list.json in a format this Loupe doesn't read. */
+function rootsOf(text: string): Previous | undefined {
+  try {
+    const raw = JSON.parse(text) as { designSystem?: unknown; app?: unknown; modules?: Record<string, { adapter?: unknown }> };
+    const first = (value: unknown) => (Array.isArray(value) && typeof value[0] === "string" ? value[0] : undefined);
+    const designSystem = first(raw.designSystem);
+    const app = first(raw.app);
+    if (designSystem === undefined || app === undefined) return undefined;
+    return { designSystem, app, specifier: specifierOf(Object.values(raw.modules ?? {})[0]?.adapter) };
+  } catch {
     return undefined;
   }
 }
