@@ -37,10 +37,8 @@ export function withLoupe<C extends Config>(
     const env = { ...base.env, LOUPE_ROOT: root, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() };
 
     // A Product layer in another format names the command that rewrites it (PER-85).
-    // When the loader can still read adapt-list.json the app starts, and the Toolbar
-    // repeats the notice. When it can't, startup fails, as for any broken adapt list:
-    // starting without the rule, or with a loader handing every file back untouched,
-    // left Turbopack's persistent cache hung or mixing up modules on orbix-ai (PER-133).
+    // One the loader can't read fails startup: dropping the rule, or handing every
+    // file back untouched, breaks Turbopack's persistent cache (PER-133).
     const text = readFileSync(adaptList, "utf8");
     const { formatOf, generateCommand } = await import("./layer-status.js");
     const format = formatOf(text);

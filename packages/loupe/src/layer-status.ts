@@ -3,30 +3,27 @@
 // it (PER-100 §5), and a `formatVersion` this Loupe doesn't write (PER-85).
 // Read-only: regeneration stays explicit, so nothing here writes.
 
-import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { ADAPT_LIST_FORMAT_VERSION } from "./adapt-list.js";
 import type { FormatNotice } from "./format-notice.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./generate/header.js";
+import { compare, hashFile } from "./meta/sources.js";
 
 export type StaleModule = {
   /** Repo-relative path of the module `generate` read. */
   source: string;
-  /** Its exported components, which the Toolbar flags by name. */
+  /** Its exported components. The Toolbar flags them by name, so a same-named component elsewhere is flagged too. */
   components: string[];
   /** Repo-relative files whose hash no longer matches, or that are gone. */
   changed: string[];
 };
 
-/** `layer`: from adapt-list.json's header or its field. `newer`: regenerating with this Loupe would downgrade it. */
-export type FormatMismatch = FormatNotice;
-
 export type LayerStatus = {
   /** The command that rewrites the Product layer, run from the repo root. */
   command: string;
   /** Null when the Product layer's format is the one this Loupe reads. */
-  format: FormatMismatch | null;
+  format: FormatNotice | null;
   /** Empty while `format` is set: an older or newer `meta/` can't be trusted. */
   stale: StaleModule[];
 };
@@ -42,11 +39,14 @@ export type LayerPaths = {
 
 const toPosix = (file: string) => file.split(path.sep).join("/");
 
+/** `generate`'s default `--out`, as `init`'s PRODUCT_LAYER.path; not imported, since that module loads TypeScript. */
+const DEFAULT_LAYER = "packages/loupe";
+
 /** `pnpm -C apps/app exec loupe generate`, with `--out` only when the layer isn't the default `packages/loupe`. */
 export function generateCommand({ root, adaptList, app }: LayerPaths): string {
   const layer = path.dirname(adaptList);
   const appRel = toPosix(path.relative(root, app));
-  const out = path.resolve(root, "packages/loupe") === layer ? "" : ` --out ${toPosix(path.relative(app, layer)) || "."}`;
+  const out = path.resolve(root, DEFAULT_LAYER) === layer ? "" : ` --out ${toPosix(path.relative(app, layer)) || "."}`;
   return `${appRel === "" ? "pnpm" : `pnpm -C ${appRel}`} exec loupe generate${out}`;
 }
 
@@ -63,28 +63,29 @@ export function readLayerStatus(paths: LayerPaths): LayerStatus {
       .map(([relative]) => relative);
     if (changed.length > 0) stale.push({ source: meta.source, components: meta.components, changed });
   }
-  stale.sort((a, b) => (a.source < b.source ? -1 : a.source > b.source ? 1 : 0));
+  stale.sort((a, b) => compare(a.source, b.source));
   return { command, format: null, stale };
 }
 
 /**
- * The header carries `generate`'s format and the `formatVersion` field the loader's.
- * A hand-edited or headerless file is drift, which `loupe doctor` reports, not a format.
+ * The header carries `generate`'s format and the `formatVersion` field the loader's;
+ * each is compared with its own runtime version. A hand-edited or headerless file
+ * is drift, which `loupe doctor` reports.
  */
-export function formatOf(text: string): FormatMismatch | null {
+export function formatOf(text: string): FormatNotice | null {
   const header = readHeader(text);
+  if (header.kind === "intact" && header.formatVersion !== GENERATE_FORMAT_VERSION) {
+    const runtime = GENERATE_FORMAT_VERSION;
+    return { layer: header.formatVersion, runtime, newer: header.formatVersion > runtime };
+  }
   let field: unknown;
   try {
     field = (JSON.parse(text) as { formatVersion?: unknown }).formatVersion;
   } catch {
-    field = undefined;
+    return null;
   }
-  const headerVersion = header.kind === "intact" ? header.formatVersion : GENERATE_FORMAT_VERSION;
-  const fieldVersion = typeof field === "number" ? field : ADAPT_LIST_FORMAT_VERSION;
-  if (headerVersion === GENERATE_FORMAT_VERSION && fieldVersion === ADAPT_LIST_FORMAT_VERSION) return null;
-  const off = headerVersion !== GENERATE_FORMAT_VERSION ? headerVersion : fieldVersion;
-  const newer = headerVersion > GENERATE_FORMAT_VERSION || fieldVersion > ADAPT_LIST_FORMAT_VERSION;
-  return { layer: off, runtime: GENERATE_FORMAT_VERSION, newer };
+  if (typeof field !== "number" || field === ADAPT_LIST_FORMAT_VERSION) return null;
+  return { layer: field, runtime: ADAPT_LIST_FORMAT_VERSION, newer: field > ADAPT_LIST_FORMAT_VERSION };
 }
 
 function metaFiles(dir: string): string[] {
@@ -109,6 +110,7 @@ function metaFiles(dir: string): string[] {
 type Meta = { source: string; files: Record<string, string>; components: string[] };
 
 // Keyed by path and stat, so a check after the first reads and hashes only what changed.
+// Never evicted: they live as long as one dev server.
 const metaCache = new Map<string, { stamp: string; meta: Meta | null }>();
 const hashCache = new Map<string, { stamp: string; hash: string }>();
 
@@ -146,13 +148,13 @@ function readMeta(file: string): Meta | null {
   return meta;
 }
 
-/** `sha256:<hex>` as `generate` writes it, or null for a file that is gone. */
+/** What `generate` stored for the file, or null for a file that is gone. */
 function hashOf(file: string): string | null {
   const stamp = stampOf(file);
   if (stamp === null) return null;
   const cached = hashCache.get(file);
   if (cached?.stamp === stamp) return cached.hash;
-  const hash = `sha256:${createHash("sha256").update(readFileSync(file)).digest("hex")}`;
+  const hash = hashFile(file);
   hashCache.set(file, { stamp, hash });
   return hash;
 }

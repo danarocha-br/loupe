@@ -2,7 +2,7 @@
 // the last `loupe generate`, and a Product layer in another format. Regeneration
 // stays explicit (PER-100 §5), so each notice names the command and runs nothing.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { LayerStatus } from "../layer-status.js";
 import { formatNotice } from "../format-notice.js";
 import { readProductLayerStatus } from "./layer-server.js";
@@ -10,7 +10,7 @@ import { readProductLayerStatus } from "./layer-server.js";
 /** At most one check this often while the page keeps changing; each one stats the sources. */
 const MIN_INTERVAL_MS = 2000;
 
-/** Logged once per message, so a re-check doesn't repeat it. */
+/** Logged once per message, so a re-check doesn't repeat it. Lives as long as the page. */
 const logged = new Set<string>();
 
 /**
@@ -21,8 +21,8 @@ export function useLayerStatus(version: number): LayerStatus | null {
   const [status, setStatus] = useState<LayerStatus | null>(null);
   const last = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const check = useRef<() => void>(() => {});
-  check.current = () => {
+  // Reads only refs and the state setter, so one closure serves every render.
+  const check = useCallback(() => {
     if (timer.current !== null) return;
     const wait = Math.max(0, last.current + MIN_INTERVAL_MS - Date.now());
     timer.current = setTimeout(() => {
@@ -30,13 +30,14 @@ export function useLayerStatus(version: number): LayerStatus | null {
       last.current = Date.now();
       readProductLayerStatus().then(
         (next) => setStatus((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next)),
-        () => {},
+        // A restarting dev server refuses the call; the next check tries again.
+        (error: unknown) => logOnce(`[loupe] Couldn't read the Product layer's status: ${String(error)}`, console.warn),
       );
     }, wait);
-  };
+  }, []);
   useEffect(() => {
-    const onFocus = () => check.current();
-    const onVisible = () => document.visibilityState === "visible" && check.current();
+    const onFocus = () => check();
+    const onVisible = () => document.visibilityState === "visible" && check();
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -45,17 +46,20 @@ export function useLayerStatus(version: number): LayerStatus | null {
       if (timer.current !== null) clearTimeout(timer.current);
       timer.current = null;
     };
-  }, []);
+  }, [check]);
   // A new page version is the trigger; the check reads nothing from it.
-  useEffect(() => check.current(), [version]);
+  useEffect(() => check(), [check, version]);
   useEffect(() => {
     if (status?.format == null) return;
-    const message = `${formatNotice(status.format)} ${status.command}`;
-    if (logged.has(message)) return;
-    logged.add(message);
-    console.error(`[loupe] ${message}`);
+    logOnce(`[loupe] ${formatNotice(status.format)} ${status.command}`, console.error);
   }, [status]);
   return status;
+}
+
+function logOnce(message: string, log: (message: string) => void): void {
+  if (logged.has(message)) return;
+  logged.add(message);
+  log(message);
 }
 
 /** Component names whose module's source changed since the last `generate`. */

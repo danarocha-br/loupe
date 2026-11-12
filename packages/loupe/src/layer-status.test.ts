@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { ADAPT_LIST_FORMAT_VERSION } from "./adapt-list.js";
 import { stampJson } from "./generate/header.js";
 import { formatOf, generateCommand, readLayerStatus } from "./layer-status.js";
 import { hashFile } from "./meta/sources.js";
@@ -112,8 +113,9 @@ describe("formatOf", () => {
     expect(formatOf(restamp(stampJson(body(1)), 2))).toEqual({ layer: 2, runtime: 1, newer: true });
   });
 
-  it("reads the loader's own field when the header agrees", () => {
-    expect(formatOf(stampJson(body(2)))).toEqual({ layer: 2, runtime: 1, newer: true });
+  it("reads the loader's own field when the header agrees, against the loader's version", () => {
+    expect(formatOf(stampJson(body(2)))).toEqual({ layer: 2, runtime: ADAPT_LIST_FORMAT_VERSION, newer: true });
+    expect(formatOf(stampJson(body(0)))).toEqual({ layer: 0, runtime: ADAPT_LIST_FORMAT_VERSION, newer: false });
   });
 
   it("leaves a hand-edited file to loupe doctor", () => {
