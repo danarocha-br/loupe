@@ -166,9 +166,11 @@ function anchorsOn(fiber: Fiber): string[] {
 /**
  * The anchor of a client Instance with no Adapter, or null. A component that
  * forwards its props (to a Slot, or an Adapter to its original) hands the anchor
- * down: only the outermost fiber carrying it is the Instance. Known limit: a
- * component that renders itself from one call site repeats that anchor, so only
- * its outermost level from there is listed.
+ * down: only the outermost fiber carrying it is the Instance, however many
+ * components between carry anchors of their own (a design-system Tooltip.Trigger
+ * is a call site too, and the call site's props reach the `render` element past
+ * it). Known limit: a component that renders itself from one call site repeats
+ * that anchor, so only its outermost level from there is listed.
  */
 function unadaptedAnchor(fiber: Fiber): string | null {
   if (!COMPOSITE_TAGS.has(fiber.tag) || adaptedName(fiber.type) !== null) return null;
@@ -177,8 +179,7 @@ function unadaptedAnchor(fiber: Fiber): string | null {
   // A Server Component's output: listed by the server scan.
   if ((fiber._debugInfo ?? []).some((info) => anchorOf(info.props) === anchor)) return null;
   for (let above = fiber.return; above; above = above.return) {
-    const anchors = anchorsOn(above);
-    if (anchors.length > 0) return anchors.includes(anchor) ? null : anchor;
+    if (anchorsOn(above).includes(anchor)) return null;
   }
   return anchor;
 }
