@@ -101,7 +101,8 @@ export function snapshot(debug: LoupeDebug, seen: SeenComponents): PageSnapshot 
       const instances = byComponent.get(component) ?? [];
       const heldHere = held.get(component) ?? [];
       const client = instances.filter((row) => row.rendered === "client");
-      const supported = client.some((row) => safeInspect(debug, row.id)?.coverage.editable);
+      // Only an adapted Instance takes Overrides; inspecting the others would walk the fibers once each.
+      const supported = client.some((row) => row.adapted && safeInspect(debug, row.id)?.coverage.editable);
       return {
         component,
         instances,

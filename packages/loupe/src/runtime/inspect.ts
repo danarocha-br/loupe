@@ -85,7 +85,7 @@ export type InspectInput = {
 export const SERVER_NOTE = "Rendered on the server: it can't be previewed in the MVP.";
 export const SPREADS_NOTE = "This call site spreads props, so library props can't be separated from the app's here.";
 export const UNADAPTED_NOTE =
-  "This component has no Adapter, so it is inspect-only: `loupe generate` writes one only for a component with a prop that can be Editable.";
+  "No Adapter renders this Instance, so it is inspect-only: `loupe generate` writes Adapters only for components with a prop that can be Editable, and imports inside the design system are never swapped for one.";
 export const NO_META_NOTE =
   "No prop metadata for this component: run `loupe generate` to see which props are editable.";
 

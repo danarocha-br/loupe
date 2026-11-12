@@ -79,7 +79,8 @@ export function scopeView(
   const record = recordOf(records, target);
   const out = new Set(record?.excluded ?? []);
   const inScope = rows.filter((other) => reaches(target, identityOf(other)));
-  const client = inScope.filter((other) => other.rendered === "client");
+  // An Override reaches only an adapted Instance; one with no Adapter (inside the design system, say) never joins.
+  const client = inScope.filter((other) => other.rendered === "client" && other.adapted);
   const server = scope === "page" ? inScope.filter((other) => other.rendered === "server") : [];
   const mounted = new Set(client.map((other) => other.id));
   const size = scope === "instance" ? "" : ` · ${client.length + server.length}`;

@@ -5,9 +5,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LayerStatus } from "../layer-status.js";
-import type { ComponentGroup } from "./page.js";
 import { formatNotice } from "../format-notice.js";
 import { readProductLayerStatus } from "./layer-server.js";
+import type { ComponentGroup } from "./page.js";
 
 /** At most one check this often while the page keeps changing; each one stats the sources. */
 const MIN_INTERVAL_MS = 2000;

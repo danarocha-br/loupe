@@ -3,7 +3,9 @@
 // fiber walk and listed inspect-only, once each, never twice for one call site.
 import { act, createElement as h, memo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { snapshot } from "../toolbar/page.js";
+import { scopeView } from "../toolbar/scopes.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug, UNADAPTED_REASON } from "./debug.js";
 import { UNADAPTED_NOTE } from "./inspect.js";
@@ -137,6 +139,55 @@ describe("anchored client Instances without an Adapter", () => {
     (child as { return?: unknown }).return = host;
     doc.__reactContainer$test = host;
     expect(loupe.list().map((row) => [row.component, row.rendered])).toEqual([["Badge", "server"]]);
+  });
+
+  it("picks the nearest Instance, also a server-rendered one inside an unadapted client one", () => {
+    const shell = "app/page.tsx › Page › Shell[1]";
+    const panel = "app/shell.tsx › Shell › Panel[1]";
+    const fiber = (extra: object) => ({ tag: 5, key: null, type: "div", memoizedProps: {}, return: null, child: null, sibling: null, alternate: null, stateNode: null, ...extra }) as Record<string, unknown>;
+    const span = document.createElement("span");
+    const div = document.createElement("div");
+    div.append(span);
+    container.append(div);
+    const spanFiber = fiber({ type: "span", stateNode: span });
+    // React records a Server Component's output on the first fiber it produced.
+    const panelFiber = fiber({ stateNode: div, child: spanFiber, _debugInfo: [{ name: "Panel", env: "Server", props: { "data-ds-anchor": panel } }] });
+    const shellFiber = fiber({ tag: 0, type: function Shell() {}, memoizedProps: { "data-ds-anchor": shell }, child: panelFiber });
+    const host = fiber({ tag: 3, child: shellFiber });
+    host.stateNode = { current: host };
+    spanFiber.return = panelFiber;
+    panelFiber.return = shellFiber;
+    shellFiber.return = host;
+    (span as unknown as Record<string, unknown>).__reactFiber$test = spanFiber;
+    (div as unknown as Record<string, unknown>).__reactFiber$test = panelFiber;
+    doc.__reactContainer$test = host;
+    expect(loupe.list().map((row) => [row.component, row.rendered])).toEqual([
+      ["Shell", "client"],
+      ["Panel", "server"],
+    ]);
+    expect(loupe.pick(span)).toBe(panel);
+  });
+
+  it("stays out of group and page scopes, which only Adapters can apply", () => {
+    // A Button drawn inside the design system: anchored, never swapped for its Adapter.
+    const inside = { "data-ds-anchor": "ds/ui/sidebar.tsx › SidebarTrigger › Button[1]" };
+    render([h(Button, { key: "b", ...loader("Button") }, "Save"), h(DsButton, { key: "d", ...inside }, "Menu")]);
+    const rows = loupe.list();
+    expect(rows.map((row) => [row.component, row.adapted])).toEqual([
+      ["Button", true],
+      ["Button", false],
+    ]);
+    const view = scopeView(loupe, rows, [], rows[0] as (typeof rows)[number], "page");
+    expect(view?.members.map((member) => member.id)).toEqual([`${at("Button")}#b`]);
+    expect(view?.label).toMatch(/· 1$/);
+  });
+
+  it("decides Coverage badges without inspecting Instances that have no Adapter", () => {
+    render([h(Button, { key: "b", ...loader("Button") }, "Save"), h(NewCard, { key: "c", ...loader("NewCard") })]);
+    const inspect = vi.spyOn(loupe, "inspect");
+    const page = snapshot(loupe, { route: "", components: new Set() });
+    expect(page.groups.find((group) => group.component === "NewCard")).toMatchObject({ supported: false, reason: "No Adapter" });
+    expect(inspect.mock.calls.map(([id]) => id)).not.toContain(at("NewCard"));
   });
 
   it("lists nothing for unanchored components or plain elements", () => {

@@ -143,8 +143,7 @@ const SERVER_REASON =
   "Rendered by a Server Component: Overrides apply only to Instances rendered in the browser.";
 
 /** Why an anchored client Instance found by the fiber walk can't be overridden (PER-100 §1). */
-export const UNADAPTED_REASON =
-  "No Adapter: `loupe generate` writes one only for a component with a prop that can be Editable.";
+export const UNADAPTED_REASON = "No Adapter renders this Instance, so Overrides can't reach it.";
 
 const anchorOf = (props: unknown): string | null => {
   const anchor = typeof props === "object" && props !== null ? (props as Props)[ANCHOR_PROP] : undefined;
@@ -166,7 +165,9 @@ function anchorsOn(fiber: Fiber): string[] {
 /**
  * The anchor of a client Instance with no Adapter, or null. A component that
  * forwards its props (to a Slot, or an Adapter to its original) hands the anchor
- * down: only the outermost fiber carrying it is the Instance.
+ * down: only the outermost fiber carrying it is the Instance. Known limit: a
+ * component that renders itself from one call site repeats that anchor, so only
+ * its outermost level from there is listed.
  */
 function unadaptedAnchor(fiber: Fiber): string | null {
   if (!COMPOSITE_TAGS.has(fiber.tag) || adaptedName(fiber.type) !== null) return null;
@@ -483,22 +484,22 @@ export function createDebug(): LoupeDebug {
 
     pick(element) {
       const scanned = scanFibers();
-      const unadapted = new Map<Fiber, string>();
-      for (const found of scanned) {
-        if (found.rendered !== "client") continue;
-        unadapted.set(found.fiber, found.entry.id);
-        if (found.fiber.alternate) unadapted.set(found.fiber.alternate, found.entry.id);
+      // A fiber several server components rendered carries each: the innermost, listed last, wins.
+      const found = new Map<Fiber, string>();
+      for (const entry of scanned) {
+        found.set(entry.fiber, entry.entry.id);
+        if (entry.fiber.alternate) found.set(entry.fiber.alternate, entry.entry.id);
       }
-      // The nearest Instance up the tree, adapted or not.
+      // The nearest Instance up the tree: adapted, client with no Adapter, or server-rendered.
       for (let fiber: Fiber | null = fiberOfNode(element); fiber; fiber = fiber.return) {
-        const id = unadapted.get(fiber);
+        const id = found.get(fiber);
         if (id !== undefined) return id;
         if (adaptedName(fiber.type) === null) continue;
         for (const instance of reg.instances.values()) {
           if (instance.fiber === fiber || instance.fiber === fiber.alternate) return instance.id;
         }
       }
-      // The nearest server-rendered Instance whose anchor is in the DOM.
+      // A server-rendered Instance whose fiber isn't on the path: the nearest anchor in the DOM.
       const anchored = element.closest(`[${ANCHOR_PROP}]`);
       const anchor = anchored?.getAttribute(ANCHOR_PROP);
       if (!anchored || !anchor) return null;
