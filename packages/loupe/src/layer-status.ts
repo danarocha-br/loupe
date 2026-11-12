@@ -123,8 +123,8 @@ function notGenerated(paths: LayerPaths, adaptListText: string, bySource: Readon
   return [...found].sort(compare);
 }
 
-/** A component's name starts upper-case; `buttonVariants` or `useSidebar` never names an Instance. */
-const COMPONENT_CASE = /^[A-Z]/;
+/** PascalCase: `buttonVariants`, `useSidebar` or `MAX_ORGS` never names an Instance. */
+const COMPONENT_CASE = /^[A-Z][A-Za-z0-9]*[a-z][A-Za-z0-9]*$/;
 
 // Keyed by path and stat, like the caches below.
 const exportCache = new Map<string, { stamp: string; names: string[] }>();

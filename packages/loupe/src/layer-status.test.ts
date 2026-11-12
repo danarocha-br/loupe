@@ -65,7 +65,7 @@ describe("readLayerStatus", () => {
 
   it("names what the next generate would add, and only from files it reads", () => {
     const { root, write, paths } = repo();
-    write("ds/components/ui/card.tsx", `"use client";\nexport function Card() { return null; }\nexport const CardTitle = () => null;\nfunction Local() { return null; }\nexport { Local as CardBody };\nexport type CardProps = { a: 1 };\nexport default function Ignored() { return null; }\nexport type { Local as CardType };\n`);
+    write("ds/components/ui/card.tsx", `"use client";\nexport function Card() { return null; }\nexport const CardTitle = () => null;\nexport const CARD_MAX = 3;\nexport const cardVariants = {};\nfunction Local() { return null; }\nexport { Local as CardBody };\nexport type CardProps = { a: 1 };\nexport default function Ignored() { return null; }\nexport type { Local as CardType };\n`);
     write("ds/components/ui/index.ts", `export { Button } from "./button";\n`);
     write("ds/components/ui/card.test.tsx", `export function CardTest() { return null; }\n`);
     write("ds/providers/theme.tsx", `export function ThemeProvider() { return null; }\n`);
