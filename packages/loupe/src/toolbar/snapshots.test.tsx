@@ -10,7 +10,7 @@ import { registry } from "../runtime/registry.js";
 
 // What the page looked like each time it was rasterized: the rasterizer is the
 // browser's job, so the test records what it would have drawn.
-type Seen = { variants: string[]; dialog: string | null; covered: boolean };
+type Seen = { variants: string[]; dialog: string | null; covered: boolean; transitions: boolean };
 const rasterized: Seen[] = [];
 
 vi.mock("./project-server.js", () => ({
@@ -23,7 +23,8 @@ vi.mock("modern-screenshot", () => ({
     rasterized.push({
       variants: [...document.querySelectorAll("button")].map((node) => node.dataset.variant ?? ""),
       dialog: document.querySelector("[data-open]")?.getAttribute("data-open") ?? null,
-      covered: document.querySelector("[data-loupe-capture]") !== null,
+      covered: document.querySelector("div[data-loupe-capture]") !== null,
+      transitions: ![...document.querySelectorAll("style")].some((style) => style.textContent?.includes("transition: none")),
     });
     const canvas = document.createElement("canvas");
     canvas.width = window.innerWidth;
@@ -144,13 +145,14 @@ describe("Capture screen", () => {
     const snapshot = await capture();
 
     expect(rasterized).toEqual([
-      { variants: ["outline", "outline", "outline", "outline"], dialog: "true", covered: false },
-      { variants: ["ghost", "ghost", "ghost", "ghost"], dialog: "true", covered: true },
+      { variants: ["outline", "outline", "outline", "outline"], dialog: "true", covered: false, transitions: false },
+      { variants: ["ghost", "ghost", "ghost", "ghost"], dialog: "true", covered: true, transitions: false },
     ]);
     // Back as it was, and nothing left on the page.
     expect(registry().view).toBe("proposed");
     expect([...container.querySelectorAll("button")].map((node) => node.dataset.variant)).toEqual(Array(4).fill("outline"));
     expect(document.querySelector("[data-loupe-capture]")).toBeNull();
+    expect(document.querySelector("style")).toBeNull();
 
     expect(snapshot.viewport).toEqual({
       before: "data:image/webp;base64,2",

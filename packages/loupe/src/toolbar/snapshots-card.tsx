@@ -55,7 +55,7 @@ export function SnapshotsCard() {
   return (
     <div className="card">
       <h3>Snapshots</h3>
-      <ul className="list" aria-label="Snapshots">
+      <ul aria-label="Snapshots" style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {list.map((snapshot) => {
           const outdated = isOutdated(snapshot);
           return (

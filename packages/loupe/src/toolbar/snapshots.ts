@@ -142,21 +142,28 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
       return { identity, overrides: overridesShown(identity) };
     });
 
-  const after = await rasterize(width, height, dpr);
-  const unfreeze = freeze(after.canvas, width, height);
+  // A CSS transition would otherwise be caught halfway through the switch.
+  const resume = stopTransitions();
+  let after: Raster;
   let before: Raster;
   try {
-    flushSync(() => setView("before"));
-    await settle();
-    // A change can move its Instance: crop the union of where it is in both views.
-    for (const change of changes) {
-      for (const entry of change.covered) entry.before = boxOf(debug, entry.id);
+    after = await rasterize(width, height, dpr);
+    const unfreeze = freeze(after.canvas, width, height);
+    try {
+      flushSync(() => setView("before"));
+      await settle();
+      // A change can move its Instance: crop the union of where it is in both views.
+      for (const change of changes) {
+        for (const entry of change.covered) entry.before = boxOf(debug, entry.id);
+      }
+      before = await rasterize(width, height, dpr);
+    } finally {
+      flushSync(() => setView("proposed"));
+      await settle();
+      unfreeze();
     }
-    before = await rasterize(width, height, dpr);
   } finally {
-    flushSync(() => setView("proposed"));
-    await settle();
-    unfreeze();
+    resume();
   }
 
   const viewport: ImagePair = {
@@ -361,6 +368,19 @@ function freeze(still: HTMLCanvasElement, width: number, height: number): () => 
     cover.remove();
     still.removeAttribute("style");
   };
+}
+
+/**
+ * Makes every change of style instant while capturing: a `transition-all` button
+ * switched to "before" would still be fading when it is rasterized. Ending a
+ * running transition early is the only effect on the page.
+ */
+function stopTransitions(): () => void {
+  const style = document.createElement("style");
+  style.setAttribute(CAPTURE_ATTRIBUTE, "");
+  style.textContent = "*, *::before, *::after { transition: none !important; }";
+  document.head.append(style);
+  return () => style.remove();
 }
 
 /** After React's commit, the browser's layout and any frame-driven positioning (menus, popovers). */
