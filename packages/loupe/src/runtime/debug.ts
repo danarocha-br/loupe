@@ -43,6 +43,7 @@ import {
   withoutLoaderProps,
 } from "./registry.js";
 import { type Inspection, inspect } from "./inspect.js";
+import { loadedMeta } from "./instance-meta.js";
 import { textScopeRefusal } from "./label-text.js";
 import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
 import { writesOf } from "./authored.js";
@@ -360,7 +361,7 @@ export function createDebug(): LoupeDebug {
         injected,
         authorship,
         writes: writesOf(server.raw),
-        meta: null,
+        meta: loadedMeta(server.entry.anchor),
         stateProps: [],
         overridesOn: status.overrides,
         ...(status.overrides ? {} : { overridesOffReason: status.reason }),
@@ -376,7 +377,7 @@ export function createDebug(): LoupeDebug {
       injected: {},
       authorship: "server",
       writes: writesOf(server.raw),
-      meta: null,
+      meta: loadedMeta(server.entry.anchor),
       stateProps: [],
       overridesOn: status.overrides,
     });

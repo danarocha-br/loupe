@@ -81,6 +81,11 @@ export type Registry = {
    * Overrides, for a Snapshot's "before" image (PER-138). The store is untouched.
    */
   view: View;
+  /**
+   * Prop metadata from `meta/` for Instances with no Adapter, by call-site file and
+   * imported name (PER-180). Filled by the Toolbar; empty until it loads any.
+   */
+  instanceMeta: Map<string, Readonly<Record<string, PropMeta>>>;
 };
 
 export type View = "proposed" | "before";
@@ -94,6 +99,7 @@ export function registry(): Registry {
   if (value && !value.listeners) value.listeners = new Set();
   if (value && !value.departed) value.departed = new Map();
   if (value && !value.view) value.view = "proposed";
+  if (value && !value.instanceMeta) value.instanceMeta = new Map();
   if (!value) {
     const problem = internalsProblem();
     value = {
@@ -103,6 +109,7 @@ export function registry(): Registry {
       status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
       listeners: new Set(),
       view: "proposed",
+      instanceMeta: new Map(),
     };
     const created = value;
     created.store.subscribe((target) => {

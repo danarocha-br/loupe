@@ -9,6 +9,8 @@ import { scopeView } from "../toolbar/scopes.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug, UNADAPTED_REASON } from "./debug.js";
 import { UNADAPTED_NOTE } from "./inspect.js";
+import { loadedMeta, metaRequestOf, rememberMeta } from "./instance-meta.js";
+import { onRegistryChange } from "./registry.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -112,6 +114,55 @@ describe("anchored client Instances without an Adapter", () => {
       coverage: { editable: 0, inspectOnly: 1 },
     });
     expect(inspection.rows).toMatchObject([{ name: "title", value: "Hi", editable: false }]);
+  });
+
+  it("shows the props meta/ declares once the Toolbar has loaded them, and stays inspect-only (PER-180)", () => {
+    render(h(NewCard, { title: "Hi", ...loader("NewCard") }));
+    expect(loupe.inspect(at("NewCard")).rows).toMatchObject([{ name: "title", reason: "UNVERIFIED" }]);
+    const request = metaRequestOf(at("NewCard"));
+    expect(request).toEqual({ path: "app/page.tsx", component: "NewCard" });
+    const changed = vi.fn();
+    const stop = onRegistryChange(changed);
+    rememberMeta([request as NonNullable<typeof request>], [
+      {
+        title: { editable: false, from: "repo", reason: "OPEN TEXT" },
+        tone: { editable: true, from: "repo", kind: "options", status: "verified", options: ["a", "b"], default: { source: "destructure", value: "a" } },
+      },
+    ]);
+    // The same answer again redraws nothing.
+    rememberMeta([request as NonNullable<typeof request>], [loadedMeta(at("NewCard"))]);
+    stop();
+    expect(changed).toHaveBeenCalledTimes(1);
+    const inspection = loupe.inspect(at("NewCard"));
+    expect(inspection.rows.map((row) => [row.name, row.editable, row.reason ?? null])).toEqual([
+      ["title", false, "OPEN TEXT"],
+      ["tone", false, "NO ADAPTER"],
+    ]);
+    expect(inspection.rows[1]?.default).toEqual({ source: "destructure", value: "a" });
+    expect(inspection).toMatchObject({ note: UNADAPTED_NOTE, coverage: { editable: 0, inspectOnly: 2 } });
+    expect(loupe.list()).toMatchObject([{ component: "NewCard", adapted: false, editable: false, reason: UNADAPTED_REASON }]);
+    expect(() => loupe.set(at("NewCard"), "tone", "b")).toThrow(/no Adapter/);
+  });
+
+  it("gives a server-rendered Instance the props meta/ declares too (PER-180)", () => {
+    const anchor = at("Badge");
+    const props = { variant: "muted", "data-ds-anchor": anchor };
+    const child = { tag: 5, key: null, type: "span", memoizedProps: {}, child: null, sibling: null, alternate: null, stateNode: null, _debugInfo: [{ name: "Badge", env: "Server", props }] };
+    const host = { tag: 3, key: null, type: null, memoizedProps: {}, return: null, child, sibling: null, alternate: null, stateNode: null as unknown };
+    host.stateNode = { current: host };
+    (child as { return?: unknown }).return = host;
+    doc.__reactContainer$test = host;
+    rememberMeta([{ path: "app/page.tsx", component: "Badge" }], [
+      { variant: { editable: true, from: "repo", kind: "options", status: "verified", options: ["default", "muted"] } },
+    ]);
+    const inspection = loupe.inspect(anchor);
+    expect(inspection.rendered).toBe("server");
+    expect(inspection.rows).toMatchObject([{ name: "variant", value: "muted", editable: false, reason: "ON THE SERVER" }]);
+  });
+
+  it("names no request for an id that isn't a call site", () => {
+    expect(metaRequestOf("not an anchor")).toBeNull();
+    expect(loadedMeta("not an anchor")).toBeNull();
   });
 
   it("can be picked and highlighted, and refuses Overrides with the reason", () => {

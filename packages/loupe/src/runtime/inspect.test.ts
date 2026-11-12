@@ -104,6 +104,46 @@ describe("inspect", () => {
     expect(result.rows.map((row) => row.reason)).toEqual([undefined, undefined]);
   });
 
+  it("gives an Instance with no Adapter its metadata's reasons and defaults, and nothing Editable (PER-180)", () => {
+    const result = inspect(base({ adapted: false, sources: undefined }));
+    expect(result.rows.map((row) => [row.name, row.editable, row.reason ?? null])).toEqual([
+      ["children", false, "NO ADAPTER"],
+      ["className", false, "OPEN TEXT"],
+      ["render", false, "STRUCTURAL"],
+      ["size", false, "NO ADAPTER"],
+      ["variant", false, "NO ADAPTER"],
+      ["onClick", false, "FUNCTION"],
+    ]);
+    expect(result.coverage).toEqual({ editable: 0, inspectOnly: 6 });
+    expect(result.rows.find((row) => row.name === "size")).toMatchObject({ set: false, default: { source: "destructure", value: "default" } });
+    // Label text keeps its label, and a call site's own text reason still wins over "no Adapter".
+    expect(result.rows.find((row) => row.name === "children")).toMatchObject({ label: "Text", text: true });
+    const fromCode = inspect(base({ adapted: false, writes: writes(["variant"], "from-code") }));
+    expect(fromCode.rows.find((row) => row.name === "children")?.reason).toBe("FROM CODE");
+  });
+
+  it("says no Adapter before Overrides off, which only an Adapter could lift", () => {
+    const result = inspect(base({ adapted: false, overridesOn: false }));
+    expect(result.rows.find((row) => row.name === "variant")?.reason).toBe("NO ADAPTER");
+  });
+
+  it("gives a server-rendered Instance with metadata its reasons and defaults, still nothing Editable (PER-180)", () => {
+    const result = inspect(
+      base({ rendered: "server", authorship: "server", injected: {}, current: { variant: "ghost", onClick: () => {} } }),
+    );
+    expect(result.note).toBe(SERVER_NOTE);
+    expect(result.coverage.editable).toBe(0);
+    expect(result.rows.map((row) => [row.name, row.reason ?? null])).toEqual([
+      ["children", "ON THE SERVER"],
+      ["className", "OPEN TEXT"],
+      ["render", "STRUCTURAL"],
+      ["size", "ON THE SERVER"],
+      ["variant", "ON THE SERVER"],
+      ["onClick", "FUNCTION"],
+    ]);
+    expect(result.rows.find((row) => row.name === "size")?.default).toEqual({ source: "destructure", value: "default" });
+  });
+
   it("flags a spreading call site and an Adapter with no metadata", () => {
     expect(inspect(base({ authorship: "spreads", writes: { attributes: [], spreads: true, children: "text" } })).note).toBe(
       SPREADS_NOTE,

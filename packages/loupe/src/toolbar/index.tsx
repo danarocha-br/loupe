@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Scope } from "../runtime/store.js";
 import { Highlight } from "./highlight.js";
+import { useInstanceMeta } from "./instance-meta.js";
 import { Panel } from "./panel.js";
 import { usePicker } from "./picker.js";
 import { type SeenComponents, safeInspect, snapshot, useDebug, usePageVersion } from "./page.js";
@@ -88,6 +89,7 @@ function ToolbarOpen({
   const version = usePageVersion(host);
   const seen = useRef<SeenComponents>({ route: "", components: new Set() }).current;
   const page = useMemo(() => snapshot(debug, seen), [debug, seen, version]);
+  useInstanceMeta(page, selected);
   const [hovered, setHovered] = useState<string[]>([]);
   const picker = usePicker(debug, host, (id) => {
     onSelect(id);

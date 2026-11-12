@@ -156,7 +156,11 @@ run. Nothing regenerates on its own. **Pick** selects by clicking
 the page (Esc cancels); only while Pick is on does the Toolbar stop the page's
 pointer events. The inspector shows the Instance, its call site, Coverage as
 "N editable props · M inspect only", each prop's Current value with a reason per
-inspect-only prop, and what a library injected in one collapsed line.
+inspect-only prop, and what a library injected in one collapsed line. For an
+Instance with no Adapter, or a server-rendered one, the inspector reads its
+component's `meta/` file from the dev server the first time it shows it, so its
+rows carry their real reasons and defaults. They stay inspect-only: a prop that
+would be Editable reads `NO ADAPTER` or `ON THE SERVER`.
 
 The same is on the console:
 

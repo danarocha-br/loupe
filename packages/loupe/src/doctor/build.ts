@@ -15,7 +15,8 @@ import { compare } from "../meta/sources.js";
  * stays out behind its dev-only dynamic import (PER-130); `data-loupe-toolbar`
  * is the attribute only Toolbar code writes, so it finds the Toolbar if it leaks.
  * `loupe-flag-preview` is the flag preview's Server Actions' marker (PER-132), and
- * `loupe-proposal-context` the Proposal's (PER-135).
+ * `loupe-proposal-context` the Proposal's (PER-135), and `loupe-instance-meta` the one
+ * that reads `meta/` for Instances with no Adapter (PER-180).
  */
 export const BUILD_NEEDLES = [
   "data-ds-anchor",
@@ -27,6 +28,7 @@ export const BUILD_NEEDLES = [
   "loupe-flag-preview",
   "loupe-proposal-context",
   "loupe-layer-status",
+  "loupe-instance-meta",
 ] as const;
 
 /**
