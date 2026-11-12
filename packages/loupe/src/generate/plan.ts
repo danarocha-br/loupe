@@ -64,6 +64,19 @@ export function coverageOf(module: ModuleMeta, entry: ComponentExport, side: Sid
   return { outcome: "adapter" };
 }
 
+/**
+ * Where a source module sits in the Product layer, `ds/<path under components/>` or
+ * `app/<path under the app>`, as `meta/` and `adapters/` mirror it (PER-100 §4).
+ * Undefined for a module `generate` doesn't read. Paths are repo-relative POSIX.
+ */
+export function layerPathOf(source: string, designSystemRoot: string, appRoot: string): string | undefined {
+  const ds = `${designSystemRoot}/components/`;
+  if (source.startsWith(ds)) return `ds/${source.slice(ds.length)}`;
+  const app = `${appRoot}/`;
+  if (source.startsWith(app)) return `app/${source.slice(app.length)}`;
+  return undefined;
+}
+
 export class MissingSpecifierError extends Error {
   override name = "MissingSpecifierError";
 }
@@ -77,17 +90,10 @@ export function plan(input: PlanInput): Plan {
     app: [input.app.root],
     modules: {},
   };
-  const dsComponents = `${input.designSystem.root}/components/`;
-  const appRoot = `${input.app.root}/`;
-
   for (const module of [...input.modules].sort((a, b) => compare(a.source, b.source))) {
-    const side: Side | undefined = module.source.startsWith(dsComponents)
-      ? "ds"
-      : module.source.startsWith(appRoot)
-        ? "app"
-        : undefined;
-    if (!side) throw new Error(`${module.source} is under neither the design system's components/ nor the app`);
-    const mirrored = `${side}/${module.source.slice(side === "ds" ? dsComponents.length : appRoot.length)}`;
+    const mirrored = layerPathOf(module.source, input.designSystem.root, input.app.root);
+    if (!mirrored) throw new Error(`${module.source} is under neither the design system's components/ nor the app`);
+    const side = mirrored.slice(0, mirrored.indexOf("/")) as Side;
 
     files.set(`meta/${mirrored}.json`, stampJson(stableJson(module)));
 

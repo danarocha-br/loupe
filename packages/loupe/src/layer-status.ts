@@ -4,13 +4,13 @@
 // PER-179), and a `formatVersion` this Loupe doesn't write (PER-85).
 // Read-only: regeneration stays explicit, so nothing here writes.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parse } from "@babel/parser";
 import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "./adapt-list.js";
 import type { FormatNotice } from "./format-notice.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./generate/header.js";
-import { compare, DESIGN_SYSTEM_INCLUDE, hashFile, sourceFiles } from "./meta/sources.js";
+import { compare, DESIGN_SYSTEM_INCLUDE, hashFile, sourceFiles, statStamp } from "./meta/sources.js";
 
 export type StaleModule = {
   /** Repo-relative path of the module `generate` read. */
@@ -136,7 +136,7 @@ const exportCache = new Map<string, { stamp: string; names: string[] }>();
  * export is named by its import, never "default". A file that doesn't parse has none.
  */
 export function exportedNames(file: string): string[] {
-  const stamp = stampOf(file);
+  const stamp = statStamp(file);
   if (stamp === null) return [];
   const cached = exportCache.get(file);
   if (cached?.stamp === stamp) return cached.names;
@@ -196,13 +196,9 @@ type Meta = { source: string; files: Record<string, string>; components: string[
 const metaCache = new Map<string, { stamp: string; meta: Meta | null }>();
 const hashCache = new Map<string, { stamp: string; hash: string }>();
 
-const stampOf = (file: string): string | null => {
-  const stats = statSync(file, { throwIfNoEntry: false });
-  return stats?.isFile() ? `${stats.mtimeMs}:${stats.size}` : null;
-};
 
 function readMeta(file: string): Meta | null {
-  const stamp = stampOf(file);
+  const stamp = statStamp(file);
   if (stamp === null) return null;
   const cached = metaCache.get(file);
   if (cached?.stamp === stamp) return cached.meta;
@@ -233,7 +229,7 @@ function readMeta(file: string): Meta | null {
 
 /** What `generate` stored for the file, or null for a file that is gone. */
 function hashOf(file: string): string | null {
-  const stamp = stampOf(file);
+  const stamp = statStamp(file);
   if (stamp === null) return null;
   const cached = hashCache.get(file);
   if (cached?.stamp === stamp) return cached.hash;

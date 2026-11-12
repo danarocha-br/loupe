@@ -10,9 +10,11 @@ import type { Props, Source } from "./store.js";
 
 /**
  * Why a row has no control. The metadata's reasons, plus the call site's own for
- * label text (`FROM CODE`, `MIXED`), and `OVERRIDES OFF` while the React self-check fails.
+ * label text (`FROM CODE`, `MIXED`), `OVERRIDES OFF` while the React self-check fails,
+ * and, for a prop the metadata calls Editable, `NO ADAPTER` or `ON THE SERVER` on an
+ * Instance no Override can reach (PER-180).
  */
-export type RowReason = InspectReason | "FROM CODE" | "MIXED" | "OVERRIDES OFF";
+export type RowReason = InspectReason | "FROM CODE" | "MIXED" | "OVERRIDES OFF" | "NO ADAPTER" | "ON THE SERVER";
 
 export type PropRow = {
   name: string;
@@ -27,7 +29,7 @@ export type PropRow = {
   /** The default the metadata knows, for an unset row. `unknown`: a library's runtime default. */
   default?: DefaultValue;
   editable: boolean;
-  /** Why an inspect-only row is; absent on a server-rendered Instance, whose note says why. */
+  /** Why an inspect-only row is; absent on a server-rendered Instance with no metadata, whose note says why. */
   reason?: RowReason;
   /** The closed set an Editable prop picks from. */
   options?: readonly OptionValue[];
@@ -172,10 +174,13 @@ export function inspect(input: InspectInput): Inspection {
     else judged = declared.editable ? { editable: true } : { editable: false, reason: declared.reason };
 
     if (judged.editable && declared?.editable && declared.kind === "options") row.options = declared.options;
-    // Only a browser-rendered Instance is previewable, and only while Overrides are on.
-    if (judged.editable && !input.overridesOn) judged = { editable: false, reason: "OVERRIDES OFF" };
-    // A server-rendered Instance gets one card-level line instead of a reason per row (PER-84).
-    if (server) judged = { editable: false };
+    // With no metadata, a server-rendered Instance gets one card-level line instead of a reason per row (PER-84).
+    if (server && meta === null) judged = { editable: false };
+    // Only an Adapter's browser-rendered Instance takes Overrides: metadata alone makes nothing Editable (PER-180).
+    else if (judged.editable && server) judged = { editable: false, reason: "ON THE SERVER" };
+    else if (judged.editable && input.adapted === false) judged = { editable: false, reason: "NO ADAPTER" };
+    // And only while Overrides are on.
+    else if (judged.editable && !input.overridesOn) judged = { editable: false, reason: "OVERRIDES OFF" };
     row.editable = judged.editable;
     if (judged.reason) row.reason = judged.reason;
     return row;
