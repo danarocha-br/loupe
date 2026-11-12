@@ -153,12 +153,15 @@ then records it.
 ## Using Loupe
 
 Start the app's dev server the way you usually do and open a page. The Loupe
-panel sits on the right of the page.
+panel sits on the right of the page, over a small dock at the bottom right with
+**Pick**, the component list, **Hide** and **Capture screen**. The panel follows
+your system's light or dark setting; the sun button in its header switches it,
+and the browser remembers your choice.
 
 1. **Find a component.** With nothing selected, the panel lists every component
    on the page, grouped by name, and the list updates as menus and dialogs open.
-   Click a row, or press **Pick** and click the component on the page (Esc
-   cancels). The selected instance is outlined.
+   Click a row, or press **Pick** in the dock and click the component on the
+   page (Esc cancels). The selected instance is outlined.
 2. **Inspect it.** The inspector shows the instance, the file and component it
    is drawn in (its call site), and Coverage. Each prop shows the value the app
    gave it. A prop you can change has a control; any other prop says why not,
@@ -184,20 +187,22 @@ panel sits on the right of the page.
    Always press **Clear flag previews** before you switch to another project:
    the preview is a cookie that other apps on `localhost` see too (see
    [Troubleshooting](#another-app-on-localhost-answers-500-with-flags-missing-flags_secret)).
-7. **Capture and export.** Press **Capture screen** whenever a state is worth
+7. **Capture and export.** Press **Capture screen** in the dock whenever a state is worth
    showing: Loupe takes a before and after pair of the whole view, plus a
    close-up pair for each change on screen. A capture goes out of date, and is
    left out of the export, once you change a value it showed, so capture again
-   after changing things. **Export…** also captures the screen as it is. It asks for a title and
-   downloads one self-contained HTML report with the screenshots and the
-   changes file inside. **Copy as Markdown** copies a short summary for a ticket.
+   after changing things. **Export Proposal**, at the top of the panel, also
+   captures the screen as it is. It asks for a title and downloads one
+   self-contained HTML report with the screenshots and the changes file inside.
+   **Copy as Markdown**, the copy button beside **Reset all**, copies a short
+   summary for a ticket.
    Exporting writes nothing to the repo and clears nothing.
 
 Your component changes live in the browser tab only. Reloading the page drops
 them, and they are never written to the product's code.
 
-**Hide** shrinks the panel to a small **Loupe** button; click it to bring the
-panel back.
+**Hide** shrinks the panel and the dock to a small **Loupe** button; click it to
+bring the panel back.
 
 ### When the panel asks you to run `generate`
 
