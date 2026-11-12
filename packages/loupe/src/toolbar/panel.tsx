@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { overridesOffNote } from "../runtime/inspect.js";
+import { overridesOffNote, UNADAPTED_NOTE } from "../runtime/inspect.js";
 import type { LastSeen } from "../runtime/registry.js";
 import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
@@ -349,7 +349,8 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
       {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
       {scoped && <MembersCard debug={debug} id={id} view={view} rows={rows} onHover={props.onHover} />}
       <CallSiteCard inspection={inspection} />
-      {inspection.note && (
+      {/* Never generated: its Coverage line says so; the note's "no Editable prop" would be a guess. */}
+      {inspection.note && !(inspection.note === UNADAPTED_NOTE && props.flags.notGenerated.includes(inspection.component)) && (
         <div className="banner" role="note">
           {inspection.note}
         </div>

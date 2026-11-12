@@ -6,6 +6,7 @@ import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { UNADAPTED_NOTE } from "../runtime/inspect.js";
 import Toolbar from "./index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
@@ -180,6 +181,17 @@ describe("components that are new since the last generate", () => {
     const coverage = shadow().querySelector("[data-testid=coverage]")?.parentElement?.textContent ?? "";
     expect(coverage).toContain("Not generated yet");
     expect(coverage).toContain(COMMAND);
+    // Not "no prop can be Editable": generate hasn't judged its props yet.
+    expect(panelText()).not.toContain(UNADAPTED_NOTE);
+  });
+
+  it("explains a generated component's missing Adapter", async () => {
+    server.status = { ...FRESH, notGenerated: ["NewCard"] };
+    await mountWithNew();
+    const instance = shadow().querySelector(`[data-instance="${site("Divider")["data-ds-anchor"]}"]`) as HTMLElement;
+    act(() => instance.click());
+    expect(panelText()).toContain(UNADAPTED_NOTE);
+    expect(shadow().querySelector("[data-testid=not-generated]")).toBeNull();
   });
 
   it("never flags an adapted component: its Adapter is generate's output", async () => {
