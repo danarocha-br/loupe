@@ -5,6 +5,9 @@ explains each change, asks the designer, runs the pinned `loupe` CLI and relays
 what it prints. The CLI makes every write; the plugin never edits the Product
 layer and never commits.
 
+For how a designer installs, uses and removes Loupe, see the
+[guide](../../README.md). This README is about how the plugin is built.
+
 | Path | What it is |
 | -- | -- |
 | `skills/install` | Compatibility check (asking its Untested question once), the yes to the edits, `loupe init`, `pnpm install`, `loupe doctor`, then a browser check that an Instance can be selected. |
@@ -43,7 +46,10 @@ more than Loupe). Measured on orbix-ai, that install changes only:
 
 - Loupe's own importer entries and packages;
 - an optional `typescript` peer in the packages that don't depend on TypeScript
-  themselves, re-resolved from 5.9.3 to the 6.0.3 that ts-morph brings.
+  themselves, re-resolved from 5.9.3 to the 6.0.3 that ts-morph brings;
+- other peers, sometimes. On the PER-94 round trip it also re-resolved
+  `@hookform/resolvers`' peer `ajv` in apps/storybook from 6.15.0 to 8.20.0.
+  `lockfile.mjs` counts it as a peer re-resolution, like the TypeScript ones.
 
 `radix-ui: "latest"` stays at its locked version: an install only re-resolves
 importers whose `package.json` changed, and the design system's didn't. Earlier
@@ -51,9 +57,10 @@ runs saw it move because they added a root `pnpm.overrides` entry, which
 re-resolves every importer.
 
 `loupe remove`'s own `pnpm install` takes Loupe's entries out but keeps the
-TypeScript 6 peers, since they still resolve. `scripts/lockfile.mjs restore`
-puts back the lockfile from the commit before the install, only when those peers
-are the sole difference and `pnpm install --frozen-lockfile` accepts it.
+TypeScript 6 peers, since they still resolve. On PER-94 it put the `ajv` peer
+back on its own. `scripts/lockfile.mjs restore` puts back the lockfile from the
+commit before the install, only when peer re-resolutions are the sole difference
+and `pnpm install --frozen-lockfile` accepts it.
 
 ## Releasing
 

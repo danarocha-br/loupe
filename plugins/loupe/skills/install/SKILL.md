@@ -61,7 +61,8 @@ Tell the designer, for the chosen app (`<app>` below), that installing will:
   - the root Biome config: exclude `packages/loupe`.
 - run `pnpm install`, which adds Loupe's entries to `pnpm-lock.yaml`. Loupe brings TypeScript 6 (through
   ts-morph), so pnpm also re-resolves an optional `typescript` peer to 6.x in packages that don't depend on
-  TypeScript themselves. That changes no code; the remove skill can put it back.
+  TypeScript themselves. It can re-resolve other peers too (on orbix-ai, Storybook's `ajv`). That changes no
+  code; the remove skill can put them back.
 - change nothing in a production build: the Toolbar loads only in development.
 
 Nothing is committed. Ask: "Shall I make these changes?" Continue only on a clear yes.

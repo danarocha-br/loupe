@@ -49,8 +49,8 @@ Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/lockfile.mjs" report --base auto`. `aut
 before Loupe's ledger was added (with `HEAD` if the install was never committed). By its `Result:` line:
 
 - `unchanged`: the lockfile is as it was before the install.
-- `peers-only`: pnpm kept the TypeScript 6 peer it picked while Loupe was installed, because that peer still
-  resolves. Offer to put the lockfile back: `node "${CLAUDE_PLUGIN_ROOT}/scripts/lockfile.mjs" restore --base auto`.
+- `peers-only`: pnpm kept a peer it re-resolved while Loupe was installed (usually the TypeScript 6 one),
+  because it still resolves. Offer to put the lockfile back: `node "${CLAUDE_PLUGIN_ROOT}/scripts/lockfile.mjs" restore --base auto`.
   It writes only `pnpm-lock.yaml`, from that commit, and keeps it only if `pnpm install --frozen-lockfile`
   accepts it; otherwise it puts the current one back. Run it only on a yes.
 - `other-changes`, `loupe-only` or `loupe-and-peers`: the lockfile changed for other reasons since the install, or Loupe's entries
