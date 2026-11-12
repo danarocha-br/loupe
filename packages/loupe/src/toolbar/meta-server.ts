@@ -8,7 +8,8 @@
 // Only the Toolbar imports this module, and the Toolbar reaches the page through
 // `<LoupeMount />`'s development-only import, so a production build holds neither.
 
-import { createMetaLookup, type InstanceMeta, type MetaRequest } from "../instance-meta.js";
+import { createMetaLookup } from "../instance-meta.js";
+import type { InstanceMeta, MetaRequest } from "../runtime/instance-meta.js";
 
 /** A string only this module holds: `loupe doctor --build` looks for it to prove the action stayed out. */
 const MARKER = "loupe-instance-meta";
@@ -16,7 +17,8 @@ const MARKER = "loupe-instance-meta";
 /** More than any page holds call sites; a larger request is refused rather than read. */
 const MAX_REQUESTS = 500;
 
-let lookup: { key: string; run: ReturnType<typeof createMetaLookup> } | null = null;
+/** The lookup for the paths `withLoupe` handed over; its caches live as long as the dev server. */
+let cached: { paths: string; lookup: ReturnType<typeof createMetaLookup> } | null = null;
 
 /** One answer per request, in order; null when `withLoupe` isn't active, so there is no Product layer to read. */
 export async function readInstanceMeta(requests: MetaRequest[]): Promise<(InstanceMeta | null)[] | null> {
@@ -29,9 +31,9 @@ export async function readInstanceMeta(requests: MetaRequest[]): Promise<(Instan
   );
   if (!valid) return null;
   try {
-    const key = `${root}\u0000${adaptList}`;
-    if (lookup?.key !== key) lookup = { key, run: createMetaLookup({ root, adaptList }) };
-    return lookup.run(requests);
+    const paths = `${root}\u0000${adaptList}`;
+    if (cached?.paths !== paths) cached = { paths, lookup: createMetaLookup({ root, adaptList }) };
+    return cached.lookup(requests);
   } catch (error) {
     console.warn(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
     return null;

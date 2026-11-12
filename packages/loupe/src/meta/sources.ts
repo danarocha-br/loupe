@@ -80,6 +80,12 @@ export function compare(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** `mtime:size` of a file, or null when it isn't one: what the dev server's read caches key on. */
+export function statStamp(file: string): string | null {
+  const stats = statSync(file, { throwIfNoEntry: false });
+  return stats?.isFile() ? `${stats.mtimeMs}:${stats.size}` : null;
+}
+
 export function hashFile(file: string): string {
   return `sha256:${createHash("sha256").update(readFileSync(file)).digest("hex")}`;
 }

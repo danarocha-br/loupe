@@ -7,10 +7,11 @@ import { parseCallSiteId } from "../call-site.js";
 import type { PropMeta } from "../meta/types.js";
 import { emitChange, registry } from "./registry.js";
 
-/** A call site's file and the name it imports, both from its anchor. Mirrors the server's `MetaRequest`. */
+/** A call site's file and the name it imports, both from its anchor: what the dev server is asked. */
 export type MetaRequest = { path: string; component: string };
 
-type Meta = Readonly<Record<string, PropMeta>>;
+/** One component's props from `meta/`, keyed by prop name. */
+export type InstanceMeta = Readonly<Record<string, PropMeta>>;
 
 const keyOf = (request: MetaRequest) => `${request.path}\u0000${request.component}`;
 
@@ -21,13 +22,13 @@ export function metaRequestOf(anchor: string): MetaRequest | null {
 }
 
 /** The metadata loaded for this anchor's component, or null while none is (yet). */
-export function loadedMeta(anchor: string): Meta | null {
+export function loadedMeta(anchor: string): InstanceMeta | null {
   const request = metaRequestOf(anchor);
   return request ? (registry().instanceMeta.get(keyOf(request)) ?? null) : null;
 }
 
 /** Stores the dev server's answers, one per request; redraws only when one changed. */
-export function rememberMeta(requests: readonly MetaRequest[], results: readonly (Meta | null)[]): void {
+export function rememberMeta(requests: readonly MetaRequest[], results: readonly (InstanceMeta | null)[]): void {
   const store = registry().instanceMeta;
   let changed = false;
   requests.forEach((request, index) => {

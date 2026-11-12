@@ -1,7 +1,7 @@
 // Loads `meta/` for the selected Instance when it has no Adapter (PER-180). Asked
-// the first time the inspector shows one and again on each later selection, so a
-// `loupe generate` in between shows; never while the panel is hidden, since only
-// the open panel mounts this.
+// each time one is selected, not only the first, so a `loupe generate` in between
+// shows; the dev server rereads only what changed. Never while the panel is
+// hidden, since only the open panel mounts this.
 
 import { useEffect } from "react";
 import { metaRequestOf, rememberMeta } from "../runtime/instance-meta.js";
@@ -18,10 +18,10 @@ export function useInstanceMeta(page: PageSnapshot, selected: string | null): vo
   useEffect(() => {
     const request = anchor === null ? null : metaRequestOf(anchor);
     if (request === null) return;
-    let live = true;
+    // Stored even after the selection moved on: the answer is keyed by its request.
     readInstanceMeta([request]).then(
       (results) => {
-        if (live && results) rememberMeta([request], results);
+        if (results) rememberMeta([request], results);
       },
       // A restarting dev server refuses the call; the rows stay as they were until the next selection.
       (error: unknown) => {
@@ -31,8 +31,5 @@ export function useInstanceMeta(page: PageSnapshot, selected: string | null): vo
         console.warn(message);
       },
     );
-    return () => {
-      live = false;
-    };
   }, [anchor]);
 }

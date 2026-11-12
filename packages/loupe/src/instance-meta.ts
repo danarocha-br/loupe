@@ -3,19 +3,16 @@
 // file (PER-100 §3). Read-only, and `generate` writes nothing for it: the lookup
 // is derived from the call site each time, so no index can drift from the source.
 
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { parse } from "@babel/parser";
 import { parseAdaptList } from "./adapt-list.js";
 import { layerPathOf } from "./generate/plan.js";
 import { formatOf } from "./layer-status.js";
-import { META_FORMAT_VERSION, type PropMeta } from "./meta/types.js";
+import { statStamp } from "./meta/sources.js";
+import { META_FORMAT_VERSION } from "./meta/types.js";
 import { createResolver } from "./resolve.js";
-
-/** A call site and the name it imports, both from its anchor. */
-export type MetaRequest = { path: string; component: string };
-
-export type InstanceMeta = Readonly<Record<string, PropMeta>>;
+import type { InstanceMeta, MetaRequest } from "./runtime/instance-meta.js";
 
 export type MetaLookupPaths = {
   /** Absolute repo root; anchors and `meta/` sources are relative to it. */
@@ -25,20 +22,17 @@ export type MetaLookupPaths = {
 };
 
 type Imports = {
-  /** Imported name → specifier. */
-  named: Map<string, string>;
+  /** Imported name → every specifier importing it by that name. */
+  named: Map<string, string[]>;
   /** Specifiers imported whole (`import * as UI`), whose members the loader anchors by property name. */
   namespaces: string[];
+  /** Local names of default imports, which the loader anchors under the local name. */
+  defaults: Set<string>;
 };
 
 const toPosix = (file: string) => file.split(path.sep).join("/");
 
-const stampOf = (file: string): string | null => {
-  const stats = statSync(file, { throwIfNoEntry: false });
-  return stats?.isFile() ? `${stats.mtimeMs}:${stats.size}` : null;
-};
-
-function realPath(file: string): string {
+function realPathOrSame(file: string): string {
   try {
     return realpathSync(file);
   } catch {
@@ -50,18 +44,18 @@ function realPath(file: string): string {
 export function createMetaLookup(paths: MetaLookupPaths): (requests: readonly MetaRequest[]) => (InstanceMeta | null)[] {
   const resolver = createResolver();
   // The resolver answers with real paths, so the root must be one too.
-  const root = realPath(path.resolve(paths.root));
+  const root = realPathOrSame(path.resolve(paths.root));
   const layer = path.dirname(paths.adaptList);
   // Keyed by path and stat, like the Product layer's status: a lookup after the first reads only what changed.
   const importsCache = new Map<string, { stamp: string; imports: Imports }>();
   const metaCache = new Map<string, { stamp: string; exports: Record<string, unknown> | null }>();
 
   const importsOf = (file: string): Imports | null => {
-    const stamp = stampOf(file);
+    const stamp = statStamp(file);
     if (stamp === null) return null;
     const cached = importsCache.get(file);
     if (cached?.stamp === stamp) return cached.imports;
-    const imports: Imports = { named: new Map(), namespaces: [] };
+    const imports: Imports = { named: new Map(), namespaces: [], defaults: new Set() };
     try {
       const program = parse(readFileSync(file, "utf8"), {
         sourceType: "module",
@@ -72,9 +66,11 @@ export function createMetaLookup(paths: MetaLookupPaths): (requests: readonly Me
         if (node.type !== "ImportDeclaration" || node.importKind === "type") continue;
         for (const specifier of node.specifiers) {
           if (specifier.type === "ImportNamespaceSpecifier") imports.namespaces.push(node.source.value);
+          if (specifier.type === "ImportDefaultSpecifier") imports.defaults.add(specifier.local.name);
           if (specifier.type !== "ImportSpecifier" || specifier.importKind === "type") continue;
           const imported = specifier.imported;
-          imports.named.set(imported.type === "Identifier" ? imported.name : imported.value, node.source.value);
+          const name = imported.type === "Identifier" ? imported.name : imported.value;
+          imports.named.set(name, [...(imports.named.get(name) ?? []), node.source.value]);
         }
       }
     } catch {
@@ -92,7 +88,7 @@ export function createMetaLookup(paths: MetaLookupPaths): (requests: readonly Me
         const mirrored = layerPathOf(source, ds, app);
         if (mirrored === undefined) continue;
         const metaFile = path.join(layer, "meta", ...`${mirrored}.json`.split("/"));
-        const stamp = stampOf(metaFile);
+        const stamp = statStamp(metaFile);
         if (stamp === null) continue;
         const cached = metaCache.get(metaFile);
         if (cached?.stamp === stamp) return cached.exports;
@@ -129,19 +125,21 @@ export function createMetaLookup(paths: MetaLookupPaths): (requests: readonly Me
     }
     return requests.map(({ path: callSite, component }) => {
       // Anchors are repo-relative: anything else never names a call site.
-      if (path.isAbsolute(callSite) || callSite.split("/").includes("..")) return null;
-      const file = path.join(root, callSite);
+      const relative = path.normalize(callSite);
+      if (path.isAbsolute(relative) || relative.split(path.sep).includes("..") || relative.includes("\0")) return null;
+      const file = path.join(root, relative);
       const imports = importsOf(file);
-      if (imports === null) return null;
-      const named = imports.named.get(component);
-      const specifiers = named === undefined ? imports.namespaces : [named];
-      for (const specifier of specifiers) {
+      // A default import is anchored under its local name, which says nothing about the export (PER-100 §2).
+      if (imports === null || imports.defaults.has(component)) return null;
+      // The anchor doesn't say which import a name came through: every module that could
+      // have supplied it must agree, or nothing is shown rather than another component's props.
+      const modules = new Set<string>();
+      for (const specifier of [...(imports.named.get(component) ?? []), ...imports.namespaces]) {
         const target = resolver.resolve(specifier, file);
-        if (target === null) continue;
-        const props = propsIn(exportsOf(target, roots), component);
-        if (props !== null) return props;
+        if (target !== null && propsIn(exportsOf(target, roots), component) !== null) modules.add(target);
       }
-      return null;
+      const [only] = modules;
+      return modules.size === 1 && only !== undefined ? propsIn(exportsOf(only, roots), component) : null;
     });
   };
 }

@@ -63,6 +63,11 @@ describe("createMetaLookup on a repo of its own", () => {
     );
     write("apps/app/ns.tsx", `import * as UI from "../../ds/components/ui/card";\n`);
     write("../outside.tsx", `import { Card } from "./repo/ds/components/ui/card";\n`);
+    // A second module that also exports a Card, with its own metadata.
+    write("ds/components/ui/other.tsx", `export function Card() { return null; }\n`);
+    write("apps/app/default.tsx", `import Card from "./local-card";\nimport * as UI from "../../ds/components/ui/card";\n`);
+    write("apps/app/two-ns.tsx", `import * as A from "../../ds/components/ui/card";\nimport * as B from "../../ds/components/ui/other";\n`);
+    write("apps/app/both.tsx", `import { Card } from "../../ds/components/ui/other";\nimport * as UI from "../../ds/components/ui/card";\n`);
     const layer = "packages/loupe";
     write(
       `${layer}/meta/${layerPathOf("ds/components/ui/card.tsx", "ds", "apps/app")}.json`,
@@ -74,6 +79,19 @@ describe("createMetaLookup on a repo of its own", () => {
           files: {},
           formatVersion,
           source: "ds/components/ui/card.tsx",
+        }),
+      ),
+    );
+    write(
+      `${layer}/meta/${layerPathOf("ds/components/ui/other.tsx", "ds", "apps/app")}.json`,
+      stampJson(
+        stableJson({
+          client: false,
+          engine: "ts-morph",
+          exports: { Card: { kind: "component", props: {}, shape: "function" } },
+          files: {},
+          formatVersion,
+          source: "ds/components/ui/other.tsx",
         }),
       ),
     );
@@ -91,6 +109,17 @@ describe("createMetaLookup on a repo of its own", () => {
     ]);
     expect(aliased?.tone).toMatchObject({ options: ["a", "b"] });
     expect(member).toEqual(aliased);
+  });
+
+  it("shows nothing when the anchor's name could have come through more than one module", () => {
+    expect(
+      repo()([
+        // A default import is anchored under its local name, never the module's export.
+        { path: "apps/app/default.tsx", component: "Card" },
+        { path: "apps/app/two-ns.tsx", component: "Card" },
+        { path: "apps/app/both.tsx", component: "Card" },
+      ]),
+    ).toEqual([null, null, null]);
   });
 
   it("reads no call site outside the repo", () => {
