@@ -1,11 +1,12 @@
-// The footer's Export and its dialog (PER-99 §8, PER-139). Functional only, like
-// the rest of the Toolbar; the visual pass is PER-140. The counts and the size
-// warning inform and never block; only an empty title holds Export back.
+// The header's Export Proposal and its dialog (PER-99 §8, PER-139), a modal centred
+// on the page (PER-140). The counts and the size warning inform and never block;
+// only an empty title holds Export back.
 
 import { type KeyboardEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
 import { REPORT_WARN_BYTES } from "../proposal/report.js";
 import { type ExportPreview, type ExportResult, exportForm, exportProposal, previewExport } from "./export.js";
 import { megabytes, plural } from "./format.js";
+import { DownloadIcon } from "./icons.js";
 
 /** "3 changes · 1 without a screenshot · 1 held for review · 0 outdated Snapshots". */
 export function countsLine(preview: ExportPreview): string {
@@ -49,12 +50,14 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
       <button
         ref={trigger}
         type="button"
+        className="btn primary"
         data-export=""
         disabled={disabled}
         title={done?.title ?? "Download the HTML report for engineering"}
         onClick={() => setOpen(true)}
       >
-        {done?.label ?? "Export…"}
+        <DownloadIcon />
+        {done?.label ?? "Export Proposal"}
       </button>
       {open && (
         <ExportDialog
@@ -143,88 +146,120 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
           run();
         }}
       >
-        <h2 id="loupe-export-title">Export Proposal</h2>
-        <label className="field">
-          <span>Title</span>
-          <input
-            ref={titleInput}
-            name="title"
-            required
-            value={title}
-            onChange={(event) => {
-              setTitle(event.target.value);
-              exportForm().title = event.target.value;
-            }}
-          />
-        </label>
-        <label className="field">
-          <span>
-            Designer <span className="muted">(optional)</span>
-          </span>
-          <input
-            name="designer"
-            value={designer}
-            onChange={(event) => {
-              setDesigner(event.target.value);
-              exportForm().designer = event.target.value;
-            }}
-          />
-        </label>
-        {preview === null && <p className="muted">Counting…</p>}
-        {preview !== null && "failed" in preview && (
-          <div className="notice" role="alert">
-            {preview.failed}
+        <div className="sec">
+          <div className="head">
+            <h2 id="loupe-export-title">Export Proposal</h2>
+            <span className="meta">HTML report</span>
+          </div>
+          <label className="field">
+            <span>Title</span>
+            <input
+              ref={titleInput}
+              name="title"
+              required
+              value={title}
+              onChange={(event) => {
+                setTitle(event.target.value);
+                exportForm().title = event.target.value;
+              }}
+            />
+          </label>
+          <label className="field">
+            <span>
+              Designer <span className="muted">(optional)</span>
+            </span>
+            <input
+              name="designer"
+              value={designer}
+              onChange={(event) => {
+                setDesigner(event.target.value);
+                exportForm().designer = event.target.value;
+              }}
+            />
+          </label>
+        </div>
+        <div className="sec">
+          {preview === null && <p className="muted">Counting…</p>}
+          {preview !== null && "failed" in preview && (
+            <div className="warn" role="alert">
+              <span className="dot" />
+              {preview.failed}
+            </div>
+          )}
+          {ready && (
+            <>
+              {/* The tiles are what the eye reads; the line is what a screen reader hears. */}
+              <div className="tiles" aria-hidden="true">
+                {[
+                  [preview.changes, "Changes"],
+                  [preview.withoutScreenshot, "No screenshot"],
+                  [preview.held, "Held"],
+                  [preview.outdatedSnapshots, "Outdated Snapshots"],
+                ].map(([count, label]) => (
+                  <div key={label} className="tile">
+                    <b>{count}</b>
+                    <span className="meta">{label}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="counts sr-only" role="status">
+                {countsLine(preview)}
+              </p>
+              <p className="muted">
+                Export captures the screen in view first. Changes without a screenshot read "No screenshot" in the
+                report.
+              </p>
+              {estimate > REPORT_WARN_BYTES && (
+                <div className="warn" role="alert">
+                  <span className="dot" />
+                  <span>
+                    The report will be about {megabytes(estimate)}, over 25 MB: some mail and ticket tools refuse files
+                    that size. Removing Snapshots makes it smaller.
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {ready && preview.entries.length > 0 && (
+          <div className="sec soft">
+            <fieldset className="notes">
+              <legend>
+                Notes <span className="muted">optional, the why</span>
+              </legend>
+              {preview.entries.map((entry) => (
+                <label key={entry.key} className="field" data-entry={entry.id}>
+                  <span>
+                    {entry.id} · {entry.label}
+                  </span>
+                  <textarea
+                    rows={2}
+                    value={notes[entry.key] ?? ""}
+                    onChange={(event) => {
+                      const next = { ...notes, [entry.key]: event.target.value };
+                      setNotes(next);
+                      exportForm().notes = next;
+                    }}
+                  />
+                </label>
+              ))}
+            </fieldset>
           </div>
         )}
-        {ready && (
-          <>
-            <p className="counts" role="status">
-              {countsLine(preview)}
-            </p>
-            <p className="muted">
-              Export captures the screen in view first. Changes without a screenshot read "No screenshot" in the report.
-            </p>
-            {estimate > REPORT_WARN_BYTES && (
-              <div className="banner" role="alert">
-                The report will be about {megabytes(estimate)}, over 25 MB: some mail and ticket tools refuse files that size.
-                Removing Snapshots makes it smaller.
-              </div>
-            )}
-            {preview.entries.length > 0 && (
-              <fieldset className="notes">
-                <legend>
-                  Notes <span className="muted">(optional, the why)</span>
-                </legend>
-                {preview.entries.map((entry) => (
-                  <label key={entry.key} className="field" data-entry={entry.id}>
-                    <span>
-                      {entry.id} · {entry.label}
-                    </span>
-                    <textarea
-                      rows={2}
-                      value={notes[entry.key] ?? ""}
-                      onChange={(event) => {
-                        const next = { ...notes, [entry.key]: event.target.value };
-                        setNotes(next);
-                        exportForm().notes = next;
-                      }}
-                    />
-                  </label>
-                ))}
-              </fieldset>
-            )}
-          </>
-        )}
         {error !== null && (
-          <div className="notice" role="alert">
-            {error}
+          <div className="sec">
+            <div className="warn" role="alert">
+              <span className="dot" />
+              {error}
+            </div>
           </div>
         )}
         <div className="actions">
-          <button type="button" disabled={busy} onClick={() => onClose()}>
+          <button type="button" className="btn" disabled={busy} onClick={() => onClose()}>
             Cancel
           </button>
-          <button type="submit" disabled={title.trim() === "" || busy}>
+          <button type="submit" className="btn primary" disabled={title.trim() === "" || busy}>
+            <DownloadIcon />
             {busy ? "Exporting…" : "Export"}
           </button>
         </div>

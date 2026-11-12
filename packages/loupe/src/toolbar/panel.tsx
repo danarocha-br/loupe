@@ -1,12 +1,13 @@
-// The panel of the 2e sketch: pinned header and footer, a scrolling middle whose
-// last card stretches, and either the component list (nothing selected) or the
-// inspector, at This instance or a group or page scope (PER-134). Functional
-// only; the visual pass is PER-140.
+// The panel of the 2e sketch (PER-140): a pinned header (Export Proposal, light or
+// dark, Hide) and footer (the Override count, Copy as Markdown, Reset all), and a
+// scrolling middle whose last card stretches. The middle holds either the
+// component list (nothing selected) or the inspector, at This instance or a group
+// or page scope (PER-134). Notices sit below the page or Instance card.
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { overridesOffNote, UNADAPTED_NOTE } from "../runtime/inspect.js";
+import { NO_META_NOTE, overridesOffNote, SERVER_NOTE, SPREADS_NOTE, UNADAPTED_NOTE } from "../runtime/inspect.js";
 import type { LastSeen } from "../runtime/registry.js";
 import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
@@ -16,8 +17,9 @@ import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 import { FlagsCard } from "./flags.js";
 import { ExportButton } from "./export-dialog.js";
+import { BackIcon, CheckIcon, ChevronIcon, CopyIcon, InfoIcon, ResetIcon, SunIcon } from "./icons.js";
 import { copyProposalMarkdown } from "./proposal.js";
-import { CaptureButton, SnapshotsCard } from "./snapshots-card.js";
+import { SnapshotsCard } from "./snapshots-card.js";
 import {
   LayerNotices,
   NotGeneratedNotice,
@@ -47,10 +49,12 @@ type PanelProps = {
   /** The group or page scope being edited, or null at This instance. */
   view: ScopeView | null;
   onHover(ids: string[]): void;
-  picking: boolean;
-  onPick(): void;
   onHide(): void;
+  theme: "light" | "dark";
+  onTheme(): void;
 };
+
+type BodyProps = PanelProps & { flags: LayerFlags; notices: ReactNode };
 
 export function Panel(props: PanelProps) {
   const { page, selected } = props;
@@ -60,29 +64,37 @@ export function Panel(props: PanelProps) {
     notGenerated: notGeneratedComponents(layer, page.groups),
     command: layer?.command ?? "",
   };
+  const notices = (
+    <>
+      <LayerNotices status={layer} />
+      {!page.status.overrides && <OverridesOff reason={page.status.reason} />}
+    </>
+  );
   return (
     <section className="panel" aria-label="Loupe">
       <header className="header">
-        <span className="title">Loupe</span>
-        <button type="button" aria-pressed={props.picking} onClick={props.onPick} title="Click an Instance on the page (Esc cancels)">
-          Pick
-        </button>
-        <CaptureButton disabled={props.picking} />
-        <button type="button" onClick={props.onHide}>
-          Hide
-        </button>
+        <ExportButton disabled={page.records.length === 0} />
+        <div className="end">
+          <button
+            type="button"
+            className="btn round"
+            aria-pressed={props.theme === "dark"}
+            onClick={props.onTheme}
+            title={props.theme === "dark" ? "Switch to light" : "Switch to dark"}
+          >
+            <SunIcon />
+            <span className="sr-only">Dark theme</span>
+          </button>
+          <button type="button" className="btn" onClick={props.onHide}>
+            Hide
+          </button>
+        </div>
       </header>
       <div className="middle">
-        <LayerNotices status={layer} />
-        {!page.status.overrides && (
-          <div className="banner" role="status">
-            {overridesOffNote(page.status.reason)}
-          </div>
-        )}
         {selected === null ? (
-          <ComponentList {...props} flags={flags} />
+          <ComponentList {...props} flags={flags} notices={notices} />
         ) : (
-          <Inspector {...props} id={selected} flags={flags} />
+          <Inspector {...props} id={selected} flags={flags} notices={notices} />
         )}
       </div>
       <Footer {...props} />
@@ -90,88 +102,150 @@ export function Panel(props: PanelProps) {
   );
 }
 
-function ComponentList({ debug, page, onSelect, onHover, flags }: PanelProps & { flags: LayerFlags }) {
+/** The React self-check failed (PER-184: said here once, not again on the Instance). */
+function OverridesOff({ reason }: { reason: string }) {
+  const sentence = overridesOffNote(reason).replace(/^Overrides are off, e/, "E");
+  return (
+    <div className="card notice-card banner" role="status">
+      <div className="head">
+        <div className="title">
+          <span className="dot red" />
+          Overrides are off
+        </div>
+      </div>
+      <p className="body">{sentence}</p>
+    </div>
+  );
+}
+
+/** What the page calls itself, before the app's name: `Billing | Acme` reads Billing. */
+function pageName(): string {
+  const title = document.title.split(/\s+[|·–—-]\s+/)[0]?.trim();
+  return title || "This page";
+}
+
+function ComponentList({ debug, page, onSelect, onHover, flags, notices }: BodyProps) {
   const instances = page.groups.reduce((sum, group) => sum + group.instances.length, 0);
   return (
     <>
-      <div className="card">
-        <h3>Nothing selected</h3>
-        <div className="muted">
-          {instances} Instances of {page.groups.length} components on this page. Pick one on the page or below.
+      <div className="card identity">
+        <div className="head">
+          <div className="title">
+            <span className="name">{pageName()}</span>
+            <span className="chip-label">{location.pathname}</span>
+          </div>
         </div>
+        <p className="body">Nothing selected. Pick a component below or click one on the page.</p>
       </div>
+      {notices}
       <NotGeneratedNotice names={flags.notGenerated} command={flags.command} />
       <FlagsCard />
       <SnapshotsCard />
       <HeldForReviewCard debug={debug} records={page.records} />
-      <div className={page.interaction.length === 0 ? "card stretch" : "card"}>
-        <h3>On this page</h3>
+      <div className={page.interaction.length === 0 ? "card list-card stretch" : "card list-card"}>
+        <div className="head">
+          <h3>On this page</h3>
+          <span className="meta">
+            {page.groups.length} component{page.groups.length === 1 ? "" : "s"} · {instances} Instance
+            {instances === 1 ? "" : "s"}
+          </span>
+        </div>
         <ul className="list" aria-label="Components on this page">
-          {page.groups.map((group) => (
-            <li key={group.component}>
-              <details>
-                <summary
-                  onMouseEnter={() => onHover(group.instances.map((row) => row.id))}
-                  onMouseLeave={() => onHover([])}
-                >
-                  {group.component} ×{group.instances.length}
-                  {group.held.length > 0 && ` · ${group.held.length} not mounted`}{" "}
-                  {flags.stale.has(group.component) && <span className="tag stale">Source changed</span>}{" "}
-                  {group.overrides > 0 && <span className="tag">{group.overrides} override{group.overrides === 1 ? "" : "s"}</span>}{" "}
-                  {group.instances.length === 0 ? null : flags.notGenerated.includes(group.component) ? (
-                    <span className="tag stale" title={flags.command}>
-                      Not generated yet
+          {page.groups.map((group) => {
+            const notGenerated = flags.notGenerated.includes(group.component);
+            return (
+              <li key={group.component} className="group">
+                <details>
+                  <summary
+                    onMouseEnter={() => onHover(group.instances.map((row) => row.id))}
+                    onMouseLeave={() => onHover([])}
+                  >
+                    <span className="cname">{group.component}</span>{" "}
+                    <span className="times">×{group.instances.length}</span>
+                    <span className="sub">
+                      {group.overrides > 0 && (
+                        <span>
+                          <span className="dot small purple" />
+                          {group.overrides} override{group.overrides === 1 ? "" : "s"}
+                        </span>
+                      )}
+                      {flags.stale.has(group.component) && (
+                        <span className="stale">
+                          <span className="dot small amber" />
+                          Source changed
+                        </span>
+                      )}
+                      {group.held.length > 0 && <span>{group.held.length} not mounted</span>}
+                      {!group.supported && group.reason && !notGenerated && group.reason !== "No Instance mounted" && (
+                        <span>{group.reason}</span>
+                      )}
                     </span>
-                  ) : group.supported ? (
-                    <span className="tag supported">Supported</span>
-                  ) : (
-                    <span className="tag" title={group.reason ?? undefined}>
-                      Inspect only
+                    <span className="status">
+                      {group.instances.length === 0 ? null : notGenerated ? (
+                        <span className="tag status stale" title={flags.command}>
+                          Not generated yet
+                        </span>
+                      ) : group.supported ? (
+                        <span className="tag status supported">Supported</span>
+                      ) : (
+                        <span className="tag status" title={group.reason ?? undefined}>
+                          Inspect only
+                        </span>
+                      )}
                     </span>
-                  )}
-                  {!group.supported && group.reason && !flags.notGenerated.includes(group.component) && (
-                    <span className="muted"> · {group.reason}</span>
-                  )}
-                </summary>
-                <ul className="list">
-                  {group.instances.map((row) => (
-                    <li key={row.id}>
-                      <button
-                        type="button"
-                        data-instance={row.id}
-                        onClick={() => onSelect(row.id)}
-                        onMouseEnter={() => onHover([row.id])}
-                        onMouseLeave={() => onHover([])}
-                      >
-                        <span className="mono">{instanceLabel(row.id, row.hint)}</span>
-                        {row.rendered === "server" && <span className="tag">On the server</span>}
-                        {instanceRecord(page.records, row.id)?.suspended && <span className="tag">Held for review</span>}
-                      </button>
-                    </li>
-                  ))}
-                  {group.held.map((entry) => (
-                    <li key={entry.id}>
-                      <button type="button" data-instance={entry.id} onClick={() => onSelect(entry.id)}>
-                        <span className="mono">{instanceLabel(entry.id, entry.lastSeen?.hint ?? null)}</span>{" "}
-                        <span className="tag">{entry.record.suspended ? "Held for review" : "No Instance mounted"}</span>
-                      </button>
-                      {/* A held-for-review record's values are on its card above. */}
-                      {!entry.record.suspended && <HeldValues record={entry.record} lastSeen={entry.lastSeen} />}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </li>
-          ))}
+                    <ChevronIcon />
+                  </summary>
+                  <ul className="list instances">
+                    {group.instances.map((row) => (
+                      <li key={row.id}>
+                        <button
+                          type="button"
+                          data-instance={row.id}
+                          onClick={() => onSelect(row.id)}
+                          onMouseEnter={() => onHover([row.id])}
+                          onMouseLeave={() => onHover([])}
+                        >
+                          <span>{instanceLabel(row.id, row.hint)}</span>
+                          {row.rendered === "server" && <span className="tag status">On the server</span>}
+                          {instanceRecord(page.records, row.id)?.suspended && (
+                            <span className="tag status held">Held for review</span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                    {group.held.map((entry) => (
+                      <li key={entry.id}>
+                        <button type="button" data-instance={entry.id} onClick={() => onSelect(entry.id)}>
+                          <span>{instanceLabel(entry.id, entry.lastSeen?.hint ?? null)}</span>{" "}
+                          {entry.record.suspended ? (
+                            <span className="tag status held">Held for review</span>
+                          ) : (
+                            <span className="tag status dashed">No Instance mounted</span>
+                          )}
+                        </button>
+                        {/* A held-for-review record's values are on its card above. */}
+                        {!entry.record.suspended && <HeldValues record={entry.record} lastSeen={entry.lastSeen} />}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            );
+          })}
         </ul>
       </div>
       {page.interaction.length > 0 && (
-        <div className="card stretch">
-          <h3>Appears on interaction</h3>
-          <div className="muted">Seen on this page, not mounted now: open the menu or dialog to inspect them.</div>
-          <ul className="list">
+        <div className="card list-card soft stretch">
+          <div className="head">
+            <h3>Appears on interaction</h3>
+            <span className="meta">Not on screen yet</span>
+          </div>
+          <ul className="list interaction">
             {page.interaction.map((component) => (
-              <li key={component}>{component}</li>
+              <li key={component}>
+                {component}
+                <span className="muted">Seen on this page, not mounted now: open its menu or dialog to inspect it.</span>
+              </li>
             ))}
           </ul>
         </div>
@@ -186,11 +260,9 @@ function ComponentList({ debug, page, onSelect, onHover, flags }: PanelProps & {
  */
 function HeldValues({ record, lastSeen }: { record: RecordRow; lastSeen: LastSeen | null }) {
   return (
-    <ul className="list muted" data-testid="held-values">
+    <ul className="list held-values" data-testid="held-values">
       {Object.entries(record.values).map(([prop, value]) => (
-        <li key={prop} className="mono">
-          {`${prop} ${formatCurrent(value)}${currentLastSeen(lastSeen, prop)}`}
-        </li>
+        <li key={prop}>{`${prop} ${formatCurrent(value)}${currentLastSeen(lastSeen, prop)}`}</li>
       ))}
     </ul>
   );
@@ -205,24 +277,32 @@ function currentLastSeen(lastSeen: LastSeen | null, prop: string): string {
 
 /**
  * Records suspended for review (PER-95): the call site's total changed, or the id
- * names more than one Instance. They apply to nothing until discarded. Nothing
- * here opens a menu or dialog to reach one.
+ * names more than one Instance. They apply to nothing until discarded, which the
+ * hollow purple ring says (PER-140). Nothing here opens a menu or dialog to reach one.
  */
 function HeldForReviewCard({ debug, records }: { debug: LoupeDebug; records: RecordRow[] }) {
   const held = records.filter((record) => record.suspended !== null);
   if (held.length === 0) return null;
   return (
-    <div className="card" data-testid="held-for-review">
-      <h3>Held for review</h3>
-      <ul className="list">
+    <div className="card list-card" data-testid="held-for-review">
+      <div className="head">
+        <div className="title">
+          <span className="dot ring" />
+          <h3>Held for review</h3>
+        </div>
+        <span className="meta">{held.length} · apply to nothing</span>
+      </div>
+      <ul className="list held-list">
         {held.map((record) => (
-          <li key={JSON.stringify(record.target)}>
-            <div className="mono">{targetLabel(record.target)}</div>
+          <li key={JSON.stringify(record.target)} className="held-item">
+            <div className="target">
+              <span>{targetLabel(record.target)}</span>
+              <button type="button" className="btn small" onClick={() => attempt(() => debug.discard(record.target))}>
+                Discard
+              </button>
+            </div>
             <div className="muted">{suspensionReason(record.suspended as Suspension)}</div>
             <HeldValues record={record} lastSeen={record.target.scope === "instance" ? debug.lastSeen(record.target.id) : null} />
-            <button type="button" onClick={() => attempt(() => debug.discard(record.target))}>
-              Discard
-            </button>
           </li>
         ))}
       </ul>
@@ -257,13 +337,22 @@ function instanceLabel(id: string, hint: string | null): string {
   return `${where}${key}`;
 }
 
-function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
-  const { debug, id, onSelect, page, scope, onScope, view } = props;
+/** An Instance's card-level note, under a title that names its kind. */
+const NOTE_TITLE: Record<string, string> = {
+  [UNADAPTED_NOTE]: "Inspect only · No Adapter",
+  [SERVER_NOTE]: "On the server",
+  [SPREADS_NOTE]: "Props spread here",
+  [NO_META_NOTE]: "No prop metadata",
+};
+
+function Inspector(props: BodyProps & { id: string }) {
+  const { debug, id, onSelect, page, scope, onScope, view, notices } = props;
   const inspection = safeInspect(debug, id);
   const recorded = debug.status.overrides && hasInstanceRecord(debug, id);
   const resetInstance = (
     <button
       type="button"
+      className="btn small"
       disabled={!recorded}
       onClick={() => {
         // `discard` also drops the record of an Instance that isn't mounted, where `reset(id)` throws (PER-128).
@@ -273,24 +362,49 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
       Reset this Instance
     </button>
   );
+  const back = (
+    <button type="button" className="btn circle" onClick={() => onSelect(null)} title="Back to every component on this page">
+      <BackIcon />
+      <span className="sr-only">All components</span>
+    </button>
+  );
   if (inspection === null) {
     const record = instanceRecord(page.records, id);
     return (
-      <div className="card stretch">
-        <h3>Not on the page now</h3>
-        <p className="mono">{id}</p>
-        {record && Object.keys(record.values).length > 0 && (
-          <>
-            <span className="tag">{record.suspended ? "Held for review" : "No Instance mounted"}</span>
-            <HeldValues record={record} lastSeen={debug.lastSeen(id)} />
-          </>
-        )}
-        <p className="muted">It shows here again when it mounts, for example when its menu or dialog opens.</p>
-        {recorded && resetInstance}
-        <button type="button" onClick={() => onSelect(null)}>
-          Back to the list
-        </button>
-      </div>
+      <>
+        <div className="card identity">
+          <div className="head">
+            <div className="title">
+              <span className="name">Not on the page now</span>
+            </div>
+            {back}
+          </div>
+          <div className="id">{id}</div>
+        </div>
+        {notices}
+        <div className="card stretch">
+          <h3>Not on the page now</h3>
+          {record && Object.keys(record.values).length > 0 && (
+            <>
+              <span>
+                {record.suspended ? (
+                  <span className="tag status held">Held for review</span>
+                ) : (
+                  <span className="tag status dashed">No Instance mounted</span>
+                )}
+              </span>
+              <HeldValues record={record} lastSeen={debug.lastSeen(id)} />
+            </>
+          )}
+          <p className="body">It shows here again when it mounts, for example when its menu or dialog opens.</p>
+          <div className="actions">
+            {recorded && resetInstance}
+            <button type="button" className="btn small" onClick={() => onSelect(null)}>
+              Back to the list
+            </button>
+          </div>
+        </div>
+      </>
     );
   }
   const ancestors = debug.ancestors(id);
@@ -305,25 +419,35 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
   const inspectOnly = inspection.rows.filter((candidate) => !candidate.editable);
   const injected = Object.entries(inspection.injected);
   const chips = row ? scopeChips(page.records, row, labels) : [];
+  const notGenerated = props.flags.notGenerated.includes(inspection.component);
+  // Never generated: its Coverage line says so; the note's "no Editable prop" would be a guess.
+  // Overrides off: the panel's banner already says it (PER-184).
+  const note =
+    inspection.note === null ||
+    (inspection.note === UNADAPTED_NOTE && notGenerated) ||
+    (!page.status.overrides && inspection.note === overridesOffNote(page.status.reason))
+      ? null
+      : inspection.note;
   return (
     <>
-      <div className="card">
-        <button type="button" onClick={() => onSelect(null)}>
-          ← All components
-        </button>
-        <h3>Instance</h3>
-        <div>
-          <strong>{inspection.component}</strong>{" "}
-          {inspection.coverage.editable > 0 ? (
-            <span className="tag supported">Supported</span>
-          ) : (
-            <span className="tag">Inspect only</span>
-          )}{" "}
-          <span className="tag">{inspection.rendered === "server" ? "On the server" : "In the browser"}</span>
-          {props.flags.stale.has(inspection.component) && <span className="tag stale">Source changed</span>}
+      <div className="card identity">
+        <div className="head">
+          <div className="title">
+            <span className="name">{inspection.component}</span>
+            {inspection.coverage.editable > 0 ? (
+              <span className="tag status supported">
+                <CheckIcon />
+                Supported
+              </span>
+            ) : (
+              <span className="tag status">Inspect only</span>
+            )}
+            {inspection.rendered === "server" && <span className="tag status">On the server</span>}
+            {props.flags.stale.has(inspection.component) && <span className="tag status stale">Source changed</span>}
+          </div>
+          {back}
         </div>
-        {editing && resetInstance}
-        <div className="mono" data-testid="instance-id">
+        <div className="id" data-testid="instance-id">
           {inspection.id}
         </div>
         {chips.length > 0 && (
@@ -336,8 +460,8 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
           </div>
         )}
         {ancestors.length > 0 && (
-          <div>
-            Inside{" "}
+          <div className="crumbs">
+            Inside
             {ancestors.map((ancestor) => (
               <button key={ancestor} type="button" onClick={() => onSelect(ancestor)}>
                 {safeInspect(debug, ancestor)?.component ?? ancestor}
@@ -345,60 +469,54 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
             ))}
           </div>
         )}
+        {editing && <div className="actions">{resetInstance}</div>}
+        {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
       </div>
-      {editing && row && <ScopePicker debug={debug} page={page} scope={scope} onScope={onScope} row={row} />}
+      {notices}
       {scoped && <MembersCard debug={debug} id={id} view={view} rows={rows} onHover={props.onHover} />}
-      <CallSiteCard inspection={inspection} />
-      {/* Never generated: its Coverage line says so; the note's "no Editable prop" would be a guess.
-          Overrides off: the panel's banner already says it (PER-184). */}
-      {inspection.note &&
-        !(inspection.note === UNADAPTED_NOTE && props.flags.notGenerated.includes(inspection.component)) &&
-        !(!page.status.overrides && inspection.note === overridesOffNote(page.status.reason)) && (
-        <div className="banner" role="note">
-          {inspection.note}
+      {note && (
+        <div className="card note-card" role="note">
+          <InfoIcon />
+          <div className="text">
+            <h3>{NOTE_TITLE[note] ?? "Note"}</h3>
+            <p className="body">{note}</p>
+          </div>
         </div>
       )}
-      <div className="card">
-        <h3>Coverage</h3>
-        <div data-testid="coverage">
-          {inspection.coverage.editable} editable prop{inspection.coverage.editable === 1 ? "" : "s"} ·{" "}
-          {inspection.coverage.inspectOnly} inspect only
+      <CoverageCard inspection={inspection} flags={props.flags} />
+      {editable.map((candidate) => (
+        <div className="card prop" key={candidate.name}>
+          {scoped ? (
+            <ScopeRowView row={candidate} editing={editing} view={view} onSelect={onSelect} onHover={props.onHover} />
+          ) : (
+            <PropRowView row={candidate} editing={editing} />
+          )}
         </div>
-        {props.flags.notGenerated.includes(inspection.component) && (
-          <div data-testid="not-generated">
-            <span className="tag stale">Not generated yet</span> Run <span className="mono">{props.flags.command}</span> to
-            read its props.
-          </div>
-        )}
-      </div>
-      <div className="card">
-        <h3>Editable props</h3>
-        {editable.length === 0 ? (
-          <div className="muted">None</div>
-        ) : scoped ? (
-          editable.map((candidate) => (
-            <ScopeRowView key={candidate.name} row={candidate} editing={editing} view={view} onSelect={onSelect} onHover={props.onHover} />
-          ))
-        ) : (
-          editable.map((candidate) => <PropRowView key={candidate.name} row={candidate} editing={editing} />)
-        )}
-      </div>
-      <div className="card stretch">
-        <h3>Inspect only</h3>
+      ))}
+      <div className="card soft stretch inspect">
+        <div className="head">
+          <h3>Inspect only</h3>
+          {!page.status.overrides && <span className="meta">Overrides off</span>}
+        </div>
         {inspectOnly.length === 0 ? (
           <div className="muted">None</div>
         ) : (
-          inspectOnly.map((candidate) => <PropRowView key={candidate.name} row={candidate} editing={scoped ? null : editing} />)
+          inspectOnly.map((candidate) => (
+            <PropRowView key={candidate.name} row={candidate} editing={scoped ? null : editing} />
+          ))
         )}
         {injected.length > 0 && (
           <details>
             <summary>
+              <ChevronIcon />
               {injected.length} set by the library
             </summary>
             {injected.map(([name, value]) => (
               <div className="row" key={name}>
-                <span className="name mono">{name}</span>
-                <span className="value mono">{formatCurrent(value)}</span>
+                <div className="line">
+                  <span className="name">{name}</span>
+                  <span className="value">{formatCurrent(value)}</span>
+                </div>
               </div>
             ))}
           </details>
@@ -408,7 +526,56 @@ function Inspector(props: PanelProps & { id: string; flags: LayerFlags }) {
   );
 }
 
-/** This instance, every Instance from this call site, every Instance on this page: each with its size. */
+/** Editable against inspect-only as a bar, and the call site under it: one card (PER-140). */
+function CoverageCard({ inspection, flags }: { inspection: Inspection; flags: LayerFlags }) {
+  const { editable, inspectOnly } = inspection.coverage;
+  const total = editable + inspectOnly;
+  const site = inspection.callSite;
+  const file = site ? `${site.path.split("/").at(-1)}:${site.line}` : null;
+  return (
+    <div className="card coverage">
+      <div className="head">
+        <h3>Coverage</h3>
+        <span className="meta" data-testid="coverage">
+          {editable} editable prop{editable === 1 ? "" : "s"} · {inspectOnly} inspect only
+        </span>
+      </div>
+      {total > 0 && (
+        <div className="bar" aria-hidden="true">
+          {total <= 12 ? (
+            Array.from({ length: total }, (_, index) => <span key={index} className={index < editable ? "on" : undefined} />)
+          ) : (
+            <>
+              {editable > 0 && <span className="on" style={{ flex: editable }} />}
+              {inspectOnly > 0 && <span style={{ flex: inspectOnly }} />}
+            </>
+          )}
+        </div>
+      )}
+      <div className="site">
+        <span className="meta">Call site</span>
+        {site ? (
+          <span className="mono" title={`${site.path}:${site.line}:${site.column}\n${inspection.anchor}`}>
+            {file} · use {site.ordinal} of {site.total}
+          </span>
+        ) : (
+          <span className="muted">No call site was anchored here.</span>
+        )}
+      </div>
+      {flags.notGenerated.includes(inspection.component) && (
+        <div className="warn" data-testid="not-generated">
+          <span className="dot" />
+          <span>
+            <span className="tag status stale">Not generated yet</span> Run <span className="mono">{flags.command}</span>{" "}
+            to read its props.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** APPLY TO: this instance, every Instance from this call site, every Instance on this page, each with its size. */
 function ScopePicker({
   debug,
   page,
@@ -421,8 +588,8 @@ function ScopePicker({
     view: scopeView(debug, page.rows, page.records, row, option),
   }));
   return (
-    <div className="card">
-      <h3>Scope</h3>
+    <div className="apply">
+      <span className="meta">Apply to</span>
       <div className="scopes" role="group" aria-label="Scope">
         {options.map(({ option, view }) => (
           <button
@@ -463,6 +630,7 @@ function MembersCard({
     const anchor = anchorOf.get(member.id) ?? "";
     bySite.set(anchor, [...(bySite.get(anchor) ?? []), member]);
   }
+  const included = view.members.filter((member) => !member.out).length;
   const memberItem = (member: ScopeView["members"][number]) => (
     <li key={member.id} onMouseEnter={() => onHover([member.id])} onMouseLeave={() => onHover([])}>
       <label>
@@ -472,15 +640,20 @@ function MembersCard({
           checked={!member.out}
           disabled={suspended}
           onChange={() => toggle(member.id, member.out)}
-        />{" "}
-        <span className="mono">{member.id === id ? "This instance" : keyOf(member.id)}</span>
-        {member.out && <span className="tag">Left out</span>}
+        />
+        <span className={member.out ? "mono muted" : "mono"}>{member.id === id ? "This instance" : keyOf(member.id)}</span>
+        {member.out && <span className="tag status">Left out</span>}
       </label>
     </li>
   );
   return (
-    <div className="card" data-testid="members">
-      <h3>Instances</h3>
+    <div className="card members" data-testid="members">
+      <div className="head">
+        <h3>Instances</h3>
+        <span className="meta">
+          {included} of {view.members.length} previewed
+        </span>
+      </div>
       <div className="muted">Untick one to leave it out: it keeps its own value.</div>
       {scope === "group" ? (
         <ul className="list">{view.members.map(memberItem)}</ul>
@@ -499,11 +672,11 @@ function MembersCard({
                     onChange={() => {
                       for (const member of members) if (member.out !== allIn) toggle(member.id, member.out);
                     }}
-                  />{" "}
+                  />
                   <span className="mono" title={anchor}>
                     {anchor ? anchor.split(" › ").slice(-2).join(" › ") : "No call site"}
-                  </span>{" "}
-                  · {members.length}
+                  </span>
+                  <span className="muted">· {members.length}</span>
                 </label>
               </legend>
               <ul className="list">{members.map(memberItem)}</ul>
@@ -514,8 +687,8 @@ function MembersCard({
       {view.server.length > 0 && (
         <ul className="list" aria-label="Server-rendered">
           {view.server.map((server) => (
-            <li key={server.id} className="mono">
-              {server.id} <span className="tag">On the server</span>
+            <li key={server.id}>
+              <span className="mono">{server.id}</span> <span className="tag status">On the server</span>
             </li>
           ))}
         </ul>
@@ -523,17 +696,20 @@ function MembersCard({
       {view.outUnmounted.length > 0 && (
         <ul className="list" aria-label="Left out, not mounted">
           {view.outUnmounted.map((outId) => (
-            <li key={outId} className="mono muted">
-              {outId} <span className="tag">Left out · not mounted</span>
+            <li key={outId}>
+              <span className="mono muted">{outId}</span> <span className="tag status dashed">Left out · not mounted</span>
             </li>
           ))}
         </ul>
       )}
       <button
         type="button"
+        className="btn small"
+        style={{ alignSelf: "flex-start" }}
         disabled={view.record === null}
         onClick={() => attempt(() => debug.discard(view.target))}
       >
+        <ResetIcon />
         Reset this scope
       </button>
     </div>
@@ -545,32 +721,20 @@ function keyOf(id: string): string {
   return id.includes("#") ? id.slice(id.indexOf("#")) : id;
 }
 
-function CallSiteCard({ inspection }: { inspection: Inspection }) {
-  const site = inspection.callSite;
-  return (
-    <div className="card">
-      <h3>Call site</h3>
-      {site ? (
-        <div className="mono">
-          {site.path}:{site.line}:{site.column} · use {site.ordinal} of {site.total}
-        </div>
-      ) : (
-        <div className="muted">No call site was anchored here.</div>
-      )}
-      <div className="mono muted">{inspection.anchor}</div>
-    </div>
-  );
-}
-
 function Footer({ page, debug }: PanelProps) {
   const count = page.overrideCount;
   return (
     <footer className="footer">
-      <span>
-        {count} override{count === 1 ? "" : "s"}
+      <span className="count">
+        <span className={count > 0 ? "dot purple" : "dot none"} />
+        <span className="text">
+          {count} Override{count === 1 ? "" : "s"} on this page
+        </span>
       </span>
+      <CopyMarkdown disabled={page.records.length === 0} />
       <button
         type="button"
+        className="btn tall"
         disabled={count === 0 || !page.status.overrides}
         onClick={() => {
           // `discard` takes a record's target, so it also drops a record whose
@@ -578,10 +742,9 @@ function Footer({ page, debug }: PanelProps) {
           for (const record of debug.records()) debug.discard(record.target);
         }}
       >
+        <ResetIcon />
         Reset all
       </button>
-      <CopyMarkdown disabled={page.records.length === 0} />
-      <ExportButton disabled={page.records.length === 0} />
     </footer>
   );
 }
@@ -595,11 +758,13 @@ function CopyMarkdown({ disabled }: { disabled: boolean }) {
     return () => clearTimeout(timer);
   }, [state]);
   const failed = typeof state === "object" ? state.failed : null;
+  const said = state === "copied" ? "Copied" : failed !== null ? "Copy failed" : null;
   return (
     <button
       type="button"
+      className={said ? "btn tall" : "btn round tall"}
       disabled={disabled || state === "copying"}
-      title={failed ?? "A short summary of every Override, to paste into a ticket"}
+      title={failed ?? "Copy as Markdown: a short summary of every Override, to paste into a ticket"}
       onClick={() => {
         setState("copying");
         copyProposalMarkdown().then(
@@ -611,7 +776,8 @@ function CopyMarkdown({ disabled }: { disabled: boolean }) {
         );
       }}
     >
-      {state === "copied" ? "Copied" : failed !== null ? "Copy failed" : "Copy as Markdown"}
+      {state === "copied" ? <CheckIcon size={14} /> : <CopyIcon />}
+      {said ?? <span className="sr-only">Copy as Markdown</span>}
     </button>
   );
 }

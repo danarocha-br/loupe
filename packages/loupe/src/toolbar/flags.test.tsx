@@ -176,7 +176,7 @@ describe("the Feature flags card", () => {
     act(() => root.render(<FlagsCard />));
     await idle();
 
-    expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("The app decides");
+    expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("APP DECIDES");
     // Declared without options: offered as on and off.
     expect(pill("showBetaFeature", "On")).toBeTruthy();
     expect(await previewedFlags()).toEqual([]);
@@ -185,7 +185,7 @@ describe("the Feature flags card", () => {
     await idle();
     await expect(overridesInCookie()).resolves.toEqual({ showBetaFeature: true });
     expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
-    expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("Previewing true");
+    expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("PREVIEWING ON");
 
     act(() => pill("plan", "Pro").click());
     await idle();
@@ -197,7 +197,7 @@ describe("the Feature flags card", () => {
     act(() => (container.querySelector('[data-flag="plan"] .reset') as HTMLButtonElement).click());
     await idle();
     expect(await previewedFlags()).toEqual([{ key: "showBetaFeature", value: true }]);
-    expect(container.querySelector('[data-flag="plan"]')?.textContent).toContain("The app decides");
+    expect(container.querySelector('[data-flag="plan"]')?.textContent).toContain("APP DECIDES");
 
     act(() => button("Clear flag previews").click());
     await idle();
