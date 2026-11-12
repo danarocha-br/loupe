@@ -14,6 +14,7 @@ import { compare } from "../meta/sources.js";
  * production build keeps it as a client reference that renders null. The Toolbar
  * stays out behind its dev-only dynamic import (PER-130); `data-loupe-toolbar`
  * is the attribute only Toolbar code writes, so it finds the Toolbar if it leaks.
+ * `loupe-flag-preview` is the flag preview's Server Actions' marker (PER-132).
  */
 export const BUILD_NEEDLES = [
   "data-ds-anchor",
@@ -22,6 +23,7 @@ export const BUILD_NEEDLES = [
   "@repo/loupe",
   "@danarocha/loupe",
   "data-loupe-toolbar",
+  "loupe-flag-preview",
 ] as const;
 
 /**

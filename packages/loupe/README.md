@@ -39,8 +39,8 @@ pnpm exec loupe doctor --build   # also runs next build under Node and scans .ne
 
 `--build` runs the app's own `next build` under Node (not the app's build
 script, which may run Bun) and fails if `.next` holds `data-ds-anchor`,
-`__loupe`, Loupe's `loader.cjs`, `@repo/loupe`, `@danarocha/loupe` or the
-Toolbar's `data-loupe-toolbar`, or if
+`__loupe`, Loupe's `loader.cjs`, `@repo/loupe`, `@danarocha/loupe`, the
+Toolbar's `data-loupe-toolbar` or its flag preview's `loupe-flag-preview`, or if
 `required-server-files.json` names the loader. It skips `.next/cache`,
 `.next/dev` and source maps (they hold the app's own source, the layout's
 import of the mount included), and writes the app's `.next` as any build does (Next may also
@@ -186,4 +186,22 @@ so once per attempt. Reset hands control back.
 Instances rendered by a Server Component are listed from React's dev-only
 `_debugInfo` and stay inspect-only. If React's dev internals don't identify the
 rendering component, Overrides turn off for the page and everything is inspect-only.
+
+### Feature flags
+
+Feature flags are the only rule the Toolbar previews. With nothing selected, the
+**Feature flags** card lists the app's flags from the Flags SDK's discovery
+endpoint, `/.well-known/vercel/flags`, which the Flags Explorer reads too. Flipping
+one writes the encrypted `vercel-flag-overrides` cookie that `flags/next` reads,
+and the page re-renders with it. **Clear** gives one flag back to the app and
+keeps the cookie's other overrides, the Vercel Toolbar's included; **Clear flag
+previews** empties the cookie. A flag with no declared options is offered as on
+and off.
+
+Both steps run as Server Actions on the dev server, because both need the app's
+`FLAGS_SECRET`: the endpoint checks an access proof made with it, and the cookie
+is encrypted with it. Without the secret or the endpoint, the card says which is
+missing. The discovery request goes to the dev server's loopback address, never
+to the host a request names. The preview lives in the cookie, so it survives a
+reload, and the Proposal builder reads it back with `previewedFlags()`.
 
