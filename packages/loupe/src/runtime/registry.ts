@@ -59,7 +59,7 @@ export type LastSeen = {
   component: string;
   anchor: string;
   hint: string | null;
-  /** The pathname it rendered on. */
+  /** The pathname it mounted on. */
   route: string;
   /** Its Current value (the app's own props) at its last commit. */
   current: Props;
@@ -71,7 +71,7 @@ export type Status = { overrides: true } | { overrides: false; reason: string };
 export type Registry = {
   store: OverrideStore;
   instances: Map<string, MountedInstance>;
-  /** Every Instance that unmounted and has not mounted again, by id. */
+  /** Unmounted Instances an Instance-scope record still names, by id; pruned as records go. */
   departed: Map<string, LastSeen>;
   status: Status;
   /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
@@ -100,6 +100,8 @@ export function registry(): Registry {
       for (const instance of created.instances.values()) {
         if (reaches(target, identityOf(instance))) instance.notify();
       }
+      const named = recordedIds(created.store);
+      for (const id of created.departed.keys()) if (!named.has(id)) created.departed.delete(id);
       emitChange();
     });
     watchRoute(() => {
@@ -213,6 +215,19 @@ function warnInspectOnly(reason: string): void {
   );
 }
 
+/** Ids an Instance-scope record holds. */
+function recordedIds(store: OverrideStore): Set<string> {
+  const ids = new Set<string>();
+  for (const record of store.records()) if (record.target.scope === "instance") ids.add(record.target.id);
+  return ids;
+}
+
+/**
+ * The route each Instance mounted on. Read at unmount, `location` may already
+ * be the next page's: a client navigation changes it before the old page's cleanups run.
+ */
+const mountedOn = new WeakMap<MountedInstance, string>();
+
 export function instanceId(anchor: string, keyPath: string): string {
   return keyPath === "" ? anchor : `${anchor}#${keyPath}`;
 }
@@ -228,6 +243,7 @@ export function register(baseId: string, entry: Omit<MountedInstance, "id">): Mo
   const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id };
   instances.set(id, instance);
+  mountedOn.set(instance, currentRoute());
   departed.delete(id);
   // Also when this one took the free base id while a `~n` is still mounted.
   const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
@@ -249,16 +265,19 @@ export function uniqueId(base: string, taken: { has(id: string): boolean }): str
 }
 
 export function unregister(instance: MountedInstance): void {
-  const { instances, departed } = registry();
+  const { instances, departed, store } = registry();
   if (instances.get(instance.id) !== instance) return;
   instances.delete(instance.id);
-  departed.set(instance.id, {
-    component: instance.component,
-    anchor: instance.anchor,
-    hint: instance.hint,
-    route: currentRoute(),
-    current: instance.live().current,
-  });
+  // Kept only while a record holds it: the Toolbar lists nothing else that isn't mounted.
+  if (recordedIds(store).has(instance.id)) {
+    departed.set(instance.id, {
+      component: instance.component,
+      anchor: instance.anchor,
+      hint: instance.hint,
+      route: mountedOn.get(instance) ?? currentRoute(),
+      current: instance.live().current,
+    });
+  }
   emitChange();
 }
 

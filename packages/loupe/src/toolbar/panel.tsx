@@ -6,8 +6,8 @@
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { overridesOffNote } from "../runtime/inspect.js";
-import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { LastSeen } from "../runtime/registry.js";
+import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
 import { attempt, type Editing, PropRowView, ScopeRowView } from "./controls.js";
 import { hasInstanceRecord, instanceRecord, safeInspect, safeProps } from "./page.js";
@@ -84,7 +84,8 @@ function ComponentList({ debug, page, onSelect, onHover }: PanelProps) {
                   onMouseEnter={() => onHover(group.instances.map((row) => row.id))}
                   onMouseLeave={() => onHover([])}
                 >
-                  {group.component} ×{group.instances.length}{" "}
+                  {group.component} ×{group.instances.length}
+                  {group.held.length > 0 && ` · ${group.held.length} not mounted`}{" "}
                   {group.overrides > 0 && <span className="tag">{group.overrides} override{group.overrides === 1 ? "" : "s"}</span>}{" "}
                   {group.instances.length === 0 ? null : group.supported ? (
                     <span className="tag supported">Supported</span>
@@ -117,7 +118,8 @@ function ComponentList({ debug, page, onSelect, onHover }: PanelProps) {
                         <span className="mono">{instanceLabel(entry.id, entry.lastSeen?.hint ?? null)}</span>{" "}
                         <span className="tag">{entry.record.suspended ? "Held for review" : "No Instance mounted"}</span>
                       </button>
-                      <HeldValues record={entry.record} lastSeen={entry.lastSeen} />
+                      {/* A held-for-review record's values are on its card above. */}
+                      {!entry.record.suspended && <HeldValues record={entry.record} lastSeen={entry.lastSeen} />}
                     </li>
                   ))}
                 </ul>

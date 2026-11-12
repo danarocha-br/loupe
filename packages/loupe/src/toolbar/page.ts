@@ -150,10 +150,10 @@ function heldInstances(debug: LoupeDebug, records: RecordRow[]): Map<string, Hel
   return held;
 }
 
-/** `path › Enclosing › Button[2]#key` → `Button`. */
+/** `path › Enclosing › Button[2]~2#key` → `Button`. */
 function componentOfAnchor(id: string): string {
   const last = id.split("#")[0]?.split(" › ").at(-1) ?? id;
-  return last.replace(/\[\d+\]$/, "");
+  return last.replace(/~\d+$/, "").replace(/\[\d+\]$/, "");
 }
 
 /** The record holding an Instance-scope Override for this id, whether it applies or is held for review. */

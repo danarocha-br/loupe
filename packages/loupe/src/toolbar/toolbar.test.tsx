@@ -706,6 +706,26 @@ describe("closed and held-for-review Overrides", () => {
     await toggleDialog();
     expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).toBeNull();
     expect(panelText()).not.toContain("No Instance mounted");
+    // Nothing is kept for it either.
+    expect(loupe.lastSeen(CONFIRM)).toBeNull();
+  });
+
+  it("lists a held Instance on the route it mounted on, even when it unmounts after a navigation", async () => {
+    await mount();
+    await toggleDialog();
+    act(() => {
+      loupe.set(CONFIRM, "variant", "default");
+    });
+    // The URL moves before the old page's Instances unmount.
+    act(() => history.pushState(null, "", "/outro"));
+    await toggleDialog();
+    expect(loupe.lastSeen(CONFIRM)?.route).toBe("/");
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).toBeNull();
+
+    act(() => history.pushState(null, "", "/"));
+    act(() => pageButton("Menu").click());
+    await settle();
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("No Instance mounted");
   });
 
   it("holds a record for review when its call site's total changes, says why, and Discard clears it", async () => {
@@ -723,6 +743,11 @@ describe("closed and held-for-review Overrides", () => {
     const review = card("Held for review") as HTMLElement;
     expect(review.textContent).toContain("Members › Button[3]");
     expect(review.textContent).toContain("Code changed here: this call site had 3 uses, now 4.");
+
+    // Closed again: its row says it is held, and its values show once, on the card.
+    await toggleDialog();
+    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("Held for review");
+    expect(shadow().querySelectorAll("[data-testid=held-values]")).toHaveLength(1);
     const discard = [...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement;
     await clickInPanel(discard);
     expect(loupe.records()).toEqual([]);
@@ -757,6 +782,9 @@ describe("closed and held-for-review Overrides", () => {
     const missing = card("Not on the page now") as HTMLElement;
     expect(missing.textContent).toContain("No Instance mounted");
     expect(missing.textContent).toContain('variant "default" · Current "ghost" (last seen)');
+
+    await clickInPanel([...missing.querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement);
+    expect(loupe.lastSeen(CONFIRM)).toBeNull();
   });
 });
 
