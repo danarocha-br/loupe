@@ -14,6 +14,8 @@ import { hasInstanceRecord, instanceRecord, safeInspect, safeProps } from "./pag
 import { formatCurrent } from "./format.js";
 import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView } from "./scopes.js";
 import { FlagsCard } from "./flags.js";
+import { useState } from "react";
+import { copyProposalMarkdown } from "./proposal.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -532,6 +534,31 @@ function Footer({ page, debug }: PanelProps) {
       >
         Reset all
       </button>
+      <CopyMarkdown disabled={page.records.length === 0} />
     </footer>
+  );
+}
+
+/** Copy as Markdown (PER-135): the Proposal's summary, for a ticket. Clears nothing. */
+function CopyMarkdown({ disabled }: { disabled: boolean }) {
+  const [done, setDone] = useState<"copied" | "failed" | null>(null);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title="A short summary of every Override, to paste into a ticket"
+      onClick={() => {
+        setDone(null);
+        copyProposalMarkdown().then(
+          () => setDone("copied"),
+          (error: unknown) => {
+            console.warn("[loupe] Copy as Markdown failed:", error);
+            setDone("failed");
+          },
+        );
+      }}
+    >
+      {done === "copied" ? "Copied" : done === "failed" ? "Copy failed" : "Copy as Markdown"}
+    </button>
   );
 }
