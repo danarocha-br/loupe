@@ -1,6 +1,6 @@
 {
   "name": "@danarocha/loupe",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Inspect and override the props of real components in a running Next.js app.",
   "license": "UNLICENSED",
   "type": "module",
