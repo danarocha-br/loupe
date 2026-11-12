@@ -8,6 +8,7 @@ export { type AdapterOptions, createAdapter } from "./adapter.js";
 export type { Authorship } from "./authored.js";
 export type { StateProp } from "./state.js";
 export { STATE_SCOPE_REASON, stateScopeRefusal } from "./state.js";
+export { TEXT_SCOPE_REASON, textScopeRefusal } from "./label-text.js";
 export type { InstanceProps, InstanceRow, LoupeDebug, RecordRow, ServerInstance } from "./debug.js";
 export type { Status } from "./registry.js";
 export type {

@@ -48,7 +48,9 @@ describe("inspect", () => {
       ["onClick", false, "FUNCTION"],
     ]);
     expect(result.coverage).toEqual({ editable: 3, inspectOnly: 3 });
-    expect(result.rows.find((row) => row.name === "children")?.label).toBe("Text");
+    expect(result.rows.find((row) => row.name === "children")).toMatchObject({ label: "Text", text: true });
+    // Only label text is marked.
+    expect(result.rows.find((row) => row.name === "variant")?.text).toBeUndefined();
   });
 
   it("shows an unset prop's default, never a guessed value", () => {
