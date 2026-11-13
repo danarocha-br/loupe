@@ -3,7 +3,7 @@
 // `test/plugin.test.mjs` keeps these equal to the CLI's own constants.
 
 export const LOUPE_PACKAGE = "@danarocha/loupe";
-export const LOUPE_VERSION = "0.0.3";
+export const LOUPE_VERSION = "0.0.4";
 
 /** Where `loupe init` writes the Product layer and its ledger, relative to the repo root. */
 export const PRODUCT_LAYER = "packages/loupe";
