@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
 import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
 import { touchPoints } from "../init/touch-points.js";
+import { version } from "../version.js";
 import { undo } from "./undo.js";
 
 const LEDGER = "packages/loupe/loupe.ledger.json";
@@ -136,6 +138,18 @@ describe("loupe remove after init", () => {
     expect(again.code).toBe(0);
     expect(again.text).toContain("Nothing to remove");
     expect(installs).toHaveLength(1);
+  });
+
+  it("undoes a package.json edit whose hash Loupe 0.0.4 recorded, with the version in it", async () => {
+    const { root, start } = await installed();
+    const ledger = JSON.parse(read(root, LEDGER));
+    const old = createHash("sha256").update(JSON.stringify([["@danarocha/loupe", version], ["@repo/loupe", "workspace:*"]])).digest("hex");
+    for (const entry of ledger.touchPoints) if (entry.id === "package-json") entry.sha256 = old;
+    writeFileSync(path.join(root, LEDGER), `${JSON.stringify(ledger, null, 2)}\n`);
+    commit(root);
+    const { code, text } = await cli(root, ["remove"]);
+    expect(code, text).toBe(0);
+    expect(diff(root, start)).toBe("");
   });
 
   it("removes the layer's ignored leftovers, such as its node_modules", async () => {

@@ -22,8 +22,12 @@ export type TouchPointId = "biome-config" | "next-config" | "package-json" | "ro
 /**
  * `exact`: the insertion is exactly what `edit` writes, so it can be adopted
  * without asking. Otherwise it is Loupe's, but shaped by someone else.
+ *
+ * `legacy`: the form Loupe 0.0.4 and earlier hashed, rebuilt with the Loupe
+ * version the ledger recorded. Only a touch point whose hash used to carry the
+ * version has one (ADR 0001).
  */
-export type Found = { canonical: string; exact: boolean };
+export type Found = { canonical: string; exact: boolean; legacy?: (version: string) => string };
 
 export type Edit = { text: string; summary: string } | { unexpected: string };
 
@@ -96,8 +100,13 @@ function packageJson(file: string, wanted: Record<string, string>): TouchPoint {
     find(text) {
       const dev = readObject(text)?.devDependencies;
       if (!isRecord(dev) || !names.every((n) => typeof dev[n] === "string")) return undefined;
-      const pairs = names.map((n) => [n, dev[n]]);
-      return { canonical: JSON.stringify(pairs), exact: names.every((n) => dev[n] === wanted[n]) };
+      // Loupe's version stays out of the hash, so a version bump never reads as drift.
+      const pairs = names.map((n) => (n === NPM_PACKAGE ? [n] : [n, dev[n]]));
+      return {
+        canonical: JSON.stringify(pairs),
+        exact: names.every((n) => dev[n] === wanted[n]),
+        legacy: (version) => JSON.stringify(names.map((n) => [n, n === NPM_PACKAGE ? version : dev[n]])),
+      };
     },
     edit(text) {
       if (text === undefined) return { unexpected: `${file} doesn't exist.` };

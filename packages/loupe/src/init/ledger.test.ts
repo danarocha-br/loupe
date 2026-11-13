@@ -59,6 +59,12 @@ function recorded(dev: Record<string, string>): string {
   return sha256(found.canonical);
 }
 
+/** A ledger that recorded Loupe 0.0.4. */
+const AT_004: Ledger = { formatVersion: 1, loupe: { package: "@danarocha/loupe", version: "0.0.4" } };
+
+/** The hash Loupe 0.0.4 and earlier recorded: the Loupe version was part of it. */
+const oldHash = (dev: Record<string, string>) => sha256(JSON.stringify(Object.entries(dev).sort(([a], [b]) => (a < b ? -1 : 1))));
+
 const auto = (hash: string): TouchPointEntry => ({ id: "package-json", file: PKG, mode: "auto", sha256: hash });
 const manual: TouchPointEntry = { id: "package-json", file: PKG, mode: "manual", sha256: null };
 
@@ -97,7 +103,7 @@ describe("judgeTouchPoint", () => {
 
   it.each(cases)("$name: $kind", ({ file, entry, kind, exact, found }) => {
     const root = repo(file === undefined ? {} : { [PKG]: file });
-    const verdict = judgeTouchPoint(root, entry(), packageJsonPoint(root));
+    const verdict = judgeTouchPoint(root, AT_004, entry(), packageJsonPoint(root));
     expect(verdict.kind).toBe(kind);
     if (verdict.kind === "unclaimed") {
       expect(verdict.claim.found.exact).toBe(exact);
@@ -109,19 +115,44 @@ describe("judgeTouchPoint", () => {
 
   it("is unrecognised when no touch point answers for an entry whose file is still there", () => {
     const root = repo({ [PKG]: packageJson(OURS) });
-    expect(judgeTouchPoint(root, auto(recorded(OURS)), undefined)).toEqual({ kind: "unrecognised" });
+    expect(judgeTouchPoint(root, AT_004, auto(recorded(OURS)), undefined)).toEqual({ kind: "unrecognised" });
   });
 
   it("is missing when no touch point answers and the file is gone", () => {
-    expect(judgeTouchPoint(repo(), auto(recorded(OURS)), undefined)).toEqual({ kind: "missing", text: undefined });
+    expect(judgeTouchPoint(repo(), AT_004, auto(recorded(OURS)), undefined)).toEqual({ kind: "missing", text: undefined });
   });
 
   it("hashes what it found the way init records it, so recording a pending step makes it intact", () => {
     const root = repo({ [PKG]: packageJson(OURS) });
     const tp = packageJsonPoint(root);
-    const claim = claimOf(judgeTouchPoint(root, manual, tp));
+    const claim = claimOf(judgeTouchPoint(root, AT_004, manual, tp));
     if (!claim) throw new Error("expected a pending step with an edit");
-    expect(judgeTouchPoint(root, { ...manual, sha256: claim.hash }, tp).kind).toBe("intact");
+    expect(judgeTouchPoint(root, AT_004, { ...manual, sha256: claim.hash }, tp).kind).toBe("intact");
+  });
+
+  it("leaves Loupe's version out of the hash, so a version bump is still intact", () => {
+    const root = repo({ [PKG]: packageJson({ ...OURS, "@danarocha/loupe": "0.0.5" }) });
+    const verdict = judgeTouchPoint(root, AT_004, auto(recorded(OURS)), packageJsonPoint(root));
+    expect(verdict.kind).toBe("intact");
+  });
+
+  it("recognises a hash Loupe 0.0.4 recorded by rebuilding it with the ledger's version", () => {
+    const root = repo({ [PKG]: packageJson({ ...OURS, "@danarocha/loupe": "0.0.5" }) });
+    const verdict = judgeTouchPoint(root, AT_004, auto(oldHash(OURS)), packageJsonPoint(root));
+    if (verdict.kind !== "intact") throw new Error(`expected intact, got ${verdict.kind}`);
+    // The hash to record from now on: the new form.
+    expect(verdict.claim.hash).toBe(recorded(OURS));
+    expect(verdict.claim.hash).not.toBe(oldHash(OURS));
+  });
+
+  it("calls an old-format hash drift when it doesn't match the version the ledger recorded", () => {
+    const root = repo({ [PKG]: packageJson(OURS) });
+    const tp = packageJsonPoint(root);
+    const at003: Ledger = { ...AT_004, loupe: { package: "@danarocha/loupe", version: "0.0.3" } };
+    expect(judgeTouchPoint(root, at003, auto(oldHash(OURS)), tp).kind).toBe("drift");
+    // Hand-edited after Loupe 0.0.4 recorded it: the other dependency still counts.
+    const edited = repo({ [PKG]: packageJson({ ...OURS, "@repo/loupe": "workspace:^" }) });
+    expect(judgeTouchPoint(edited, AT_004, auto(oldHash(OURS)), packageJsonPoint(edited)).kind).toBe("drift");
   });
 });
 

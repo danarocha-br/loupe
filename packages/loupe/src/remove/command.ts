@@ -166,7 +166,7 @@ function planRemoval(root: string, ledger: Ledger): Plan {
     const entry = entries.find((e) => e.id === id);
     if (!entry) return;
     const tp = points.get(id) ?? (id === "biome-config" ? biomeConfig(entry.file) : undefined);
-    const v = (override ?? ((x) => x))(judge(root, entry, tp));
+    const v = (override ?? ((x) => x))(judge(root, ledger, entry, tp));
     const abs = path.join(root, entry.file);
     if (v.kind === "undo") plan.writes.push({ id, file: entry.file, text: v.text, before: readFileSync(abs, "utf8") });
     else if (v.kind === "kept") plan.kept.push({ id, file: entry.file, why: v.why });
@@ -186,10 +186,10 @@ function planRemoval(root: string, ledger: Ledger): Plan {
   return plan;
 }
 
-function judge(root: string, entry: TouchPointEntry, tp: TouchPoint | undefined): Removal {
+function judge(root: string, ledger: Ledger, entry: TouchPointEntry, tp: TouchPoint | undefined): Removal {
   // A touch point now drawn from another file doesn't answer for this entry.
   const point = tp?.file === entry.file ? tp : undefined;
-  const verdict = judgeTouchPoint(root, entry, point);
+  const verdict = judgeTouchPoint(root, ledger, entry, point);
   switch (verdict.kind) {
     case "unrecognised":
       return { kind: "kept", why: `loupe remove doesn't recognise ${entry.file} as this touch point any more` };

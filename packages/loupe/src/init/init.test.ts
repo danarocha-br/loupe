@@ -3,7 +3,9 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
 import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
-import { EXIT_MANUAL } from "./command.js";
+import { EXIT_MANUAL, parseInitArgs, runInit } from "./command.js";
+import { type Ledger as LedgerFile, serialiseLedger } from "./ledger.js";
+import { sha256 } from "./syntax.js";
 
 const LEDGER = "packages/loupe/loupe.ledger.json";
 const temps: string[] = [];
@@ -89,12 +91,28 @@ async function initAnswering(root: string, answers: string[], ...argv: string[])
   return { code, text: out.join("\n") };
 }
 
+/** `loupe init` as the given installed Loupe version would run it. */
+async function initAt(root: string, version: string, ...argv: string[]) {
+  const options = parseInitArgs(argv);
+  if (typeof options === "string") throw new Error(options);
+  const out: string[] = [];
+  const code = await runInit(options, {
+    out: (line) => out.push(line),
+    err: (line) => out.push(line),
+    ask: async () => "",
+    cwd: root,
+    nodeVersion: "22.22.2",
+    version,
+  });
+  return { code, text: out.join("\n") };
+}
+
 const read = (root: string, file: string) => readFileSync(path.join(root, file), "utf8");
 type Ledger = {
   touchPoints: { id: string; file: string; mode: string; sha256: string | null }[];
   files: { path: string; sha256: string }[];
   productLayer: unknown;
-  loupe: unknown;
+  loupe?: { package: string; version: string };
 };
 const ledger = (root: string) => JSON.parse(read(root, LEDGER)) as Ledger;
 
@@ -243,16 +261,13 @@ describe("a touch point with an unexpected shape", () => {
 });
 
 describe("the ledger", () => {
-  it("refuses a ledger from a newer format or another Loupe version", async () => {
+  it("refuses a ledger from a newer format", async () => {
     const root = gitRepo({ [LEDGER]: { formatVersion: 2 } });
     const before = snapshot(root);
     const newer = await init(root);
     expect(newer.code).toBe(1);
     expect(newer.text).toContain("formatVersion 2");
     expect(snapshot(root)).toEqual(before);
-
-    const other = gitRepo({ [LEDGER]: { formatVersion: 1, loupe: { package: "@danarocha/loupe", version: "9.9.9" } } });
-    expect((await init(other)).text).toContain("was written by Loupe 9.9.9");
   });
 
   it("keeps a yes the check records during the same run", async () => {
@@ -273,3 +288,141 @@ describe("the ledger", () => {
   });
 });
 
+describe("upgrading by rerunning loupe init", () => {
+  const PKG = "apps/web/package.json";
+  const LAYOUT = "apps/web/app/layout.tsx";
+  const packageJsonHash = (root: string) => ledger(root).touchPoints.find((t) => t.id === "package-json")?.sha256;
+  const peer = (root: string) => JSON.parse(read(root, "packages/loupe/package.json")).peerDependencies["@danarocha/loupe"];
+
+  /** An install as Loupe 0.0.4 left it, committed: its package-json hash carries the version. */
+  async function installedAt004(): Promise<string> {
+    const root = gitRepo();
+    expect((await initAt(root, "0.0.4")).code).toBe(0);
+    const l = JSON.parse(read(root, LEDGER)) as LedgerFile;
+    for (const t of l.touchPoints ?? []) {
+      if (t.id === "package-json") t.sha256 = sha256(JSON.stringify([["@danarocha/loupe", "0.0.4"], ["@repo/loupe", "workspace:*"]]));
+    }
+    writeFileSync(path.join(root, LEDGER), serialiseLedger(l));
+    commit(root);
+    return root;
+  }
+
+  /** The person's half: the version bump in the app's package.json (pnpm install updates the lockfile too). */
+  function bump(root: string, version: string): void {
+    const json = JSON.parse(read(root, PKG));
+    json.devDependencies["@danarocha/loupe"] = version;
+    writeFileSync(path.join(root, PKG), `${JSON.stringify(json, null, 2)}\n`);
+  }
+
+  it("moves an install to the newer version and re-records the old-format hash", async () => {
+    const root = await installedAt004();
+    bump(root, "0.0.5");
+    commit(root);
+
+    const { code, text } = await initAt(root, "0.0.5");
+    expect(text).toMatch(/package-json +apps\/web\/package\.json: recorded again, without Loupe's version in its hash/);
+    expect(text).toContain("Upgraded from Loupe 0.0.4 to 0.0.5.");
+    expect(code).toBe(0);
+    expect(ledger(root).loupe).toEqual({ package: "@danarocha/loupe", version: "0.0.5" });
+    expect(packageJsonHash(root)).toBe(sha256(JSON.stringify([["@danarocha/loupe"], ["@repo/loupe", "workspace:*"]])));
+    expect(peer(root)).toBe("0.0.5");
+
+    commit(root);
+    const settled = snapshot(root);
+    const again = await initAt(root, "0.0.5");
+    expect(again.text).toContain("Nothing to do");
+    expect(again.code).toBe(0);
+    expect(snapshot(root)).toEqual(settled);
+  });
+
+  it("keeps the old version while a hand-edited file blocks it, and a rerun finishes the upgrade", async () => {
+    const root = await installedAt004();
+    const original = read(root, LAYOUT);
+    writeFileSync(path.join(root, LAYOUT), original.replace("<LoupeMount />", "<LoupeMount debug />"));
+    bump(root, "0.0.5");
+    commit(root);
+
+    const blocked = await initAt(root, "0.0.5");
+    expect(blocked.code).toBe(1);
+    expect(blocked.text).toMatch(/root-layout +apps\/web\/app\/layout\.tsx: changed since loupe init recorded it; left as is/);
+    expect(blocked.text).toContain(`${LEDGER} stays at Loupe 0.0.4 until they are resolved.`);
+    expect(ledger(root).loupe).toEqual({ package: "@danarocha/loupe", version: "0.0.4" });
+    // The other items were reconciled, each recorded before it was written.
+    expect(peer(root)).toBe("0.0.5");
+    expect(packageJsonHash(root)).toBe(sha256(JSON.stringify([["@danarocha/loupe"], ["@repo/loupe", "workspace:*"]])));
+
+    writeFileSync(path.join(root, LAYOUT), original);
+    commit(root);
+    const rerun = await initAt(root, "0.0.5");
+    expect(rerun.text).toContain("Upgraded from Loupe 0.0.4 to 0.0.5.");
+    expect(rerun.code).toBe(0);
+    expect(ledger(root).loupe).toEqual({ package: "@danarocha/loupe", version: "0.0.5" });
+  });
+
+  it("refuses a newer Loupe while the app still pins the old one, as pnpm dlx would run it", async () => {
+    const root = await installedAt004();
+    const before = snapshot(root);
+    const { code, text } = await initAt(root, "0.0.5");
+    expect(code).toBe(1);
+    expect(text).toContain("apps/web/package.json has @danarocha/loupe 0.0.4, and this is Loupe 0.0.5.");
+    expect(text).toContain("To upgrade, set it to 0.0.5, run pnpm install, commit, then rerun loupe init.");
+    expect(snapshot(root)).toEqual(before);
+  });
+
+  it("keeps the old version while a manual step waits, even after --adopt, until a rerun", async () => {
+    const root = await installedAt004();
+    const fnConfig = 'import type { NextConfig } from "next";\n\nexport default (phase: string): NextConfig => ({});\n';
+    writeFileSync(path.join(root, "apps/web/next.config.ts"), fnConfig);
+    bump(root, "0.0.5");
+    commit(root);
+
+    const first = await initAt(root, "0.0.5");
+    expect(first.code).toBe(EXIT_MANUAL);
+    expect(first.text).toContain(`${LEDGER} stays at Loupe 0.0.4 until the manual steps are recorded.`);
+    expect(ledger(root).loupe?.version).toBe("0.0.4");
+
+    writeFileSync(
+      path.join(root, "apps/web/next.config.ts"),
+      'import { withLoupe } from "@repo/loupe/next";\nimport type { NextConfig } from "next";\n\nexport default withLoupe((phase: string): NextConfig => ({}));\n',
+    );
+    const adopted = await initAt(root, "0.0.5", "--adopt");
+    expect(adopted.code).toBe(0);
+    expect(adopted.text).toContain("Rerun loupe init to finish upgrading to 0.0.5.");
+    expect(ledger(root).loupe?.version).toBe("0.0.4");
+
+    commit(root);
+    const rerun = await initAt(root, "0.0.5");
+    expect(rerun.text).toContain("Upgraded from Loupe 0.0.4 to 0.0.5.");
+    expect(rerun.code).toBe(0);
+    expect(ledger(root).loupe?.version).toBe("0.0.5");
+  });
+
+  it("refuses a downgrade and writes nothing", async () => {
+    const root = await installedAt004();
+    const before = snapshot(root);
+    const { code, text } = await initAt(root, "0.0.3");
+    expect(code).toBe(1);
+    expect(text).toContain(`${LEDGER} was written by Loupe 0.0.4; this is 0.0.3.`);
+    expect(text).toContain("Install @danarocha/loupe@0.0.4");
+    expect(snapshot(root)).toEqual(before);
+  });
+
+  it("asks for the version bump to be committed first", async () => {
+    const root = await installedAt004();
+    bump(root, "0.0.5");
+    const before = snapshot(root);
+    const { code, text } = await initAt(root, "0.0.5");
+    expect(code).toBe(1);
+    expect(text).toContain(PKG);
+    expect(text).toContain("records Loupe 0.0.4, and 0.0.5 is installed: commit the version bump, then rerun loupe init.");
+    expect(text).toContain("Nothing was written.");
+    expect(snapshot(root)).toEqual(before);
+
+    // The lockfile alone counts too: pnpm install changed it after the bump was committed.
+    commit(root);
+    writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n# 0.0.5\n");
+    const lock = await initAt(root, "0.0.5");
+    expect(lock.code).toBe(1);
+    expect(lock.text).toContain("commit the version bump, then rerun loupe init.");
+  });
+});

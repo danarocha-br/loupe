@@ -290,20 +290,25 @@ loaded.
 
 ## Upgrade
 
-The intended upgrade is a version bump plus `generate`, with no full reinstall.
-**That path isn't finished in 0.0.x.** `generate` rewrites your components'
-files for the new version, but the ledger and `packages/loupe/package.json`
-keep the old version. `doctor` then reports "Loupe versions differ", and
-`loupe init` refuses to run. If you already tried it and see either message,
-undo the attempt with git first: `git restore` the app's `package.json`,
-`pnpm-lock.yaml` and `packages/loupe`, run `pnpm install`, then follow the steps
-below.
+You upgrade Loupe in place: bump the version, install, commit, and rerun
+`loupe init`. Nothing is removed. For an app in `apps/app`:
 
-Until that's fixed, upgrade by removing Loupe and installing it again:
+1. In `apps/app/package.json`, change `@danarocha/loupe` to the new version.
+   Keep it exact, without `^`. Then run `pnpm install` from the repo root.
+2. Commit `apps/app/package.json` and `pnpm-lock.yaml`. `loupe init` won't run
+   while they have uncommitted changes, and says "commit the version bump, then
+   rerun" if you forget.
+3. From the repo root, run:
 
-1. Run `/loupe:remove` and commit the result. Removal uses the Loupe copy in
-   your app, so it doesn't matter which plugin version you have.
-2. Update the plugin, then restart Claude Code:
+   ```bash
+   pnpm -C apps/app exec loupe init
+   ```
+
+   It rewrites its own files in `packages/loupe`, regenerates your components'
+   files for the new version, and ends with "Upgraded from Loupe <old> to <new>". Commit what it
+   wrote.
+4. Update the plugin too, so its skills match the new version, then restart
+   Claude Code:
 
    ```bash
    claude plugin marketplace update loupe
@@ -313,10 +318,16 @@ Until that's fixed, upgrade by removing Loupe and installing it again:
    claude plugin update loupe@loupe
    ```
 
-3. Run `/loupe:install`.
+5. Restart `next dev`, since a running dev server still has the old Loupe
+   loaded.
 
-You lose nothing you'd want to keep: your component changes only ever lived in
-the browser tab.
+If `loupe init` stops on a file that was edited by hand, the install stays on
+the old version until that's resolved. `/loupe:doctor` says which file and
+reports "Loupe versions differ". Restore the file with git, commit, and run
+`loupe init` again: it picks up where it stopped.
+
+Loupe never moves an install to an older version: `loupe init` refuses when the
+installed version is older than the one it recorded.
 
 ## Troubleshooting
 

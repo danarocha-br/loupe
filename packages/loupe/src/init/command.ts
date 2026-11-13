@@ -8,7 +8,7 @@ import path from "node:path";
 import { type CheckIo, checkCompatibility } from "../compat/check.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
 import { runGenerate } from "../generate/command.js";
-import { version as installedVersion } from "../version.js";
+import { compareVersions, version as installedVersion } from "../version.js";
 import {
   claimOf,
   type FileEntry,
@@ -40,7 +40,8 @@ export const initUsage = `Usage: loupe init [options]
 Runs the compatibility check, creates the Product layer (${PRODUCT_LAYER.path}),
 makes four edits (the app's package.json, next.config.ts, the root layout and the
 Biome config), then runs loupe generate. Each edit is recorded in ${LEDGER_PATH}.
-A rerun writes only what is missing. Loupe never writes the lockfile.
+A rerun writes only what is missing; with a newer Loupe installed, it upgrades
+the install. Loupe never writes the lockfile.
 
 Options:
   --app <dir>      the app to install into (asked when there are several)
@@ -94,18 +95,34 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
     io.out(NOTHING_WRITTEN);
     return 1;
   }
-  if (ledger.loupe && ledger.loupe.version !== version) {
-    io.err(`${LEDGER_PATH} was written by Loupe ${ledger.loupe.version}; this is ${version}.`);
-    io.err(`Install ${NPM_PACKAGE}@${ledger.loupe.version}, or run loupe generate for an upgrade's Adapters.`);
+  // A newer Loupe is an upgrade: init reconciles every item, then moves the recorded version (ADR 0001).
+  const recorded = ledger.loupe?.version;
+  const order = recorded === undefined ? 0 : compareVersions(version, recorded);
+  if (order < 0) {
+    io.err(`${LEDGER_PATH} was written by Loupe ${recorded}; this is ${version}.`);
+    io.err(`Install ${NPM_PACKAGE}@${recorded}.`);
     io.out(NOTHING_WRITTEN);
     return 1;
   }
+  const upgrade: Upgrade | undefined = recorded !== undefined && order > 0 ? { from: recorded, to: version } : undefined;
 
   const knownApp = options.app ?? ledger.productLayer?.app;
+  // The bump comes first: a newer Loupe run through `pnpm dlx` must not move an app still pinned to the old one.
+  // Only a plain version is checked; a `catalog:` or `workspace:` pin is the person's own way to name it.
+  if (upgrade && knownApp !== undefined) {
+    const pin = dependency(readJson<PackageJson>(path.join(root, knownApp, "package.json")) ?? {}, NPM_PACKAGE);
+    if (pin === undefined || (/^\d/.test(pin) && pin !== version)) {
+      io.err(`${knownApp}/package.json has ${NPM_PACKAGE} ${pin ?? "missing"}, and this is Loupe ${version}.`);
+      io.err(`To upgrade, set it to ${version}, run pnpm install, commit, then rerun loupe init.`);
+      io.out(NOTHING_WRITTEN);
+      return 1;
+    }
+  }
   // Before the check, so a refusal records nothing, and again once the app is known.
   // `--adopt` writes only the ledger and generate's output, so it skips this.
   const guard = !options.adopt;
-  if (guard && refuseDirty(dirtyPaths(root, git, protectedPaths(root, knownApp, version)), options, io, ledger)) {
+  const bump = upgrade && knownApp !== undefined ? { ...upgrade, files: [LOCKFILE, `${knownApp}/package.json`] } : undefined;
+  if (guard && refuseDirty(dirtyPaths(root, git, protectedPaths(root, knownApp, version)), options, io, ledger, bump)) {
     return 1;
   }
 
@@ -144,9 +161,10 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
     return 1;
   }
 
-  const run = new Run(root, ledger, io);
+  const run = new Run(root, ledger, io, upgrade, options.adopt);
   run.ledger.formatVersion ??= LEDGER_FORMAT_VERSION;
-  run.ledger.loupe = { package: NPM_PACKAGE, version };
+  // A first install records its version up front; an upgrade moves it last (Run.finish).
+  run.ledger.loupe ??= { package: NPM_PACKAGE, version };
   run.ledger.productLayer = { app, name: PRODUCT_LAYER.name, path: PRODUCT_LAYER.path };
   const points = touchPoints({ root, app, version, workspaceProtocol: protocol });
 
@@ -186,7 +204,14 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   return run.finish();
 }
 
-/** One `init` run: the ledger in memory, written ahead of every file it describes. */
+/** An install moving from the recorded Loupe version to the newer one installed. */
+type Upgrade = { from: string; to: string };
+
+/**
+ * One `init` run: the ledger in memory, written ahead of every file it describes. During an `upgrade`,
+ * the recorded version moves last, and only when nothing was left blocked: no item left as is, no manual
+ * step waiting. `--adopt` reconciles nothing else, so it never moves it.
+ */
 class Run {
   problems = 0;
   manual = 0;
@@ -197,6 +222,8 @@ class Run {
     readonly root: string,
     readonly ledger: Ledger,
     readonly io: InitIo,
+    readonly upgrade: Upgrade | undefined,
+    readonly adopting: boolean,
   ) {}
 
   private record(): void {
@@ -254,11 +281,16 @@ class Run {
 
   touchPoint(tp: TouchPoint): void {
     const entry = this.ledger.touchPoints?.find((t) => t.id === tp.id);
-    const verdict = judgeTouchPoint(this.root, entry, tp);
+    const verdict = judgeTouchPoint(this.root, this.ledger, entry, tp);
     const line = (mark: string, what: string) => this.io.out(`  ${mark} ${tp.id.padEnd(13)}${tp.file}: ${what}`);
 
     switch (verdict.kind) {
       case "intact":
+        // A hash Loupe 0.0.4 or earlier recorded, with the Loupe version in it.
+        if (entry && verdict.claim.hash !== entry.sha256) {
+          this.setTouchPoint({ ...entry, sha256: verdict.claim.hash });
+          line("✓", "recorded again, without Loupe's version in its hash");
+        }
         return;
       case "drift":
         this.problems += 1;
@@ -297,7 +329,7 @@ class Run {
   /** `--adopt`: records a hand-made Loupe edit; touches no file but the ledger. */
   adopt(tp: TouchPoint): void {
     const entry = this.ledger.touchPoints?.find((t) => t.id === tp.id);
-    const verdict = judgeTouchPoint(this.root, entry, tp);
+    const verdict = judgeTouchPoint(this.root, this.ledger, entry, tp);
     const pending = entry
       ? entry.mode === "manual" && verdict.kind === "pending"
       : verdict.kind === "unclaimed" && !verdict.claim.found.exact;
@@ -338,15 +370,28 @@ class Run {
   finish(): number {
     const { io } = this;
     io.out("");
+    const { upgrade } = this;
+    const unfinished = (why: string) =>
+      upgrade && `${LEDGER_PATH} stays at Loupe ${upgrade.from} ${why}. Then rerun loupe init to finish upgrading to ${upgrade.to}.`;
     if (this.problems > 0) {
       io.err(`${this.problems} item${this.problems === 1 ? "" : "s"} need${this.problems === 1 ? "s" : ""} attention; loupe init never overwrites them.`);
+      const line = unfinished("until they are resolved");
+      if (line) io.err(line);
       return 1;
     }
+    const upgraded = upgrade !== undefined && this.manual === 0 && !this.adopting;
+    if (upgraded) {
+      this.ledger.loupe = { package: NPM_PACKAGE, version: upgrade.to };
+      this.record();
+    }
+    const rerun = upgrade && !upgraded && this.manual === 0 ? `Rerun loupe init to finish upgrading to ${upgrade.to}.` : undefined;
     if (!this.wrote && this.manual === 0) {
       io.out(`Nothing to do: everything matches ${LEDGER_PATH}.`);
+      if (rerun) io.out(rerun);
       return 0;
     }
     io.out(`Recorded in ${LEDGER_PATH}.`);
+    if (upgraded) io.out(`Upgraded from Loupe ${upgrade.from} to ${upgrade.to}.`);
     if (this.packageJsonChanged) {
       io.out(`Next: run pnpm install to link ${PRODUCT_LAYER.name}. Loupe never writes the lockfile.`);
     }
@@ -354,8 +399,11 @@ class Run {
       io.out(
         `${this.manual} manual step${this.manual === 1 ? "" : "s"} needed. After making ${this.manual === 1 ? "it" : "them"}, run loupe init --adopt.`,
       );
+      const line = unfinished("until the manual steps are recorded");
+      if (line) io.out(line);
       return EXIT_MANUAL;
     }
+    if (rerun) io.out(rerun);
     return 0;
   }
 }
@@ -394,7 +442,10 @@ export function dirtyPaths(root: string, git: string, guarded: string[]): Dirty 
   return { blocking: dirty.filter(blocks), other: dirty.filter((f) => !blocks(f)) };
 }
 
-function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: Ledger): boolean {
+/** An upgrade, and the files its version bump changes. */
+type Bump = Upgrade & { files: string[] };
+
+function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: Ledger, bump?: Bump): boolean {
   if (dirty.blocking.length === 0) {
     if (dirty.other.length > 0) io.out(`Note: ${dirty.other.length} other file(s) have uncommitted changes; Loupe won't touch them.`);
     return false;
@@ -409,7 +460,11 @@ function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: Led
     return false;
   }
   list("These files have uncommitted changes, and loupe init may write them:");
-  io.err("Commit or stash them, or rerun with --allow-dirty.");
+  if (bump && dirty.blocking.some((f) => bump.files.includes(f))) {
+    io.err(`${LEDGER_PATH} records Loupe ${bump.from}, and ${bump.to} is installed: commit the version bump, then rerun loupe init.`);
+  } else {
+    io.err("Commit or stash them, or rerun with --allow-dirty.");
+  }
   const pending = (ledger.touchPoints ?? []).filter((t) => t.mode === "manual" && !t.sha256);
   if (pending.some((t) => dirty.blocking.includes(t.file))) {
     io.err("If that is a manual step you just made, record it with loupe init --adopt.");
