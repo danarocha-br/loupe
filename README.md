@@ -348,10 +348,9 @@ Delete the cookie: in Chrome, open DevTools → Application → Cookies →
 `http://localhost`, delete `vercel-flag-overrides`, and reload. Next time, press
 **Clear flag previews** before switching projects.
 
-How long a preview lasts depends on the Loupe version. With 0.0.3, the release
-the plugin installs today, the cookie has no expiry date: it stays until you
-clear it or end the browser session. From the next release, it expires 8 hours
-after your last flag change, and the Feature flags card says so.
+From 0.0.4 on, a preview expires 8 hours after your last flag change, and the
+Feature flags card says so. A cookie written by 0.0.3 or earlier has no expiry
+date: it stays until you clear it or end the browser session.
 
 ### The panel doesn't appear
 
