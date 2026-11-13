@@ -1,6 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { callSiteId, instanceId } from "../call-site.js";
-import { createOverrideStore, reaches, type InstanceKey, type ScopeTarget } from "./store.js";
+import { callSiteId, instanceId, unanchoredId } from "../call-site.js";
+import {
+  createOverrideStore,
+  type InstanceKey,
+  inScope,
+  namesInstance,
+  reachOf,
+  recordsFor,
+  type Scope,
+  type ScopeTarget,
+  targetAt,
+} from "./store.js";
 
 const TRIGGER = callSiteId({ path: "app/menu.tsx", enclosing: "MemberRowMenu", component: "Button", ordinal: 1 });
 const OTHER_SITE = callSiteId({ path: "app/invites.tsx", enclosing: "InvitationRowMenu", component: "Button", ordinal: 1 });
@@ -385,14 +395,14 @@ describe("Override store: change notifications", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it("reaches() says which Instances a record reaches", () => {
-    expect(reaches(instance(ROW_1), row(1))).toBe(true);
-    expect(reaches(instance(ROW_1), row(2))).toBe(false);
-    expect(reaches(group(), row(2))).toBe(true);
-    expect(reaches(group(), invite())).toBe(false);
-    expect(reaches(page(), invite())).toBe(true);
-    expect(reaches(page("Badge"), invite())).toBe(false);
-    expect(reaches(page("Button", "/other"), invite())).toBe(false);
+  it("inScope() says which Instances a record's scope holds", () => {
+    expect(inScope(instance(ROW_1), row(1))).toBe(true);
+    expect(inScope(instance(ROW_1), row(2))).toBe(false);
+    expect(inScope(group(), row(2))).toBe(true);
+    expect(inScope(group(), invite())).toBe(false);
+    expect(inScope(page(), invite())).toBe(true);
+    expect(inScope(page("Badge"), invite())).toBe(false);
+    expect(inScope(page("Button", "/other"), invite())).toBe(false);
   });
 });
 
@@ -580,5 +590,176 @@ describe("Override store: kept across unmount, suspended for review (PER-125)", 
     store.set(instance(ROW_1), "variant", "destructive");
     store.observe(seen(1, null));
     expect(store.resolve(at(1, null)).props.variant).toBe("destructive");
+  });
+});
+
+describe("Override resolution: Overrides off", () => {
+  const OFF = { overrides: false as const, reason: "React reported no fiber." };
+
+  it("starts on, and resolves to the Current value alone once off, every value from the app", () => {
+    const store = createOverrideStore();
+    expect(store.status).toEqual({ overrides: true });
+    store.set(instance(ROW_1), "variant", "destructive");
+    expect(store.disable(OFF.reason)).toBe(true);
+    expect(store.status).toEqual(OFF);
+    expect(store.resolve(row(1, { variant: "ghost", size: "sm" }))).toEqual({
+      props: { variant: "ghost", size: "sm" },
+      sources: { variant: "app", size: "app" },
+      overrides: {},
+    });
+    expect(store.applies(row(1))).toBe(false);
+    // The records stay: only what applies changes.
+    expect(store.records()).toHaveLength(1);
+  });
+
+  it("can start off, and stays off: a second disable changes nothing", () => {
+    const store = createOverrideStore({ status: OFF });
+    expect(store.status).toEqual(OFF);
+    expect(store.disable("another reason")).toBe(false);
+    expect(store.status).toEqual(OFF);
+  });
+
+  it("refuses every write while off, with the same message", () => {
+    const store = createOverrideStore();
+    store.set(group(), "variant", "destructive");
+    store.disable(OFF.reason);
+    const message = `[loupe] Overrides are off, everything is inspect-only: ${OFF.reason}`;
+    expect(() => store.set(instance(ROW_1), "variant", "outline")).toThrow(message);
+    expect(() => store.reset(group(), "variant")).toThrow(message);
+    expect(() => store.reset(group())).toThrow(message);
+    expect(() => store.exclude(group(), ROW_1)).toThrow(message);
+    expect(() => store.include(group(), ROW_1)).toThrow(message);
+    expect(() => store.reapply(group())).toThrow(message);
+  });
+});
+
+describe("Override resolution: the before view", () => {
+  const dialog = (current: Record<string, unknown> = { open: false, tone: "plain" }) => ({
+    ...row(1, current),
+    stateProps: ["open"],
+  });
+
+  it("renders the proposed view by default: what resolve gives", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "open", true);
+    store.set(instance(ROW_1), "tone", "danger");
+    expect(store.view).toBe("proposed");
+    expect(store.render(dialog())).toEqual(store.resolve(dialog()));
+  });
+
+  it("keeps only the State-prop Overrides in the before view, and resolve ignores the view", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "open", true);
+    store.set(group(), "tone", "danger");
+    expect(store.setView("before")).toBe(true);
+    expect(store.setView("before")).toBe(false);
+    expect(store.render(dialog())).toEqual({
+      props: { open: true, tone: "plain" },
+      sources: { open: "instance", tone: "app" },
+      overrides: { open: true },
+    });
+    expect(store.resolve(dialog()).overrides).toEqual({ open: true, tone: "danger" });
+    store.setView("proposed");
+    expect(store.render(dialog()).props).toEqual({ open: true, tone: "danger" });
+  });
+
+  it("renders the Current value alone with Overrides off, in either view", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "open", true);
+    store.disable("off");
+    store.setView("before");
+    expect(store.render(dialog()).props).toEqual({ open: false, tone: "plain" });
+  });
+});
+
+describe("Override resolution: Reach", () => {
+  const suspended = { reason: "ambiguous" as const, ids: [ROW_2] };
+  const record = (target: ScopeTarget, excluded: string[] = [], isSuspended = false) => ({
+    target,
+    excluded,
+    suspended: isSuspended ? suspended : null,
+  });
+
+  it.each([
+    ["an Instance record, its own Instance", record(instance(ROW_1)), row(1), "applies"],
+    ["an Instance record, another Instance", record(instance(ROW_1)), row(2), null],
+    ["a group record, an Instance of its call site", record(group()), row(2), "applies"],
+    ["a group record, another call site", record(group()), invite(), null],
+    ["a page record, the component on its route", record(page()), invite(), "applies"],
+    ["a page record, another component", record(page("Badge")), invite(), null],
+    ["a page record, another route", record(page("Button", "/other")), invite(), null],
+    ["a group record that leaves the Instance out", record(group(), [ROW_1]), row(1), "left-out"],
+    ["a group record that leaves another one out", record(group(), [ROW_2]), row(1), "applies"],
+    ["a suspended group record", record(group(), [], true), row(1), "suspended"],
+    ["a suspended group record that leaves the Instance out", record(group(), [ROW_1], true), row(1), "left-out"],
+    ["a suspended record outside the scope", record(group(), [], true), invite(), null],
+  ] as const)("%s: %s", (_name, given, identity, expected) => {
+    expect(reachOf(given, identity)).toBe(expected);
+  });
+
+  it("recordsFor lists the records whose scope holds the Instance, in the order given, with its Reach", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "variant", "outline");
+    store.set(instance(ROW_2), "variant", "outline");
+    store.set(group(), "size", "sm");
+    store.exclude(group(), ROW_1);
+    store.set(page(), "variant", "secondary");
+    store.set(group(OTHER_SITE), "size", "lg");
+    expect(recordsFor(store.records(), row(1)).map(({ record, reach }) => [record.target.scope, reach])).toEqual([
+      ["instance", "applies"],
+      ["group", "left-out"],
+      ["page", "applies"],
+    ]);
+  });
+
+  it("recordsFor lists them narrowest first, whatever order it is given", () => {
+    const records = [record(page()), record(group()), record(instance(ROW_1))];
+    expect(recordsFor(records, row(1)).map(({ record: { target } }) => target.scope)).toEqual(["instance", "group", "page"]);
+  });
+
+  it("a record names the Instances it doesn't leave out, suspended or not", () => {
+    expect(namesInstance(record(group()), row(1))).toBe(true);
+    expect(namesInstance(record(group(), [], true), row(1))).toBe(true);
+    expect(namesInstance(record(group(), [ROW_1], true), row(1))).toBe(false);
+    expect(namesInstance(record(group()), invite())).toBe(false);
+  });
+
+  it("agrees with resolve: a record only changes an Instance it applies to", () => {
+    const store = createOverrideStore();
+    store.set(group(), "variant", "destructive");
+    store.exclude(group(), ROW_1);
+    for (const n of [1, 2]) {
+      const [entry] = recordsFor(store.records(), row(n));
+      expect(entry?.reach === "applies").toBe(store.resolve(row(n)).sources.variant === "group");
+    }
+  });
+});
+
+describe("Override resolution: the record an Override goes into", () => {
+  const identity = { id: ROW_1, anchor: TRIGGER, component: "Button", route: ROUTE };
+
+  it("names the Instance, its call site, or its component on its route", () => {
+    expect(targetAt(identity, "instance")).toEqual(instance(ROW_1));
+    expect(targetAt(identity, "group")).toEqual(group());
+    expect(targetAt(identity, "page")).toEqual(page());
+  });
+
+  it("has no group for an Instance with no call site", () => {
+    expect(targetAt({ ...identity, anchor: unanchoredId("Button") }, "group")).toBeNull();
+  });
+
+  it("refuses an unknown scope", () => {
+    expect(() => targetAt(identity, "everywhere" as Scope)).toThrow(
+      '[loupe] Unknown scope "everywhere": use "instance", "group" or "page".',
+    );
+  });
+
+  it("is the record the Override lands in: reachOf says it applies to that Instance", () => {
+    const store = createOverrideStore();
+    for (const scope of ["instance", "group", "page"] as const) {
+      const target = targetAt(identity, scope);
+      if (target) store.set(target, "variant", scope);
+    }
+    expect(recordsFor(store.records(), { ...identity }).map(({ reach }) => reach)).toEqual(["applies", "applies", "applies"]);
   });
 });

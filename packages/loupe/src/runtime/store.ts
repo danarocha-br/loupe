@@ -1,5 +1,10 @@
-// The Override store: plain records, no React, so every scope rule is testable
-// without rendering.
+// Override resolution: the one authority on what applies to an Instance now.
+// Plain records, no React, no globals, so every rule is testable without rendering.
+//
+// It holds the Override records, whether Overrides are on at all (the React
+// self-check), and the view (the page as proposed, or the "before" view a Snapshot
+// captures). It answers two questions: what an Instance renders with (`resolve`,
+// `render`), and which Instances a record reaches (`reachOf`).
 //
 // One record per scope target: an Instance, a call-site group (one call site, on
 // any route) or a page (one component on one route). Per prop the narrowest scope
@@ -11,7 +16,18 @@
 // A record pins the total of each call site it names. A changed total, or an id
 // that more than one mounted Instance holds, suspends it: never rebound to a guess.
 
+import { isUnanchored } from "../call-site.js";
+
 export type Props = Record<string, unknown>;
+
+/** Overrides are disabled and everything is inspect-only while `overrides` is false. */
+export type Status = { overrides: true } | { overrides: false; reason: string };
+
+/**
+ * `before` renders every Instance as the app has it, keeping only State-prop
+ * Overrides, for a Snapshot's "before" image (PER-138). The records are untouched.
+ */
+export type View = "proposed" | "before";
 
 /** Where a resolved value came from: the app's own props, or an Override scope. */
 export type Source = "app" | "instance" | "group" | "page";
@@ -53,6 +69,9 @@ export type InstanceKey = InstanceIdentity & {
   current: Props;
 };
 
+/** What the Adapter needs to render an Instance: its State props stay held in the "before" view. */
+export type RenderKey = InstanceKey & { stateProps: readonly string[] };
+
 export type Resolved = {
   /** What the component renders with: the Current value with Overrides on top. */
   props: Props;
@@ -74,6 +93,13 @@ export type OverrideRecord = {
 export type StoreListener = (changed: ScopeTarget) => void;
 
 export type OverrideStore = {
+  /** Whether Overrides are on. Every write throws while they are off. */
+  readonly status: Status;
+  /** Drops to inspect-only for good. False when Overrides were already off. */
+  disable(reason: string): boolean;
+  readonly view: View;
+  /** Switches the view `render` uses. False when it was already that view. */
+  setView(view: View): boolean;
   /**
    * Overrides one prop for a scope target. `undefined` is a real Override: the prop
    * is unset. Throws on a suspended record.
@@ -88,9 +114,14 @@ export type OverrideStore = {
   exclude(target: ScopeTarget, instanceId: string): void;
   /** Undoes `exclude`. */
   include(target: ScopeTarget, instanceId: string): void;
-  /** Props plus the scope each value came from. */
+  /**
+   * Props plus the scope each value came from, in the proposed view. With Overrides
+   * off, the Current value alone, every value from the app.
+   */
   resolve(instance: InstanceKey): Resolved;
-  /** Whether any Override reaches this Instance. */
+  /** What the Adapter renders with: `resolve`, or in the "before" view only its State-prop Overrides. */
+  render(instance: RenderKey): Resolved;
+  /** Whether any Override reaches this Instance. False while Overrides are off. */
   applies(instance: InstanceIdentity): boolean;
   /** Instance records first, then group, then page. */
   records(): OverrideRecord[];
@@ -106,8 +137,74 @@ export type OverrideStore = {
 /** Narrowest first, the order `records()` lists them in (`targetsOf` keeps the same order). */
 export const PRECEDENCE: readonly Scope[] = ["instance", "group", "page"];
 
-/** Whether a record for `target` reaches this Instance, exclusions aside. */
-export function reaches(target: ScopeTarget, instance: InstanceIdentity): boolean {
+/** The error every write throws while Overrides are off. */
+export function assertOverridesOn(status: Status): void {
+  if (!status.overrides) {
+    throw new Error(`[loupe] Overrides are off, everything is inspect-only: ${status.reason}`);
+  }
+}
+
+/**
+ * The record an Override on this Instance at `scope` goes into; null for a group
+ * with no call site. Throws on an unknown scope.
+ */
+export function targetAt(
+  instance: Pick<InstanceIdentity, "id" | "anchor" | "component" | "route">,
+  scope: Scope,
+): ScopeTarget | null {
+  switch (scope) {
+    case "instance":
+      return { scope, id: instance.id };
+    case "group":
+      return isUnanchored(instance.anchor) ? null : { scope, anchor: instance.anchor };
+    case "page":
+      return { scope, route: instance.route, component: instance.component };
+    default:
+      throw new Error(`[loupe] Unknown scope ${JSON.stringify(scope)}: use "instance", "group" or "page".`);
+  }
+}
+
+/** What Reach is judged on: a record's target, who it leaves out, and whether it is suspended. */
+export type ReachRecord = Pick<OverrideRecord, "target" | "excluded" | "suspended">;
+
+/**
+ * How a record stands towards one Instance: in its Reach ("applies"), left out of
+ * it, or held back because the record is suspended. Null when the Instance is
+ * outside the record's scope. Left out wins over suspended.
+ *
+ * Judged on the record alone. `resolve` also checks, at render, that the call sites
+ * the record pinned still have their totals (a changed one suspends the record in
+ * the same commit), and applies nothing while Overrides are off.
+ */
+export type Reach = "applies" | "left-out" | "suspended";
+
+export function reachOf(record: ReachRecord, instance: InstanceIdentity): Reach | null {
+  if (!inScope(record.target, instance)) return null;
+  if (record.excluded.includes(instance.id)) return "left-out";
+  return record.suspended ? "suspended" : "applies";
+}
+
+/** Whether the record names this Instance: in its scope and not left out, suspended or not. */
+export function namesInstance(record: ReachRecord, instance: InstanceIdentity): boolean {
+  const reach = reachOf(record, instance);
+  return reach === "applies" || reach === "suspended";
+}
+
+/** The records whose scope holds this Instance, narrowest first, each with how it stands towards it. */
+export function recordsFor<R extends ReachRecord>(
+  records: readonly R[],
+  instance: InstanceIdentity,
+): { record: R; reach: Reach }[] {
+  return records
+    .flatMap((record) => {
+      const reach = reachOf(record, instance);
+      return reach === null ? [] : [{ record, reach }];
+    })
+    .sort((a, b) => PRECEDENCE.indexOf(a.record.target.scope) - PRECEDENCE.indexOf(b.record.target.scope));
+}
+
+/** Whether `target` is at a scope that holds this Instance, left-out Instances and suspension aside. */
+export function inScope(target: ScopeTarget, instance: InstanceIdentity): boolean {
   switch (target.scope) {
     case "instance":
       return target.id === instance.id;
@@ -151,7 +248,42 @@ type Entry = {
 const describeTarget = (target: ScopeTarget): string =>
   target.scope === "page" ? `page ${target.component} on ${target.route}` : `${target.scope} ${keyOf(target)}`;
 
-export function createOverrideStore(): OverrideStore {
+/**
+ * The "before" view (PER-138): the app's own props, with only the State-prop
+ * Overrides on top. A forced state is context, not a change, so the "before" image
+ * shows the same dialog open.
+ */
+function statesOnly(resolved: Resolved, current: Props, stateProps: readonly string[]): Resolved {
+  const props: Props = { ...current };
+  const sources: Record<string, Source> = {};
+  for (const key of Object.keys(current)) sources[key] = "app";
+  const overrides: Props = {};
+  for (const prop of stateProps) {
+    if (!(prop in resolved.overrides)) continue;
+    props[prop] = resolved.overrides[prop];
+    overrides[prop] = resolved.overrides[prop];
+    sources[prop] = resolved.sources[prop] ?? "instance";
+  }
+  return { props, sources, overrides };
+}
+
+/** The Current value alone: what renders while Overrides are off. */
+function appOnly(current: Props): Resolved {
+  return {
+    props: current,
+    overrides: {},
+    sources: Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const])),
+  };
+}
+
+export type StoreOptions = {
+  /** Off from the start when the React self-check failed before anything rendered. */
+  status?: Status;
+};
+
+export function createOverrideStore(options: StoreOptions = {}): OverrideStore {
+  let status: Status = options.status ?? { overrides: true };
+  let view: View = "proposed";
   const scopes: Record<Scope, Map<string, Entry>> = {
     instance: new Map(),
     group: new Map(),
@@ -206,6 +338,7 @@ export function createOverrideStore(): OverrideStore {
 
   /** The record to add to, refusing a suspended one. */
   const findOrCreateActive = (target: ScopeTarget): Entry => {
+    assertOverridesOn(status);
     const entry = findOrCreate(target);
     if (entry.suspended) {
       throw new Error(
@@ -243,7 +376,44 @@ export function createOverrideStore(): OverrideStore {
     }
   };
 
+  const resolve = (instance: InstanceKey): Resolved => {
+    if (!status.overrides) return appOnly(instance.current);
+    const props: Props = { ...instance.current };
+    const sources: Record<string, Source> = {};
+    for (const key of Object.keys(instance.current)) sources[key] = "app";
+    const overrides: Props = {};
+    // Widest first, so a narrower scope overwrites it.
+    for (const entry of reaching(instance).reverse()) {
+      for (const [key, value] of entry.values) {
+        props[key] = value;
+        overrides[key] = value;
+        sources[key] = entry.target.scope;
+      }
+    }
+    return { props, sources, overrides };
+  };
+
   return {
+    get status() {
+      return status;
+    },
+
+    disable(reason) {
+      if (!status.overrides) return false;
+      status = { overrides: false, reason };
+      return true;
+    },
+
+    get view() {
+      return view;
+    },
+
+    setView(next) {
+      if (view === next) return false;
+      view = next;
+      return true;
+    },
+
     set(target, prop, value) {
       const entry = findOrCreateActive(target);
       repin(entry);
@@ -253,6 +423,7 @@ export function createOverrideStore(): OverrideStore {
     },
 
     reset(target, prop) {
+      assertOverridesOn(status);
       const entry = find(target);
       if (!entry) return;
       if (prop === undefined) {
@@ -265,6 +436,7 @@ export function createOverrideStore(): OverrideStore {
     },
 
     exclude(target, instanceId) {
+      assertOverridesOn(status);
       requireExcludable(target);
       const entry = findOrCreateActive(target);
       if (entry.excluded.has(instanceId)) return;
@@ -274,6 +446,7 @@ export function createOverrideStore(): OverrideStore {
     },
 
     include(target, instanceId) {
+      assertOverridesOn(status);
       requireExcludable(target);
       const entry = find(target);
       if (!entry?.excluded.delete(instanceId)) return;
@@ -282,24 +455,15 @@ export function createOverrideStore(): OverrideStore {
       emit({ scope: "instance", id: instanceId });
     },
 
-    resolve(instance) {
-      const props: Props = { ...instance.current };
-      const sources: Record<string, Source> = {};
-      for (const key of Object.keys(instance.current)) sources[key] = "app";
-      const overrides: Props = {};
-      // Widest first, so a narrower scope overwrites it.
-      for (const entry of reaching(instance).reverse()) {
-        for (const [key, value] of entry.values) {
-          props[key] = value;
-          overrides[key] = value;
-          sources[key] = entry.target.scope;
-        }
-      }
-      return { props, sources, overrides };
+    resolve,
+
+    render(instance) {
+      const resolved = resolve(instance);
+      return view === "before" ? statesOnly(resolved, instance.current, instance.stateProps) : resolved;
     },
 
     applies(instance) {
-      return reaching(instance).some((entry) => entry.values.size > 0);
+      return status.overrides && reaching(instance).some((entry) => entry.values.size > 0);
     },
 
     records() {
@@ -343,6 +507,7 @@ export function createOverrideStore(): OverrideStore {
     },
 
     reapply(target) {
+      assertOverridesOn(status);
       const entry = find(target);
       if (!entry?.suspended) return;
       if (entry.suspended.reason === "ambiguous") {

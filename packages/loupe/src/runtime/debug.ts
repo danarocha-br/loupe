@@ -27,13 +27,23 @@
 
 import { type Authorship, splitAuthored } from "./authored.js";
 import { type Discovery, discover, type FoundInstance } from "./discovery.js";
-import { identityOf, type LastSeen, type MountedInstance, registry, scopeTarget, type Status } from "./registry.js";
+import { identityOf, type LastSeen, type MountedInstance, registry } from "./registry.js";
 import { type Inspection, inspect } from "./inspect.js";
 import { loadedMeta } from "./instance-meta.js";
 import { textScopeRefusal } from "./label-text.js";
 import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
 import { writesOf } from "./authored.js";
-import { type OverrideRecord, type Props, reaches, type Scope, type ScopeTarget, type Source } from "./store.js";
+import {
+  assertOverridesOn,
+  type OverrideRecord,
+  namesInstance,
+  type Props,
+  type Scope,
+  type ScopeTarget,
+  type Source,
+  type Status,
+  targetAt,
+} from "./store.js";
 
 export type InstanceRow = {
   id: string;
@@ -145,13 +155,7 @@ export function createDebug(): LoupeDebug {
     const { current, injected, authorship } = instance.live();
     // Resolved over the app's props alone, so injected props get no source and
     // never reach Coverage.
-    const resolved = reg.status.overrides
-      ? reg.store.resolve({ ...identityOf(instance), current })
-      : {
-          props: current,
-          overrides: {},
-          sources: Object.fromEntries(Object.keys(current).map((key) => [key, "app" as const])),
-        };
+    const resolved = reg.store.resolve({ ...identityOf(instance), current });
     return {
       id: instance.id,
       current,
@@ -166,26 +170,20 @@ export function createDebug(): LoupeDebug {
 
   /** The record an Override on this Instance at this scope goes into. */
   const targetOf = (instance: MountedInstance, scope: Scope): ScopeTarget => {
-    if (!["instance", "group", "page"].includes(scope)) {
-      throw new Error(`[loupe] Unknown scope ${JSON.stringify(scope)}: use "instance", "group" or "page".`);
-    }
-    const target = scopeTarget(instance, scope);
+    const target = targetAt(identityOf(instance), scope);
     if (!target) throw new Error(`[loupe] ${instance.id}: no call site was anchored here, so it has no group.`);
     return target;
   };
 
-  const assertEditable = (): void => {
-    if (!reg.status.overrides) {
-      throw new Error(`[loupe] Overrides are off, everything is inspect-only: ${reg.status.reason}`);
-    }
-  };
+  /** Checked before any other refusal, so with Overrides off that is what a write says. */
+  const assertEditable = (): void => assertOverridesOn(reg.store.status);
 
   function records(): RecordRow[] {
     const mounted = [...reg.instances.values()];
     return reg.store.records().map((record) => ({
       ...record,
       mounted: mounted
-        .filter((instance) => reaches(record.target, identityOf(instance)) && !record.excluded.includes(instance.id))
+        .filter((instance) => namesInstance(record, identityOf(instance)))
         .map((instance) => instance.id),
     }));
   }
@@ -198,7 +196,7 @@ export function createDebug(): LoupeDebug {
 
   function inspectInstance(id: string): Inspection {
     const instance = reg.instances.get(id);
-    const status = reg.status;
+    const status = reg.store.status;
     if (instance) {
       const { current, injected, authorship } = instance.live();
       return inspect({
@@ -256,13 +254,13 @@ export function createDebug(): LoupeDebug {
 
   return {
     get status() {
-      return reg.status;
+      return reg.store.status;
     },
 
     list(filter) {
       const matches = (row: { id: string; component: string }) =>
         filter === undefined || row.component === filter || row.id.includes(filter);
-      const status = reg.status;
+      const status = reg.store.status;
       const client: InstanceRow[] = [...reg.instances.values()].filter(matches).map((instance) => ({
         id: instance.id,
         component: instance.component,

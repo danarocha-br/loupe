@@ -10,7 +10,7 @@ export type { StateProp } from "./state.js";
 export { STATE_SCOPE_REASON, stateScopeRefusal } from "./state.js";
 export { TEXT_SCOPE_REASON, textScopeRefusal } from "./label-text.js";
 export type { InstanceProps, InstanceRow, LoupeDebug, RecordRow, ServerInstance } from "./debug.js";
-export type { LastSeen, Status } from "./registry.js";
+export type { LastSeen } from "./registry.js";
 export type {
   InstanceIdentity,
   OverrideRecord,
@@ -19,6 +19,7 @@ export type {
   Scope,
   ScopeTarget,
   Source,
+  Status,
   Suspension,
 } from "./store.js";
 

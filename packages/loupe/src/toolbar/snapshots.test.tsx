@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId, instanceId } from "../call-site.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
-import { registry } from "../runtime/registry.js";
+import { disableOverrides, registry } from "../runtime/registry.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -150,7 +150,7 @@ describe("Capture screen", () => {
       { variants: ["ghost", "ghost", "ghost", "ghost"], dialog: "true", covered: true, transitions: false },
     ]);
     // Back as it was, and nothing left on the page.
-    expect(registry().view).toBe("proposed");
+    expect(registry().store.view).toBe("proposed");
     expect([...container.querySelectorAll("button")].map((node) => node.dataset.variant)).toEqual(Array(4).fill("outline"));
     expect(document.querySelector("[data-loupe-capture]")).toBeNull();
     expect(document.querySelector("style")).toBeNull();
@@ -200,6 +200,15 @@ describe("Capture screen", () => {
     expect(isOutdated(snapshot)).toBe(false);
     act(() => loupe.reset(DIALOG_ID, "open"));
     expect(isOutdated(snapshot)).toBe(true);
+  });
+
+  it("is Outdated once Overrides drop to inspect-only: the page no longer shows what it showed", async () => {
+    setUp();
+    const snapshot = await capture();
+    expect(isOutdated(snapshot)).toBe(false);
+    act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
+    expect(isOutdated(snapshot)).toBe(true);
+    expect(exportableSnapshots()).toEqual([]);
   });
 
   it("ignores an Override on an Instance it didn't show", async () => {
