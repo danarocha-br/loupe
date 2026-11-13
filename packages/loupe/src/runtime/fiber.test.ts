@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Fiber, keyPathOf } from "./fiber.js";
+import { type Fiber, keyPathOf, keyPaths } from "./fiber.js";
 
 /** A fiber chain from the root down; returns the innermost fiber. */
 function chain(...keys: (string | null)[]): Fiber {
@@ -44,5 +44,19 @@ describe("keyPathOf", () => {
   it("is empty when nothing above the Instance has an app key", () => {
     expect(keyPathOf(chain("c-page", null, null))).toBe("");
     expect(keyPathOf(null)).toBe("");
+  });
+});
+
+describe("keyPaths", () => {
+  it("answers as keyPathOf does, for fibers that share their ancestors", () => {
+    const keyPathOfFiber = keyPaths();
+    const row = chain("layout", "c-page", "team-1", "", null, "base-ui-_R_1_");
+    const below = { ...row, key: "m1", return: row };
+    const beside = { ...row, key: "c", return: row };
+    for (const fiber of [row, below, beside, row.return, null]) {
+      expect(keyPathOfFiber(fiber)).toBe(keyPathOf(fiber));
+    }
+    expect(keyPathOfFiber(below)).toBe("team-1//m1");
+    expect(keyPathOfFiber(beside)).toBe("");
   });
 });

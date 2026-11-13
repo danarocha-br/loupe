@@ -1,6 +1,10 @@
 // The one place that reads React's dev-only internals. None of this is public
 // API, and it changed in 19.0, 19.1 and 19.2 (PER-98), so every use goes through
 // the self-check: if the internals don't behave, Loupe goes inspect-only.
+// Other modules follow the links the `Fiber` type names, read its props and the
+// fields of the `DebugInfo` records `serverComponentsOn` hands them, but fiber
+// tags, where React keeps those records, and the keys React puts on DOM nodes
+// stay here.
 
 import * as React from "react";
 import type { Props } from "./store.js";
@@ -85,14 +89,35 @@ function isRouterKey(key: string): boolean {
  * above it is the router's, the same for every Instance on the page.
  */
 export function keyPathOf(fiber: Fiber | null): string {
-  const keys: string[] = [];
-  for (let node = fiber; node; node = node.return) {
-    if (node.key === null) continue;
-    if (isRouterKey(node.key)) break;
-    if (isLibraryKey(node.key)) continue;
-    keys.push(node.key);
-  }
-  return keys.reverse().join("/");
+  return keyPaths()(fiber);
+}
+
+/**
+ * `keyPathOf` for a walk that asks about many fibers: each fiber's `return`
+ * chain is followed once, and its key path remembered for the fibers below.
+ */
+export function keyPaths(): (fiber: Fiber | null) => string {
+  // null until a fiber on the way down adds a key: an app key can be "".
+  const known = new Map<Fiber, string | null>();
+  return (fiber) => {
+    const path: Fiber[] = [];
+    let keys: string | null = null;
+    for (let node = fiber; node; node = node.return) {
+      if (known.has(node)) {
+        keys = known.get(node) ?? null;
+        break;
+      }
+      path.push(node);
+      if (node.key !== null && isRouterKey(node.key)) break;
+    }
+    for (let index = path.length - 1; index >= 0; index--) {
+      const node = path[index] as Fiber;
+      if (node.key !== null && isRouterKey(node.key)) keys = null;
+      else if (node.key !== null && !isLibraryKey(node.key)) keys = keys === null ? node.key : `${keys}/${node.key}`;
+      known.set(node, keys);
+    }
+    return keys ?? "";
+  };
 }
 
 /** The fiber React attached to a DOM node, or null. */
@@ -124,6 +149,38 @@ export function rootFibers(doc: Document): Fiber[] {
     }
   }
   return [...roots];
+}
+
+// React's fiber tag for a DOM element.
+const HOST_COMPONENT = 5;
+// React's fiber tags for a component the app wrote: function, class, forwardRef, memo, simple memo.
+const COMPOSITE_TAGS: ReadonlySet<number> = new Set([0, 1, 11, 14, 15]);
+
+/** Whether a fiber is a component someone wrote, rather than a DOM element, text or React's own. */
+export function isComposite(fiber: Fiber): boolean {
+  return COMPOSITE_TAGS.has(fiber.tag);
+}
+
+/**
+ * The Server Components React's dev build recorded on a fiber, outermost first.
+ * React records each on the first fiber its output produced. Empty in production.
+ */
+export function serverComponentsOn(fiber: Fiber): readonly DebugInfo[] {
+  return fiber._debugInfo ?? [];
+}
+
+/** The outermost DOM elements a fiber renders, through portals too (a dialog's popup is in one). */
+export function hostNodesOf(fiber: Fiber | null): Element[] {
+  const found: Element[] = [];
+  const stack: Fiber[] = fiber?.child ? [fiber.child] : [];
+  while (stack.length > 0) {
+    const node = stack.pop() as Fiber;
+    if (node.sibling) stack.push(node.sibling);
+    if (node.tag === HOST_COMPONENT && node.stateNode instanceof Element) found.push(node.stateNode);
+    else if (node.child) stack.push(node.child);
+  }
+  // Depth-first with a stack visits siblings in reverse.
+  return found.reverse();
 }
 
 /** Calls `visit` for every fiber under `root`, depth first, without recursion. */
