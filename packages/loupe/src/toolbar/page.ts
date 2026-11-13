@@ -2,6 +2,7 @@
 // changes. Nothing here writes; the rules live in the runtime (`inspect.ts`).
 
 import { useEffect, useMemo, useState } from "react";
+import { callSiteLabels } from "../call-site.js";
 import { createDebug, type InstanceProps, type InstanceRow, type LoupeDebug, type RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { currentRoute, type LastSeen, onRegistryChange, registry, type Status } from "../runtime/registry.js";
@@ -147,16 +148,10 @@ function heldInstances(debug: LoupeDebug, records: RecordRow[]): Map<string, Hel
     const id = record.target.id;
     const lastSeen = debug.lastSeen(id);
     if (lastSeen && lastSeen.route !== currentRoute()) continue;
-    const component = lastSeen?.component ?? componentOfAnchor(id);
+    const component = lastSeen?.component ?? callSiteLabels(id).component;
     held.set(component, [...(held.get(component) ?? []), { id, record, lastSeen }]);
   }
   return held;
-}
-
-/** `path › Enclosing › Button[2]~2#key` → `Button`. */
-function componentOfAnchor(id: string): string {
-  const last = id.split("#")[0]?.split(" › ").at(-1) ?? id;
-  return last.replace(/~\d+$/, "").replace(/\[\d+\]$/, "");
 }
 
 /** The record holding an Instance-scope Override for this id, whether it applies or is held for review. */

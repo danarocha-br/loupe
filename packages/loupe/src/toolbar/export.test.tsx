@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { REPORT_DATA_ID } from "../proposal/report.js";
 import type { Proposal } from "../proposal/types.js";
@@ -46,14 +47,16 @@ const Button = createAdapter("Button", (props: { variant?: string; children?: st
     {props.children}
   </button>
 ));
-const ROW = "app/members.tsx › MemberRow › Button[1]";
+const ROW_KEY = { path: "app/members.tsx", enclosing: "MemberRow", component: "Button", ordinal: 1 };
+const ROW = callSiteId(ROW_KEY);
+const ROW_HINT = callSiteHint(ROW_KEY, { line: 12, column: 9, total: 1 });
 const writes = JSON.stringify({ attributes: [{ name: "variant", writtenAs: "literal" }], spreads: false, children: "text" });
 
 function Page() {
   return (
     <main>
       {["ana", "bia"].map((member) => (
-        <Button key={member} {...({ "data-ds-anchor": ROW, "data-ds-source": "app/members.tsx:12:9 1/1", "data-ds-writes": writes } as object)} variant="ghost">
+        <Button key={member} {...({ [ANCHOR_ATTRIBUTE]: ROW, [SOURCE_ATTRIBUTE]: ROW_HINT, "data-ds-writes": writes } as object)} variant="ghost">
           {member}
         </Button>
       ))}
@@ -173,7 +176,7 @@ afterEach(() => {
 describe("the export dialog", () => {
   it("opens from the footer, prefilled with a title, and counts what the file will hold", async () => {
     expect(button("Export Proposal")?.disabled).toBe(true);
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
 
@@ -190,7 +193,7 @@ describe("the export dialog", () => {
   });
 
   it("holds Export back only while the title is empty", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
     const submit = button("Export", dialog() as HTMLDialogElement);
@@ -202,7 +205,7 @@ describe("the export dialog", () => {
   });
 
   it("downloads one report with the title, designer and notes, and clears nothing", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     const records = registry().store.records();
     await openDialog();
@@ -247,7 +250,7 @@ describe("the export dialog", () => {
   });
 
   it("closes on Cancel and on Escape, downloading nothing", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
     act(() => button("Cancel", dialog() as HTMLDialogElement)?.click());
@@ -262,12 +265,12 @@ describe("the export dialog", () => {
   });
 
   it("counts outdated Snapshots and warns past 25 MB, without blocking", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     pixels = "x".repeat(7 * 1024 * 1024);
     await capture();
     await capture();
-    act(() => loupe.set(`${ROW}#ana`, "variant", "secondary", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "secondary", "group"));
     pixels = "y".repeat(7 * 1024 * 1024);
     await capture();
     await capture();
@@ -283,7 +286,7 @@ describe("the export dialog", () => {
   });
 
   it("exports without its own Snapshot when the capture fails, and says so", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(0);
     vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -297,7 +300,7 @@ describe("the export dialog", () => {
   });
 
   it("drops its own Snapshot when it repeats a manual one of the same screen", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await capture();
     await openDialog();

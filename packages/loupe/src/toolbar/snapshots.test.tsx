@@ -2,6 +2,7 @@
 import { act, createElement as h, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteId, instanceId } from "../call-site.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
@@ -61,9 +62,9 @@ const Dialog = createAdapter(
   { state: ["open"] },
 );
 
-const TRIGGER = "app/membros/menu.tsx › MemberRowMenu › Button[1]";
-const DIALOG = "app/membros/menu.tsx › MemberRowMenu › Dialog[1]";
-const DIALOG_ID = `${DIALOG}#dialog`;
+const TRIGGER = callSiteId({ path: "app/membros/menu.tsx", enclosing: "MemberRowMenu", component: "Button", ordinal: 1 });
+const DIALOG = callSiteId({ path: "app/membros/menu.tsx", enclosing: "MemberRowMenu", component: "Dialog", ordinal: 1 });
+const DIALOG_ID = instanceId(DIALOG, "dialog");
 
 let container: HTMLDivElement;
 let root: Root;
@@ -117,9 +118,9 @@ function membros(): ReactElement {
     "div",
     null,
     rows.map((box, index) =>
-      h("section", { key: `user_${index + 1}` }, h(Button, { variant: "ghost", box, "data-ds-anchor": TRIGGER } as ButtonProps)),
+      h("section", { key: `user_${index + 1}` }, h(Button, { variant: "ghost", box, [ANCHOR_ATTRIBUTE]: TRIGGER } as ButtonProps)),
     ),
-    h("aside", { key: "dialog" }, h(Dialog, { open: false, onOpenChange: () => {}, box: [300, 300, 400, 200], "data-ds-anchor": DIALOG } as DialogProps)),
+    h("aside", { key: "dialog" }, h(Dialog, { open: false, onOpenChange: () => {}, box: [300, 300, 400, 200], [ANCHOR_ATTRIBUTE]: DIALOG } as DialogProps)),
   );
 }
 
@@ -134,7 +135,7 @@ const capture = async (options?: Parameters<typeof captureScreen>[0]) => {
 function setUp() {
   act(() => root.render(membros()));
   act(() => {
-    loupe.set(`${TRIGGER}#user_1`, "variant", "outline", "group");
+    loupe.set(instanceId(TRIGGER, "user_1"), "variant", "outline", "group");
     loupe.set(DIALOG_ID, "open", true);
   });
 }
@@ -174,9 +175,9 @@ describe("Capture screen", () => {
     const p = CROP_PADDING;
     expect(drawn[0]).toEqual([600 - p, 100 - p, 32 + 2 * p, 132 + 2 * p, 0, 0, 32 + 2 * p, 132 + 2 * p]);
     expect(snapshot.shown.map((entry) => entry.identity.id)).toEqual([
-      `${TRIGGER}#user_1`,
-      `${TRIGGER}#user_2`,
-      `${TRIGGER}#user_3`,
+      instanceId(TRIGGER, "user_1"),
+      instanceId(TRIGGER, "user_2"),
+      instanceId(TRIGGER, "user_3"),
       DIALOG_ID,
     ]);
     expect(snapshot.bytes).toBe(snapshot.viewport.before.length * 2 + 2 * "data:image/webp;base64,crop-of-1".length);
@@ -189,13 +190,13 @@ describe("Capture screen", () => {
     expect(isOutdated(snapshot)).toBe(false);
     expect(exportableSnapshots()).toHaveLength(1);
 
-    act(() => loupe.set(`${TRIGGER}#user_1`, "variant", "secondary", "group"));
+    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "secondary", "group"));
     expect(isOutdated(snapshot)).toBe(true);
     expect(exportableSnapshots()).toEqual([]);
     expect(snapshotBytes()).toBe(0);
 
     // A State prop it showed counts too: closing the dialog changes the screen.
-    act(() => loupe.set(`${TRIGGER}#user_1`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "outline", "group"));
     expect(isOutdated(snapshot)).toBe(false);
     act(() => loupe.reset(DIALOG_ID, "open"));
     expect(isOutdated(snapshot)).toBe(true);
@@ -204,7 +205,7 @@ describe("Capture screen", () => {
   it("ignores an Override on an Instance it didn't show", async () => {
     setUp();
     const snapshot = await capture();
-    act(() => loupe.set(`${TRIGGER}#user_4`, "variant", "secondary"));
+    act(() => loupe.set(instanceId(TRIGGER, "user_4"), "variant", "secondary"));
     expect(isOutdated(snapshot)).toBe(false);
   });
 
@@ -268,7 +269,7 @@ describe("in the Proposal and the Toolbar", () => {
     expect(proposal.routes[0]?.screenshots.map((shot) => shot.id)).toEqual(["s1", "s2"]);
     expect(proposal.routes[0]?.changes.map((change) => change.screenshots)).toEqual([["s2"]]);
 
-    act(() => loupe.set(`${TRIGGER}#user_1`, "variant", "secondary", "group"));
+    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "secondary", "group"));
     proposal = await collectProposal({ title: "t" });
     expect(proposal.routes[0]?.screenshots).toEqual([]);
 
@@ -296,7 +297,7 @@ describe("in the Proposal and the Toolbar", () => {
     expect(card.textContent).toContain("/ · 1024×768 · 1 crop");
     expect(card.textContent).not.toContain("Outdated");
 
-    act(() => loupe.set(`${TRIGGER}#user_1`, "variant", "secondary", "group"));
+    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "secondary", "group"));
     act(() => cardRoot.render(h(SnapshotsCard)));
     expect(card.textContent).toContain("Outdated");
 
@@ -341,7 +342,7 @@ describe("crops", () => {
 
   it("names the changes on screen, skipping left-out Instances and State-only records", () => {
     const mounted = ["user_1", "user_2"].map((key) => ({
-      id: `${TRIGGER}#${key}`,
+      id: instanceId(TRIGGER, key),
       anchor: TRIGGER,
       component: "Button",
       hint: null,
@@ -353,13 +354,13 @@ describe("crops", () => {
     const boxes = new Map([...mounted, dialog].map((instance) => [instance.id, box]));
     const changes = changesOnScreen(
       [
-        { target: { scope: "group", anchor: TRIGGER }, values: { size: "sm" }, excluded: [`${TRIGGER}#user_2`], suspended: null },
+        { target: { scope: "group", anchor: TRIGGER }, values: { size: "sm" }, excluded: [instanceId(TRIGGER, "user_2")], suspended: null },
         { target: { scope: "instance", id: DIALOG }, values: { open: true }, excluded: [], suspended: null },
         {
-          target: { scope: "instance", id: `${TRIGGER}#user_2` },
+          target: { scope: "instance", id: instanceId(TRIGGER, "user_2") },
           values: { variant: "outline" },
           excluded: [],
-          suspended: { reason: "ambiguous", ids: [`${TRIGGER}#user_2`] },
+          suspended: { reason: "ambiguous", ids: [instanceId(TRIGGER, "user_2")] },
         },
       ],
       [...mounted, dialog],

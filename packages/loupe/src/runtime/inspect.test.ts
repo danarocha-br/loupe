@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { callSiteHint, callSiteId, instanceId } from "../call-site.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
-import { type InspectInput, inspect, NO_META_NOTE, parseHint, reasonOfValue, SERVER_NOTE, SPREADS_NOTE } from "./inspect.js";
+import { type InspectInput, inspect, NO_META_NOTE, reasonOfValue, SERVER_NOTE, SPREADS_NOTE } from "./inspect.js";
 
 const options = (values: (string | boolean)[], extra: Partial<PropMeta> = {}): PropMeta =>
   ({ editable: true, from: "repo", kind: "options", status: "verified", options: values, ...extra }) as PropMeta;
@@ -20,11 +21,14 @@ const writes = (names: string[], children: CallSiteWrites["children"] = "text"):
   children,
 });
 
+const SITE = { path: "a.tsx", enclosing: "A", component: "Button", ordinal: 1 };
+const ANCHOR = callSiteId(SITE);
+
 const base = (over: Partial<InspectInput> = {}): InspectInput => ({
-  id: "a.tsx › A › Button[1]#m1",
+  id: instanceId(ANCHOR, "m1"),
   component: "Button",
-  anchor: "a.tsx › A › Button[1]",
-  hint: "app/a.tsx:12:7 1/2",
+  anchor: ANCHOR,
+  hint: callSiteHint({ ...SITE, path: "app/a.tsx" }, { line: 12, column: 7, total: 2 }),
   rendered: "client",
   current: { variant: "ghost", children: "Cancelar", onClick: () => {} },
   injected: { "aria-expanded": false, "data-slot": "button" },
@@ -172,11 +176,6 @@ describe("inspect", () => {
 });
 
 describe("helpers", () => {
-  it("parses the loader's hint", () => {
-    expect(parseHint("app/a.tsx:12:7 2/4")).toEqual({ path: "app/a.tsx", line: 12, column: 7, ordinal: 2, total: 4 });
-    expect(parseHint(null)).toBeNull();
-  });
-
   it("names a reason for an undeclared value", () => {
     expect(reasonOfValue(() => {})).toBe("FUNCTION");
     expect(reasonOfValue("x")).toBe("OPEN TEXT");

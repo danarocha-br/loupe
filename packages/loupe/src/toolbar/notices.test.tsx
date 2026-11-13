@@ -2,6 +2,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
@@ -27,7 +28,9 @@ const Button = createAdapter("Button", (props: { children?: ReactNode }) => <but
 const Badge = createAdapter("Badge", (props: { children?: ReactNode }) => <span {...props} />, {
   props: { children: { editable: true, from: "@types/react", kind: "text" } },
 });
-const site = (component: string) => ({ "data-ds-anchor": `app/page.tsx › Page › ${component}[1]` });
+const site = (component: string) => ({
+  [ANCHOR_ATTRIBUTE]: callSiteId({ path: "app/page.tsx", enclosing: "Page", component, ordinal: 1 }),
+});
 const LoupeMount = devMount(Toolbar);
 
 const COMMAND = "pnpm -C apps/app exec loupe generate";
@@ -176,7 +179,7 @@ describe("components that are new since the last generate", () => {
     expect(notice).toContain("NewCard");
     expect(notice).toContain(COMMAND);
 
-    const instance = shadow().querySelector(`[data-instance="${site("NewCard")["data-ds-anchor"]}"]`) as HTMLElement;
+    const instance = shadow().querySelector(`[data-instance="${site("NewCard")[ANCHOR_ATTRIBUTE]}"]`) as HTMLElement;
     act(() => instance.click());
     const coverage = shadow().querySelector("[data-testid=coverage]")?.closest(".card")?.textContent ?? "";
     expect(coverage).toContain("Not generated yet");
@@ -188,7 +191,7 @@ describe("components that are new since the last generate", () => {
   it("explains a generated component's missing Adapter", async () => {
     server.status = { ...FRESH, notGenerated: ["NewCard"] };
     await mountWithNew();
-    const instance = shadow().querySelector(`[data-instance="${site("Divider")["data-ds-anchor"]}"]`) as HTMLElement;
+    const instance = shadow().querySelector(`[data-instance="${site("Divider")[ANCHOR_ATTRIBUTE]}"]`) as HTMLElement;
     act(() => instance.click());
     expect(panelText()).toContain(UNADAPTED_NOTE);
     expect(shadow().querySelector("[data-testid=not-generated]")).toBeNull();

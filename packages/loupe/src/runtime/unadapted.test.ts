@@ -4,6 +4,7 @@
 import { act, createElement as h, memo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { snapshot } from "../toolbar/page.js";
 import { scopeView } from "../toolbar/scopes.js";
 import { createAdapter } from "./adapter.js";
@@ -34,10 +35,12 @@ const MemoCard = memo(function MemoCardInner(props: Props) {
   return h("section", props);
 });
 
-const at = (component: string, n = 1) => `app/page.tsx › Page › ${component}[${n}]`;
+const siteAt = (path: string, enclosing: string, component: string, ordinal = 1) => ({ path, enclosing, component, ordinal });
+const pageSite = (component: string, n = 1) => siteAt("app/page.tsx", "Page", component, n);
+const at = (component: string, n = 1) => callSiteId(pageSite(component, n));
 const loader = (component: string, n = 1, line = 10) => ({
-  "data-ds-anchor": at(component, n),
-  "data-ds-source": `app/page.tsx:${line}:5 ${n}/1`,
+  [ANCHOR_ATTRIBUTE]: at(component, n),
+  [SOURCE_ATTRIBUTE]: callSiteHint(pageSite(component, n), { line, column: 5, total: 1 }),
 });
 
 let container: HTMLDivElement;
@@ -78,7 +81,7 @@ describe("anchored client Instances without an Adapter", () => {
     expect(rows[1]).toMatchObject({
       id: at("NewCard"),
       anchor: at("NewCard"),
-      hint: "app/page.tsx:12:5 1/1",
+      hint: callSiteHint(pageSite("NewCard"), { line: 12, column: 5, total: 1 }),
       editable: false,
       reason: UNADAPTED_REASON,
       overrides: {},
@@ -100,7 +103,7 @@ describe("anchored client Instances without an Adapter", () => {
       return h("a", props);
     }
     function MenuButton(props: Props) {
-      return h(Trigger, { "data-ds-anchor": "ui/sidebar.tsx › SidebarMenuButton › Trigger[1]", render: h(Link, props) });
+      return h(Trigger, { [ANCHOR_ATTRIBUTE]: callSiteId(siteAt("ui/sidebar.tsx", "SidebarMenuButton", "Trigger")), render: h(Link, props) });
     }
     const MenuAdapter = createAdapter("MenuButton", MenuButton);
     render(
@@ -114,8 +117,8 @@ describe("anchored client Instances without an Adapter", () => {
     // registered is listed once, adapted, and not again as the Link carrying its anchor.
     const menuRows = loupe.list().filter((row) => row.anchor === at("MenuButton"));
     expect(menuRows.map((row) => [row.id, row.adapted])).toEqual([
-      [`${at("MenuButton")}#Agentes`, true],
-      [`${at("MenuButton")}#Conversas`, true],
+      [instanceId(at("MenuButton"), "Agentes"), true],
+      [instanceId(at("MenuButton"), "Conversas"), true],
     ]);
   });
 
@@ -127,7 +130,7 @@ describe("anchored client Instances without an Adapter", () => {
       return h("a", props);
     }
     function Outer(props: Props) {
-      return h(Trigger, { "data-ds-anchor": "ui/outer.tsx › Outer › Trigger[1]", render: h(Inner, props) });
+      return h(Trigger, { [ANCHOR_ATTRIBUTE]: callSiteId(siteAt("ui/outer.tsx", "Outer", "Trigger")), render: h(Inner, props) });
     }
     render(h(Outer, loader("Outer")));
     expect(loupe.list().filter((row) => row.anchor === at("Outer")).map((row) => [row.id, row.adapted])).toEqual([
@@ -144,8 +147,8 @@ describe("anchored client Instances without an Adapter", () => {
       ),
     );
     expect(loupe.list().map((row) => [row.id, row.component])).toEqual([
-      [`${at("Card")}#m1`, "Card"],
-      [`${at("Card")}#m2`, "Card"],
+      [instanceId(at("Card"), "m1"), "Card"],
+      [instanceId(at("Card"), "m2"), "Card"],
     ]);
   });
 
@@ -192,7 +195,7 @@ describe("anchored client Instances without an Adapter", () => {
 
   it("gives a server-rendered Instance the props meta/ declares too (PER-180)", () => {
     const anchor = at("Badge");
-    const props = { variant: "muted", "data-ds-anchor": anchor };
+    const props = { variant: "muted", [ANCHOR_ATTRIBUTE]: anchor };
     const child = { tag: 5, key: null, type: "span", memoizedProps: {}, child: null, sibling: null, alternate: null, stateNode: null, _debugInfo: [{ name: "Badge", env: "Server", props }] };
     const host = { tag: 3, key: null, type: null, memoizedProps: {}, return: null, child, sibling: null, alternate: null, stateNode: null as unknown };
     host.stateNode = { current: host };
@@ -228,7 +231,7 @@ describe("anchored client Instances without an Adapter", () => {
 
   it("leaves a Server Component's client child to the server scan, so it is listed once", () => {
     const anchor = at("Badge");
-    const props = { variant: "muted", "data-ds-anchor": anchor };
+    const props = { variant: "muted", [ANCHOR_ATTRIBUTE]: anchor };
     // A client component a Server Component rendered with its props: React records the server one on it.
     const child = { tag: 0, key: null, type: () => null, memoizedProps: props, child: null, sibling: null, alternate: null, stateNode: null, _debugInfo: [{ name: "Badge", env: "Server", props }] };
     const host = { tag: 3, key: null, type: null, memoizedProps: {}, return: null, child, sibling: null, alternate: null, stateNode: null as unknown };
@@ -239,8 +242,8 @@ describe("anchored client Instances without an Adapter", () => {
   });
 
   it("picks the nearest Instance, also a server-rendered one inside an unadapted client one", () => {
-    const shell = "app/page.tsx › Page › Shell[1]";
-    const panel = "app/shell.tsx › Shell › Panel[1]";
+    const shell = at("Shell");
+    const panel = callSiteId(siteAt("app/shell.tsx", "Shell", "Panel"));
     const fiber = (extra: object) => ({ tag: 5, key: null, type: "div", memoizedProps: {}, return: null, child: null, sibling: null, alternate: null, stateNode: null, ...extra }) as Record<string, unknown>;
     const span = document.createElement("span");
     const div = document.createElement("div");
@@ -248,8 +251,8 @@ describe("anchored client Instances without an Adapter", () => {
     container.append(div);
     const spanFiber = fiber({ type: "span", stateNode: span });
     // React records a Server Component's output on the first fiber it produced.
-    const panelFiber = fiber({ stateNode: div, child: spanFiber, _debugInfo: [{ name: "Panel", env: "Server", props: { "data-ds-anchor": panel } }] });
-    const shellFiber = fiber({ tag: 0, type: function Shell() {}, memoizedProps: { "data-ds-anchor": shell }, child: panelFiber });
+    const panelFiber = fiber({ stateNode: div, child: spanFiber, _debugInfo: [{ name: "Panel", env: "Server", props: { [ANCHOR_ATTRIBUTE]: panel } }] });
+    const shellFiber = fiber({ tag: 0, type: function Shell() {}, memoizedProps: { [ANCHOR_ATTRIBUTE]: shell }, child: panelFiber });
     const host = fiber({ tag: 3, child: shellFiber });
     host.stateNode = { current: host };
     spanFiber.return = panelFiber;
@@ -267,7 +270,7 @@ describe("anchored client Instances without an Adapter", () => {
 
   it("stays out of group and page scopes, which only Adapters can apply", () => {
     // A Button drawn inside the design system: anchored, never swapped for its Adapter.
-    const inside = { "data-ds-anchor": "ds/ui/sidebar.tsx › SidebarTrigger › Button[1]" };
+    const inside = { [ANCHOR_ATTRIBUTE]: callSiteId(siteAt("ds/ui/sidebar.tsx", "SidebarTrigger", "Button")) };
     render([h(Button, { key: "b", ...loader("Button") }, "Save"), h(DsButton, { key: "d", ...inside }, "Menu")]);
     const rows = loupe.list();
     expect(rows.map((row) => [row.component, row.adapted])).toEqual([
@@ -275,7 +278,7 @@ describe("anchored client Instances without an Adapter", () => {
       ["Button", false],
     ]);
     const view = scopeView(loupe, rows, [], rows[0] as (typeof rows)[number], "page");
-    expect(view?.members.map((member) => member.id)).toEqual([`${at("Button")}#b`]);
+    expect(view?.members.map((member) => member.id)).toEqual([instanceId(at("Button"), "b")]);
     expect(view?.label).toMatch(/· 1$/);
   });
 

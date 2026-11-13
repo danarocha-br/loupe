@@ -7,6 +7,7 @@
 // file holds each image once rather than once in the JSON and again in the markup.
 // Without scripts the text still reads in full.
 
+import { callSiteLabels } from "../call-site.js";
 import { plural } from "../toolbar/format.js";
 import { ordinal } from "./build.js";
 import type {
@@ -69,10 +70,6 @@ function value(raw: JsonValue | undefined, text: boolean): string {
   return JSON.stringify(raw);
 }
 
-function lastSegment(anchor: string): string {
-  return anchor.split(" › ").at(-1) ?? anchor;
-}
-
 function howWritten(writtenAs: Exclude<WrittenAs, "varies">, expression: string | undefined): string {
   switch (writtenAs) {
     case "literal":
@@ -94,7 +91,7 @@ function capitalize(html: string): string {
 
 function writtenCell(prop: ProposalProp): string {
   if (prop.writtenAs !== "varies") return capitalize(howWritten(prop.writtenAs, prop.expression));
-  const sites = (prop.perCallSite ?? []).map((site) => `${escapeHtml(lastSegment(site.anchor))} ${howWritten(site.writtenAs, site.expression)}`);
+  const sites = (prop.perCallSite ?? []).map((site) => `${escapeHtml(callSiteLabels(site.anchor).site)} ${howWritten(site.writtenAs, site.expression)}`);
   return `Differs per call site: ${sites.join("; ")}`;
 }
 

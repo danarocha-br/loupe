@@ -3,6 +3,7 @@
 // Editable prop or inspect-only with a reason, and Coverage as the two counts.
 // Pure: the rules live here so the Toolbar only draws them.
 
+import { type CallSiteHint, parseHint } from "../call-site.js";
 import type { DefaultValue, InspectReason, OptionValue, PropMeta } from "../meta/types.js";
 import type { CallSiteWrites, WrittenAs } from "../writes.js";
 import type { Authorship } from "./authored.js";
@@ -42,8 +43,6 @@ export type PropRow = {
   source?: Source;
 };
 
-export type CallSite = { path: string; line: number; column: number; ordinal: number; total: number };
-
 export type Inspection = {
   id: string;
   component: string;
@@ -51,7 +50,7 @@ export type Inspection = {
   anchor: string;
   rendered: "client" | "server";
   /** Parsed from the hint; null when the loader wrote none. */
-  callSite: CallSite | null;
+  callSite: CallSiteHint | null;
   /** Editable rows first, then inspect-only ones. */
   rows: PropRow[];
   /** "N editable props · M inspect only". */
@@ -93,14 +92,6 @@ export const NO_META_NOTE =
 
 export function overridesOffNote(reason: string | undefined): string {
   return `Overrides are off, everything is inspect-only: this React build isn't supported${reason ? ` (${reason})` : ""}.`;
-}
-
-/** `path:line:col n/total`. */
-export function parseHint(hint: string | null): CallSite | null {
-  const match = hint === null ? null : /^(.*):(\d+):(\d+) (\d+)\/(\d+)$/.exec(hint);
-  if (!match) return null;
-  const [, path, line, column, ordinal, total] = match;
-  return { path: path as string, line: +(line as string), column: +(column as string), ordinal: +(ordinal as string), total: +(total as string) };
 }
 
 /**

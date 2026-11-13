@@ -2,6 +2,7 @@
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
@@ -26,8 +27,12 @@ const Button = createAdapter("Button", (props: { variant?: string; children?: st
   </button>
 ));
 
-const ROW = "app/members.tsx › MemberRow › Button[1]";
-const CONFIRM = "app/members.tsx › Members › Button[1]";
+const ROW_KEY = { path: "app/members.tsx", enclosing: "MemberRow", component: "Button", ordinal: 1 };
+const CONFIRM_KEY = { path: "app/members.tsx", enclosing: "Members", component: "Button", ordinal: 1 };
+const ROW = callSiteId(ROW_KEY);
+const CONFIRM = callSiteId(CONFIRM_KEY);
+const ROW_HINT = callSiteHint(ROW_KEY, { line: 12, column: 9, total: 1 });
+const CONFIRM_HINT = callSiteHint(CONFIRM_KEY, { line: 30, column: 7, total: 1 });
 const writes = (names: string[]) =>
   JSON.stringify({ attributes: names.map((name) => ({ name, writtenAs: "literal" })), spreads: false, children: "text" });
 
@@ -37,7 +42,7 @@ function Page({ confirming }: { confirming: boolean }) {
       {["ana", "bia"].map((member) => (
         <Button
           key={member}
-          {...({ "data-ds-anchor": ROW, "data-ds-source": "app/members.tsx:12:9 1/1", "data-ds-writes": writes(["variant"]) } as object)}
+          {...({ [ANCHOR_ATTRIBUTE]: ROW, [SOURCE_ATTRIBUTE]: ROW_HINT, "data-ds-writes": writes(["variant"]) } as object)}
           variant="ghost"
         >
           {member}
@@ -45,7 +50,7 @@ function Page({ confirming }: { confirming: boolean }) {
       ))}
       {confirming && (
         <Button
-          {...({ "data-ds-anchor": CONFIRM, "data-ds-source": "app/members.tsx:30:7 1/1", "data-ds-writes": writes(["variant"]) } as object)}
+          {...({ [ANCHOR_ATTRIBUTE]: CONFIRM, [SOURCE_ATTRIBUTE]: CONFIRM_HINT, "data-ds-writes": writes(["variant"]) } as object)}
           variant="destructive"
         >
           Remover
@@ -100,7 +105,7 @@ afterEach(() => {
 
 describe("the Proposal from the page", () => {
   it("keeps an unmounted Instance's change, as last seen", async () => {
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     act(() => loupe.set(CONFIRM, "variant", "default"));
     act(() => show(false));
     await settle();
@@ -118,7 +123,7 @@ describe("the Proposal from the page", () => {
   });
 
   it("names its first change when no title is given, and clears nothing", async () => {
-    act(() => loupe.set(`${ROW}#bia`, "variant", "outline"));
+    act(() => loupe.set(instanceId(ROW, "bia"), "variant", "outline"));
     const before = registry().store.records();
     const proposal = await collectProposal();
     expect(proposal.title).toBe("Button variant in MemberRow");
@@ -144,7 +149,7 @@ describe("the Proposal from the page", () => {
     Object.defineProperty(navigator, "clipboard", { value: { write: vi.fn(async () => {}) }, configurable: true });
 
     expect(footerButton("Copy as Markdown")?.disabled).toBe(true);
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     act(() => footerButton("Copy as Markdown")?.click());
     await settle();
@@ -163,7 +168,7 @@ describe("the Proposal from the page", () => {
     });
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     act(() => footerButton("Copy as Markdown")?.click());
     await settle();
@@ -174,10 +179,10 @@ describe("the Proposal from the page", () => {
 
   it("places a record set again after a reset on the route it is set on now", async () => {
     const start = location.pathname;
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
-    act(() => loupe.reset(`${ROW}#ana`, undefined, "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+    act(() => loupe.reset(instanceId(ROW, "ana"), undefined, "group"));
     act(() => history.pushState(null, "", "/elsewhere"));
-    act(() => loupe.set(`${ROW}#ana`, "variant", "outline", "group"));
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     const proposal = await collectProposal({ title: "Moved" });
     expect(proposal.routes.map((route) => route.route)).toEqual(["/elsewhere"]);
     act(() => history.pushState(null, "", start));

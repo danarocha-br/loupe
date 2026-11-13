@@ -2,6 +2,7 @@
 import { act, type ReactNode, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import type { PropMeta } from "../meta/types.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
@@ -54,10 +55,15 @@ const Dialog = createAdapter(
 );
 const MenuItem = createAdapter("MenuItem", (props: { children?: ReactNode }) => <div role="menuitem">{props.children}</div>);
 
+// A call site inside `Members`, by component and ordinal.
+const membersSite = (component: string, ordinal: number) =>
+  ({ path: "app/members.tsx", enclosing: "Members", component, ordinal }) as const;
+const members = (component: string, ordinal: number) => callSiteId(membersSite(component, ordinal));
+
 // What the loader writes at a call site.
 const site = (n: number, names: string[], children = "text") => ({
-  "data-ds-anchor": `app/members.tsx › Members › Button[${n}]`,
-  "data-ds-source": `app/members.tsx:${10 + n}:9 ${n}/2`,
+  [ANCHOR_ATTRIBUTE]: members("Button", n),
+  [SOURCE_ATTRIBUTE]: callSiteHint(membersSite("Button", n), { line: 10 + n, column: 9, total: 2 }),
   "data-ds-writes": JSON.stringify({ attributes: names.map((name) => ({ name, writtenAs: "literal" })), spreads: false, children }),
 });
 
@@ -66,8 +72,8 @@ const LoupeMount = devMount(Toolbar);
 // The dialog's confirm Button: `total` is the call site's use count, which an edit
 // above it changes; `twice` renders it twice with no key, so one id names both.
 const confirmSite = (total: number) => ({
-  "data-ds-anchor": "app/members.tsx › Members › Button[3]",
-  "data-ds-source": `app/members.tsx:40:11 3/${total}`,
+  [ANCHOR_ATTRIBUTE]: members("Button", 3),
+  [SOURCE_ATTRIBUTE]: callSiteHint(membersSite("Button", 3), { line: 40, column: 11, total }),
   "data-ds-writes": JSON.stringify({ attributes: [{ name: "variant", writtenAs: "literal" }], spreads: false, children: "text" }),
 });
 
@@ -97,14 +103,14 @@ function Page({
         Menu
       </Button>
       {open && (
-        <MenuItem {...({ "data-ds-anchor": "app/members.tsx › Members › MenuItem[1]" } as object)}>Remover</MenuItem>
+        <MenuItem {...({ [ANCHOR_ATTRIBUTE]: members("MenuItem", 1) } as object)}>Remover</MenuItem>
       )}
       <button type="button" onClick={() => setConfirming(true)}>
         Abrir
       </button>
       <Dialog
         {...({
-          "data-ds-anchor": "app/members.tsx › Members › Dialog[1]",
+          [ANCHOR_ATTRIBUTE]: members("Dialog", 1),
           "data-ds-writes": JSON.stringify({
             attributes: [
               { name: "open", writtenAs: "expression", expression: "confirming" },
@@ -290,7 +296,7 @@ describe("the Toolbar", () => {
     const item = loupe.list("MenuItem")[0]?.id as string;
     act(() => {
       loupe.set(item, "children", "Sair");
-      loupe.set("app/members.tsx › Members › Button[1]#ana", "variant", "default");
+      loupe.set(ANA, "variant", "default");
     });
     act(() => pageButton("Menu").click());
     await settle();
@@ -313,8 +319,8 @@ describe("the Toolbar", () => {
   });
 });
 
-const BIA = "app/members.tsx › Members › Button[1]#bia";
-const DIALOG = "app/members.tsx › Members › Dialog[1]";
+const BIA = instanceId(members("Button", 1), "bia");
+const DIALOG = members("Dialog", 1);
 const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
 const inRow = (prop: string, text: string) =>
   [...row(prop).querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
@@ -431,8 +437,8 @@ describe("controls at This instance, edge cases", () => {
   });
 });
 
-const ANA = "app/members.tsx › Members › Button[1]#ana";
-const MENU = "app/members.tsx › Members › Button[2]";
+const ANA = instanceId(members("Button", 1), "ana");
+const MENU = members("Button", 2);
 const GROUP = "All in Members · Button 1 of 2";
 const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
 const pill = (prop: string, option: string) =>
@@ -471,7 +477,7 @@ describe("group and page scopes", () => {
     await clickInPanel(pill("variant", '"default"'));
     expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe(`from ${GROUP}`);
     expect(variants()).toEqual(["default", "default", "default", "default"]);
-    expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "group", anchor: "app/members.tsx › Members › Button[1]" }]);
+    expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "group", anchor: members("Button", 1) }]);
     expect(loupe.props(MENU).overrides).toEqual({});
     // The pills keep counting the app's own values after the Override is set.
     expect(pill("variant", '"ghost"').textContent).toBe('"ghost" 4');
@@ -571,7 +577,7 @@ describe("group and page scopes", () => {
     expect(ringKinds()).toHaveLength(5);
     expect(shadow().querySelectorAll("fieldset.site")).toHaveLength(2);
 
-    await clickInPanel(shadow().querySelector(`input[data-site="app/members.tsx › Members › Button[2]"]`) as HTMLInputElement);
+    await clickInPanel(shadow().querySelector(`input[data-site="${MENU}"]`) as HTMLInputElement);
     expect(loupe.records()[0]?.excluded).toEqual([MENU]);
     await clickInPanel(pill("variant", '"default"'));
     expect(loupe.props(MENU).overrides).toEqual({});
@@ -634,7 +640,7 @@ describe("the Text row (PER-137)", () => {
     await type(field, "Membro");
     expect(textField()).toBe(field);
     expect(loupe.records().map((record) => [record.target, record.values])).toEqual([
-      [{ scope: "group", anchor: "app/members.tsx › Members › Button[1]" }, { children: "Membro" }],
+      [{ scope: "group", anchor: members("Button", 1) }, { children: "Membro" }],
     ]);
     expect([...container.querySelectorAll("li button")].map((button) => button.textContent)).toEqual(["Membro", "Membro", "Membro", "Membro"]);
     await clickInPanel(inRow("children", "Reset"));
@@ -676,7 +682,7 @@ describe("the Text row (PER-137)", () => {
   });
 });
 
-const CONFIRM = "app/members.tsx › Members › Button[3]";
+const CONFIRM = members("Button", 3);
 const card = (heading: string) =>
   [...shadow().querySelectorAll<HTMLElement>(".card")].find((candidate) => candidate.querySelector("h3")?.textContent === heading);
 const toggleDialog = async () => {

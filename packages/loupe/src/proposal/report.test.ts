@@ -5,6 +5,7 @@ import { URL as NodeUrl } from "node:url";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
+import { callSiteId, instanceId } from "../call-site.js";
 import { proposalReport, REPORT_DATA_ID, reportFileName } from "./report.js";
 import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
@@ -13,7 +14,9 @@ import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
 const ROUTE = "/org/acme/configuracoes/membros";
 const FILE = "apps/app/components/product/member-row-menu.tsx";
-const TRIGGER = `${FILE} › MemberRowMenu › Button[1]`;
+const siteAt = (path: string, enclosing: string, component: string, ordinal = 1) =>
+  callSiteId({ path, enclosing, component, ordinal });
+const TRIGGER = siteAt(FILE, "MemberRowMenu", "Button");
 const shot = (id: string, kind: "viewport" | "crop", caption: string) => ({
   id,
   kind,
@@ -59,9 +62,9 @@ function sample(): Proposal {
               { name: "size", current: "icon", proposed: "sm", writtenAs: "literal" },
             ],
             instances: [
-              { id: `${TRIGGER}#user_1`, keyPath: "user_1", included: true, onScreenAtExport: true },
-              { id: `${TRIGGER}#user_2`, keyPath: "user_2", included: true, onScreenAtExport: true },
-              { id: `${TRIGGER}#user_4`, keyPath: "user_4", included: false, onScreenAtExport: true },
+              { id: instanceId(TRIGGER, "user_1"), keyPath: "user_1", included: true, onScreenAtExport: true },
+              { id: instanceId(TRIGGER, "user_2"), keyPath: "user_2", included: true, onScreenAtExport: true },
+              { id: instanceId(TRIGGER, "user_4"), keyPath: "user_4", included: false, onScreenAtExport: true },
             ],
             needsCondition: "Left out: 1 (user_4), needs a condition",
             serverRendered: [],
@@ -83,12 +86,12 @@ function sample(): Proposal {
                 component: "AlertDialogCancel",
                 nth: 1,
                 total: 1,
-                anchor: `${FILE} › MemberRowMenu › AlertDialogCancel[1]`,
+                anchor: siteAt(FILE, "MemberRowMenu", "AlertDialogCancel"),
                 lineHint: "118:9",
               },
             ],
             props: [{ name: "children", current: "Cancelar", proposed: "Voltar", writtenAs: "literal" }],
-            instances: [{ id: "x#user_2", keyPath: "user_2", included: true, onScreenAtExport: false }],
+            instances: [{ id: instanceId("x", "user_2"), keyPath: "user_2", included: true, onScreenAtExport: false }],
             needsCondition: null,
             serverRendered: [],
             overriddenBy: [],
@@ -103,8 +106,8 @@ function sample(): Proposal {
             component: "Badge",
             origin: null,
             callSites: [
-              { path: "apps/app/settings-header.tsx", enclosing: "SettingsHeader", component: "Badge", nth: 1, total: 2, anchor: "a › SettingsHeader › Badge[1]", lineHint: "80:13" },
-              { path: "apps/app/settings-header.tsx", enclosing: "SettingsHeader", component: "Badge", nth: 2, total: 2, anchor: "a › SettingsHeader › Badge[2]", lineHint: null },
+              { path: "apps/app/settings-header.tsx", enclosing: "SettingsHeader", component: "Badge", nth: 1, total: 2, anchor: siteAt("a", "SettingsHeader", "Badge", 1), lineHint: "80:13" },
+              { path: "apps/app/settings-header.tsx", enclosing: "SettingsHeader", component: "Badge", nth: 2, total: 2, anchor: siteAt("a", "SettingsHeader", "Badge", 2), lineHint: null },
             ],
             props: [
               {
@@ -113,14 +116,14 @@ function sample(): Proposal {
                 proposedUnset: true,
                 writtenAs: "varies",
                 perCallSite: [
-                  { anchor: "a › SettingsHeader › Badge[1]", writtenAs: "literal" },
-                  { anchor: "a › SettingsHeader › Badge[2]", writtenAs: "expression", expression: "tone" },
+                  { anchor: siteAt("a", "SettingsHeader", "Badge", 1), writtenAs: "literal" },
+                  { anchor: siteAt("a", "SettingsHeader", "Badge", 2), writtenAs: "expression", expression: "tone" },
                 ],
               },
             ],
             instances: [],
             needsCondition: null,
-            serverRendered: [{ id: "b#user_1", anchor: "apps/app/membros/page.tsx › MembersTable › Badge[1]", keyPath: "user_1" }],
+            serverRendered: [{ id: instanceId("b", "user_1"), anchor: siteAt("apps/app/membros/page.tsx", "MembersTable", "Badge"), keyPath: "user_1" }],
             overriddenBy: [],
             alsoRendersOn: [],
             onScreenAtExport: true,
@@ -130,7 +133,7 @@ function sample(): Proposal {
         ],
         statesShown: [
           {
-            anchor: `${FILE} › MemberRowMenu › AlertDialog[1]`,
+            anchor: siteAt(FILE, "MemberRowMenu", "AlertDialog"),
             component: "AlertDialog",
             keyPath: "user_2",
             prop: "open",
@@ -162,7 +165,7 @@ function sample(): Proposal {
       {
         scope: "call-site",
         component: "Button",
-        anchor: "apps/app/membros/page-client.tsx › MembersHeader › Button[1]",
+        anchor: siteAt("apps/app/membros/page-client.tsx", "MembersHeader", "Button"),
         route: ROUTE,
         reason: "code-changed",
         detail: "Code changed here, review: this call site had 1 use and now has 2",
@@ -249,7 +252,7 @@ describe("the HTML report", () => {
     const prop = change?.props[0];
     if (!change || !prop) throw new Error("sample changed");
     prop.expression = "a < b && <script>window.pwned=1</script>";
-    (change.callSites[0] as { anchor: string }).anchor = "x › <svg onload=window.pwned=1> › Button[1]";
+    (change.callSites[0] as { anchor: string }).anchor = siteAt("x", "<svg onload=window.pwned=1>", "Button");
     const { win, doc } = open(proposalReport(proposal));
     expect(win.pwned).toBeUndefined();
     expect(doc.querySelectorAll("img:not([data-shot]), b, i, svg")).toHaveLength(0);

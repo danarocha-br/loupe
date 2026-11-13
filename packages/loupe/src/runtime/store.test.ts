@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
+import { callSiteId, instanceId } from "../call-site.js";
 import { createOverrideStore, reaches, type InstanceKey, type ScopeTarget } from "./store.js";
 
-const TRIGGER = "app/menu.tsx › MemberRowMenu › Button[1]";
-const OTHER_SITE = "app/invites.tsx › InvitationRowMenu › Button[1]";
+const TRIGGER = callSiteId({ path: "app/menu.tsx", enclosing: "MemberRowMenu", component: "Button", ordinal: 1 });
+const OTHER_SITE = callSiteId({ path: "app/invites.tsx", enclosing: "InvitationRowMenu", component: "Button", ordinal: 1 });
 const ROUTE = "/settings/members";
 
 const row = (n: number, current: Record<string, unknown> = { variant: "ghost" }): InstanceKey => ({
-  id: `${TRIGGER}#m${n}`,
+  id: instanceId(TRIGGER, `m${n}`),
   anchor: TRIGGER,
   component: "Button",
   route: ROUTE,
   current,
 });
 const invite = (current: Record<string, unknown> = { variant: "ghost" }): InstanceKey => ({
-  id: `${OTHER_SITE}#i1`,
+  id: instanceId(OTHER_SITE, "i1"),
   anchor: OTHER_SITE,
   component: "Button",
   route: ROUTE,

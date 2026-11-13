@@ -3,8 +3,8 @@
 // through `__loupe` with the selected Instance as the scope's representative.
 
 import type { InstanceProps, InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
-import { parseHint } from "../runtime/inspect.js";
-import { identityOf, scopeTarget, UNANCHORED } from "../runtime/registry.js";
+import { callSiteLabels, isUnanchored, parseHint } from "../call-site.js";
+import { identityOf, scopeTarget } from "../runtime/registry.js";
 import { keyOf, PRECEDENCE, reaches, type Scope, type ScopeTarget, type Source } from "../runtime/store.js";
 import { appValue, formatCurrent } from "./format.js";
 import { safeInspect, safeProps } from "./page.js";
@@ -49,9 +49,8 @@ function narrower(source: Source | undefined, scope: Scope): boolean {
 
 /** "All in MemberRowMenu", and "· Button 2 of 2" when the enclosing component uses it more than once. */
 function groupLabel(row: Pick<InstanceRow, "anchor" | "hint" | "component">): string | null {
-  if (row.anchor.startsWith(UNANCHORED)) return null;
-  const parts = row.anchor.split(" › ");
-  const enclosing = parts.length >= 3 ? parts[parts.length - 2] : null;
+  if (isUnanchored(row.anchor)) return null;
+  const { enclosing } = callSiteLabels(row.anchor);
   const base = enclosing ? `All in ${enclosing}` : "All from this call site";
   const site = parseHint(row.hint);
   return site && site.total > 1 ? `${base} · ${row.component} ${site.ordinal} of ${site.total}` : base;

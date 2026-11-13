@@ -7,8 +7,7 @@
 // (PER-90). State-prop values go to "States shown", suspended records to "Held for
 // review" (PER-96, PER-97, PER-99).
 
-import { parseCallSiteId } from "../call-site.js";
-import { parseHint } from "../runtime/inspect.js";
+import { pageAnchor, parseCallSiteId, parseHint, parseInstanceId } from "../call-site.js";
 import { keyOf, type OverrideRecord, type Props, type ScopeTarget } from "../runtime/store.js";
 import { stateSiblingName } from "../state-prop.js";
 import { formatCurrent } from "../toolbar/format.js";
@@ -143,11 +142,6 @@ function proposedOf(value: unknown): Pick<ProposalProp, "proposed" | "proposedUn
   return value === undefined ? { proposedUnset: true } : { proposed: toJson(value) };
 }
 
-/** The part of an Instance id after the anchor: its key path, with any `~n` mount-order suffix. */
-function keyPathOfId(id: string, anchor: string): string {
-  return id.startsWith(`${anchor}#`) ? id.slice(anchor.length + 1) : "";
-}
-
 function callSiteOf(anchor: string, sighting: Sighting | undefined, component: string): ProposalCallSite {
   const key = parseCallSiteId(anchor);
   const hint = parseHint(sighting?.hint ?? null);
@@ -249,14 +243,14 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
 
     if (record.target.scope === "instance") {
       const sighting = byId.get(record.target.id);
-      const anchor = sighting?.anchor ?? anchorOfId(record.target.id);
+      const anchor = sighting?.anchor ?? parseInstanceId(record.target.id).anchor;
       for (const prop of Object.keys(record.values).filter((name) => states.has(name))) {
         shown.push({
           route,
           state: {
             anchor,
             component: sighting?.component ?? parseCallSiteId(anchor)?.component ?? "",
-            keyPath: sighting?.keyPath ?? keyPathOfId(record.target.id, anchor),
+            keyPath: sighting?.keyPath ?? parseInstanceId(record.target.id).key,
             prop,
             forced: toJson(record.values[prop]),
             controlled: sighting ? prop in sighting.current : false,
@@ -287,7 +281,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
     for (const id of record.excluded) {
       if (listed.has(id)) continue;
       const seen = byId.get(id);
-      instances.push({ id, keyPath: seen?.keyPath ?? keyPathOfId(id, anchorOfId(id)), included: false, onScreenAtExport: seen?.mounted ?? false });
+      instances.push({ id, keyPath: seen?.keyPath ?? parseInstanceId(id).key, included: false, onScreenAtExport: seen?.mounted ?? false });
     }
 
     const props: ProposalProp[] = changed.map((name) => ({
@@ -341,12 +335,12 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
   function conditionOf(record: OverrideRecord, instances: readonly ProposalInstance[]): string | null {
     if (record.target.scope === "instance") {
       const id = record.target.id;
-      const anchor = byId.get(id)?.anchor ?? anchorOfId(id);
+      const anchor = byId.get(id)?.anchor ?? parseInstanceId(id).anchor;
       const siblings = siblingsOf(anchor);
       const others = siblings.filter((sighting) => sighting.id !== id).length;
       if (others === 0) return null;
       const total = others + 1;
-      const keyPath = byId.get(id)?.keyPath ?? keyPathOfId(id, anchor);
+      const keyPath = byId.get(id)?.keyPath ?? parseInstanceId(id).key;
       return `1 of ${total} from this call site${keyPath ? ` (${keyPath})` : ""}, needs a condition`;
     }
     const left = instances.filter((instance) => !instance.included);
@@ -400,10 +394,10 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
         component: componentOf(target, coverage(record)),
         anchor:
           target.scope === "page"
-            ? `${target.route} › ${target.component}`
+            ? pageAnchor(target.route, target.component)
             : target.scope === "group"
               ? target.anchor
-              : (byId.get(target.id)?.anchor ?? anchorOfId(target.id)),
+              : (byId.get(target.id)?.anchor ?? parseInstanceId(target.id).anchor),
         route: routeOf(record),
         reason: suspended.reason,
         detail:
@@ -430,7 +424,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
   function callSiteAnchors(record: OverrideRecord, client: readonly Sighting[]): string[] {
     const { target } = record;
     if (target.scope === "group") return [target.anchor];
-    if (target.scope === "instance") return [byId.get(target.id)?.anchor ?? anchorOfId(target.id)];
+    if (target.scope === "instance") return [byId.get(target.id)?.anchor ?? parseInstanceId(target.id).anchor];
     const excluded = new Set(record.excluded);
     return [...new Set(client.filter((sighting) => !excluded.has(sighting.id)).map((sighting) => sighting.anchor))].sort();
   }
@@ -542,13 +536,6 @@ function componentOf(target: ScopeTarget, covered: readonly Sighting[]): string 
   if (target.scope === "page") return target.component;
   const seen = covered[0]?.component;
   if (seen) return seen;
-  const anchor = target.scope === "group" ? target.anchor : anchorOfId(target.id);
+  const anchor = target.scope === "group" ? target.anchor : parseInstanceId(target.id).anchor;
   return parseCallSiteId(anchor)?.component ?? "";
-}
-
-/** An Instance id is its anchor, then `#` and the key path; `~n` marks a mount-order duplicate. */
-function anchorOfId(id: string): string {
-  const hash = id.indexOf("#");
-  const base = hash === -1 ? id : id.slice(0, hash);
-  return base.replace(/~\d+$/, "");
 }

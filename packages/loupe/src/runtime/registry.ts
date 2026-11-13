@@ -4,7 +4,7 @@
 
 import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
-import { hintTotal } from "../call-site.js";
+import { ANCHOR_ATTRIBUTE, isUnanchored, parseHint, SOURCE_ATTRIBUTE, sharesBase, uniqueId } from "../call-site.js";
 import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
@@ -19,14 +19,8 @@ import {
   type ScopeTarget,
 } from "./store.js";
 
-export const ANCHOR_PROP = "data-ds-anchor";
-export const SOURCE_PROP = "data-ds-source";
-
-/** Anchor for an Adapter rendered where the loader added none. */
-export const UNANCHORED = "<unanchored>";
-
 export type MountedInstance = {
-  /** Instance id: the call-site anchor, then `#` and the app-authored key path when there is one. */
+  /** Instance id (call-site.ts): the anchor, the app-authored key path when there is one, and `~n` for a duplicate. */
   id: string;
   /** The call-site id the loader wrote (`data-ds-anchor`). */
   anchor: string;
@@ -164,7 +158,7 @@ export function identityOf(
     anchor: instance.anchor,
     component: instance.component,
     route: currentRoute(),
-    total: hintTotal(instance.hint),
+    total: parseHint(instance.hint)?.total ?? null,
   };
 }
 
@@ -177,7 +171,7 @@ export function scopeTarget(
     case "instance":
       return { scope, id: instance.id };
     case "group":
-      return instance.anchor.startsWith(UNANCHORED) ? null : { scope, anchor: instance.anchor };
+      return isUnanchored(instance.anchor) ? null : { scope, anchor: instance.anchor };
     case "page":
       return { scope, route: currentRoute(), component: instance.component };
   }
@@ -256,10 +250,6 @@ function recordedIds(store: OverrideStore): Set<string> {
  */
 const mountedOn = new WeakMap<MountedInstance, string>();
 
-export function instanceId(anchor: string, keyPath: string): string {
-  return keyPath === "" ? anchor : `${anchor}#${keyPath}`;
-}
-
 /**
  * Registers a mounted Instance under `baseId`, or `baseId~2`, `~3`… when another
  * mounted Instance already holds it (the same call site, rendered twice with no
@@ -278,18 +268,6 @@ export function register(baseId: string, entry: Omit<MountedInstance, "id">): Mo
   if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
   emitChange();
   return instance;
-}
-
-/** Whether `id` is `base` or one of its mount-order duplicates, `base~n`. */
-export function sharesBase(id: string, base: string): boolean {
-  return id === base || (id.startsWith(`${base}~`) && /^\d+$/.test(id.slice(base.length + 1)));
-}
-
-/** `base`, or `base~2`, `~3`… when `taken` already holds it. */
-export function uniqueId(base: string, taken: { has(id: string): boolean }): string {
-  let id = base;
-  for (let n = 2; taken.has(id); n++) id = `${base}~${n}`;
-  return id;
 }
 
 export function unregister(instance: MountedInstance): void {
@@ -311,7 +289,7 @@ export function unregister(instance: MountedInstance): void {
 
 /** The app's props without the attributes the loader added to the call site. */
 export function withoutLoaderProps(props: Props): Props {
-  if (!(ANCHOR_PROP in props) && !(SOURCE_PROP in props) && !(WRITES_ATTRIBUTE in props)) return props;
-  const { [ANCHOR_PROP]: _anchor, [SOURCE_PROP]: _source, [WRITES_ATTRIBUTE]: _writes, ...rest } = props;
+  if (!(ANCHOR_ATTRIBUTE in props) && !(SOURCE_ATTRIBUTE in props) && !(WRITES_ATTRIBUTE in props)) return props;
+  const { [ANCHOR_ATTRIBUTE]: _anchor, [SOURCE_ATTRIBUTE]: _source, [WRITES_ATTRIBUTE]: _writes, ...rest } = props;
   return rest;
 }

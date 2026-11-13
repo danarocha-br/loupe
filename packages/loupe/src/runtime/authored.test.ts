@@ -5,6 +5,7 @@
 import { act, cloneElement, createElement as h, type ReactElement, type Ref, useLayoutEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { encodeCallSiteWrites, type CallSiteWrites } from "../writes.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug } from "./debug.js";
@@ -38,7 +39,9 @@ function MenuTrigger({ render: element, children }: { render: ReactElement<Loose
 const writes = (record: Partial<CallSiteWrites>) =>
   encodeCallSiteWrites({ attributes: [], spreads: false, children: "none", ...record });
 
-const triggerAnchor = "member-row-menu.tsx › MemberRowMenu › Button[1]";
+const siteAt = (path: string, enclosing: string, component: string, ordinal = 1) =>
+  callSiteId({ path, enclosing, component, ordinal });
+const triggerAnchor = siteAt("member-row-menu.tsx", "MemberRowMenu", "Button");
 
 let container: HTMLDivElement;
 let root: Root;
@@ -69,7 +72,7 @@ function renderTrigger(record: string | undefined, extra: Loose = {}) {
           variant: "ghost",
           size: "icon",
           "aria-label": "Actions for Ana",
-          "data-ds-anchor": triggerAnchor,
+          [ANCHOR_ATTRIBUTE]: triggerAnchor,
           ...(record === undefined ? {} : { "data-ds-writes": record }),
           ...extra,
         }),
@@ -111,21 +114,22 @@ describe("authored vs library props", () => {
     const described = loupe.props(triggerAnchor);
     expect(described.current).not.toHaveProperty("data-ds-writes");
     expect(described.injected).not.toHaveProperty("data-ds-writes");
-    expect(described.injected).not.toHaveProperty("data-ds-anchor");
+    expect(described.injected).not.toHaveProperty(ANCHOR_ATTRIBUTE);
   });
 
   it("counts children as the app's when the call site writes them", () => {
+    const pageButton = siteAt("page.tsx", "Page", "Button");
     render(
       h(
         Button,
-        { variant: "ghost", "data-ds-anchor": "page.tsx › Page › Button[1]", "data-ds-writes": writes({
+        { variant: "ghost", [ANCHOR_ATTRIBUTE]: pageButton, "data-ds-writes": writes({
           attributes: [{ name: "variant", writtenAs: "literal" }],
           children: "text",
         }) },
         "Invite",
       ),
     );
-    expect(loupe.props("page.tsx › Page › Button[1]").current).toEqual({ variant: "ghost", children: "Invite" });
+    expect(loupe.props(pageButton).current).toEqual({ variant: "ghost", children: "Invite" });
   });
 
   it("an Override on a prop the call site didn't write lands among the app's rows, not the library's", () => {
@@ -190,7 +194,7 @@ function DsDialog({
   );
 }
 const Dialog = createAdapter("AlertDialog", DsDialog, { state: ["open"] });
-const dialogAnchor = "member-row-menu.tsx › MemberRowMenu › AlertDialog[1]";
+const dialogAnchor = siteAt("member-row-menu.tsx", "MemberRowMenu", "AlertDialog");
 const dialogShown = () => container.querySelector("[role=alertdialog]") !== null;
 const pressCancel = () => act(() => (container.querySelector("[role=alertdialog] button") as HTMLButtonElement).click());
 
@@ -211,7 +215,7 @@ describe("State props", () => {
         onAppChange(open);
         setConfirming(open);
       },
-      "data-ds-anchor": dialogAnchor,
+      [ANCHOR_ATTRIBUTE]: dialogAnchor,
       "data-ds-writes": controlled,
     } as Loose);
   }
@@ -267,7 +271,7 @@ describe("State props", () => {
       return h(Dialog, {
         open: confirming,
         onOpenChange: setConfirming,
-        "data-ds-anchor": dialogAnchor,
+        [ANCHOR_ATTRIBUTE]: dialogAnchor,
         "data-ds-writes": controlled,
       } as Loose);
     }
@@ -286,7 +290,7 @@ describe("State props", () => {
 
   it("holds an uncontrolled State prop too, and reports the component's attempt through the handler", () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
-    render(h(Dialog, { "data-ds-anchor": dialogAnchor, "data-ds-writes": writes({ children: "elements" }) } as Loose));
+    render(h(Dialog, { [ANCHOR_ATTRIBUTE]: dialogAnchor, "data-ds-writes": writes({ children: "elements" }) } as Loose));
     expect(loupe.props(dialogAnchor).states).toEqual({ open: { controlled: false } });
     act(() => {
       loupe.set(dialogAnchor, "open", true);
@@ -310,11 +314,12 @@ describe("State props", () => {
       },
       { state: ["open"] },
     );
-    render(h(Eager, { "data-ds-anchor": "e › E › Eager[1]" } as Loose));
+    const eager = siteAt("e", "E", "Eager");
+    render(h(Eager, { [ANCHOR_ATTRIBUTE]: eager } as Loose));
     act(() => {
-      loupe.set("e › E › Eager[1]", "open", true);
+      loupe.set(eager, "open", true);
     });
-    expect(loupe.props("e › E › Eager[1]").states.open).toEqual({
+    expect(loupe.props(eager).states.open).toEqual({
       controlled: false,
       held: { value: true, appTried: false },
     });
@@ -331,7 +336,7 @@ describe("State props", () => {
       },
       { state: ["open"] },
     );
-    render(h(Probe, { open: false, onOpenChange: handler, "data-ds-anchor": "p › P › Probe[1]" } as Loose));
+    render(h(Probe, { open: false, onOpenChange: handler, [ANCHOR_ATTRIBUTE]: siteAt("p", "P", "Probe") } as Loose));
     expect(received).toBe(handler);
   });
 

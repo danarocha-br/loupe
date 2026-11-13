@@ -11,21 +11,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { hintTotal } from "../call-site.js";
+import { ANCHOR_ATTRIBUTE, instanceId, parseHint, SOURCE_ATTRIBUTE, unanchoredId } from "../call-site.js";
 import type { PropMeta } from "../meta/types.js";
 import { splitAuthored, writesOf } from "./authored.js";
 import { currentFiber, keyPathOf } from "./fiber.js";
 import {
-  ANCHOR_PROP,
   disableOverrides,
   emitChange,
   identityOf,
-  instanceId,
   type MountedInstance,
   register,
   registry,
-  SOURCE_PROP,
-  UNANCHORED,
   unregister,
   withoutLoaderProps,
 } from "./registry.js";
@@ -101,7 +97,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
     }
 
     const anchor =
-      typeof props[ANCHOR_PROP] === "string" ? (props[ANCHOR_PROP] as string) : `${UNANCHORED} › ${name}`;
+      typeof props[ANCHOR_ATTRIBUTE] === "string" ? (props[ANCHOR_ATTRIBUTE] as string) : unanchoredId(name);
     const keyPath = identified ? keyPathOf(fiber) : "";
     const baseId = instanceId(anchor, keyPath);
     // Overrides apply only once this Instance holds its id, so a duplicate never
@@ -186,9 +182,9 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
 
 /** The hop guard. Runs before paint, so a suspended Override is never shown. */
 function observeCallSite(instance: MountedInstance): void {
-  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: hintTotal(instance.hint) });
+  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: parseHint(instance.hint)?.total ?? null });
 }
 
 function hintOf(props: Props): string | null {
-  return typeof props[SOURCE_PROP] === "string" ? (props[SOURCE_PROP] as string) : null;
+  return typeof props[SOURCE_ATTRIBUTE] === "string" ? (props[SOURCE_ATTRIBUTE] as string) : null;
 }

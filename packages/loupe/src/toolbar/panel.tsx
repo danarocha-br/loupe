@@ -5,6 +5,7 @@
 // or page scope (PER-134). Notices sit below the page or Instance card.
 
 import { type ReactNode, useEffect, useState } from "react";
+import { callSiteLabels, parseHint } from "../call-site.js";
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
 import { NO_META_NOTE, overridesOffNote, SERVER_NOTE, SPREADS_NOTE, UNADAPTED_NOTE } from "../runtime/inspect.js";
@@ -328,7 +329,7 @@ function suspensionReason(suspended: Suspension): string {
 
 /** What a record names: an Instance, every Instance from a call site, or a component on a page. */
 function targetLabel(target: ScopeTarget): string {
-  const short = (anchor: string) => anchor.split(" › ").slice(-2).join(" › ");
+  const short = (idOrAnchor: string) => callSiteLabels(idOrAnchor).short;
   switch (target.scope) {
     case "instance":
       return short(target.id);
@@ -341,9 +342,9 @@ function targetLabel(target: ScopeTarget): string {
 
 /** The call site's file and line, then the key path that tells repeated Instances apart. */
 function instanceLabel(id: string, hint: string | null): string {
-  const where = hint ? hint.replace(/:\d+ \d+\/\d+$/, "").split("/").at(-1) : id;
-  const key = id.includes("#") ? id.slice(id.indexOf("#")) : "";
-  return `${where}${key}`;
+  const site = parseHint(hint);
+  const where = site ? `${site.path.split("/").at(-1)}:${site.line}` : id;
+  return `${where}${callSiteLabels(id).key}`;
 }
 
 /** An Instance's card-level note, under a title that names its kind. */
@@ -683,7 +684,7 @@ function MembersCard({
                     }}
                   />
                   <span className="mono" title={anchor}>
-                    {anchor ? anchor.split(" › ").slice(-2).join(" › ") : "No call site"}
+                    {anchor ? callSiteLabels(anchor).short : "No call site"}
                   </span>
                   <span className="muted">· {members.length}</span>
                 </label>
@@ -727,7 +728,7 @@ function MembersCard({
 
 /** The key path that tells repeated Instances apart, or the whole id when there is none. */
 function keyOf(id: string): string {
-  return id.includes("#") ? id.slice(id.indexOf("#")) : id;
+  return callSiteLabels(id).key || id;
 }
 
 function Footer({ page, debug }: PanelProps) {

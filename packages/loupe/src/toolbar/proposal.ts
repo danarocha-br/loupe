@@ -8,6 +8,7 @@
 // `__loupe.proposalMarkdown(options?)` the Copy as Markdown text. Snapshots that
 // aren't Outdated ride along (PER-138); `{ capture: true }` takes one first.
 
+import { parseInstanceId } from "../call-site.js";
 import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
 import { proposalMarkdown } from "../proposal/markdown.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
@@ -175,7 +176,7 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
       anchor: entry.anchor,
       hint: entry.hint,
       component: entry.component,
-      keyPath: entry.id.startsWith(`${entry.anchor}#`) ? entry.id.slice(entry.anchor.length + 1) : "",
+      keyPath: parseInstanceId(entry.id).key,
       rendered: "server",
       current: entry.props,
       writes: null,
