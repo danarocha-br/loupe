@@ -127,7 +127,8 @@ function sortKeys(value: unknown): unknown {
 export type Claim = { found: Found; hash: string };
 
 /**
- * - `intact`: recorded, and Loupe's edit is there unchanged.
+ * - `intact`: recorded, and Loupe's edit is there unchanged. `claim.hash` is the hash to record: it differs from the
+ *   entry's when the entry holds a hash written by Loupe 0.0.4 or earlier, which carried the Loupe version.
  * - `drift`: recorded, and the edit was changed by hand since.
  * - `missing`: recorded, and the edit (or the file) is gone.
  * - `pending`: recorded without a hash (a manual step not adopted yet); `claim` is the edit if one is there.
@@ -139,7 +140,7 @@ export type Claim = { found: Found; hash: string };
  * `text` is the file's content, undefined when it doesn't exist.
  */
 export type TouchPointVerdict =
-  | { kind: "intact"; text: string }
+  | { kind: "intact"; text: string; claim: Claim }
   | { kind: "drift"; text: string }
   | { kind: "missing"; text: string | undefined }
   | { kind: "pending"; text: string | undefined; claim: Claim | undefined }
@@ -147,8 +148,16 @@ export type TouchPointVerdict =
   | { kind: "not-loupes"; text: string | undefined }
   | { kind: "unrecognised" };
 
-/** Judges one touch point against its ledger entry. Pass `tp` undefined when no touch point answers for `entry`. */
-export function judgeTouchPoint(root: string, entry: TouchPointEntry | undefined, tp: TouchPoint | undefined): TouchPointVerdict {
+/**
+ * Judges one touch point against its ledger entry. Pass `tp` undefined when no touch point answers for `entry`.
+ * `ledger` gives the recorded Loupe version, which an old-format hash is rebuilt with.
+ */
+export function judgeTouchPoint(
+  root: string,
+  ledger: Ledger,
+  entry: TouchPointEntry | undefined,
+  tp: TouchPoint | undefined,
+): TouchPointVerdict {
   if (!tp) {
     const there = entry !== undefined && existsSync(path.join(root, entry.file));
     return there ? { kind: "unrecognised" } : { kind: "missing", text: undefined };
@@ -158,11 +167,20 @@ export function judgeTouchPoint(root: string, entry: TouchPointEntry | undefined
   const claim = found ? { found, hash: sha256(found.canonical) } : undefined;
   if (entry?.sha256) {
     if (text === undefined || !claim) return { kind: "missing", text };
-    return claim.hash === entry.sha256 ? { kind: "intact", text } : { kind: "drift", text };
+    return claim.hash === entry.sha256 || recordedTheOldWay(claim, entry.sha256, ledger)
+      ? { kind: "intact", text, claim }
+      : { kind: "drift", text };
   }
   if (entry) return { kind: "pending", text, claim };
   if (text !== undefined && claim) return { kind: "unclaimed", text, claim };
   return { kind: "not-loupes", text };
+}
+
+/** Whether `hash` is the old form of `claim`: what Loupe 0.0.4 and earlier recorded, the ledger's version included. */
+function recordedTheOldWay(claim: Claim, hash: string, ledger: Ledger): boolean {
+  const version = ledger.loupe?.version;
+  const legacy = claim.found.legacy;
+  return version !== undefined && legacy !== undefined && sha256(legacy(version)) === hash;
 }
 
 /** The Loupe edit a verdict found, when it found one. */

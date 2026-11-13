@@ -65,7 +65,8 @@ Once installed, `pnpm exec loupe check` in the app's folder reruns it.
 `init` runs the check, creates the Product layer (`packages/loupe`), makes the
 four edits (the app's `package.json`, `next.config.ts`, the root layout and the
 Biome config), then runs `generate`. Each edit is recorded in
-`packages/loupe/loupe.ledger.json`. A rerun writes only what is missing.
+`packages/loupe/loupe.ledger.json`. A rerun writes only what is missing; with a
+newer Loupe installed, it upgrades the install (see [Upgrading](#upgrading)).
 
 The first run goes through `pnpm dlx`, as above. Once the app has its copy:
 
@@ -161,16 +162,36 @@ fails, it puts the dependencies back so the next run retries.
 
 ## Upgrading
 
-The intended upgrade is a version bump of the app's `@danarocha/loupe`, then
-`pnpm install` and `loupe generate`. In 0.0.x only part of that works:
-`generate` rewrites the Adapters and `meta/` for the new version, but only
-`init` writes the ledger, and it refuses once the installed version differs from
-the ledger's. So the ledger and `packages/loupe/package.json` (whose
-`peerDependencies` pins the old version) keep the old version, and `doctor`
-reports "Loupe versions differ".
+An upgrade is a rerun of `init` with the newer version installed:
 
-Until that's fixed, upgrade by removing and reinstalling: `loupe remove` with the
-installed version, then `init` with the new one through `pnpm dlx`.
+1. In the app's `package.json`, set `@danarocha/loupe` to the new version,
+   exact as `init` wrote it, and run `pnpm install`.
+2. Commit both. `init` refuses while the app's `package.json` or the lockfile
+   has uncommitted changes; during an upgrade it says "commit the version bump,
+   then rerun".
+3. Run `pnpm exec loupe init` in the app's folder.
+
+`init` then reconciles item by item, as on any rerun, recording each item in the
+ledger before writing it. It rewrites its own unedited files in
+`packages/loupe` (that `package.json` pins the version in `peerDependencies`),
+reapplies a touch point that went missing, and runs `generate`, which rewrites
+the Adapters and `meta/`. The ledger's `loupe.version` moves last, and only when
+nothing was left blocked: then `init` prints "Upgraded from Loupe <old> to <new>".
+`init` refuses to start while the app's `package.json` still pins the old
+version, as when a newer release runs through `pnpm dlx`.
+
+If a hand-edited file or a manual step stops it, the ledger keeps the old
+version, and `doctor` reports "Loupe versions differ" with "Run loupe init to
+finish upgrading". Restore the file (or make the manual step and run
+`init --adopt`), commit, and rerun `init`; it picks up where it stopped.
+
+The `package.json` touch point's hash leaves out Loupe's version, so a bump never
+reads as drift. A ledger written by 0.0.4 or earlier still has the version in
+that hash: `init`, `doctor` and `remove` recognise it by rebuilding it with the
+ledger's version, and `init` records it again the new way.
+
+Loupe never downgrades: when the installed version is older than the ledger's,
+`init` refuses and writes nothing.
 
 ## The dev loader
 

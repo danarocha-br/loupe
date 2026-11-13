@@ -169,11 +169,16 @@ describe("loupe doctor reporting drift", () => {
     expect(snapshot(root)).toEqual(before);
   });
 
-  it("doesn't count a formatting-only change to a touch point", async () => {
+  it("reads a package.json hash Loupe 0.0.4 recorded, with the version in it, as intact", async () => {
     const root = await installed();
-    edit(root, "apps/web/next.config.ts", (t) => t.replace('"@repo/loupe/next"', "'@repo/loupe/next'"));
+    edit(root, LEDGER, (t) => {
+      const ledger = JSON.parse(t);
+      const old = createHash("sha256").update(JSON.stringify([["@danarocha/loupe", version], ["@repo/loupe", "workspace:*"]])).digest("hex");
+      for (const entry of ledger.touchPoints) if (entry.id === "package-json") entry.sha256 = old;
+      return `${JSON.stringify(ledger, null, 2)}\n`;
+    });
     const { code, text } = await doctor(root);
-    expect(text).toMatch(/✓ next-config /);
+    expect(text).toMatch(/✓ package-json /);
     expect(code).toBe(0);
   });
 
@@ -279,6 +284,17 @@ describe("loupe doctor on a broken install", () => {
     const { code, text } = await doctor(root);
     expect(text).toContain("✗ Loupe versions differ");
     expect(text).toContain("apps/web/node_modules: 9.9.9");
+    expect(code).toBe(1);
+  });
+
+  it("points to loupe init when only the ledger is behind, as an unfinished upgrade leaves it", async () => {
+    const root = await installed();
+    edit(root, LEDGER, (t) => t.replace(`"version": "${version}"`, '"version": "0.0.1"'));
+    const { code, text } = await doctor(root);
+    expect(text).toContain("✗ Loupe versions differ");
+    expect(text).toContain("the ledger: 0.0.1");
+    expect(text).toContain(`Run loupe init to finish upgrading to ${version}.`);
+    expect(text).not.toContain("exact-pinned");
     expect(code).toBe(1);
   });
 

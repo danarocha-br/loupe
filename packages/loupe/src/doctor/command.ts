@@ -20,7 +20,7 @@ import {
 } from "../init/ledger.js";
 import { NPM_PACKAGE, PRODUCT_LAYER, touchPoints } from "../init/touch-points.js";
 import { compare } from "../meta/sources.js";
-import { version as installedVersion } from "../version.js";
+import { compareVersions, version as installedVersion } from "../version.js";
 import { type BuildRunner, nextBuild, scanBuild } from "./build.js";
 
 export type DoctorOptions = { build: boolean; help?: boolean };
@@ -184,9 +184,18 @@ function versions(
   if (values.size === 1 && !values.has(undefined)) {
     report.ok(`Loupe ${cli} in ${seen.map(([where]) => where).join(", ")}`);
   } else {
+    // Everything but the ledger is on a newer Loupe: an upgrade init hasn't finished (ADR 0001).
+    const recorded = ledger.loupe?.version;
+    const upgrading = recorded !== undefined && compareVersions(cli, recorded) > 0 && seen.every(([where, v]) => where === "the ledger" || v === cli);
     report.fail(
       `Loupe versions differ`,
-      seen.map(([where, v]) => `${where}: ${v ?? "missing"}`).concat(`Install ${NPM_PACKAGE} exact-pinned, run pnpm install, and run the CLI from that copy.`),
+      seen
+        .map(([where, v]) => `${where}: ${v ?? "missing"}`)
+        .concat(
+          upgrading
+            ? `Run loupe init to finish upgrading to ${cli}.`
+            : `Install ${NPM_PACKAGE} exact-pinned, run pnpm install, and run the CLI from that copy.`,
+        ),
     );
   }
 
@@ -217,7 +226,7 @@ function touchPointChecks(report: Report, root: string, ledger: Ledger, app: str
   for (const tp of points) {
     const entry = recorded.find((t) => t.id === tp.id);
     const label = `${tp.id.padEnd(13)}${tp.file}`;
-    const verdict = judgeTouchPoint(root, entry, tp);
+    const verdict = judgeTouchPoint(root, ledger, entry, tp);
     switch (verdict.kind) {
       case "unclaimed":
       case "not-loupes":
