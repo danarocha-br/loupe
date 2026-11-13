@@ -24,6 +24,12 @@ _Avoid_: anchor
 The generated stand-in for a component module that lets its Instances take Overrides.
 _Avoid_: wrapper, proxy
 
+**Unadapted Instance**:
+An Instance rendered in the browser from an anchored call site, but with no Adapter, so it is inspect only. Loupe finds it by walking React's tree.
+
+**Server-rendered Instance**:
+An Instance a Server Component rendered. Loupe finds it through React's development record of the Server Component, and never overrides it.
+
 **Inspect only**:
 An Instance that can be inspected but not overridden: it has no Adapter, it rendered on the server, or Overrides are off for the page.
 

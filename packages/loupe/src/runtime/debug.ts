@@ -25,19 +25,9 @@
 //   __loupe.ancestors(id)          the adapted Instances around it, nearest first
 //   __loupe.status                 whether Overrides are on (the React self-check)
 
-import { ANCHOR_ATTRIBUTE, instanceId, parseCallSiteId, SOURCE_ATTRIBUTE, uniqueId } from "../call-site.js";
-import { adaptedName } from "./adapter.js";
 import { type Authorship, splitAuthored } from "./authored.js";
-import { type Fiber, fiberOfNode, keyPathOf, rootFibers, walkFibers } from "./fiber.js";
-import {
-  identityOf,
-  type LastSeen,
-  type MountedInstance,
-  registry,
-  scopeTarget,
-  type Status,
-  withoutLoaderProps,
-} from "./registry.js";
+import { type Discovery, discover, type FoundInstance } from "./discovery.js";
+import { identityOf, type LastSeen, type MountedInstance, registry, scopeTarget, type Status } from "./registry.js";
 import { type Inspection, inspect } from "./inspect.js";
 import { loadedMeta } from "./instance-meta.js";
 import { textScopeRefusal } from "./label-text.js";
@@ -117,89 +107,31 @@ export type LoupeDebug = {
   ancestors(id: string): string[];
 };
 
-// React's fiber tag for a DOM element.
-const HOST_COMPONENT = 5;
-// React's fiber tags for a component the app wrote: function, class, forwardRef, memo, simple memo.
-const COMPOSITE_TAGS: ReadonlySet<number> = new Set([0, 1, 11, 14, 15]);
-
-/** The outermost DOM elements a fiber renders, through portals too (a dialog's popup is in one). */
-export function hostNodesOf(fiber: Fiber | null): Element[] {
-  const found: Element[] = [];
-  const stack: Fiber[] = fiber?.child ? [fiber.child] : [];
-  while (stack.length > 0) {
-    const node = stack.pop() as Fiber;
-    if (node.sibling) stack.push(node.sibling);
-    if (node.tag === HOST_COMPONENT && node.stateNode instanceof Element) found.push(node.stateNode);
-    else if (node.child) stack.push(node.child);
-  }
-  // Depth-first with a stack visits siblings in reverse.
-  return found.reverse();
-}
-
 const SERVER_REASON =
   "Rendered by a Server Component: Overrides apply only to Instances rendered in the browser.";
 
 /** Why an anchored client Instance found by the fiber walk can't be overridden (PER-100 §1). */
 export const UNADAPTED_REASON = "No Adapter renders this Instance, so Overrides can't reach it.";
 
-const anchorOf = (props: unknown): string | null => {
-  const anchor = typeof props === "object" && props !== null ? (props as Props)[ANCHOR_ATTRIBUTE] : undefined;
-  return typeof anchor === "string" ? anchor : null;
-};
-
-/** The call-site ids a fiber carries: in its own props, and in the server components that rendered it. */
-function anchorsOn(fiber: Fiber): string[] {
-  const found: string[] = [];
-  const own = anchorOf(fiber.memoizedProps);
-  if (own !== null) found.push(own);
-  for (const info of fiber._debugInfo ?? []) {
-    const anchor = anchorOf(info.props);
-    if (anchor !== null) found.push(anchor);
-  }
-  return found;
-}
-
-/**
- * The anchor of a client Instance with no Adapter, or null. A component that
- * forwards its props (to a Slot, or an Adapter to its original) hands the anchor
- * down: only the outermost fiber carrying it is the Instance, however many
- * components between carry anchors of their own (a design-system Tooltip.Trigger
- * is a call site too, and the call site's props reach the `render` element past
- * it). Known limit: a component that renders itself from one call site repeats
- * that anchor, so only its outermost level from there is listed.
- */
-function unadaptedAnchor(fiber: Fiber): string | null {
-  if (!COMPOSITE_TAGS.has(fiber.tag) || adaptedName(fiber.type) !== null) return null;
-  const anchor = anchorOf(fiber.memoizedProps);
-  if (anchor === null) return null;
-  // A Server Component's output: listed by the server scan.
-  if ((fiber._debugInfo ?? []).some((info) => anchorOf(info.props) === anchor)) return null;
-  for (let above = fiber.return; above; above = above.return) {
-    if (anchorsOn(above).includes(anchor)) return null;
-  }
-  return anchor;
-}
-
-/** The name the call site imports, from the anchor; the type's own name as a fallback. */
-function componentOf(anchor: string, type: unknown): string {
-  const named = parseCallSiteId(anchor)?.component;
-  if (named) return named;
-  const value = type as { displayName?: unknown; name?: unknown; render?: { name?: unknown }; type?: { name?: unknown } } | null;
-  for (const name of [value?.displayName, value?.name, value?.render?.name, value?.type?.name]) {
-    if (typeof name === "string" && name !== "") return name;
-  }
-  return "Anonymous";
-}
-
 export function createDebug(): LoupeDebug {
   const reg = registry();
+
+  /** The Instances on the page as it is now. */
+  const page = (): Discovery =>
+    discover(typeof document === "undefined" ? undefined : document, reg.instances.values());
+
+  /** An Instance no Adapter registered, or undefined. */
+  const foundInstance = (id: string): FoundInstance | undefined => {
+    const instance = page().find(id);
+    return instance && instance.kind !== "adapted" ? instance : undefined;
+  };
 
   const requireMounted = (id: string): MountedInstance => {
     const instance = reg.instances.get(id);
     if (!instance) {
-      const found = scanFibers().find((scanned) => scanned.entry.id === id);
+      const found = foundInstance(id);
       throw new Error(
-        found?.rendered === "server"
+        found?.kind === "server"
           ? `[loupe] ${id}: ${SERVER_REASON}`
           : found
             ? `[loupe] ${id} has no Adapter, so it is inspect-only.`
@@ -258,68 +190,10 @@ export function createDebug(): LoupeDebug {
     }));
   }
 
-  /** A client one's `env` is "Client"; its fiber is the Instance's own. */
-  type Scanned = { entry: ServerInstance; fiber: Fiber; raw: Props; rendered: "client" | "server" };
-
-  /**
-   * Instances no Adapter registered, with the fiber that carries each and its props
-   * as written: server-rendered ones from React's `_debugInfo`, and anchored client
-   * components with no Adapter.
-   */
-  function scanFibers(): Scanned[] {
-    if (typeof document === "undefined") return [];
-    const found = new Map<string, Scanned>();
-    const seen = new Set<object>();
-    for (const root of rootFibers(document)) {
-      walkFibers(root, (fiber) => {
-        for (const info of fiber._debugInfo ?? []) {
-          if (seen.has(info)) continue;
-          seen.add(info);
-          const props = (typeof info.props === "object" && info.props !== null ? info.props : {}) as Props;
-          const anchor = props[ANCHOR_ATTRIBUTE];
-          // Page and layout components are not call sites the loader anchored.
-          if (typeof info.name !== "string" || typeof anchor !== "string") continue;
-          const id = uniqueId(instanceId(anchor, keyPathOf(fiber)), found);
-          found.set(id, {
-            entry: {
-              id,
-              component: info.name,
-              anchor,
-              hint: typeof props[SOURCE_ATTRIBUTE] === "string" ? (props[SOURCE_ATTRIBUTE] as string) : null,
-              env: typeof info.env === "string" ? info.env : "Server",
-              props: withoutLoaderProps(props),
-            },
-            fiber,
-            raw: props,
-            rendered: "server",
-          });
-        }
-        const anchor = unadaptedAnchor(fiber);
-        if (anchor === null) return;
-        const raw = fiber.memoizedProps as Props;
-        const id = uniqueId(instanceId(anchor, keyPathOf(fiber)), found);
-        found.set(id, {
-          entry: {
-            id,
-            component: componentOf(anchor, fiber.type),
-            anchor,
-            hint: typeof raw[SOURCE_ATTRIBUTE] === "string" ? (raw[SOURCE_ATTRIBUTE] as string) : null,
-            env: "Client",
-            props: withoutLoaderProps(raw),
-          },
-          fiber,
-          raw,
-          rendered: "client",
-        });
-      });
-    }
-    return [...found.values()];
-  }
-
   function scan(): ServerInstance[] {
-    return scanFibers()
-      .filter((scanned) => scanned.rendered === "server")
-      .map((scanned) => scanned.entry);
+    return page()
+      .instances.filter((instance): instance is FoundInstance => instance.kind === "server")
+      .map(({ id, component, anchor, hint, env, props }) => ({ id, component, anchor, hint, env, props }));
   }
 
   function inspectInstance(id: string): Inspection {
@@ -343,22 +217,22 @@ export function createDebug(): LoupeDebug {
         ...(status.overrides ? { sources: describe(instance).sources } : { overridesOffReason: status.reason }),
       });
     }
-    const server = scanFibers().find((scanned) => scanned.entry.id === id);
-    if (!server) throw new Error(`[loupe] No Instance ${id} on this page.`);
-    if (server.rendered === "client") {
-      const { current, injected, authorship } = splitAuthored(server.entry.props, writesOf(server.raw));
+    const found = foundInstance(id);
+    if (!found) throw new Error(`[loupe] No Instance ${id} on this page.`);
+    if (found.kind === "unadapted") {
+      const { current, injected, authorship } = splitAuthored(found.props, writesOf(found.raw));
       return inspect({
         id,
-        component: server.entry.component,
-        anchor: server.entry.anchor,
-        hint: server.entry.hint,
+        component: found.component,
+        anchor: found.anchor,
+        hint: found.hint,
         rendered: "client",
         adapted: false,
         current,
         injected,
         authorship,
-        writes: writesOf(server.raw),
-        meta: loadedMeta(server.entry.anchor),
+        writes: writesOf(found.raw),
+        meta: loadedMeta(found.anchor),
         stateProps: [],
         overridesOn: status.overrides,
         ...(status.overrides ? {} : { overridesOffReason: status.reason }),
@@ -366,15 +240,15 @@ export function createDebug(): LoupeDebug {
     }
     return inspect({
       id,
-      component: server.entry.component,
-      anchor: server.entry.anchor,
-      hint: server.entry.hint,
+      component: found.component,
+      anchor: found.anchor,
+      hint: found.hint,
       rendered: "server",
-      current: server.entry.props,
+      current: found.props,
       injected: {},
       authorship: "server",
-      writes: writesOf(server.raw),
-      meta: loadedMeta(server.entry.anchor),
+      writes: writesOf(found.raw),
+      meta: loadedMeta(found.anchor),
       stateProps: [],
       overridesOn: status.overrides,
     });
@@ -402,24 +276,22 @@ export function createDebug(): LoupeDebug {
         renders: instance.renders,
         stateProps: instance.stateProps,
       }));
-      const scanned = scanFibers().map((found) => ({ ...found.entry, rendered: found.rendered }));
-      const others = (rendered: "client" | "server"): InstanceRow[] =>
-        scanned
-          .filter((entry) => entry.rendered === rendered && matches(entry))
-          .map((entry) => ({
-            id: entry.id,
-            component: entry.component,
-            anchor: entry.anchor,
-            hint: entry.hint,
-            rendered,
-            adapted: false,
-            editable: false,
-            reason: rendered === "server" ? SERVER_REASON : UNADAPTED_REASON,
-            overrides: {},
-            renders: 0,
-            stateProps: [],
-          }));
-      return [...client, ...others("client"), ...others("server")];
+      const others: InstanceRow[] = page()
+        .instances.filter((instance): instance is FoundInstance => instance.kind !== "adapted" && matches(instance))
+        .map((instance) => ({
+          id: instance.id,
+          component: instance.component,
+          anchor: instance.anchor,
+          hint: instance.hint,
+          rendered: instance.kind === "server" ? "server" : "client",
+          adapted: false,
+          editable: false,
+          reason: instance.kind === "server" ? SERVER_REASON : UNADAPTED_REASON,
+          overrides: {},
+          renders: 0,
+          stateProps: [],
+        }));
+      return [...client, ...others];
     },
 
     props(id) {
@@ -481,35 +353,7 @@ export function createDebug(): LoupeDebug {
     },
 
     pick(element) {
-      const scanned = scanFibers();
-      // A fiber several server components rendered carries each: the innermost, listed last, wins.
-      const found = new Map<Fiber, string>();
-      for (const entry of scanned) {
-        found.set(entry.fiber, entry.entry.id);
-        if (entry.fiber.alternate) found.set(entry.fiber.alternate, entry.entry.id);
-      }
-      // The nearest Instance up the tree: adapted, client with no Adapter, or server-rendered.
-      for (let fiber: Fiber | null = fiberOfNode(element); fiber; fiber = fiber.return) {
-        const id = found.get(fiber);
-        if (id !== undefined) return id;
-        if (adaptedName(fiber.type) === null) continue;
-        for (const instance of reg.instances.values()) {
-          if (instance.fiber === fiber || instance.fiber === fiber.alternate) return instance.id;
-        }
-      }
-      // A server-rendered Instance whose fiber isn't on the path: the nearest anchor in the DOM.
-      const anchored = element.closest(`[${ANCHOR_ATTRIBUTE}]`);
-      const anchor = anchored?.getAttribute(ANCHOR_ATTRIBUTE);
-      if (!anchored || !anchor) return null;
-      const keyPath = keyPathOf(fiberOfNode(anchored));
-      return (
-        scanned.find(
-          (found) =>
-            found.rendered === "server" &&
-            found.entry.anchor === anchor &&
-            found.entry.id.startsWith(instanceId(anchor, keyPath)),
-        )?.entry.id ?? null
-      );
+      return page().at(element);
     },
 
     scan,
@@ -517,31 +361,11 @@ export function createDebug(): LoupeDebug {
     inspect: inspectInstance,
 
     nodes(id) {
-      const instance = reg.instances.get(id);
-      if (instance) {
-        // The recorded fiber may be the stale one of React's two copies.
-        const nodes = hostNodesOf(instance.fiber).filter((node) => node.isConnected);
-        return nodes.length > 0 ? nodes : hostNodesOf(instance.fiber?.alternate ?? null).filter((node) => node.isConnected);
-      }
-      const server = scanFibers().find((scanned) => scanned.entry.id === id);
-      return server ? hostNodesOf(server.fiber) : [];
+      return page().nodes(id);
     },
 
     ancestors(id) {
-      const instance = reg.instances.get(id);
-      if (!instance) return [];
-      const byFiber = new Map<Fiber, string>();
-      for (const other of reg.instances.values()) {
-        if (!other.fiber) continue;
-        byFiber.set(other.fiber, other.id);
-        if (other.fiber.alternate) byFiber.set(other.fiber.alternate, other.id);
-      }
-      const found: string[] = [];
-      for (let fiber = instance.fiber?.return ?? null; fiber; fiber = fiber.return) {
-        const owner = byFiber.get(fiber);
-        if (owner && owner !== id) found.push(owner);
-      }
-      return found;
+      return page().ancestors(id);
     },
   };
 }
