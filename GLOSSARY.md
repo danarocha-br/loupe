@@ -45,11 +45,26 @@ _Avoid_: edit, patch
 **Scope**:
 How far an Override reaches: This instance, every Instance of a call site, or All on page. The narrowest scope wins.
 
+**Reach**:
+The Instances an Override applies to right now: every Instance at its scope that it doesn't leave out, while it isn't suspended.
+_Avoid_: match, targets
+
+**Left out**:
+An Instance that a group or page Override skips. It falls back to the next scope.
+_Avoid_: excluded
+
+**Suspended**:
+An Override that stopped applying until it is reapplied or discarded, because its call site's code changed or it matches more than one Instance.
+_Avoid_: disabled, paused
+
 **Flag preview**:
 A feature-flag value forced for this browser through the Flags SDK's override cookie.
 
 **Snapshot**:
 A before-and-after capture of the page, or a close-up of one change. It goes out of date once a value it showed changes.
+
+**Before view**:
+The page with every Override off except those on State props, so an open dialog stays open. A Snapshot's "before" image is taken in it.
 
 **Proposal**:
 The record of a designer's Overrides, Flag previews and Snapshots, handed to engineering. The HTML report and the Markdown summary are renderings of it.
