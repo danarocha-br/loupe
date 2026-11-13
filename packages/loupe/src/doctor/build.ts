@@ -5,6 +5,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { ANCHOR_ATTRIBUTE } from "../call-site.js";
 import { nextDir } from "../compat/repo.js";
 import { compare } from "../meta/sources.js";
 
@@ -19,7 +20,7 @@ import { compare } from "../meta/sources.js";
  * one that reads `meta/` for Instances with no Adapter (PER-180).
  */
 export const BUILD_NEEDLES = [
-  "data-ds-anchor",
+  ANCHOR_ATTRIBUTE,
   "__loupe",
   "loupe/dist/loader.cjs",
   "@repo/loupe",

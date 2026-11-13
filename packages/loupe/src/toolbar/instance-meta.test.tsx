@@ -4,6 +4,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
@@ -24,7 +25,8 @@ function Card(props: { tone?: string; children?: ReactNode }) {
 }
 
 const LoupeMount = devMount(Toolbar);
-const CARD = "app/members.tsx › Members › Card[1]";
+const CARD = callSiteId({ path: "app/members.tsx", enclosing: "Members", component: "Card", ordinal: 1 });
+const SAVE = callSiteId({ path: "app/members.tsx", enclosing: "Members", component: "Button", ordinal: 1 });
 
 let container: HTMLDivElement;
 let root: Root;
@@ -80,8 +82,8 @@ async function mount() {
     root.render(
       <>
         <main>
-          <Button {...({ "data-ds-anchor": "app/members.tsx › Members › Button[1]" } as object)}>Salvar</Button>
-          <Card {...({ "data-ds-anchor": CARD } as object)}>Resumo</Card>
+          <Button {...({ [ANCHOR_ATTRIBUTE]: SAVE } as object)}>Salvar</Button>
+          <Card {...({ [ANCHOR_ATTRIBUTE]: CARD } as object)}>Resumo</Card>
         </main>
         <LoupeMount />
       </>,
@@ -95,13 +97,13 @@ describe("loading meta/ for an Instance with no Adapter", () => {
   it("asks for nothing until the inspector shows one, and nothing for an adapted one", async () => {
     await mount();
     expect(readInstanceMeta).not.toHaveBeenCalled();
-    await click(instance("Button[1]"));
+    await click(instance(SAVE));
     expect(readInstanceMeta).not.toHaveBeenCalled();
   });
 
   it("loads its metadata when it is selected, and shows each declared prop's reason and default", async () => {
     await mount();
-    await click(instance("Card[1]"));
+    await click(instance(CARD));
     expect(readInstanceMeta).toHaveBeenCalledTimes(1);
     expect(readInstanceMeta).toHaveBeenCalledWith([{ path: "app/members.tsx", component: "Card" }]);
     await settle();
@@ -123,7 +125,7 @@ describe("loading meta/ for an Instance with no Adapter", () => {
     readInstanceMeta.mockRejectedValueOnce(new Error("restarting"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await mount();
-    await click(instance("Card[1]"));
+    await click(instance(CARD));
     await settle();
     expect(shadow().querySelector("[data-prop=children]")?.textContent).toContain("UNVERIFIED");
     expect(warn).toHaveBeenCalled();

@@ -25,21 +25,17 @@
 //   __loupe.ancestors(id)          the adapted Instances around it, nearest first
 //   __loupe.status                 whether Overrides are on (the React self-check)
 
-import { parseCallSiteId } from "../call-site.js";
+import { ANCHOR_ATTRIBUTE, instanceId, parseCallSiteId, SOURCE_ATTRIBUTE, uniqueId } from "../call-site.js";
 import { adaptedName } from "./adapter.js";
 import { type Authorship, splitAuthored } from "./authored.js";
 import { type Fiber, fiberOfNode, keyPathOf, rootFibers, walkFibers } from "./fiber.js";
 import {
-  ANCHOR_PROP,
   identityOf,
-  instanceId,
   type LastSeen,
   type MountedInstance,
   registry,
-  SOURCE_PROP,
   scopeTarget,
   type Status,
-  uniqueId,
   withoutLoaderProps,
 } from "./registry.js";
 import { type Inspection, inspect } from "./inspect.js";
@@ -147,7 +143,7 @@ const SERVER_REASON =
 export const UNADAPTED_REASON = "No Adapter renders this Instance, so Overrides can't reach it.";
 
 const anchorOf = (props: unknown): string | null => {
-  const anchor = typeof props === "object" && props !== null ? (props as Props)[ANCHOR_PROP] : undefined;
+  const anchor = typeof props === "object" && props !== null ? (props as Props)[ANCHOR_ATTRIBUTE] : undefined;
   return typeof anchor === "string" ? anchor : null;
 };
 
@@ -280,7 +276,7 @@ export function createDebug(): LoupeDebug {
           if (seen.has(info)) continue;
           seen.add(info);
           const props = (typeof info.props === "object" && info.props !== null ? info.props : {}) as Props;
-          const anchor = props[ANCHOR_PROP];
+          const anchor = props[ANCHOR_ATTRIBUTE];
           // Page and layout components are not call sites the loader anchored.
           if (typeof info.name !== "string" || typeof anchor !== "string") continue;
           const id = uniqueId(instanceId(anchor, keyPathOf(fiber)), found);
@@ -289,7 +285,7 @@ export function createDebug(): LoupeDebug {
               id,
               component: info.name,
               anchor,
-              hint: typeof props[SOURCE_PROP] === "string" ? (props[SOURCE_PROP] as string) : null,
+              hint: typeof props[SOURCE_ATTRIBUTE] === "string" ? (props[SOURCE_ATTRIBUTE] as string) : null,
               env: typeof info.env === "string" ? info.env : "Server",
               props: withoutLoaderProps(props),
             },
@@ -307,7 +303,7 @@ export function createDebug(): LoupeDebug {
             id,
             component: componentOf(anchor, fiber.type),
             anchor,
-            hint: typeof raw[SOURCE_PROP] === "string" ? (raw[SOURCE_PROP] as string) : null,
+            hint: typeof raw[SOURCE_ATTRIBUTE] === "string" ? (raw[SOURCE_ATTRIBUTE] as string) : null,
             env: "Client",
             props: withoutLoaderProps(raw),
           },
@@ -502,8 +498,8 @@ export function createDebug(): LoupeDebug {
         }
       }
       // A server-rendered Instance whose fiber isn't on the path: the nearest anchor in the DOM.
-      const anchored = element.closest(`[${ANCHOR_PROP}]`);
-      const anchor = anchored?.getAttribute(ANCHOR_PROP);
+      const anchored = element.closest(`[${ANCHOR_ATTRIBUTE}]`);
+      const anchor = anchored?.getAttribute(ANCHOR_ATTRIBUTE);
       if (!anchored || !anchor) return null;
       const keyPath = keyPathOf(fiberOfNode(anchored));
       return (

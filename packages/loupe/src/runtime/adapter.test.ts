@@ -14,6 +14,7 @@ import {
 import * as React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE, uniqueId } from "../call-site.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug } from "./debug.js";
 import { setView } from "./registry.js";
@@ -34,7 +35,10 @@ function DsButton({ variant = "default", ref, ...props }: ButtonProps) {
 DsButton.slot = "button";
 
 const Button = createAdapter("Button", DsButton);
-const anchor = (n: number) => `app/page.tsx › Page › Button[${n}]`;
+const buttonSite = (ordinal: number) => ({ path: "app/page.tsx", enclosing: "Page", component: "Button", ordinal });
+const anchor = (n: number) => callSiteId(buttonSite(n));
+// What the id becomes when a second Instance mounts under it with no key to tell them apart.
+const duplicate = (id: string) => uniqueId(id, new Set([id]));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -64,20 +68,20 @@ describe("createAdapter", () => {
         "ul",
         null,
         ["m1", "m2"].map((id) =>
-          h("li", { key: id }, h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps)),
+          h("li", { key: id }, h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps)),
         ),
       ),
     );
-    expect(loupe.list().map((row) => row.id)).toEqual([`${anchor(1)}#m1`, `${anchor(1)}#m2`]);
+    expect(loupe.list().map((row) => row.id)).toEqual([instanceId(anchor(1), "m1"), instanceId(anchor(1), "m2")]);
     expect(loupe.status).toEqual({ overrides: true });
 
     act(() => {
-      loupe.set(`${anchor(1)}#m2`, "variant", "destructive");
+      loupe.set(instanceId(anchor(1), "m2"), "variant", "destructive");
     });
     expect(buttons().map((button) => button.dataset.variant)).toEqual(["ghost", "destructive"]);
 
     act(() => {
-      loupe.reset(`${anchor(1)}#m2`);
+      loupe.reset(instanceId(anchor(1), "m2"));
     });
     expect(buttons().map((button) => button.dataset.variant)).toEqual(["ghost", "ghost"]);
   });
@@ -87,7 +91,7 @@ describe("createAdapter", () => {
       const [count, setCount] = useState(0);
       return h(
         Button,
-        { disabled: count > 0, onClick: () => setCount(count + 1), "data-ds-anchor": anchor(1) } as ButtonProps,
+        { disabled: count > 0, onClick: () => setCount(count + 1), [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps,
         `clicked ${count}`,
       );
     }
@@ -104,7 +108,7 @@ describe("createAdapter", () => {
     act(() => buttons()[0]?.click());
     expect(loupe.props(anchor(1)).current).toMatchObject({ disabled: true, children: "clicked 1" });
     expect(buttons()[0]?.dataset.variant).toBe("outline");
-    expect(buttons()[0]?.getAttribute("data-ds-anchor")).toBe(anchor(1));
+    expect(buttons()[0]?.getAttribute(ANCHOR_ATTRIBUTE)).toBe(anchor(1));
   });
 
   it("passes refs through, with an Override applied", () => {
@@ -115,7 +119,7 @@ describe("createAdapter", () => {
       React.useEffect(() => {
         node = ref.current;
       });
-      return h(Button, { ref, "data-ds-anchor": anchor(1) } as ButtonProps);
+      return h(Button, { ref, [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps);
     }
     render(h(Page));
     act(() => {
@@ -140,14 +144,14 @@ describe("createAdapter", () => {
       h(
         "div",
         { key: "row-1" },
-        h(Trigger, { render: h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps) }),
+        h(Trigger, { render: h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps) }),
       ),
     );
     // `row-1` is the app's key; Base UI's generated one is left out.
     const [row] = loupe.list();
-    expect(row?.id).toBe(`${anchor(1)}#row-1`);
+    expect(row?.id).toBe(instanceId(anchor(1), "row-1"));
     act(() => {
-      loupe.set(`${anchor(1)}#row-1`, "variant", "destructive");
+      loupe.set(instanceId(anchor(1), "row-1"), "variant", "destructive");
     });
     expect(buttons()[0]?.getAttribute("aria-haspopup")).toBe("menu");
     expect(buttons()[0]?.dataset.variant).toBe("destructive");
@@ -158,16 +162,17 @@ describe("createAdapter", () => {
     const Themed = createAdapter("Themed", (props: { label: string }) =>
       h("span", null, `${props.label}:${useContext(Theme)}`),
     );
-    render(h(Theme.Provider, { value: "dark" }, h(Themed, { label: "a", "data-ds-anchor": "x › X › Themed[1]" } as { label: string })));
+    const themed = callSiteId({ path: "x", enclosing: "X", component: "Themed", ordinal: 1 });
+    render(h(Theme.Provider, { value: "dark" }, h(Themed, { label: "a", [ANCHOR_ATTRIBUTE]: themed } as { label: string })));
     act(() => {
-      loupe.set("x › X › Themed[1]", "label", "b");
+      loupe.set(themed, "label", "b");
     });
     expect(container.textContent).toBe("b:dark");
   });
 
   it("applies an Override behind a React.memo parent that does not rerender", () => {
     const Row = memo(function Row() {
-      return h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps);
+      return h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps);
     });
     render(h(Row));
     act(() => {
@@ -187,26 +192,27 @@ describe("createAdapter", () => {
     expect((Adapted as unknown as { $$typeof?: unknown }).$$typeof).toBeUndefined();
     expect((Button as unknown as typeof DsButton).slot).toBe("button");
 
-    render(h(Adapted, { variant: "ghost", "data-ds-anchor": "x › X › MemoButton[1]" } as ButtonProps));
+    const memoButton = callSiteId({ path: "x", enclosing: "X", component: "MemoButton", ordinal: 1 });
+    render(h(Adapted, { variant: "ghost", [ANCHOR_ATTRIBUTE]: memoButton } as ButtonProps));
     act(() => {
-      loupe.set("x › X › MemoButton[1]", "variant", "outline");
+      loupe.set(memoButton, "variant", "outline");
     });
     expect(buttons()[0]?.dataset.variant).toBe("outline");
   });
 
   it("re-registers under the new id when the call site's anchor changes", () => {
-    render(h(Button, { "data-ds-anchor": anchor(1) } as ButtonProps));
-    render(h(Button, { "data-ds-anchor": anchor(2) } as ButtonProps));
+    render(h(Button, { [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps));
+    render(h(Button, { [ANCHOR_ATTRIBUTE]: anchor(2) } as ButtonProps));
     expect(loupe.list().map((row) => row.id)).toEqual([anchor(2)]);
   });
 
   it("keeps an Override across an unmount and remount under the same id", () => {
-    render(h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps));
+    render(h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps));
     act(() => {
       loupe.set(anchor(1), "variant", "destructive");
     });
     render(h("div"));
-    render(h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps));
+    render(h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps));
     expect(buttons()[0]?.dataset.variant).toBe("destructive");
   });
 
@@ -216,8 +222,8 @@ describe("createAdapter", () => {
       h(
         "div",
         null,
-        ids.map((id) => h("div", { key: id }, h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps))),
-        h(Button, { variant: "ghost", "data-ds-anchor": anchor(2) } as ButtonProps),
+        ids.map((id) => h("div", { key: id }, h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps))),
+        h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(2) } as ButtonProps),
         extra,
       );
     const variants = () => buttons().map((button) => button.dataset.variant);
@@ -225,10 +231,10 @@ describe("createAdapter", () => {
     it("a group Override changes every Instance of its call site and no other; page scope reaches both", () => {
       render(rows(["m1", "m2", "m3"]));
       act(() => {
-        loupe.set(`${anchor(1)}#m2`, "variant", "outline", "group");
+        loupe.set(instanceId(anchor(1), "m2"), "variant", "outline", "group");
       });
       expect(variants()).toEqual(["outline", "outline", "outline", "ghost"]);
-      expect(loupe.props(`${anchor(1)}#m1`).sources.variant).toBe("group");
+      expect(loupe.props(instanceId(anchor(1), "m1")).sources.variant).toBe("group");
 
       act(() => {
         loupe.set(anchor(2), "variant", "secondary", "page");
@@ -237,7 +243,7 @@ describe("createAdapter", () => {
       expect(loupe.props(anchor(2)).sources.variant).toBe("page");
 
       act(() => {
-        loupe.reset(`${anchor(1)}#m1`, undefined, "group");
+        loupe.reset(instanceId(anchor(1), "m1"), undefined, "group");
       });
       expect(variants()).toEqual(["secondary", "secondary", "secondary", "secondary"]);
     });
@@ -245,8 +251,8 @@ describe("createAdapter", () => {
     it("an Instance that mounts later joins its group and page on its first frame", () => {
       render(rows(["m1"]));
       act(() => {
-        loupe.set(`${anchor(1)}#m1`, "variant", "outline", "group");
-        loupe.set(`${anchor(1)}#m1`, "disabled", true, "page");
+        loupe.set(instanceId(anchor(1), "m1"), "variant", "outline", "group");
+        loupe.set(instanceId(anchor(1), "m1"), "disabled", true, "page");
       });
       render(rows(["m1", "m2"]));
       expect(variants()).toEqual(["outline", "outline", "ghost"]);
@@ -256,8 +262,8 @@ describe("createAdapter", () => {
     it("an excluded Instance keeps its exclusion through a rerender and a remount", () => {
       render(rows(["m1", "m2"]));
       act(() => {
-        loupe.set(`${anchor(1)}#m1`, "variant", "outline", "group");
-        loupe.exclude(`${anchor(1)}#m1`, "group");
+        loupe.set(instanceId(anchor(1), "m1"), "variant", "outline", "group");
+        loupe.exclude(instanceId(anchor(1), "m1"), "group");
       });
       expect(variants()).toEqual(["ghost", "outline", "ghost"]);
 
@@ -271,14 +277,14 @@ describe("createAdapter", () => {
         {
           target: { scope: "group", anchor: anchor(1) },
           values: { variant: "outline" },
-          excluded: [`${anchor(1)}#m1`],
+          excluded: [instanceId(anchor(1), "m1")],
           suspended: null,
-          mounted: [`${anchor(1)}#m2`],
+          mounted: [instanceId(anchor(1), "m2")],
         },
       ]);
 
       act(() => {
-        loupe.include(`${anchor(1)}#m1`, "group");
+        loupe.include(instanceId(anchor(1), "m1"), "group");
       });
       expect(variants()).toEqual(["outline", "outline", "ghost"]);
     });
@@ -334,8 +340,8 @@ describe("createAdapter", () => {
       ({ open, tone }: DialogProps) => h("div", { "data-open": String(open), "data-tone": tone }),
       { state: ["open"] },
     );
-    const id = "app/page.tsx › Page › Dialog[1]";
-    render(h(Dialog, { open: false, onOpenChange: () => {}, tone: "calm", "data-ds-anchor": id } as DialogProps));
+    const id = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Dialog", ordinal: 1 });
+    render(h(Dialog, { open: false, onOpenChange: () => {}, tone: "calm", [ANCHOR_ATTRIBUTE]: id } as DialogProps));
     act(() => {
       loupe.set(id, "open", true);
       loupe.set(id, "tone", "loud");
@@ -354,19 +360,19 @@ describe("createAdapter", () => {
   });
 
   it("names a picked DOM node's Instance", () => {
-    render(h("div", { key: "a" }, h(Button, { "data-ds-anchor": anchor(1) } as ButtonProps, h("i", null, "x"))));
+    render(h("div", { key: "a" }, h(Button, { [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps, h("i", null, "x"))));
     const icon = container.querySelector("i") as Element;
-    expect(loupe.pick(icon)).toBe(`${anchor(1)}#a`);
+    expect(loupe.pick(icon)).toBe(instanceId(anchor(1), "a"));
   });
 
   it("tells apart Instances from one call site with no key, and suspends an Override that now matches both", () => {
-    const row = () => h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps);
+    const row = () => h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps);
     render(h("div", null, row()));
     act(() => {
       loupe.set(anchor(1), "variant", "destructive");
     });
     render(h("div", null, row(), h("span", null, row())));
-    expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), `${anchor(1)}~2`]);
+    expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), duplicate(anchor(1))]);
     // `~2` is mount order: never applied to a guess.
     expect(buttons().map((button) => button.dataset.variant)).toEqual(["ghost", "ghost"]);
     expect(loupe.records()[0]?.suspended).toEqual({ reason: "ambiguous", ids: [anchor(1)] });
@@ -378,29 +384,29 @@ describe("createAdapter", () => {
   });
 
   it("suspends an Override when a duplicate takes the free id while `~2` is still mounted", () => {
-    const row = () => h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps);
+    const row = () => h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps);
     render(h("div", null, h("p", null, row()), h("p", null, row())));
-    expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), `${anchor(1)}~2`]);
+    expect(loupe.list().map((r) => r.id)).toEqual([anchor(1), duplicate(anchor(1))]);
     act(() => {
-      loupe.set(`${anchor(1)}~2`, "variant", "destructive");
+      loupe.set(duplicate(anchor(1)), "variant", "destructive");
     });
     // The first unmounts; a new one mounts in its place and takes the free base id.
     render(h("div", null, null, h("p", null, row())));
     render(h("div", null, h("section", null, row()), h("p", null, row())));
-    expect(loupe.list().map((r) => r.id).sort()).toEqual([anchor(1), `${anchor(1)}~2`]);
+    expect(loupe.list().map((r) => r.id).sort()).toEqual([anchor(1), duplicate(anchor(1))]);
     expect(buttons().map((button) => button.dataset.variant)).toEqual(["ghost", "ghost"]);
-    expect(loupe.records()[0]?.suspended).toEqual({ reason: "ambiguous", ids: [`${anchor(1)}~2`] });
+    expect(loupe.records()[0]?.suspended).toEqual({ reason: "ambiguous", ids: [duplicate(anchor(1))] });
   });
 
   describe("kept across unmount, suspended for review (PER-125)", () => {
     // A dialog: its confirm Button mounts only while it is open. 2nd of `total` Buttons.
-    const source = (total: number) => `app/page.tsx:12:7 2/${total}`;
+    const source = (total: number) => callSiteHint(buttonSite(2), { line: 12, column: 7, total });
     const dialog = (open: boolean, total = 2) =>
       h(
         "div",
         null,
         open
-          ? h(Button, { variant: "default", "data-ds-anchor": anchor(2), "data-ds-source": source(total) } as ButtonProps)
+          ? h(Button, { variant: "default", [ANCHOR_ATTRIBUTE]: anchor(2), [SOURCE_ATTRIBUTE]: source(total) } as ButtonProps)
           : null,
       );
     const confirm = { scope: "instance", id: anchor(2) } as const;
@@ -467,6 +473,9 @@ describe("createAdapter", () => {
   });
 
   it("lists server-rendered Instances from _debugInfo, inspect-only, with their key path", () => {
+    const badgeSite = { path: "app/page.tsx", enclosing: "MembersPage", component: "Badge", ordinal: 1 };
+    const BADGE = callSiteId(badgeSite);
+    const BADGE_HINT = callSiteHint(badgeSite, { line: 26, column: 13, total: 1 });
     const fiber = (key: string | null, extra: object = {}) => ({
       tag: 5,
       key,
@@ -485,7 +494,7 @@ describe("createAdapter", () => {
         {
           name: "Badge",
           env: "Server",
-          props: { variant: "muted", "data-ds-anchor": "app/page.tsx › MembersPage › Badge[1]", "data-ds-source": "app/page.tsx:26:13 1/1" },
+          props: { variant: "muted", [ANCHOR_ATTRIBUTE]: BADGE, [SOURCE_ATTRIBUTE]: BADGE_HINT },
         },
       ],
     });
@@ -499,16 +508,16 @@ describe("createAdapter", () => {
     try {
       expect(loupe.scan()).toEqual([
         {
-          id: "app/page.tsx › MembersPage › Badge[1]#m2",
+          id: instanceId(BADGE, "m2"),
           component: "Badge",
-          anchor: "app/page.tsx › MembersPage › Badge[1]",
-          hint: "app/page.tsx:26:13 1/1",
+          anchor: BADGE,
+          hint: BADGE_HINT,
           env: "Server",
           props: { variant: "muted" },
         },
       ]);
       expect(loupe.list()).toMatchObject([{ rendered: "server", editable: false }]);
-      expect(() => loupe.set("app/page.tsx › MembersPage › Badge[1]#m2", "variant", "default")).toThrow(
+      expect(() => loupe.set(instanceId(BADGE, "m2"), "variant", "default")).toThrow(
         /Server Component/,
       );
     } finally {
@@ -530,7 +539,7 @@ describe("createAdapter", () => {
       },
     });
     try {
-      render(h(Button, { "data-ds-anchor": anchor(1) } as ButtonProps));
+      render(h(Button, { [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps));
       await act(async () => {});
       expect(loupe.status).toEqual({
         overrides: false,
@@ -556,7 +565,7 @@ describe("createAdapter", () => {
       },
     });
 
-    render(h(Button, { variant: "ghost", "data-ds-anchor": anchor(1) } as ButtonProps));
+    render(h(Button, { variant: "ghost", [ANCHOR_ATTRIBUTE]: anchor(1) } as ButtonProps));
     await act(async () => {});
     expect(loupe.status.overrides).toBe(false);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("This React build isn't supported"));

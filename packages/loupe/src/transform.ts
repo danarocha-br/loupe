@@ -13,11 +13,13 @@ import { parse } from "@babel/parser";
 import MagicString from "magic-string";
 import type { AdaptList } from "./adapt-list.js";
 import {
+  ANCHOR_ATTRIBUTE,
   assignOrdinals,
   callSiteHint,
   callSiteId,
   DEFAULT_EXPORT_SCOPE,
   MODULE_SCOPE,
+  SOURCE_ATTRIBUTE,
 } from "./call-site.js";
 import {
   type CallSiteWrites,
@@ -26,8 +28,6 @@ import {
   WRITES_ATTRIBUTE,
 } from "./writes.js";
 
-export const ANCHOR_ATTRIBUTE = "data-ds-anchor";
-export const SOURCE_ATTRIBUTE = "data-ds-source";
 export { WRITES_ATTRIBUTE };
 
 const LOUPE_ATTRIBUTES: ReadonlySet<string> = new Set([

@@ -4,6 +4,7 @@
 import { act, createElement as h, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { encodeCallSiteWrites } from "../writes.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug } from "./debug.js";
@@ -12,7 +13,7 @@ import { singleLine, textScopeRefusal } from "./label-text.js";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const Button = createAdapter("Button", (props: Record<string, unknown>) => h("button", props));
-const anchor = "invite-dialog.tsx › InviteDialog › Button[1]";
+const anchor = callSiteId({ path: "invite-dialog.tsx", enclosing: "InviteDialog", component: "Button", ordinal: 1 });
 
 let container: HTMLDivElement;
 let root: Root;
@@ -36,7 +37,7 @@ const cancel = () =>
   render(
     h(
       Button,
-      { "data-ds-anchor": anchor, "data-ds-writes": encodeCallSiteWrites({ attributes: [], spreads: false, children: "text" }) },
+      { [ANCHOR_ATTRIBUTE]: anchor, "data-ds-writes": encodeCallSiteWrites({ attributes: [], spreads: false, children: "text" }) },
       "Cancelar",
     ),
   );

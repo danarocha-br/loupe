@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
+import { callSiteHint, callSiteId, instanceId } from "../call-site.js";
 import type { OverrideRecord } from "../runtime/store.js";
 import type { CallSiteWrites } from "../writes.js";
 import { buildProposal, buildProposalKeyed, ordinal, type ProposalInput, type Sighting, setOnKey, toJson } from "./build.js";
@@ -13,12 +14,19 @@ import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
 const ROUTE = "/org/acme/configuracoes/membros";
 const FILE = "apps/app/components/product/member-row-menu.tsx";
-const TRIGGER = `${FILE} › MemberRowMenu › Button[1]`;
-const CONFIRM = `${FILE} › MemberRowMenu › Button[2]`;
-const DIALOG = `${FILE} › MemberRowMenu › AlertDialog[1]`;
-const CANCEL = `${FILE} › MemberRowMenu › AlertDialogCancel[1]`;
-const INVITE = "apps/app/app/membros/page-client.tsx › MembersHeader › Button[1]";
-const BADGE = "apps/app/app/membros/page.tsx › MembersTable › Badge[1]";
+const menuSite = (component: string, ordinal: number) => ({ path: FILE, enclosing: "MemberRowMenu", component, ordinal });
+const TRIGGER_SITE = menuSite("Button", 1);
+const CONFIRM_SITE = menuSite("Button", 2);
+const DIALOG_SITE = menuSite("AlertDialog", 1);
+const CANCEL_SITE = menuSite("AlertDialogCancel", 1);
+const INVITE_SITE = { path: "apps/app/app/membros/page-client.tsx", enclosing: "MembersHeader", component: "Button", ordinal: 1 };
+const BADGE_SITE = { path: "apps/app/app/membros/page.tsx", enclosing: "MembersTable", component: "Badge", ordinal: 1 };
+const TRIGGER = callSiteId(TRIGGER_SITE);
+const CONFIRM = callSiteId(CONFIRM_SITE);
+const DIALOG = callSiteId(DIALOG_SITE);
+const CANCEL = callSiteId(CANCEL_SITE);
+const INVITE = callSiteId(INVITE_SITE);
+const BADGE = callSiteId(BADGE_SITE);
 
 const literal = (...names: string[]): CallSiteWrites => ({
   attributes: names.map((name) => ({ name, writtenAs: "literal" as const })),
@@ -46,40 +54,40 @@ function membros(): Sighting[] {
   return [
     ...USERS.map((user, index) =>
       sighting({
-        id: `${TRIGGER}#${user}`,
+        id: instanceId(TRIGGER, user),
         anchor: TRIGGER,
         component: "Button",
-        hint: `${FILE}:80:13 1/2`,
+        hint: callSiteHint(TRIGGER_SITE, { line: 80, column: 13, total: 2 }),
         keyPath: user,
         current: { variant: index === 3 ? "secondary" : "ghost", size: "icon" },
         writes: { attributes: [{ name: "variant", writtenAs: "expression", expression: "isSelf ? \"secondary\" : \"ghost\"" }, { name: "size", writtenAs: "literal" }], spreads: false, children: "elements" },
       }),
     ),
     sighting({
-      id: `${CONFIRM}#user_2`,
+      id: instanceId(CONFIRM, "user_2"),
       anchor: CONFIRM,
       component: "Button",
-      hint: `${FILE}:120:9 2/2`,
+      hint: callSiteHint(CONFIRM_SITE, { line: 120, column: 9, total: 2 }),
       keyPath: "user_2",
       current: { variant: "destructive" },
       writes: literal("variant"),
       mounted: false,
     }),
     sighting({
-      id: `${DIALOG}#user_2`,
+      id: instanceId(DIALOG, "user_2"),
       anchor: DIALOG,
       component: "AlertDialog",
-      hint: `${FILE}:100:5 1/1`,
+      hint: callSiteHint(DIALOG_SITE, { line: 100, column: 5, total: 1 }),
       keyPath: "user_2",
       current: { open: false },
       writes: { attributes: [{ name: "open", writtenAs: "expression", expression: "open" }, { name: "onOpenChange", writtenAs: "expression", expression: "setOpen" }], spreads: false, children: "elements" },
       stateProps: ["open"],
     }),
     sighting({
-      id: `${CANCEL}#user_2`,
+      id: instanceId(CANCEL, "user_2"),
       anchor: CANCEL,
       component: "AlertDialogCancel",
-      hint: `${FILE}:118:9 1/1`,
+      hint: callSiteHint(CANCEL_SITE, { line: 118, column: 9, total: 1 }),
       keyPath: "user_2",
       current: { children: "Cancelar" },
       writes: { attributes: [], spreads: false, children: "text" },
@@ -88,17 +96,17 @@ function membros(): Sighting[] {
       id: INVITE,
       anchor: INVITE,
       component: "Button",
-      hint: "apps/app/app/membros/page-client.tsx:30:7 1/1",
+      hint: callSiteHint(INVITE_SITE, { line: 30, column: 7, total: 1 }),
       current: { variant: "default" },
       writes: literal("variant"),
     }),
     sighting({
-      id: `${BADGE}#user_1`,
+      id: instanceId(BADGE, "user_1"),
       anchor: BADGE,
       component: "Badge",
       rendered: "server",
       keyPath: "user_1",
-      hint: "apps/app/app/membros/page.tsx:44:11 1/1",
+      hint: callSiteHint(BADGE_SITE, { line: 44, column: 11, total: 1 }),
     }),
   ];
 }
@@ -179,7 +187,7 @@ describe("buildProposal", () => {
 
   it("flags a left-out Instance of a call-site change as needing a condition", () => {
     const proposal = buildProposal(
-      input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [`${TRIGGER}#user_4`] })]),
+      input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [instanceId(TRIGGER, "user_4")] })]),
     );
     const [change] = changesOf(proposal);
     expect(change?.needsCondition).toBe("Left out: 1 (user_4), needs a condition");
@@ -191,7 +199,7 @@ describe("buildProposal", () => {
   it("flags one Instance of a repeated call site, and not the only one of a single call site", () => {
     const proposal = buildProposal(
       input([
-        record({ scope: "instance", id: `${TRIGGER}#user_3` }, { variant: "outline" }),
+        record({ scope: "instance", id: instanceId(TRIGGER, "user_3") }, { variant: "outline" }),
         record({ scope: "instance", id: INVITE }, { variant: "secondary" }),
       ]),
     );
@@ -205,7 +213,7 @@ describe("buildProposal", () => {
   it("lists every call site a page change reached, the server-rendered ones apart, and who wins over it", () => {
     const proposal = buildProposal(
       input([
-        record({ scope: "instance", id: `${TRIGGER}#user_1` }, { size: "lg" }),
+        record({ scope: "instance", id: instanceId(TRIGGER, "user_1") }, { size: "lg" }),
         record({ scope: "page", route: ROUTE, component: "Button" }, { size: "sm" }),
         record({ scope: "page", route: ROUTE, component: "Badge" }, { variant: "outline" }),
       ]),
@@ -216,7 +224,7 @@ describe("buildProposal", () => {
     expect(page?.overriddenBy).toEqual([instance?.id]);
     expect(page?.props[0]?.writtenAs).toBe("varies");
     expect(page?.props[0]?.perCallSite).toHaveLength(3);
-    expect(badge?.serverRendered).toEqual([{ id: `${BADGE}#user_1`, anchor: BADGE, keyPath: "user_1" }]);
+    expect(badge?.serverRendered).toEqual([{ id: instanceId(BADGE, "user_1"), anchor: BADGE, keyPath: "user_1" }]);
     expect(badge?.callSites).toEqual([]);
     expectValid(proposal);
   });
@@ -230,7 +238,7 @@ describe("buildProposal", () => {
   });
 
   it("puts a State prop under States shown, not under changes", () => {
-    const proposal = buildProposal(input([record({ scope: "instance", id: `${DIALOG}#user_2` }, { open: true })]));
+    const proposal = buildProposal(input([record({ scope: "instance", id: instanceId(DIALOG, "user_2") }, { open: true })]));
     const [route] = proposal.routes;
     expect(route?.changes).toEqual([]);
     expect(route?.statesShown).toEqual([
@@ -257,9 +265,9 @@ describe("buildProposal", () => {
           { suspended: { reason: "code-changed", anchor: TRIGGER, was: 2, now: 3 } },
         ),
         record(
-          { scope: "instance", id: `${CONFIRM}#user_2` },
+          { scope: "instance", id: instanceId(CONFIRM, "user_2") },
           { variant: undefined },
-          { suspended: { reason: "ambiguous", ids: [`${CONFIRM}#user_2`] } },
+          { suspended: { reason: "ambiguous", ids: [instanceId(CONFIRM, "user_2")] } },
         ),
       ]),
     );
@@ -280,7 +288,7 @@ describe("buildProposal", () => {
         anchor: CONFIRM,
         route: ROUTE,
         reason: "ambiguous",
-        detail: `Matches more than one Instance, review: ${CONFIRM}#user_2`,
+        detail: `Matches more than one Instance, review: ${instanceId(CONFIRM, "user_2")}`,
         props: [{ name: "variant", proposedUnset: true }],
       },
     ]);
@@ -288,7 +296,7 @@ describe("buildProposal", () => {
   });
 
   it("flags a change with no Instance mounted, its Current value as last seen", () => {
-    const proposal = buildProposal(input([record({ scope: "instance", id: `${CONFIRM}#user_2` }, { variant: "default" })]));
+    const proposal = buildProposal(input([record({ scope: "instance", id: instanceId(CONFIRM, "user_2") }, { variant: "default" })]));
     const [change] = changesOf(proposal);
     expect(change?.onScreenAtExport).toBe(false);
     expect(change?.props[0]).toMatchObject({ current: "destructive", proposed: "default" });
@@ -296,7 +304,7 @@ describe("buildProposal", () => {
   });
 
   it("keeps a record that was never seen, as a call site with no total", () => {
-    const anchor = `${FILE} › MemberRowMenu › DropdownMenuItem[3]`;
+    const anchor = callSiteId(menuSite("DropdownMenuItem", 3));
     const proposal = buildProposal(input([record({ scope: "group", anchor }, { variant: "destructive" })]));
     const [change] = changesOf(proposal);
     expect(change?.callSites[0]).toMatchObject({ nth: 3, total: null, lineHint: null, component: "DropdownMenuItem" });
@@ -355,7 +363,7 @@ describe("buildProposal", () => {
   });
 
   it("reads the store without changing it", () => {
-    const records = [record({ scope: "group", anchor: TRIGGER }, { variant: "outline" }, { excluded: [`${TRIGGER}#user_4`] })];
+    const records = [record({ scope: "group", anchor: TRIGGER }, { variant: "outline" }, { excluded: [instanceId(TRIGGER, "user_4")] })];
     const before = structuredClone(records);
     buildProposal(input(records));
     expect(records).toEqual(before);
@@ -456,10 +464,10 @@ describe("the published schema", () => {
     const proposal = buildProposal(
       input(
         [
-          record({ scope: "instance", id: `${TRIGGER}#user_3` }, { variant: "outline" }),
-          record({ scope: "instance", id: `${DIALOG}#user_2` }, { open: true }),
+          record({ scope: "instance", id: instanceId(TRIGGER, "user_3") }, { variant: "outline" }),
+          record({ scope: "instance", id: instanceId(DIALOG, "user_2") }, { open: true }),
           record({ scope: "group", anchor: CANCEL }, { children: "Voltar" }),
-          record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [`${TRIGGER}#user_4`] }),
+          record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [instanceId(TRIGGER, "user_4")] }),
           record({ scope: "page", route: ROUTE, component: "Button" }, { size: undefined }),
           record({ scope: "group", anchor: INVITE }, { variant: "ghost" }, { suspended: { reason: "code-changed", anchor: INVITE, was: 1, now: 2 } }),
         ],
@@ -486,8 +494,8 @@ describe("Copy as Markdown", () => {
   it("is a short summary fit for a ticket", () => {
     const proposal = buildProposal(
       input([
-        record({ scope: "instance", id: `${TRIGGER}#user_3` }, { variant: "outline" }),
-        record({ scope: "instance", id: `${DIALOG}#user_2` }, { open: true }),
+        record({ scope: "instance", id: instanceId(TRIGGER, "user_3") }, { variant: "outline" }),
+        record({ scope: "instance", id: instanceId(DIALOG, "user_2") }, { open: true }),
         record({ scope: "group", anchor: INVITE }, { variant: "ghost" }, { suspended: { reason: "code-changed", anchor: INVITE, was: 1, now: 2 } }),
       ]),
     );
@@ -539,10 +547,10 @@ describe("helpers", () => {
 describe("what the page last showed", () => {
   it("counts only the mounted Instances while any is mounted, and keeps a left-out one that isn't", () => {
     const old = USERS.map((user) =>
-      sighting({ id: `${TRIGGER}#old_${user}`, anchor: TRIGGER, component: "Button", keyPath: `old_${user}`, current: { size: "lg" }, mounted: false }),
+      sighting({ id: instanceId(TRIGGER, `old_${user}`), anchor: TRIGGER, component: "Button", keyPath: `old_${user}`, current: { size: "lg" }, mounted: false }),
     );
     const proposal = buildProposal(
-      input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [`${TRIGGER}#old_user_1`] })], {
+      input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" }, { excluded: [instanceId(TRIGGER, "old_user_1")] })], {
         // Rows of an earlier page of the list, seen first.
         sightings: [...old, ...membros()],
       }),
