@@ -1,9 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
-import { type Files, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
+import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
 import { touchPoints } from "../init/touch-points.js";
 import { undo } from "./undo.js";
 
@@ -68,12 +67,9 @@ const repoFiles: Files = {
   "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
 };
 
-const git = (root: string, ...args: string[]) =>
-  execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-
 function commit(root: string, message = "step"): void {
-  git(root, "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A");
-  git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", message);
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "--allow-empty", "-m", message);
 }
 
 /** A committed repo with `loupe init` run and committed; returns the starting commit too. */

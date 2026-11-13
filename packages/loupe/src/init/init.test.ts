@@ -1,9 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
-import { type Files, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
+import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
 import { EXIT_MANUAL } from "./command.js";
 
 const LEDGER = "packages/loupe/loupe.ledger.json";
@@ -59,22 +58,19 @@ const repoFiles: Files = {
   "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
 };
 
-const git = (root: string, ...args: string[]) =>
-  execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-
 /** A committed repo, so the touch points start clean. */
 function gitRepo(files: Files = {}): string {
   const root = makeRepo({ ...repoFiles, ...files });
   temps.push(root);
   git(root, "init", "-q", "-b", "main");
-  git(root, "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A");
-  git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "start");
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "start");
   return root;
 }
 
 function commit(root: string): void {
-  git(root, "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A");
-  git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "step");
+  git(root, "add", "-A");
+  git(root, "commit", "-q", "-m", "step");
 }
 
 async function init(root: string, ...argv: string[]) {

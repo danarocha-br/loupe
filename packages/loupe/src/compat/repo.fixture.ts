@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
@@ -45,12 +46,26 @@ export function makeRepo(files: Files = {}, base: Files = supportedRepo): string
   return root;
 }
 
-/** Every file under `root` with its contents, to prove a run wrote nothing. */
+/**
+ * Runs git in a test repo with a fixed identity and no background maintenance:
+ * auto gc and maintenance write lock files under `.git` while a test reads the tree.
+ */
+export function git(root: string, ...args: string[]): string {
+  const config = ["user.name=t", "user.email=t@t", "gc.auto=0", "maintenance.auto=false"];
+  return execFileSync("git", [...config.flatMap((c) => ["-c", c]), ...args], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+/** Every file under `root` with its contents, to prove a run wrote nothing. Skips `.git`. */
 export function snapshot(root: string): Record<string, string> {
   const out: Record<string, string> = {};
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
+      if (entry.isDirectory() && entry.name === ".git") continue;
       if (entry.isDirectory()) walk(full);
       else out[relative(root, full)] = readFileSync(full, "utf8");
     }

@@ -1,10 +1,9 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
-import { type Files, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
+import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
 import { version } from "../version.js";
 import type { BuildRunner } from "./build.js";
 import { runDoctor } from "./command.js";
@@ -45,14 +44,6 @@ const repoFiles: Files = {
   "biome.jsonc": '{\n  "files": {\n    "includes": ["**/*"]\n  }\n}\n',
   "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
 };
-
-// No background maintenance: it writes a lock file under .git while a snapshot reads the tree.
-const git = (root: string, ...args: string[]) =>
-  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "gc.auto=0", "-c", "maintenance.auto=false", ...args], {
-    cwd: root,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
 
 type Output = { code: number; text: string; questions: string[] };
 
