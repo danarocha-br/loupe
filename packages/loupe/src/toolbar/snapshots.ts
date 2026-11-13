@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { type ImagePair, type SnapshotInput, setOnKey, toJson } from "../proposal/build.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, emitChange, identityOf, type MountedInstance, registry, setView } from "../runtime/registry.js";
-import { type InstanceIdentity, type OverrideRecord, reaches } from "../runtime/store.js";
+import { type InstanceIdentity, type OverrideRecord, reachOf } from "../runtime/store.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
 /** Marks the still that covers the page while "before" renders; never captured. */
@@ -208,8 +208,8 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
 }
 
 /**
- * Per live record with a non-State prop, the Instances on screen it reaches and
- * doesn't leave out: the change's crop covers them.
+ * Per record with a non-State prop, the Instances on screen in its Reach: the
+ * change's crop covers them.
  */
 export function changesOnScreen(
   records: readonly OverrideRecord[],
@@ -218,12 +218,10 @@ export function changesOnScreen(
 ): ChangeOnScreen[] {
   const changes: ChangeOnScreen[] = [];
   for (const record of records) {
-    if (record.suspended) continue;
     const covered: Covered[] = [];
     for (const instance of mounted) {
       const box = boxes.get(instance.id);
-      if (!box || record.excluded.includes(instance.id)) continue;
-      if (!reaches(record.target, identityOf(instance))) continue;
+      if (!box || reachOf(record, identityOf(instance)) !== "applies") continue;
       const states = record.target.scope === "instance" ? instance.stateProps : [];
       if (!Object.keys(record.values).some((prop) => !states.includes(prop))) continue;
       covered.push({ id: instance.id, keyPath: instance.keyPath, after: box, before: null });

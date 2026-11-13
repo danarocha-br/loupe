@@ -4,8 +4,17 @@
 
 import type { InstanceProps, InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import { callSiteLabels, isUnanchored, parseHint } from "../call-site.js";
-import { identityOf, scopeTarget } from "../runtime/registry.js";
-import { keyOf, PRECEDENCE, reaches, type Scope, type ScopeTarget, type Source } from "../runtime/store.js";
+import { identityOf } from "../runtime/registry.js";
+import {
+  inScope,
+  PRECEDENCE,
+  reachOf,
+  recordsFor,
+  type Scope,
+  type ScopeTarget,
+  type Source,
+  targetAt,
+} from "../runtime/store.js";
 import { appValue, formatCurrent } from "./format.js";
 import { safeInspect, safeProps } from "./page.js";
 
@@ -60,10 +69,6 @@ export function labelsOf(row: Pick<InstanceRow, "anchor" | "hint" | "component">
   return { instance: "This instance", group: groupLabel(row), page: PAGE_LABEL };
 }
 
-function recordOf(records: readonly RecordRow[], target: ScopeTarget): RecordRow | null {
-  return records.find((record) => record.target.scope === target.scope && keyOf(record.target) === keyOf(target)) ?? null;
-}
-
 /** Who `scope` reaches from `row`, or null when the Instance has no such scope. */
 export function scopeView(
   debug: LoupeDebug,
@@ -72,15 +77,15 @@ export function scopeView(
   row: InstanceRow,
   scope: Scope,
 ): ScopeView | null {
-  const target = scopeTarget(row, scope);
+  const identity = identityOf(row);
+  const target = targetAt(identity, scope);
   const name = labelsOf(row)[scope];
   if (!target || name === null) return null;
-  const record = recordOf(records, target);
-  const out = new Set(record?.excluded ?? []);
-  const inScope = rows.filter((other) => reaches(target, identityOf(other)));
+  const record = recordsFor(records, identity).find((entry) => entry.record.target.scope === scope)?.record ?? null;
+  const atScope = rows.filter((other) => inScope(target, identityOf(other)));
   // An Override reaches only an adapted Instance; one with no Adapter (inside the design system, say) never joins.
-  const client = inScope.filter((other) => other.rendered === "client" && other.adapted);
-  const server = scope === "page" ? inScope.filter((other) => other.rendered === "server") : [];
+  const client = atScope.filter((other) => other.rendered === "client" && other.adapted);
+  const server = scope === "page" ? atScope.filter((other) => other.rendered === "server") : [];
   const mounted = new Set(client.map((other) => other.id));
   const size = scope === "instance" ? "" : ` · ${client.length + server.length}`;
   const serverNote = server.length > 0 ? ` (${server.length} server-rendered, inspect only)` : "";
@@ -92,9 +97,12 @@ export function scopeView(
     target,
     label: `${name}${size}${serverNote}${suspended}`,
     name,
-    members: client.map((other) => ({ id: other.id, out: out.has(other.id) })),
+    members: client.map((other) => ({
+      id: other.id,
+      out: record !== null && reachOf(record, identityOf(other)) === "left-out",
+    })),
     server,
-    outUnmounted: [...out].filter((id) => !mounted.has(id)),
+    outUnmounted: (record?.excluded ?? []).filter((id) => !mounted.has(id)),
     record,
     live(id) {
       if (!lives.has(id)) lives.set(id, safeProps(debug, id));
@@ -117,11 +125,10 @@ export function scopeView(
 
 /** The group and page records acting on an Instance, and the ones it was left out of. */
 function actingOn(records: readonly RecordRow[], row: InstanceRow) {
-  return (["group", "page"] as const).flatMap((scope) => {
-    const target = scopeTarget(row, scope);
-    const record = target && recordOf(records, target);
-    // A suspended record acts on nobody until it is reapplied (PER-95).
-    return record && !record.suspended ? [{ scope, record, out: record.excluded.includes(row.id) }] : [];
+  return recordsFor(records, identityOf(row)).flatMap(({ record, reach }) => {
+    const { scope } = record.target;
+    // A suspended record acts on nobody until it is reapplied (PER-95), not even to leave one out.
+    return scope === "instance" || record.suspended ? [] : [{ scope, record, out: reach === "left-out" }];
   });
 }
 

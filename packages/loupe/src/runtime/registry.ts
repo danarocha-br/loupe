@@ -1,10 +1,11 @@
-// The Instance registry: every mounted adapted Instance, the Override store, and
-// the self-check result. One per page, kept on `globalThis` so that a Fast
-// Refresh that re-evaluates this module finds the same Instances and Overrides.
+// The Instance registry: every mounted adapted Instance, and the Override store,
+// which holds the self-check result and the view. One per page, kept on
+// `globalThis` so that a Fast Refresh that re-evaluates this module finds the same
+// Instances and Overrides.
 
 import type { Fiber } from "./fiber.js";
 import { internalsProblem } from "./fiber.js";
-import { ANCHOR_ATTRIBUTE, isUnanchored, parseHint, SOURCE_ATTRIBUTE, sharesBase, uniqueId } from "../call-site.js";
+import { ANCHOR_ATTRIBUTE, parseHint, SOURCE_ATTRIBUTE, sharesBase, uniqueId } from "../call-site.js";
 import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
@@ -14,9 +15,9 @@ import {
   type InstanceIdentity,
   type OverrideStore,
   type Props,
-  reaches,
-  type Scope,
-  type ScopeTarget,
+  inScope,
+  type Status,
+  type View,
 } from "./store.js";
 
 export type MountedInstance = {
@@ -59,22 +60,13 @@ export type LastSeen = {
   current: Props;
 };
 
-/** Overrides are disabled and everything is inspect-only while this is set. */
-export type Status = { overrides: true } | { overrides: false; reason: string };
-
 export type Registry = {
   store: OverrideStore;
   instances: Map<string, MountedInstance>;
   /** Unmounted Instances an Instance-scope record still names, by id; pruned as records go. */
   departed: Map<string, LastSeen>;
-  status: Status;
   /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
   listeners: Set<() => void>;
-  /**
-   * `before` renders every Instance as the app has it, keeping only State-prop
-   * Overrides, for a Snapshot's "before" image (PER-138). The store is untouched.
-   */
-  view: View;
   /**
    * Prop metadata from `meta/` for Instances with no Adapter, by call-site file and
    * imported name (PER-180). Filled by the Toolbar; empty until it loads any.
@@ -82,38 +74,36 @@ export type Registry = {
   instanceMeta: Map<string, Readonly<Record<string, PropMeta>>>;
 };
 
-export type View = "proposed" | "before";
-
 const GLOBAL_KEY = "__loupeRegistry";
 
 export function registry(): Registry {
   const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry };
   let value = host[GLOBAL_KEY];
   // One made by an earlier version of this module, kept across a Fast Refresh.
+  if (value && typeof value.store.render !== "function") {
+    // Its store predates Override resolution: the status and view it kept move into a
+    // new store. Its records can't (their pins and suspensions would be lost), so they go.
+    const old = value as Registry & { status?: Status; view?: View };
+    value.store = createOverrideStore(old.status ? { status: old.status } : {});
+    if (old.view) value.store.setView(old.view);
+    delete old.status;
+    delete old.view;
+    connect(value);
+  }
   if (value && !value.listeners) value.listeners = new Set();
   if (value && !value.departed) value.departed = new Map();
-  if (value && !value.view) value.view = "proposed";
   if (value && !value.instanceMeta) value.instanceMeta = new Map();
   if (!value) {
     const problem = internalsProblem();
     value = {
-      store: createOverrideStore(),
+      store: createOverrideStore(problem === null ? {} : { status: { overrides: false, reason: problem } }),
       instances: new Map(),
       departed: new Map(),
-      status: problem === null ? { overrides: true } : { overrides: false, reason: problem },
       listeners: new Set(),
-      view: "proposed",
       instanceMeta: new Map(),
     };
     const created = value;
-    created.store.subscribe((target) => {
-      for (const instance of created.instances.values()) {
-        if (reaches(target, identityOf(instance))) instance.notify();
-      }
-      const named = recordedIds(created.store);
-      for (const id of created.departed.keys()) if (!named.has(id)) created.departed.delete(id);
-      emitChange();
-    });
+    connect(created);
     watchRoute(() => {
       // A page Override is per route: Instances that outlive a navigation (a layout's)
       // stop or start matching one.
@@ -124,6 +114,19 @@ export function registry(): Registry {
     host[GLOBAL_KEY] = value;
   }
   return value;
+}
+
+/** Rerenders the Instances a store change can touch, and forgets departed ones no record names. */
+function connect(value: Registry): void {
+  const { store } = value;
+  store.subscribe((target) => {
+    for (const instance of value.instances.values()) {
+      if (inScope(target, identityOf(instance))) instance.notify();
+    }
+    const named = recordedIds(store);
+    for (const id of value.departed.keys()) if (!named.has(id)) value.departed.delete(id);
+    emitChange();
+  });
 }
 
 /**
@@ -160,21 +163,6 @@ export function identityOf(
     route: currentRoute(),
     total: parseHint(instance.hint)?.total ?? null,
   };
-}
-
-/** The record an Override on this Instance at `scope` goes into; null for a group with no call site. */
-export function scopeTarget(
-  instance: Pick<MountedInstance, "id" | "anchor" | "component">,
-  scope: Scope,
-): ScopeTarget | null {
-  switch (scope) {
-    case "instance":
-      return { scope, id: instance.id };
-    case "group":
-      return isUnanchored(instance.anchor) ? null : { scope, anchor: instance.anchor };
-    case "page":
-      return { scope, route: currentRoute(), component: instance.component };
-  }
 }
 
 const WRAPPED = Symbol.for("loupe.historyWrapped");
@@ -216,16 +204,14 @@ function watchRoute(onChange: () => void): void {
  */
 export function setView(view: View): void {
   const value = registry();
-  if (value.view === view) return;
-  value.view = view;
+  if (!value.store.setView(view)) return;
   for (const instance of value.instances.values()) instance.notify();
 }
 
 /** Drops to inspect-only for the rest of the page's life. Fails closed. */
 export function disableOverrides(reason: string): void {
   const value = registry();
-  if (!value.status.overrides) return;
-  value.status = { overrides: false, reason };
+  if (!value.store.disable(reason)) return;
   warnInspectOnly(reason);
   for (const instance of value.instances.values()) instance.notify();
   emitChange();

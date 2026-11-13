@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { callSiteLabels } from "../call-site.js";
 import { createDebug, type InstanceProps, type InstanceRow, type LoupeDebug, type RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { currentRoute, type LastSeen, onRegistryChange, registry, type Status } from "../runtime/registry.js";
+import { currentRoute, type LastSeen, onRegistryChange, registry } from "../runtime/registry.js";
+import type { Status } from "../runtime/store.js";
 
 /** Components seen on the current route, for "Appears on interaction". */
 export type SeenComponents = { route: string; components: Set<string> };
@@ -93,7 +94,7 @@ export function snapshot(debug: LoupeDebug, seen: SeenComponents): PageSnapshot 
     byComponent.set(row.component, list);
     seen.components.add(row.component);
   }
-  const status = registry().status;
+  const status = registry().store.status;
   const records = debug.records();
   const held = heldInstances(debug, records);
   const components = new Set([...byComponent.keys(), ...held.keys()]);
