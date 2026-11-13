@@ -6,12 +6,18 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "../adapt-list.js";
 import { checkCompatibility } from "../compat/check.js";
-import { LedgerError } from "../compat/ledger.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
 import { runGenerate } from "../generate/command.js";
 import { GENERATE_FORMAT_VERSION } from "../generate/header.js";
-import { type InitLedger, LEDGER_FORMAT_VERSION, LEDGER_PATH, readInitLedger } from "../init/ledger.js";
-import { fileHash, sha256 } from "../init/syntax.js";
+import {
+  judgeLayerFile,
+  judgeTouchPoint,
+  LEDGER_FORMAT_VERSION,
+  LEDGER_PATH,
+  type Ledger,
+  LedgerError,
+  readLedger,
+} from "../init/ledger.js";
 import { NPM_PACKAGE, PRODUCT_LAYER, touchPoints } from "../init/touch-points.js";
 import { compare } from "../meta/sources.js";
 import { version as installedVersion } from "../version.js";
@@ -90,9 +96,9 @@ class Report {
 export async function runDoctor(options: DoctorOptions, io: DoctorIo): Promise<number> {
   const version = io.version ?? installedVersion;
   const root = findRoot(path.resolve(io.cwd));
-  let ledger: InitLedger;
+  let ledger: Ledger;
   try {
-    ledger = readInitLedger(root);
+    ledger = readLedger(root);
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     io.err(error.message);
@@ -160,7 +166,7 @@ function readAdaptList(root: string, layerPath: string): AdaptListRoots | undefi
 function versions(
   report: Report,
   root: string,
-  ledger: InitLedger,
+  ledger: Ledger,
   app: string,
   cli: string,
   adaptList: AdaptListRoots | undefined,
@@ -198,28 +204,47 @@ function versions(
 }
 
 // 3 and 8. Each touch point present with the hash init recorded; the Biome exclusion is one of them.
-function touchPointChecks(report: Report, root: string, ledger: InitLedger, app: string, version: string): void {
+function touchPointChecks(report: Report, root: string, ledger: Ledger, app: string, version: string): void {
   report.heading("Touch points");
   const points = touchPoints({ root, app, version, workspaceProtocol: "" });
   const recorded = ledger.touchPoints ?? [];
   const ids = new Set(points.map((t) => t.id));
+  const missing = (label: string) => report.fail(`${label}: Loupe's edit is missing`, ["Run loupe init to reapply it."]);
+  const drift = (label: string) =>
+    report.fail(`${label}: drift, changed by hand since loupe init recorded it`, [
+      "Left as it is. Undo the change, or remove and reinstall Loupe.",
+    ]);
   for (const tp of points) {
     const entry = recorded.find((t) => t.id === tp.id);
     const label = `${tp.id.padEnd(13)}${tp.file}`;
-    const abs = path.join(root, tp.file);
-    const found = existsSync(abs) ? tp.find(readFileSync(abs, "utf8")) : undefined;
-    if (!entry) {
-      report.fail(`${label}: not in the ledger`, ["Run loupe init."]);
-    } else if (entry.mode === "manual" && !entry.sha256) {
-      report.fail(`${label}: manual step not recorded yet`, ["Make the edit loupe init printed, then run loupe init --adopt."]);
-    } else if (!found) {
-      report.fail(`${label}: Loupe's edit is missing`, ["Run loupe init to reapply it."]);
-    } else if (sha256(found.canonical) !== entry.sha256) {
-      report.fail(`${label}: drift, changed by hand since loupe init recorded it`, [
-        "Left as it is. Undo the change, or remove and reinstall Loupe.",
-      ]);
-    } else {
-      report.ok(`${label}${entry.mode === "manual" ? " (manual)" : ""}`);
+    const verdict = judgeTouchPoint(root, entry, tp);
+    switch (verdict.kind) {
+      case "unclaimed":
+      case "not-loupes":
+        report.fail(`${label}: not in the ledger`, ["Run loupe init."]);
+        break;
+      case "pending":
+        // Only a manual step is waiting for --adopt. An `auto` entry with no hash recorded an edit
+        // its touch point couldn't find again: whatever is there now doesn't match the record.
+        if (entry?.mode === "manual") {
+          report.fail(`${label}: manual step not recorded yet`, ["Make the edit loupe init printed, then run loupe init --adopt."]);
+        } else if (verdict.claim) {
+          drift(label);
+        } else {
+          missing(label);
+        }
+        break;
+      case "missing":
+        missing(label);
+        break;
+      case "drift":
+        drift(label);
+        break;
+      case "unrecognised":
+        throw new Error(`${tp.id}: judged without its touch point`);
+      case "intact":
+        report.ok(`${label}${entry?.mode === "manual" ? " (manual)" : ""}`);
+        break;
     }
   }
   if (!ids.has("biome-config")) report.ok("No root Biome config, so no Biome exclusion is needed");
@@ -230,15 +255,15 @@ function touchPointChecks(report: Report, root: string, ledger: InitLedger, app:
 }
 
 // 4 and 5. init's files match the ledger; generate's match their headers and their sources.
-function productLayerChecks(report: Report, root: string, ledger: InitLedger, layerPath: string): void {
+function productLayerChecks(report: Report, root: string, ledger: Ledger, layerPath: string): void {
   report.heading(`Product layer ${layerPath}`);
   const files = ledger.files ?? [];
   const drift: string[] = [];
   const missing: string[] = [];
   for (const entry of files) {
-    const abs = path.join(root, layerPath, entry.path);
-    if (!existsSync(abs)) missing.push(entry.path);
-    else if (fileHash(readFileSync(abs, "utf8")) !== entry.sha256) drift.push(entry.path);
+    const verdict = judgeLayerFile(root, path.posix.join(layerPath, entry.path), entry);
+    if (verdict.kind === "missing") missing.push(entry.path);
+    else if (verdict.kind === "drift") drift.push(entry.path);
   }
   if (files.length === 0) report.fail("The ledger lists none of loupe init's files", ["Run loupe init."]);
   else if (drift.length === 0 && missing.length === 0) report.ok(`${files.length} files from loupe init match the ledger`);

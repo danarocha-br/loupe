@@ -6,16 +6,20 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type CheckIo, checkCompatibility } from "../compat/check.js";
-import { LedgerError } from "../compat/ledger.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
 import { runGenerate } from "../generate/command.js";
 import { version as installedVersion } from "../version.js";
 import {
+  claimOf,
   type FileEntry,
-  type InitLedger,
+  formatTooNew,
+  judgeLayerFile,
+  judgeTouchPoint,
   LEDGER_FORMAT_VERSION,
   LEDGER_PATH,
-  readInitLedger,
+  type Ledger,
+  LedgerError,
+  readLedger,
   saveLedger,
   type TouchPointEntry,
 } from "./ledger.js";
@@ -76,16 +80,17 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
     return 1;
   }
 
-  let ledger: InitLedger;
+  let ledger: Ledger;
   try {
-    ledger = readInitLedger(root);
+    ledger = readLedger(root);
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     io.err(error.message);
     return 1;
   }
-  if ((ledger.formatVersion ?? LEDGER_FORMAT_VERSION) > LEDGER_FORMAT_VERSION) {
-    io.err(`${LEDGER_PATH} has formatVersion ${ledger.formatVersion}; this Loupe (${version}) reads ${LEDGER_FORMAT_VERSION}. Upgrade Loupe.`);
+  const tooNew = formatTooNew(ledger, version);
+  if (tooNew) {
+    io.err(tooNew);
     io.out(NOTHING_WRITTEN);
     return 1;
   }
@@ -114,7 +119,7 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   if (!check.ok || !check.app) return 1;
   const app = check.app;
   // The check may have just recorded a yes in the ledger.
-  ledger = readInitLedger(root);
+  ledger = readLedger(root);
   if (guard && knownApp === undefined) {
     // The ledger was clean before the check, which may have just written its yes there.
     const dirty = dirtyPaths(root, git, protectedPaths(root, app, version));
@@ -190,7 +195,7 @@ class Run {
 
   constructor(
     readonly root: string,
-    readonly ledger: InitLedger,
+    readonly ledger: Ledger,
     readonly io: InitIo,
   ) {}
 
@@ -221,82 +226,91 @@ class Run {
 
   productFile(file: string, content: string): void {
     const repoPath = `${PRODUCT_LAYER.path}/${file}`;
-    const abs = path.join(this.root, repoPath);
-    const have = existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
     const want = fileHash(content);
     const entry = this.ledger.files?.find((f) => f.path === file);
+    const verdict = judgeLayerFile(this.root, repoPath, entry);
     const line = (mark: string, what: string) => this.io.out(`  ${mark} ${file.padEnd(14)}${what}`);
 
-    if (have !== undefined && fileHash(have) === want) {
+    if (verdict.kind !== "missing" && fileHash(verdict.text) === want) {
       if (entry?.sha256 !== want) {
         this.setFile({ path: file, sha256: want });
         line("✓", "already in place, recorded");
       }
       return;
     }
-    if (have !== undefined && (!entry || fileHash(have) !== entry.sha256)) {
+    // Only a file the ledger records as init's, unedited, may be overwritten.
+    if (verdict.kind !== "missing" && !(verdict.kind === "intact" && verdict.by === "init")) {
       this.problems += 1;
-      line("✗", entry ? "edited by hand since loupe init wrote it; left as is" : "not written by loupe init; left as is");
+      const edited = verdict.kind === "drift" && verdict.by === "init";
+      line("✗", edited ? "edited by hand since loupe init wrote it; left as is" : "not written by loupe init; left as is");
       this.io.err(`    Restore ${repoPath} with git, or move it away, then rerun loupe init.`);
       return;
     }
     // Missing, or ours and unedited but out of date: recorded first, then written.
     this.setFile({ path: file, sha256: want });
     this.write(repoPath, content);
-    line("+", have === undefined ? (entry ? "restored" : "written") : "updated");
+    line("+", verdict.kind === "missing" ? (entry ? "restored" : "written") : "updated");
   }
 
   touchPoint(tp: TouchPoint): void {
-    const abs = path.join(this.root, tp.file);
-    const text = existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
-    const found = text === undefined ? undefined : tp.find(text);
     const entry = this.ledger.touchPoints?.find((t) => t.id === tp.id);
+    const verdict = judgeTouchPoint(this.root, entry, tp);
     const line = (mark: string, what: string) => this.io.out(`  ${mark} ${tp.id.padEnd(13)}${tp.file}: ${what}`);
-    const hash = found ? sha256(found.canonical) : undefined;
 
-    if (entry?.sha256) {
-      if (hash === entry.sha256) return;
-      if (found) {
+    switch (verdict.kind) {
+      case "intact":
+        return;
+      case "drift":
         this.problems += 1;
         line("✗", "changed since loupe init recorded it; left as is");
         return;
-      }
-      this.apply(tp, text, line, "reapplied");
-      return;
-    }
-
-    if (found) {
-      if (found.exact) {
-        // Exactly what init writes. A pending manual step stays `manual`: a person made it.
-        this.setTouchPoint({ id: tp.id, file: tp.file, mode: entry ? "manual" : "auto", sha256: hash ?? null });
-        line("✓", entry ? "adopted (manual)" : "already in place, recorded");
+      case "missing":
+        this.apply(tp, verdict.text, line, "reapplied");
+        return;
+      case "pending":
+      case "unclaimed": {
+        // A pending step with no edit made yet: init makes it.
+        if (!verdict.claim) {
+          this.apply(tp, verdict.text, line, "");
+          return;
+        }
+        if (verdict.claim.found.exact) {
+          // Exactly what init writes. A pending manual step stays `manual`: a person made it.
+          this.setTouchPoint({ id: tp.id, file: tp.file, mode: entry ? "manual" : "auto", sha256: verdict.claim.hash });
+          line("✓", entry ? "adopted (manual)" : "already in place, recorded");
+          return;
+        }
+        this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: null });
+        this.manual += 1;
+        line("!", entry ? "edited by hand; check it, then adopt it" : "has a Loupe edit init didn't write");
+        this.printManual(tp, "Check it against these instructions, then run loupe init --adopt:");
         return;
       }
-      this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: null });
-      this.manual += 1;
-      line("!", entry ? "edited by hand; check it, then adopt it" : "has a Loupe edit init didn't write");
-      this.printManual(tp, "Check it against these instructions, then run loupe init --adopt:");
-      return;
+      case "not-loupes":
+        this.apply(tp, verdict.text, line, "");
+        return;
+      case "unrecognised":
+        throw new Error(`${tp.id}: judged without its touch point`);
     }
-    this.apply(tp, text, line, "");
   }
 
   /** `--adopt`: records a hand-made Loupe edit; touches no file but the ledger. */
   adopt(tp: TouchPoint): void {
-    const abs = path.join(this.root, tp.file);
-    const text = existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
-    const found = text === undefined ? undefined : tp.find(text);
     const entry = this.ledger.touchPoints?.find((t) => t.id === tp.id);
-    const pending = entry ? entry.mode === "manual" && !entry.sha256 : found !== undefined && !found.exact;
+    const verdict = judgeTouchPoint(this.root, entry, tp);
+    const pending = entry
+      ? entry.mode === "manual" && verdict.kind === "pending"
+      : verdict.kind === "unclaimed" && !verdict.claim.found.exact;
     if (!pending) return;
     const line = (mark: string, what: string) => this.io.out(`  ${mark} ${tp.id.padEnd(13)}${tp.file}: ${what}`);
-    if (!found) {
+    const claim = claimOf(verdict);
+    if (!claim) {
       this.manual += 1;
       line("!", "no Loupe edit found to adopt");
       this.printManual(tp, "Make this edit by hand, then rerun loupe init --adopt:");
       return;
     }
-    this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: sha256(found.canonical) });
+    this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: claim.hash });
     line("✓", "adopted (manual)");
   }
 
@@ -380,7 +394,7 @@ export function dirtyPaths(root: string, git: string, guarded: string[]): Dirty 
   return { blocking: dirty.filter(blocks), other: dirty.filter((f) => !blocks(f)) };
 }
 
-function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: InitLedger): boolean {
+function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: Ledger): boolean {
   if (dirty.blocking.length === 0) {
     if (dirty.other.length > 0) io.out(`Note: ${dirty.other.length} other file(s) have uncommitted changes; Loupe won't touch them.`);
     return false;

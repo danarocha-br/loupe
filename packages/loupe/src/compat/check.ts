@@ -1,6 +1,6 @@
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { type DesignSystem, designSystemCandidates, grade } from "./grade.js";
-import { isAccepted, LEDGER_PATH, LedgerError, readLedger, recordAccepted } from "./ledger.js";
+import { isAccepted, LEDGER_PATH, LedgerError, readLedger, recordAccepted } from "../init/ledger.js";
 import {
   filesImporting,
   findRoot,

@@ -24,7 +24,7 @@ describe("the Installer plugin", () => {
       new RegExp(`PRODUCT_LAYER = \\{ name: "${PRODUCT_LAYER_PACKAGE}", path: "${PRODUCT_LAYER}" \\}`),
     );
     assert.match(src("init/touch-points.ts"), new RegExp(`NPM_PACKAGE = "${LOUPE_PACKAGE}"`));
-    assert.match(src("compat/ledger.ts"), new RegExp(`LEDGER_PATH = "${LEDGER}"`));
+    assert.match(src("init/ledger.ts"), new RegExp(`LEDGER_PATH = "${LEDGER}"`));
   });
 
   it("has a manifest, a marketplace entry, and no bin/ and no npm dependencies", () => {

@@ -7,12 +7,18 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { LedgerError } from "../compat/ledger.js";
 import { findRoot } from "../compat/repo.js";
-import { readHeader } from "../generate/header.js";
 import { dirtyPaths, gitTop, LOCKFILE, NOTHING_WRITTEN } from "../init/command.js";
-import { type InitLedger, LEDGER_FORMAT_VERSION, LEDGER_PATH, readInitLedger, type TouchPointEntry } from "../init/ledger.js";
-import { fileHash, sha256 } from "../init/syntax.js";
+import {
+  formatTooNew,
+  judgeLayerFile,
+  judgeTouchPoint,
+  LEDGER_PATH,
+  type Ledger,
+  LedgerError,
+  readLedger,
+  type TouchPointEntry,
+} from "../init/ledger.js";
 import {
   biomeConfig,
   EXCLUSION,
@@ -57,8 +63,8 @@ export type RemoveIo = {
   install?: (root: string) => number;
 };
 
-/** What happens to one touch point. */
-type Verdict = { kind: "absent" } | { kind: "undo"; text: string } | { kind: "kept"; why: string };
+/** What `remove` does with one touch point. */
+type Removal = { kind: "absent" } | { kind: "undo"; text: string } | { kind: "kept"; why: string };
 
 type Write = { id: TouchPointId; file: string; text: string; before: string };
 type Kept = { id: TouchPointId; file: string; why: string };
@@ -97,7 +103,7 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
     io.out(`Nothing to remove: there is no ${LEDGER_PATH}, so loupe init hasn't run here.`);
     return 0;
   }
-  let ledger: InitLedger;
+  let ledger: Ledger;
   try {
     ledger = readRemovableLedger(root);
   } catch (error) {
@@ -134,11 +140,10 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
 }
 
 /** Reads the ledger and refuses one `remove` can't trust with deletes. */
-function readRemovableLedger(root: string): InitLedger {
-  const ledger = readInitLedger(root);
-  if ((ledger.formatVersion ?? LEDGER_FORMAT_VERSION) > LEDGER_FORMAT_VERSION) {
-    throw new LedgerError(`${LEDGER_PATH} has formatVersion ${ledger.formatVersion}; this Loupe (${installedVersion}) reads ${LEDGER_FORMAT_VERSION}. Upgrade Loupe.`);
-  }
+function readRemovableLedger(root: string): Ledger {
+  const ledger = readLedger(root);
+  const tooNew = formatTooNew(ledger, installedVersion);
+  if (tooNew) throw new LedgerError(tooNew);
   const layer = ledger.productLayer?.path;
   if ((layer !== undefined && layer !== LAYER) || !arrayOrMissing(ledger.touchPoints) || !arrayOrMissing(ledger.files)) {
     throw new LedgerError(`${LEDGER_PATH} isn't one loupe init wrote. Fix or restore it with git, then rerun.`);
@@ -150,14 +155,14 @@ function arrayOrMissing(value: unknown): boolean {
   return value === undefined || Array.isArray(value);
 }
 
-function planRemoval(root: string, ledger: InitLedger): Plan {
+function planRemoval(root: string, ledger: Ledger): Plan {
   const entries = ledger.touchPoints ?? [];
   const app = ledger.productLayer?.app ?? appOf(entries);
   const points = new Map(
     (app === undefined ? [] : touchPoints({ root, app, version: installedVersion, workspaceProtocol: "" })).map((t) => [t.id, t]),
   );
   const plan: Plan = { writes: [], kept: [], holding: [], layer: [], clear: false };
-  const add = (id: TouchPointId, override?: (v: Verdict) => Verdict) => {
+  const add = (id: TouchPointId, override?: (v: Removal) => Removal) => {
     const entry = entries.find((e) => e.id === id);
     if (!entry) return;
     const tp = points.get(id) ?? (id === "biome-config" ? biomeConfig(entry.file) : undefined);
@@ -181,41 +186,48 @@ function planRemoval(root: string, ledger: InitLedger): Plan {
   return plan;
 }
 
-function judge(root: string, entry: TouchPointEntry, tp: TouchPoint | undefined): Verdict {
-  const abs = path.join(root, entry.file);
-  // Deleted by hand: nothing of Loupe's is left in it.
-  if (!existsSync(abs)) return { kind: "absent" };
-  if (!tp || tp.file !== entry.file) return { kind: "kept", why: `loupe remove doesn't recognise ${entry.file} as this touch point any more` };
-  const text = readFileSync(abs, "utf8");
-  const found = tp.find(text);
-  if (!found) return { kind: "absent" };
-  if (!entry.sha256) return { kind: "kept", why: "a manual step loupe init never recorded (no --adopt)" };
-  if (sha256(found.canonical) !== entry.sha256) return { kind: "kept", why: "changed since loupe init recorded it" };
-  const u = undo(tp, text);
-  return "manual" in u ? { kind: "kept", why: u.manual } : { kind: "undo", text: u.text };
+function judge(root: string, entry: TouchPointEntry, tp: TouchPoint | undefined): Removal {
+  // A touch point now drawn from another file doesn't answer for this entry.
+  const point = tp?.file === entry.file ? tp : undefined;
+  const verdict = judgeTouchPoint(root, entry, point);
+  switch (verdict.kind) {
+    case "unrecognised":
+      return { kind: "kept", why: `loupe remove doesn't recognise ${entry.file} as this touch point any more` };
+    // Deleted by hand, or nothing of Loupe's is left in it.
+    case "missing":
+      return { kind: "absent" };
+    case "pending":
+      return verdict.claim ? { kind: "kept", why: "a manual step loupe init never recorded (no --adopt)" } : { kind: "absent" };
+    case "drift":
+      return { kind: "kept", why: "changed since loupe init recorded it" };
+    case "intact": {
+      if (!point) throw new Error(`${entry.id}: judged intact without its touch point`);
+      const u = undo(point, verdict.text);
+      return "manual" in u ? { kind: "kept", why: u.manual } : { kind: "undo", text: u.text };
+    }
+    case "unclaimed":
+    case "not-loupes":
+      throw new Error(`${entry.id}: a ledger entry judged as unrecorded`);
+  }
 }
 
 /** Every file in the Product layer, with whether it is still Loupe's own to delete. */
-function layerInventory(root: string, ledger: InitLedger): LayerFile[] {
+function layerInventory(root: string, ledger: Ledger): LayerFile[] {
   const list = (...args: string[]) =>
     execFileSync("git", ["ls-files", "-z", ...args, "--exclude-standard", "--", LAYER], { cwd: root, encoding: "utf8" })
       .split("\0")
       .filter(Boolean);
   const out: LayerFile[] = [];
   for (const file of [...new Set(list("--cached", "--others"))].sort()) {
-    const abs = path.join(root, file);
-    // The ledger goes last; a file deleted by hand but still tracked needs nothing.
-    if (file === LEDGER_PATH || !existsSync(abs)) continue;
-    const content = readFileSync(abs, "utf8");
+    // The ledger goes last.
+    if (file === LEDGER_PATH) continue;
     const entry = ledger.files?.find((f) => f.path === path.posix.relative(LAYER, file));
-    if (entry) {
-      const same = fileHash(content) === entry.sha256;
-      out.push(same ? { path: file, delete: true } : { path: file, delete: false, why: "edited since loupe init wrote it" });
-      continue;
-    }
-    const header = readHeader(content).kind;
-    if (header === "intact") out.push({ path: file, delete: true });
-    else out.push({ path: file, delete: false, why: header === "edited" ? "edited since loupe generate wrote it" : "not written by Loupe" });
+    const verdict = judgeLayerFile(root, file, entry);
+    // A file deleted by hand but still tracked needs nothing.
+    if (verdict.kind === "missing") continue;
+    if (verdict.kind === "intact") out.push({ path: file, delete: true });
+    else if (verdict.kind === "drift") out.push({ path: file, delete: false, why: `edited since loupe ${verdict.by} wrote it` });
+    else out.push({ path: file, delete: false, why: "not written by Loupe" });
   }
   // Ignored files carry no hash to check, so only pnpm's node_modules may go.
   const nodeModules = `${LAYER}/node_modules/`;
