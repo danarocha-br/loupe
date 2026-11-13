@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { stampModule } from "../generate/header.js";
 import {
+  claimOf,
   type FileEntry,
   formatTooNew,
   judgeLayerFile,
@@ -99,10 +100,10 @@ describe("judgeTouchPoint", () => {
     const verdict = judgeTouchPoint(root, entry(), packageJsonPoint(root));
     expect(verdict.kind).toBe(kind);
     if (verdict.kind === "unclaimed") {
-      expect(verdict.found.exact).toBe(exact);
-      expect(verdict.hash).toBe(sha256(verdict.found.canonical));
+      expect(verdict.claim.found.exact).toBe(exact);
+      expect(verdict.claim.hash).toBe(sha256(verdict.claim.found.canonical));
     }
-    if (verdict.kind === "pending") expect(verdict.found !== undefined).toBe(found);
+    if (verdict.kind === "pending") expect(verdict.claim !== undefined).toBe(found);
     if (verdict.kind !== "unrecognised") expect(verdict.text).toBe(file);
   });
 
@@ -118,9 +119,9 @@ describe("judgeTouchPoint", () => {
   it("hashes what it found the way init records it, so recording a pending step makes it intact", () => {
     const root = repo({ [PKG]: packageJson(OURS) });
     const tp = packageJsonPoint(root);
-    const pending = judgeTouchPoint(root, manual, tp);
-    if (pending.kind !== "pending" || !pending.hash) throw new Error(`expected a pending step with an edit, got ${pending.kind}`);
-    expect(judgeTouchPoint(root, { ...manual, sha256: pending.hash }, tp).kind).toBe("intact");
+    const claim = claimOf(judgeTouchPoint(root, manual, tp));
+    if (!claim) throw new Error("expected a pending step with an edit");
+    expect(judgeTouchPoint(root, { ...manual, sha256: claim.hash }, tp).kind).toBe("intact");
   });
 });
 

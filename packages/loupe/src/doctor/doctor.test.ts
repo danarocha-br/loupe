@@ -186,6 +186,20 @@ describe("loupe doctor reporting drift", () => {
     expect(code).toBe(0);
   });
 
+  it("reports an automatic touch point recorded without a hash as drift, not as a manual step", async () => {
+    // init records `auto` with no hash when a touch point can't find the edit it just made.
+    const root = await installed();
+    edit(root, "packages/loupe/loupe.ledger.json", (t) => {
+      const ledger = JSON.parse(t);
+      for (const entry of ledger.touchPoints) if (entry.id === "root-layout") entry.sha256 = null;
+      return `${JSON.stringify(ledger, null, 2)}\n`;
+    });
+    const { code, text } = await doctor(root);
+    expect(text).toMatch(/✗ root-layout +apps\/web\/app\/layout\.tsx: drift, changed by hand since loupe init recorded it/);
+    expect(text).not.toContain("manual step not recorded yet");
+    expect(code).toBe(1);
+  });
+
   it("reports a touch point whose Loupe edit is gone", async () => {
     const root = await installed();
     edit(root, "biome.jsonc", () => repoFiles["biome.jsonc"] as string);

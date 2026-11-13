@@ -63,8 +63,8 @@ export type RemoveIo = {
   install?: (root: string) => number;
 };
 
-/** What happens to one touch point. */
-type Verdict = { kind: "absent" } | { kind: "undo"; text: string } | { kind: "kept"; why: string };
+/** What `remove` does with one touch point. */
+type Removal = { kind: "absent" } | { kind: "undo"; text: string } | { kind: "kept"; why: string };
 
 type Write = { id: TouchPointId; file: string; text: string; before: string };
 type Kept = { id: TouchPointId; file: string; why: string };
@@ -162,7 +162,7 @@ function planRemoval(root: string, ledger: Ledger): Plan {
     (app === undefined ? [] : touchPoints({ root, app, version: installedVersion, workspaceProtocol: "" })).map((t) => [t.id, t]),
   );
   const plan: Plan = { writes: [], kept: [], holding: [], layer: [], clear: false };
-  const add = (id: TouchPointId, override?: (v: Verdict) => Verdict) => {
+  const add = (id: TouchPointId, override?: (v: Removal) => Removal) => {
     const entry = entries.find((e) => e.id === id);
     if (!entry) return;
     const tp = points.get(id) ?? (id === "biome-config" ? biomeConfig(entry.file) : undefined);
@@ -186,9 +186,10 @@ function planRemoval(root: string, ledger: Ledger): Plan {
   return plan;
 }
 
-function judge(root: string, entry: TouchPointEntry, tp: TouchPoint | undefined): Verdict {
+function judge(root: string, entry: TouchPointEntry, tp: TouchPoint | undefined): Removal {
   // A touch point now drawn from another file doesn't answer for this entry.
-  const verdict = judgeTouchPoint(root, entry, tp?.file === entry.file ? tp : undefined);
+  const point = tp?.file === entry.file ? tp : undefined;
+  const verdict = judgeTouchPoint(root, entry, point);
   switch (verdict.kind) {
     case "unrecognised":
       return { kind: "kept", why: `loupe remove doesn't recognise ${entry.file} as this touch point any more` };
@@ -196,17 +197,17 @@ function judge(root: string, entry: TouchPointEntry, tp: TouchPoint | undefined)
     case "missing":
       return { kind: "absent" };
     case "pending":
-      return verdict.found ? { kind: "kept", why: "a manual step loupe init never recorded (no --adopt)" } : { kind: "absent" };
+      return verdict.claim ? { kind: "kept", why: "a manual step loupe init never recorded (no --adopt)" } : { kind: "absent" };
     case "drift":
       return { kind: "kept", why: "changed since loupe init recorded it" };
     case "intact": {
-      const u = undo(tp as TouchPoint, verdict.text);
+      if (!point) throw new Error(`${entry.id}: judged intact without its touch point`);
+      const u = undo(point, verdict.text);
       return "manual" in u ? { kind: "kept", why: u.manual } : { kind: "undo", text: u.text };
     }
-    // Not reached: an entry is always recorded.
     case "unclaimed":
     case "not-loupes":
-      return { kind: "absent" };
+      throw new Error(`${entry.id}: a ledger entry judged as unrecorded`);
   }
 }
 

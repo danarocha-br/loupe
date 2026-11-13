@@ -209,6 +209,11 @@ function touchPointChecks(report: Report, root: string, ledger: Ledger, app: str
   const points = touchPoints({ root, app, version, workspaceProtocol: "" });
   const recorded = ledger.touchPoints ?? [];
   const ids = new Set(points.map((t) => t.id));
+  const missing = (label: string) => report.fail(`${label}: Loupe's edit is missing`, ["Run loupe init to reapply it."]);
+  const drift = (label: string) =>
+    report.fail(`${label}: drift, changed by hand since loupe init recorded it`, [
+      "Left as it is. Undo the change, or remove and reinstall Loupe.",
+    ]);
   for (const tp of points) {
     const entry = recorded.find((t) => t.id === tp.id);
     const label = `${tp.id.padEnd(13)}${tp.file}`;
@@ -219,17 +224,24 @@ function touchPointChecks(report: Report, root: string, ledger: Ledger, app: str
         report.fail(`${label}: not in the ledger`, ["Run loupe init."]);
         break;
       case "pending":
-        report.fail(`${label}: manual step not recorded yet`, ["Make the edit loupe init printed, then run loupe init --adopt."]);
+        // Only a manual step is waiting for --adopt. An `auto` entry with no hash recorded an edit
+        // its touch point couldn't find again: whatever is there now doesn't match the record.
+        if (entry?.mode === "manual") {
+          report.fail(`${label}: manual step not recorded yet`, ["Make the edit loupe init printed, then run loupe init --adopt."]);
+        } else if (verdict.claim) {
+          drift(label);
+        } else {
+          missing(label);
+        }
         break;
       case "missing":
-      case "unrecognised":
-        report.fail(`${label}: Loupe's edit is missing`, ["Run loupe init to reapply it."]);
+        missing(label);
         break;
       case "drift":
-        report.fail(`${label}: drift, changed by hand since loupe init recorded it`, [
-          "Left as it is. Undo the change, or remove and reinstall Loupe.",
-        ]);
+        drift(label);
         break;
+      case "unrecognised":
+        throw new Error(`${tp.id}: judged without its touch point`);
       case "intact":
         report.ok(`${label}${entry?.mode === "manual" ? " (manual)" : ""}`);
         break;

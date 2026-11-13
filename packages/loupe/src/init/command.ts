@@ -10,6 +10,7 @@ import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
 import { runGenerate } from "../generate/command.js";
 import { version as installedVersion } from "../version.js";
 import {
+  claimOf,
   type FileEntry,
   formatTooNew,
   judgeLayerFile,
@@ -268,14 +269,14 @@ class Run {
         return;
       case "pending":
       case "unclaimed": {
-        const { found, hash } = verdict;
-        if (!found || !hash) {
+        // A pending step with no edit made yet: init makes it.
+        if (!verdict.claim) {
           this.apply(tp, verdict.text, line, "");
           return;
         }
-        if (found.exact) {
+        if (verdict.claim.found.exact) {
           // Exactly what init writes. A pending manual step stays `manual`: a person made it.
-          this.setTouchPoint({ id: tp.id, file: tp.file, mode: entry ? "manual" : "auto", sha256: hash });
+          this.setTouchPoint({ id: tp.id, file: tp.file, mode: entry ? "manual" : "auto", sha256: verdict.claim.hash });
           line("✓", entry ? "adopted (manual)" : "already in place, recorded");
           return;
         }
@@ -289,8 +290,7 @@ class Run {
         this.apply(tp, verdict.text, line, "");
         return;
       case "unrecognised":
-        // Not reached: `tp` always answers here.
-        return;
+        throw new Error(`${tp.id}: judged without its touch point`);
     }
   }
 
@@ -300,17 +300,17 @@ class Run {
     const verdict = judgeTouchPoint(this.root, entry, tp);
     const pending = entry
       ? entry.mode === "manual" && verdict.kind === "pending"
-      : verdict.kind === "unclaimed" && !verdict.found.exact;
+      : verdict.kind === "unclaimed" && !verdict.claim.found.exact;
     if (!pending) return;
     const line = (mark: string, what: string) => this.io.out(`  ${mark} ${tp.id.padEnd(13)}${tp.file}: ${what}`);
-    const hash = verdict.kind === "pending" || verdict.kind === "unclaimed" ? verdict.hash : undefined;
-    if (!hash) {
+    const claim = claimOf(verdict);
+    if (!claim) {
       this.manual += 1;
       line("!", "no Loupe edit found to adopt");
       this.printManual(tp, "Make this edit by hand, then rerun loupe init --adopt:");
       return;
     }
-    this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: hash });
+    this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: claim.hash });
     line("✓", "adopted (manual)");
   }
 

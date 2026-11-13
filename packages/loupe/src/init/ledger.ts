@@ -92,7 +92,10 @@ export function isAccepted(ledger: Ledger, { app, item, seen }: Acceptance): boo
   return (ledger.untestedAccepted ?? []).some((a) => a.app === app && a.item === item && a.seen === seen);
 }
 
-/** Records the check's yes, replacing any older yes for the same app and item. Every other field is kept. */
+/**
+ * Records the check's yes, replacing any older yes for the same app and item. The check owns only
+ * `untestedAccepted`; every other field is kept as it is.
+ */
 export function recordAccepted(root: string, entries: Acceptance[], now: Date): void {
   const ledger = readLedger(root);
   // NUL can't appear in a path or an item key, so the pair can't collide.
@@ -120,23 +123,27 @@ function sortKeys(value: unknown): unknown {
 // only (GLOSSARY.md). Whether the item is what *this* version would write is
 // `init`'s question, not the ledger's.
 
+/** A Loupe edit found in a touch point's file, and the hash the ledger records for it. */
+export type Claim = { found: Found; hash: string };
+
 /**
  * - `intact`: recorded, and Loupe's edit is there unchanged.
  * - `drift`: recorded, and the edit was changed by hand since.
  * - `missing`: recorded, and the edit (or the file) is gone.
- * - `pending`: recorded as a manual step, not adopted yet; `found` is the edit if one is there.
- * - `unclaimed`: not recorded, but a Loupe edit is there; `found.exact` when it is exactly what `init` writes.
+ * - `pending`: recorded without a hash (a manual step not adopted yet); `claim` is the edit if one is there.
+ * - `unclaimed`: not recorded, but a Loupe edit is there; `claim.found.exact` when it is exactly what `init` writes.
  * - `not-loupes`: not recorded, and no Loupe edit is there.
- * - `unrecognised`: recorded, but no touch point answers for it any more, and its file is still there.
+ * - `unrecognised`: recorded, but the caller has no touch point that answers for that file any more, and the
+ *   file is still there. Only the caller knows the touch point moved: `remove` passes none when the file differs.
  *
- * `text` is the file's content, undefined when it doesn't exist; `hash` is what to record for `found`.
+ * `text` is the file's content, undefined when it doesn't exist.
  */
 export type TouchPointVerdict =
   | { kind: "intact"; text: string }
   | { kind: "drift"; text: string }
   | { kind: "missing"; text: string | undefined }
-  | { kind: "pending"; text: string | undefined; found: Found | undefined; hash: string | undefined }
-  | { kind: "unclaimed"; text: string; found: Found; hash: string }
+  | { kind: "pending"; text: string | undefined; claim: Claim | undefined }
+  | { kind: "unclaimed"; text: string; claim: Claim }
   | { kind: "not-loupes"; text: string | undefined }
   | { kind: "unrecognised" };
 
@@ -148,14 +155,19 @@ export function judgeTouchPoint(root: string, entry: TouchPointEntry | undefined
   }
   const text = readText(root, tp.file);
   const found = text === undefined ? undefined : tp.find(text);
-  const hash = found ? sha256(found.canonical) : undefined;
+  const claim = found ? { found, hash: sha256(found.canonical) } : undefined;
   if (entry?.sha256) {
-    if (text === undefined || !found) return { kind: "missing", text };
-    return hash === entry.sha256 ? { kind: "intact", text } : { kind: "drift", text };
+    if (text === undefined || !claim) return { kind: "missing", text };
+    return claim.hash === entry.sha256 ? { kind: "intact", text } : { kind: "drift", text };
   }
-  if (entry) return { kind: "pending", text, found, hash };
-  if (text !== undefined && found && hash) return { kind: "unclaimed", text, found, hash };
+  if (entry) return { kind: "pending", text, claim };
+  if (text !== undefined && claim) return { kind: "unclaimed", text, claim };
   return { kind: "not-loupes", text };
+}
+
+/** The Loupe edit a verdict found, when it found one. */
+export function claimOf(verdict: TouchPointVerdict): Claim | undefined {
+  return verdict.kind === "pending" || verdict.kind === "unclaimed" ? verdict.claim : undefined;
 }
 
 /**
