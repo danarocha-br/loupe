@@ -1,30 +1,16 @@
 // A prop row of the inspector and its control (PER-131, PER-134, PER-137): pills for
 // a closed set of options, a field for label text, the app's Current value beside
-// an Override, Reset, and the holding notice for a State prop (PER-96). At This
-// instance a row edits one Instance; at a group or page scope it edits that
-// scope's record, with its members' Current values counted on the pills. Each
+// an Override, Reset, and the holding notice for a State prop (PER-96). Each
 // Editable row is its own card, with a purple dot while it holds an Override (PER-140).
+//
+// The row comes decided from `panelView()` (PER-214); this file draws it, makes the
+// write its data names, and keeps the Text field's unsent text while it has focus.
 
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
-import type { OptionValue } from "../meta/types.js";
-import type { InstanceProps, LoupeDebug } from "../runtime/debug.js";
-import type { PropRow } from "../runtime/inspect.js";
-import { singleLine, textScopeRefusal } from "../runtime/label-text.js";
-import { STATE_SCOPE_REASON } from "../runtime/state.js";
-import type { Scope, Source } from "../runtime/store.js";
-import { appValue, formatCurrent, formatDefault } from "./format.js";
+import { useLayoutEffect, useRef, useState } from "react";
+import type { LoupeDebug } from "../runtime/debug.js";
+import { singleLine } from "../runtime/label-text.js";
 import { LockIcon, ResetIcon } from "./icons.js";
-import { keepingOwn, NOT_SET, type ScopeLabels, type ScopeView, valueCounts } from "./scopes.js";
-
-/** A mounted, browser-rendered Instance while Overrides are on: what its rows can edit. */
-export type Editing = {
-  debug: LoupeDebug;
-  id: string;
-  live: InstanceProps;
-  labels: ScopeLabels;
-  /** Per prop, the scope this Instance falls back to once its own Override is reset. */
-  fallback: Record<string, Scope>;
-};
+import { type Control, type PropItem, TEXT, type ValueText } from "./panel-view/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -38,31 +24,11 @@ export function attempt(write: () => void): void {
   }
 }
 
-/** The app's value as the row shows it: set, its default, or `not set`. */
-function currentValue(row: PropRow): ReactNode {
-  if (row.set) return formatCurrent(row.value);
-  if (row.default) return <span className="tag">{formatDefault(row.default)}</span>;
-  return <span className="muted">not set</span>;
-}
-
-/** What a scope is called where a value comes from it. */
-function scopeName(source: Source, labels: ScopeLabels): string {
-  if (source === "app") return "the app";
-  return labels[source] ?? "this call site";
-}
-
-const RESET_TO: Record<Scope, string> = { instance: "Reset", group: "Reset to group value", page: "Reset to page value" };
-
-/** One line under a label-text row the call site writes in a way no field can change (PER-113). */
-const EXPLAIN: Partial<Record<string, string>> = {
-  "FROM CODE": "Written as an expression here, so it changes in code.",
-  MIXED: "Text and code together: no single string to change.",
-  CONTENT: "Elements, or nothing, between the tags.",
-};
-
-function explanation(row: PropRow): string | undefined {
-  if (row.name !== "children" || !row.reason) return undefined;
-  return EXPLAIN[row.reason];
+/** The app's value: written, the metadata's default as a tag, or a muted `not set`. */
+function ValueView({ value }: { value: ValueText }) {
+  if (value.kind === "default") return <span className="tag">{value.text}</span>;
+  if (value.kind === "unset") return <span className="muted">{value.text}</span>;
+  return <>{value.text}</>;
 }
 
 /** The Override dot: purple while the row holds one, an empty slot otherwise so names line up. */
@@ -70,228 +36,130 @@ function Dot({ on }: { on: boolean }) {
   return <span className={on ? "dot purple" : "dot"} aria-hidden="true" />;
 }
 
-export function PropRowView({ row, editing }: { row: PropRow; editing: Editing | null }) {
-  // Only an Instance-scope Override is this scope's to reset; a group or page one says where it comes from.
-  const source = editing?.live.sources[row.name];
-  const overridden = source === "instance";
-  // Any Override's value, whatever its scope, puts the app's own value on a `Current:` line.
-  const fromOverride = source !== undefined && source !== "app";
-  const held = editing?.live.states[row.name]?.held;
-  const tried = held !== undefined && "appTried" in held;
-  const fallback = editing?.fallback[row.name];
-  const reset = editing && overridden ? () => attempt(() => editing.debug.reset(editing.id, row.name)) : null;
-  const resetButton = reset && (
-    <button type="button" className="btn small reset" onClick={reset}>
-      <ResetIcon />
-      {RESET_TO[fallback ?? "instance"]}
-    </button>
-  );
-  const value: unknown = editing && row.name in editing.live.overrides ? editing.live.overrides[row.name] : appValue(row);
+/** Label text left empty: the row says so, as the field shows nothing. */
+function EmptyTag() {
   return (
-    <div className={overridden ? "row overridden" : "row"} data-prop={row.name}>
-      <div className="line">
-        {row.editable && <Dot on={overridden} />}
-        <span className="name">
-          {row.label}
-          {row.label !== row.name && <span className="mono"> {row.name}</span>}
-        </span>
-        {row.text && value === "" && <EmptyTag />}
-        {row.state && <span className="tag">STATE</span>}
-        {!fromOverride && <span className="value">{currentValue(row)}</span>}
-        {row.reason && <span className="tag">{row.reason}</span>}
-        {!tried && resetButton}
-      </div>
-      {explanation(row) && <div className="explain">{explanation(row)}</div>}
-      {editing && source && (
-        <div className="source muted" data-testid="source">
-          from {scopeName(source, editing.labels)}
-        </div>
-      )}
-      {row.editable && editing && (
-        // Keyed so another Instance drops the field's unsent text. Not on the source: the
-        // first keystroke makes an Override, and a remount would take the field's focus.
-        <Control
-          key={editing.id}
-          row={row}
-          value={value}
-          set={(next) => attempt(() => editing.debug.set(editing.id, row.name, next))}
-        />
-      )}
-      {fromOverride && (
-        <div className="current" data-testid="current">
-          <span className="meta">Current:</span> {currentValue(row)}
-        </div>
-      )}
-      {tried && (
-        <div className="notice" role="status" data-testid="held">
-          Your Override holds this at <code>{formatCurrent(held.value)}</code>; the app tried to set{" "}
-          <code>{formatCurrent(held.appTried)}</code>. {resetButton}
-        </div>
-      )}
-    </div>
+    <span className="tag empty" data-testid="empty">
+      {TEXT.empty}
+    </span>
   );
 }
 
-/**
- * A prop row at a group or page scope: it edits that scope's record. The pills
- * count the Current values of the members still in the scope, and the row notes
- * the members a narrower scope keeps at their own value.
- */
-export function ScopeRowView({
-  row,
-  editing,
-  view,
+export function PropRowView({
+  item,
+  debug,
   onSelect,
   onHover,
 }: {
-  row: PropRow;
-  editing: Editing;
-  view: ScopeView;
+  item: PropItem;
+  debug: LoupeDebug;
   onSelect(id: string): void;
   onHover(ids: string[]): void;
 }) {
-  const { debug, id } = editing;
-  const scope = view.scope;
-  const values = view.record?.values ?? {};
-  const overridden = row.name in values;
-  // A suspended record is shown, never written: "Code changed here, review" is PER-136's.
-  const suspended = view.record?.suspended != null;
-  const inScope = view.members.filter((member) => !member.out).length;
-  const counts = valueCounts(view, row.name);
-  const sole = counts.size === 1 && inScope > 0 ? ([...counts.keys()][0] as string) : null;
-  const keeping = keepingOwn(view, row.name);
-  // Instance scope only for a State prop (a group `open` would open every dialog at that
-  // call site at once, PER-96); never page scope for label text (PER-113).
-  const textRefusal = row.text ? textScopeRefusal(scope, row.name) : null;
-  const refusal = row.state
-    ? { testId: "state-only", reason: STATE_SCOPE_REASON }
-    : textRefusal && { testId: "per-call-site", reason: textRefusal };
-  // The pressed pill: this scope's Override, else the one value every member shares.
-  const value: unknown = overridden
-    ? values[row.name]
-    : sole !== null && sole !== NOT_SET
-      ? row.options
-        ? row.options.find((option) => formatCurrent(option) === sole)
-        : textOf(sole)
-      : undefined;
+  const { reset } = item;
+  const resetButton = reset && (
+    <button
+      type="button"
+      className="btn small reset"
+      onClick={() => attempt(() => debug.reset(reset.write.id, reset.write.prop, reset.write.scope))}
+    >
+      <ResetIcon />
+      {reset.label}
+    </button>
+  );
+  const { keeping } = item;
   return (
-    <div className={overridden ? "row overridden" : "row"} data-prop={row.name}>
+    <div className={item.overridden ? "row overridden" : "row"} data-prop={item.name}>
       <div className="line">
-        {row.editable && <Dot on={overridden} />}
+        {item.dot && <Dot on={item.dot === "on"} />}
         <span className="name">
-          {row.label}
-          {row.label !== row.name && <span className="mono"> {row.name}</span>}
+          {item.label}
+          {item.codeName && <span className="mono"> {item.codeName}</span>}
         </span>
-        {row.state && <span className="tag">STATE</span>}
-        <span className="value" data-testid="counts">
-          {/* Text with no control here still shows what it says, not only that it matches. */}
-          {sole !== null && !textRefusal
-            ? `SAME ON ALL ${inScope}`
-            : [...counts].map(([key, count]) => `${key} ${count}`).join(" · ")}
-        </span>
-        {row.text && overridden && values[row.name] === "" && <EmptyTag />}
-        {row.reason && <span className="tag">{row.reason}</span>}
-        {overridden && !suspended && (
-          <button
-            type="button"
-            className="btn small reset"
-            onClick={() => attempt(() => debug.reset(id, row.name, scope))}
-          >
-            <ResetIcon />
-            Reset
-          </button>
+        {/* Label text left empty sits beside the name at This instance, and after the counts at a scope. */}
+        {item.empty && item.counts === null && <EmptyTag />}
+        {item.state && <span className="tag">{TEXT.state}</span>}
+        {item.value && (
+          <span className="value">
+            <ValueView value={item.value} />
+          </span>
         )}
+        {item.counts !== null && (
+          <span className="value" data-testid="counts">
+            {item.counts}
+          </span>
+        )}
+        {item.empty && item.counts !== null && <EmptyTag />}
+        {item.reason && <span className="tag">{item.reason}</span>}
+        {reset && !reset.inNotice && resetButton}
       </div>
-      <div className="source muted" data-testid="source">
-        from {overridden ? view.name : "the app"}
-      </div>
-      {refusal ? (
-        <div className="refusal" data-testid={refusal.testId}>
-          <LockIcon />
-          {refusal.reason}
+      {item.explanation && <div className="explain">{item.explanation}</div>}
+      {item.source && (
+        <div className="source muted" data-testid="source">
+          {item.source}
         </div>
-      ) : (
-        row.editable &&
-        !suspended && (
-          // Not keyed on `overridden`: the first keystroke sets this scope's value.
-          <Control
-            key={scope}
-            row={row}
-            value={value}
-            counts={counts}
-            set={(next) => attempt(() => debug.set(id, row.name, next, scope))}
-          />
-        )
       )}
-      {keeping.length > 0 && (
+      {item.control && (
+        <ControlView key={item.control.kind === "refused" ? "refused" : item.control.key} control={item.control} label={item.label} debug={debug} />
+      )}
+      {item.current && (
+        <div className="current" data-testid="current">
+          <span className="meta">{TEXT.current}</span> <ValueView value={item.current} />
+        </div>
+      )}
+      {item.held && (
+        <div className="notice" role="status" data-testid="held">
+          {item.held.before} <code>{item.held.value}</code>
+          {item.held.middle} <code>{item.held.tried}</code>
+          {item.held.after} {reset?.inNotice && resetButton}
+        </div>
+      )}
+      {keeping && (
         <button
           type="button"
           className="keeping"
-          onClick={() => onSelect(keeping[0] as string)}
-          onMouseEnter={() => onHover(keeping)}
+          onClick={() => onSelect(keeping.select)}
+          onMouseEnter={() => onHover(keeping.ids)}
           onMouseLeave={() => onHover([])}
         >
-          {keeping.length} of {inScope} {keeping.length === 1 ? "keeps its own value" : "keep their own values"}
+          {keeping.text}
         </button>
       )}
     </div>
   );
 }
 
-/** Label text left empty: the row says so, as the field shows nothing. */
-function EmptyTag() {
-  return (
-    <span className="tag empty" data-testid="empty">
-      empty
-    </span>
-  );
-}
-
-/** The label text a pill key names (`formatCurrent` of a string is its JSON), or undefined. */
-function textOf(key: string): string | undefined {
-  try {
-    const parsed: unknown = JSON.parse(key);
-    return typeof parsed === "string" ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Pills for a closed set of options, each with its count at a scope; a field for label text (PER-113). */
-function Control({
-  row,
-  value,
-  set,
-  counts,
-}: {
-  row: PropRow;
-  value: unknown;
-  set(next: unknown): void;
-  counts?: Map<string, number>;
-}) {
-  if (row.options) {
+/** Pills for a closed set of options, each with its count at a scope; a field for label text (PER-113); or why neither. */
+function ControlView({ control, label, debug }: { control: Control; label: string; debug: LoupeDebug }) {
+  if (control.kind === "refused") {
     return (
-      <div className="pills" role="group" aria-label={row.label}>
-        {row.options.map((option: OptionValue) => {
-          const label = formatCurrent(option);
-          const count = counts?.get(label);
-          return (
-            <button
-              key={`${typeof option}:${option}`}
-              type="button"
-              aria-pressed={Object.is(value, option)}
-              data-option={label}
-              onClick={() => set(option)}
-            >
-              {label}
-              {count !== undefined && <span className="count"> {count}</span>}
-            </button>
-          );
-        })}
+      <div className="refusal" data-testid={control.refusal}>
+        <LockIcon />
+        {control.text}
       </div>
     );
   }
-  return <TextField label={row.label} value={typeof value === "string" ? value : ""} set={set} />;
+  const { write } = control;
+  const set = (next: unknown) => attempt(() => debug.set(write.id, write.prop, next, write.scope));
+  if (control.kind === "options") {
+    return (
+      <div className="pills" role="group" aria-label={label}>
+        {control.options.map((option) => (
+          <button
+            key={`${typeof option.value}:${option.value}`}
+            type="button"
+            aria-pressed={option.pressed}
+            data-option={option.label}
+            onClick={() => set(option.value)}
+          >
+            {option.label}
+            {option.count !== null && <span className="count"> {option.count}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  }
+  return <TextField label={label} value={control.value} set={set} />;
 }
 
 /**

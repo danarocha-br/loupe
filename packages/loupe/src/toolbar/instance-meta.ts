@@ -6,15 +6,12 @@
 import { useEffect } from "react";
 import { metaRequestOf, rememberMeta } from "../runtime/instance-meta.js";
 import { readInstanceMeta } from "./meta-server.js";
-import type { PageSnapshot } from "./page.js";
 
 /** Logged once per message, so a re-selection doesn't repeat it. Lives as long as the page. */
 const logged = new Set<string>();
 
-export function useInstanceMeta(page: PageSnapshot, selected: string | null): void {
-  const row = selected === null ? undefined : page.rows.find((candidate) => candidate.id === selected);
-  // An Adapter carries its own metadata.
-  const anchor = row && !row.adapted ? row.anchor : null;
+/** `anchor`: the selected Instance's, when no Adapter carries its metadata (`PanelView.metaAnchor`). */
+export function useInstanceMeta(anchor: string | null): void {
   useEffect(() => {
     const request = anchor === null ? null : metaRequestOf(anchor);
     if (request === null) return;
