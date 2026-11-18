@@ -12,8 +12,9 @@
 // doesn't visibly disturb the page. Nothing is drawn on the images.
 //
 // A Snapshot records the Overrides each Instance on screen showed. When one of
-// them changes, the Snapshot is Outdated and isn't exported. Snapshots live until
-// the page reloads.
+// them changes, the Snapshot is Outdated and isn't exported. Retake takes one again
+// in its place, from the page it shows only. An export takes its own Snapshot,
+// unless it would repeat a manual one. Snapshots live until the page reloads.
 
 import { flushSync } from "react-dom";
 import { type ImagePair, type SnapshotInput, setOnKey, toJson } from "../proposal/build.js";
@@ -23,9 +24,9 @@ import { type InstanceIdentity, type OverrideRecord, reachOf } from "../runtime/
 import { CAPTURE_ATTRIBUTE, screenshotRasterizer } from "./snapshots-raster.js";
 
 /** Around a crop, in CSS pixels. */
-export const CROP_PADDING = 24;
+const CROP_PADDING = 24;
 /** Per-Instance crops when a change's union is taller than the viewport. */
-export const MAX_INSTANCE_CROPS = 4;
+const MAX_INSTANCE_CROPS = 4;
 
 export type Snapshot = SnapshotInput & {
   /** 1-based, in capture order; kept by a Retake. */
@@ -41,6 +42,14 @@ export type Snapshot = SnapshotInput & {
   shown: { identity: InstanceIdentity; overrides: string }[];
   /** The images' size as embedded in a report: the data URLs' length. */
   bytes: number;
+};
+
+/** A Snapshot as the list shows it, read when the list is. */
+export type ListedSnapshot = Snapshot & {
+  /** An Override one of its Instances showed has changed since: it isn't exported. */
+  outdated: boolean;
+  /** Taken on another route than this one: it can't be retaken from here. */
+  elsewhere: boolean;
 };
 
 /** A box in CSS pixels, from the viewport's top left corner. */
@@ -93,8 +102,26 @@ function store(): Store {
   return host[GLOBAL_KEY];
 }
 
-export function snapshots(): readonly Snapshot[] {
-  return store().list;
+/** Every Snapshot this page load, oldest first, each as it reads now. */
+export function snapshots(): readonly ListedSnapshot[] {
+  return store().list.map((snapshot) => ({
+    ...snapshot,
+    outdated: isOutdated(snapshot),
+    elsewhere: takenElsewhere(snapshot),
+  }));
+}
+
+/** Takes a Snapshot of the screen in view. Captures run one at a time. */
+export function captureScreen(): Promise<Snapshot> {
+  return enqueue(() => capture({}));
+}
+
+/**
+ * Takes Snapshot `id` again, keeping its place and number. Refuses one taken on
+ * another page: it would be replaced with a picture of the wrong page.
+ */
+export function retakeSnapshot(id: number): Promise<Snapshot> {
+  return enqueue(() => capture({ retake: id }));
 }
 
 export function removeSnapshot(id: number): void {
@@ -105,46 +132,90 @@ export function removeSnapshot(id: number): void {
   emitChange();
 }
 
+/**
+ * The export's own Snapshot of the screen in view (PER-99 §3). It replaces the
+ * last export's Snapshot of this route. It is dropped when it repeats a manual
+ * one, so the report doesn't show the same screen twice (PER-138). A failed
+ * capture is warned about and returned rather than thrown: the export goes on
+ * without it.
+ */
+export async function captureForExport(): Promise<{ failed: string | null }> {
+  try {
+    await enqueue(async () => {
+      const taken = await capture({ auto: true });
+      if (repeatsManual(taken)) removeSnapshot(taken.id);
+      return taken;
+    });
+    return { failed: null };
+  } catch (error) {
+    console.warn("[loupe] The export's Snapshot failed; exporting without it.", error);
+    return { failed: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** The Snapshots an export carries, oldest first: every one that isn't Outdated. */
+export function exportableSnapshots(): SnapshotInput[] {
+  return kept().map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
+}
+
+/**
+ * Roughly what the export's own Snapshot adds to the report, in bytes: the newest
+ * kept Snapshot's size, and nothing when this route already has one, which it
+ * replaces or repeats. The export dialog warns past 25 MB (PER-139).
+ */
+export function exportCaptureBytes(): number {
+  const list = kept();
+  const route = currentRoute();
+  return list.some((snapshot) => snapshot.route === route) ? 0 : (list.at(-1)?.bytes ?? 0);
+}
+
 /** The Overrides that reach an Instance, sorted and as JSON, so two readings compare as strings. */
-export function overridesShown(identity: InstanceIdentity): string {
+function overridesShown(identity: InstanceIdentity): string {
   const { overrides } = registry().store.resolve({ ...identity, current: {} });
   const sorted = Object.fromEntries(Object.keys(overrides).sort().map((key) => [key, toJson(overrides[key])]));
   return JSON.stringify(sorted);
 }
 
 /** Whether an Override one of its Instances showed has changed since: then it isn't exported. */
-export function isOutdated(snapshot: Pick<Snapshot, "shown">): boolean {
+function isOutdated(snapshot: Snapshot): boolean {
   return snapshot.shown.some((entry) => overridesShown(entry.identity) !== entry.overrides);
 }
 
-/** The Snapshots an export carries, oldest first. */
-export function exportableSnapshots(): SnapshotInput[] {
-  return snapshots()
-    .filter((snapshot) => !isOutdated(snapshot))
-    .map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
+/** The Snapshots that aren't Outdated. */
+function kept(): Snapshot[] {
+  return store().list.filter((snapshot) => !isOutdated(snapshot));
 }
 
-/** What the kept Snapshots add to a report, in bytes. The export dialog warns past 25 MB (PER-139). */
-export function snapshotBytes(): number {
-  return snapshots()
-    .filter((snapshot) => !isOutdated(snapshot))
-    .reduce((sum, snapshot) => sum + snapshot.bytes, 0);
+/** Retake works only on the page a Snapshot shows. */
+function takenElsewhere(snapshot: Snapshot): boolean {
+  return snapshot.route !== currentRoute();
 }
 
-export type CaptureOptions = {
-  /** Retake: replace this Snapshot, keeping its place and number. */
-  replace?: number;
-  /** Taken by an export: replaces the last export's Snapshot of the same route. */
-  auto?: boolean;
-};
+/** Whether an export's own Snapshot shows what a manual one of its route already does. */
+function repeatsManual(taken: Snapshot): boolean {
+  return kept().some(
+    (other) =>
+      !other.auto &&
+      other.route === taken.route &&
+      other.viewport.before === taken.viewport.before &&
+      other.viewport.after === taken.viewport.after,
+  );
+}
 
-/** Takes a Snapshot of the screen in view. Captures run one at a time. */
-export function captureScreen(options: CaptureOptions = {}): Promise<Snapshot> {
+/** Runs `job` once every capture before it has finished. */
+function enqueue(job: () => Promise<Snapshot>): Promise<Snapshot> {
   const state = store();
-  const run = state.queue.then(() => capture(options));
+  const run = state.queue.then(job);
   state.queue = run.catch(() => {});
   return run;
 }
+
+type CaptureOptions = {
+  /** Retake: replace this Snapshot, keeping its place and number. */
+  retake?: number;
+  /** The export's own: replaces the last export's Snapshot of the same route. */
+  auto?: boolean;
+};
 
 type Covered = { id: string; keyPath: string; after: Rect; before: Rect | null };
 
@@ -166,8 +237,11 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   const route = currentRoute();
   const url = location.href;
   const state = store();
-  const replaced = options.replace === undefined ? undefined : state.list.find((s) => s.id === options.replace);
-  if (replaced && replaced.route !== route) {
+  const replaced = options.retake === undefined ? undefined : state.list.find((s) => s.id === options.retake);
+  if (options.retake !== undefined && !replaced) {
+    throw new Error(`[loupe] There is no Snapshot ${options.retake} to retake.`);
+  }
+  if (replaced && takenElsewhere(replaced)) {
     throw new Error(`[loupe] Snapshot ${replaced.id} was taken on ${replaced.route}: open that page to retake it.`);
   }
 
@@ -250,7 +324,7 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
  * Per record with a non-State prop, the Instances on screen in its Reach: the
  * change's crop covers them.
  */
-export function changesOnScreen(
+function changesOnScreen(
   records: readonly OverrideRecord[],
   mounted: readonly Pick<MountedInstance, "id" | "anchor" | "component" | "hint" | "keyPath" | "stateProps">[],
   boxes: ReadonlyMap<string, Rect>,
@@ -277,7 +351,7 @@ type Crop = { rect: Rect; keyPath: string | null; more: number };
  * that is taller than the viewport, one per Instance, top first, up to
  * MAX_INSTANCE_CROPS, the last saying how many more there were.
  */
-export function cropRects(covered: readonly Covered[], width: number, height: number): Crop[] {
+function cropRects(covered: readonly Covered[], width: number, height: number): Crop[] {
   const boxes = covered.map((entry) => ({ entry, box: entry.before ? union([entry.after, entry.before]) : entry.after }));
   const whole = union(boxes.map(({ box }) => box));
   if (whole.bottom - whole.top <= height) {
@@ -382,15 +456,19 @@ function settle(): Promise<void> {
   });
 }
 
-/** Adds `capture`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
-export function exposeSnapshots(): void {
-  if (typeof window === "undefined") return;
+/** Adds `capture`, `retake`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
+function exposeSnapshots(): void {
   const debug = debugOf() as LoupeDebug & {
-    capture?: (options?: CaptureOptions) => Promise<Snapshot>;
-    snapshots?: () => (Snapshot & { outdated: boolean })[];
+    capture?: () => Promise<Snapshot>;
+    retake?: (id: number) => Promise<Snapshot>;
+    snapshots?: () => readonly ListedSnapshot[];
     removeSnapshot?: (id: number) => void;
   };
   debug.capture ??= captureScreen;
-  debug.snapshots ??= () => snapshots().map((snapshot) => ({ ...snapshot, outdated: isOutdated(snapshot) }));
+  debug.retake ??= retakeSnapshot;
+  debug.snapshots ??= snapshots;
   debug.removeSnapshot ??= removeSnapshot;
 }
+
+// With the Toolbar, like `__loupe.proposal()`.
+if (typeof window !== "undefined") exposeSnapshots();

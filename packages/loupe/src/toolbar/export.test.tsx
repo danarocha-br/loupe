@@ -103,9 +103,9 @@ async function openDialog(): Promise<void> {
   await until(() => dialog()?.querySelector(".counts") != null);
 }
 
-async function capture(options?: Parameters<typeof captureScreen>[0]) {
+async function capture() {
   await act(async () => {
-    await captureScreen(options);
+    await captureScreen();
   });
 }
 

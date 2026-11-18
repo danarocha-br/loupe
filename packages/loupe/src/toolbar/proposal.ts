@@ -6,7 +6,7 @@
 // Nothing here writes to the store or the repo: exporting clears nothing.
 // Once the Toolbar loads, `__loupe.proposal(options?)` returns the JSON and
 // `__loupe.proposalMarkdown(options?)` the Copy as Markdown text. Snapshots that
-// aren't Outdated ride along (PER-138); `{ capture: true }` takes one first.
+// aren't Outdated ride along (PER-138); `{ capture: true }` takes the export's own first.
 
 import { parseInstanceId } from "../call-site.js";
 import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
@@ -16,15 +16,16 @@ import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
 import { previewedFlags } from "./flags-store.js";
 import { readProjectContext } from "./project-server.js";
-import { captureScreen, exportableSnapshots, exposeSnapshots } from "./snapshots.js";
+import { captureForExport, exportableSnapshots } from "./snapshots.js";
 
 export type ProposalOptions = {
   title?: string;
   designer?: string | null;
   /**
    * Take a Snapshot of the screen in view first, as an export does (PER-99 §3).
-   * It replaces the previous export's Snapshot of this route. A failed capture
-   * leaves the Proposal without it rather than failing.
+   * It replaces the previous export's Snapshot of this route, and is dropped when
+   * it repeats a manual one. A failed capture leaves the Proposal without it
+   * rather than failing.
    */
   capture?: boolean;
   /** Per record (`setOnKey`), the designer's note for its entry (PER-139). */
@@ -155,11 +156,7 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
 
 /** The Proposal, and per change id the record it reads: what the export dialog keeps notes against. */
 export async function collectProposalKeyed(options: ProposalOptions = {}): Promise<{ proposal: Proposal; keys: Record<string, string> }> {
-  if (options.capture) {
-    await captureScreen({ auto: true }).catch((error: unknown) => {
-      console.warn("[loupe] The export's Snapshot failed; exporting without it.", error);
-    });
-  }
+  if (options.capture) await captureForExport();
   const tracker = startTracking();
   refresh(tracker);
   const reg = registry();
@@ -250,5 +247,4 @@ export function exposeProposal(): void {
 if (typeof window !== "undefined") {
   startTracking();
   exposeProposal();
-  exposeSnapshots();
 }

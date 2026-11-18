@@ -19,16 +19,14 @@ vi.mock("./project-server.js", () => ({
 }));
 
 const {
+  captureForExport,
   captureScreen,
-  changesOnScreen,
-  cropRects,
+  exportCaptureBytes,
   exportableSnapshots,
-  isOutdated,
   removeSnapshot,
-  snapshotBytes,
+  retakeSnapshot,
   setRasterizer,
   snapshots,
-  CROP_PADDING,
 } = await import("./snapshots.js");
 const { fixedPixels } = await import("./snapshots.fixture.js");
 const { collectProposal } = await import("./proposal.js");
@@ -50,6 +48,7 @@ const Dialog = createAdapter(
 const TRIGGER = callSiteId({ path: "app/membros/menu.tsx", enclosing: "MemberRowMenu", component: "Button", ordinal: 1 });
 const DIALOG = callSiteId({ path: "app/membros/menu.tsx", enclosing: "MemberRowMenu", component: "Dialog", ordinal: 1 });
 const DIALOG_ID = instanceId(DIALOG, "dialog");
+const row = (n: number) => instanceId(TRIGGER, `user_${n}`);
 
 let container: HTMLDivElement;
 let root: Root;
@@ -74,9 +73,14 @@ function draw(): string {
   return String(rasterized.length);
 }
 
+/** Draws with fixed pixels, `layout` and `draw` unless the test says otherwise. Starts the list over. */
+function pixels(options: Parameters<typeof fixedPixels>[0] = {}) {
+  setRasterizer(fixedPixels({ layout, draw, ...options }));
+}
+
 beforeEach(() => {
   delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
-  setRasterizer(fixedPixels({ layout, draw }));
+  pixels();
   rasterized.length = 0;
   container = document.createElement("div");
   document.body.append(container);
@@ -87,6 +91,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  history.pushState(null, "", "/");
   vi.restoreAllMocks();
 });
 
@@ -98,37 +103,57 @@ const rows: Box[] = [
   [900, 600, 32, 32],
 ];
 
-function membros(): ReactElement {
+function membros(boxes: readonly Box[]): ReactElement {
   return h(
     "div",
     null,
-    rows.map((box, index) =>
+    boxes.map((box, index) =>
       h("section", { key: `user_${index + 1}` }, h(Button, { variant: "ghost", box, [ANCHOR_ATTRIBUTE]: TRIGGER } as ButtonProps)),
     ),
     h("aside", { key: "dialog" }, h(Dialog, { open: false, onOpenChange: () => {}, box: [300, 300, 400, 200], [ANCHOR_ATTRIBUTE]: DIALOG } as DialogProps)),
   );
 }
 
-const capture = async (options?: Parameters<typeof captureScreen>[0]) => {
-  let result: Awaited<ReturnType<typeof captureScreen>> | undefined;
+/** Runs a capture, or anything that takes one, inside `act`: it switches the view and back. */
+async function run<T>(job: () => Promise<T>): Promise<T> {
+  let result: T | undefined;
   await act(async () => {
-    result = await captureScreen(options);
+    result = await job();
   });
-  return result as Awaited<ReturnType<typeof captureScreen>>;
-};
+  return result as T;
+}
 
-function setUp() {
-  act(() => root.render(membros()));
+/** The rows, every one outlined as a group, and the dialog held open: a State prop. */
+function setUp(boxes: readonly Box[] = rows) {
+  act(() => root.render(membros(boxes)));
   act(() => {
-    loupe.set(instanceId(TRIGGER, "user_1"), "variant", "outline", "group");
+    loupe.set(row(1), "variant", "outline", "group");
     loupe.set(DIALOG_ID, "open", true);
   });
+}
+
+const ids = () => snapshots().map((snapshot) => [snapshot.id, snapshot.auto]);
+
+function renderCard() {
+  const card = document.createElement("div");
+  document.body.append(card);
+  const cardRoot = createRoot(card);
+  act(() => cardRoot.render(h(SnapshotsCard)));
+  return {
+    card,
+    rerender: () => act(() => cardRoot.render(h(SnapshotsCard))),
+    button: (text: string) => [...card.querySelectorAll("button")].find((node) => node.textContent === text),
+    remove: () => {
+      act(() => cardRoot.unmount());
+      card.remove();
+    },
+  };
 }
 
 describe("Capture screen", () => {
   it("rasterizes after, then before under a still of the page, with the dialog held open in both", async () => {
     setUp();
-    const snapshot = await capture();
+    const snapshot = await run(captureScreen);
 
     expect(rasterized).toEqual([
       { variants: ["outline", "outline", "outline", "outline"], dialog: "true", covered: false, transitions: false },
@@ -146,9 +171,8 @@ describe("Capture screen", () => {
       failedImages: 0,
     });
     // One crop pair for the group change, cut from both images around the three
-    // rows on screen, padded; State props make no crop of their own.
-    const p = CROP_PADDING;
-    const rect = `${100 - p},${600 - p},${232 + p},${632 + p}`;
+    // rows on screen, 24px of padding around them; State props make no crop of their own.
+    const rect = "76,576,256,656";
     expect(snapshot.crops).toEqual([
       {
         change: `group:${TRIGGER}`,
@@ -159,67 +183,97 @@ describe("Capture screen", () => {
         failedImages: 0,
       },
     ]);
-    expect(snapshot.shown.map((entry) => entry.identity.id)).toEqual([
-      instanceId(TRIGGER, "user_1"),
-      instanceId(TRIGGER, "user_2"),
-      instanceId(TRIGGER, "user_3"),
-      DIALOG_ID,
-    ]);
+    expect(snapshot.shown.map((entry) => entry.identity.id)).toEqual([row(1), row(2), row(3), DIALOG_ID]);
     expect(snapshot.bytes).toBe(2 * "data:image/png;base64,1".length + 2 * `data:image/png;base64,1@${rect}`.length);
-    expect(snapshotBytes()).toBe(snapshot.bytes);
+    expect(snapshots()).toEqual([{ ...snapshot, outdated: false, elsewhere: false }]);
+  });
+
+  it("counts the images that didn't load on the viewport pair, the more of the two, and none on crops", async () => {
+    pixels({ failed: [1, 3] });
+    setUp();
+    const snapshot = await run(captureScreen);
+    expect(snapshot.viewport.failedImages).toBe(3);
+    expect(snapshot.crops.map((crop) => crop.failedImages)).toEqual([0]);
+  });
+
+  it("leaves the page as it was, and the list, when a drawing fails", async () => {
+    pixels({
+      draw: () => {
+        const image = draw();
+        if (image === "4") throw new Error("The canvas is tainted.");
+        return image;
+      },
+    });
+    setUp();
+    const first = await run(captureScreen);
+    await act(async () => {
+      await expect(captureScreen()).rejects.toThrow("The canvas is tainted.");
+    });
+    // It failed drawing "before", under the still.
+    expect(rasterized.map((seen) => seen.covered)).toEqual([false, true, false, true]);
+    expect(registry().store.view).toBe("proposed");
+    expect([...container.querySelectorAll("button")].map((node) => node.dataset.variant)).toEqual(Array(4).fill("outline"));
+    expect(document.querySelector("[data-loupe-capture]")).toBeNull();
+    expect(document.querySelector("style")).toBeNull();
+    expect(snapshots().map((snapshot) => snapshot.capturedAt)).toEqual([first.capturedAt]);
+
+    // The next capture isn't held up by it.
+    await run(captureScreen);
+    expect(ids()).toEqual([
+      [1, false],
+      [2, false],
+    ]);
   });
 
   it("is Outdated, and not exported, once an Override it showed changes", async () => {
     setUp();
-    const snapshot = await capture();
-    expect(isOutdated(snapshot)).toBe(false);
+    await run(captureScreen);
+    expect(snapshots()[0]?.outdated).toBe(false);
     expect(exportableSnapshots()).toHaveLength(1);
 
-    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "secondary", "group"));
-    expect(isOutdated(snapshot)).toBe(true);
+    act(() => loupe.set(row(1), "variant", "secondary", "group"));
+    expect(snapshots()[0]?.outdated).toBe(true);
     expect(exportableSnapshots()).toEqual([]);
-    expect(snapshotBytes()).toBe(0);
 
     // A State prop it showed counts too: closing the dialog changes the screen.
-    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "outline", "group"));
-    expect(isOutdated(snapshot)).toBe(false);
+    act(() => loupe.set(row(1), "variant", "outline", "group"));
+    expect(snapshots()[0]?.outdated).toBe(false);
     act(() => loupe.reset(DIALOG_ID, "open"));
-    expect(isOutdated(snapshot)).toBe(true);
+    expect(snapshots()[0]?.outdated).toBe(true);
   });
 
   it("is Outdated once Overrides drop to inspect-only: the page no longer shows what it showed", async () => {
     setUp();
-    const snapshot = await capture();
-    expect(isOutdated(snapshot)).toBe(false);
+    await run(captureScreen);
+    expect(snapshots()[0]?.outdated).toBe(false);
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
-    expect(isOutdated(snapshot)).toBe(true);
+    expect(snapshots()[0]?.outdated).toBe(true);
     expect(exportableSnapshots()).toEqual([]);
   });
 
   it("ignores an Override on an Instance it didn't show", async () => {
     setUp();
-    const snapshot = await capture();
-    act(() => loupe.set(instanceId(TRIGGER, "user_4"), "variant", "secondary"));
-    expect(isOutdated(snapshot)).toBe(false);
+    await run(captureScreen);
+    act(() => loupe.set(row(4), "variant", "secondary"));
+    expect(snapshots()[0]?.outdated).toBe(false);
   });
 
   it("Retake keeps the place and number, Remove drops it, and an export replaces its own last one", async () => {
     setUp();
-    const first = await capture();
-    const second = await capture();
+    const first = await run(captureScreen);
+    const second = await run(captureScreen);
     expect(snapshots().map((snapshot) => snapshot.id)).toEqual([1, 2]);
 
-    const retaken = await capture({ replace: first.id });
+    const retaken = await run(() => retakeSnapshot(first.id));
     expect(retaken.id).toBe(1);
     expect(snapshots().map((snapshot) => [snapshot.id, snapshot.capturedAt])).toEqual([
       [1, retaken.capturedAt],
       [2, second.capturedAt],
     ]);
 
-    const auto = await capture({ auto: true });
-    const again = await capture({ auto: true });
-    expect(again.id).toBe(auto.id);
-    expect(snapshots().map((snapshot) => [snapshot.id, snapshot.auto])).toEqual([
+    expect(await run(captureForExport)).toEqual({ failed: null });
+    expect(await run(captureForExport)).toEqual({ failed: null });
+    expect(ids()).toEqual([
       [1, false],
       [2, false],
       [3, true],
@@ -227,22 +281,37 @@ describe("Capture screen", () => {
 
     removeSnapshot(2);
     expect(snapshots().map((snapshot) => snapshot.id)).toEqual([1, 3]);
+    await expect(retakeSnapshot(2)).rejects.toThrow("There is no Snapshot 2 to retake.");
+  });
 
-    // A Retake on another page would replace it with a picture of the wrong page.
+  it("won't retake a Snapshot taken on another page, and the card says so", async () => {
+    setUp();
+    await run(captureScreen);
     history.pushState(null, "", "/elsewhere");
-    try {
-      await expect(captureScreen({ replace: 1 })).rejects.toThrow("Snapshot 1 was taken on /: open that page to retake it.");
-    } finally {
-      history.pushState(null, "", "/");
-    }
+    // A Retake here would replace it with a picture of the wrong page.
+    expect(snapshots()[0]?.elsewhere).toBe(true);
+    await expect(retakeSnapshot(1)).rejects.toThrow("Snapshot 1 was taken on /: open that page to retake it.");
+    expect(rasterized).toHaveLength(2);
+
+    const card = renderCard();
+    expect(card.button("Retake")?.disabled).toBe(true);
+    expect(card.card.textContent).toContain("Taken on /: open that page to retake it.");
+    card.remove();
+  });
+
+  it("estimates what an export's own Snapshot adds: nothing where this route has one, else the newest kept one", async () => {
+    setUp();
+    const snapshot = await run(captureScreen);
+    expect(exportCaptureBytes()).toBe(0);
+    history.pushState(null, "", "/elsewhere");
+    expect(exportCaptureBytes()).toBe(snapshot.bytes);
+    act(() => loupe.set(row(1), "variant", "secondary", "group"));
+    expect(exportCaptureBytes()).toBe(0);
   });
 
   it("runs one capture at a time", async () => {
     setUp();
-    let both: unknown[] = [];
-    await act(async () => {
-      both = await Promise.all([captureScreen(), captureScreen()]);
-    });
+    const both = await run(() => Promise.all([captureScreen(), captureScreen()]));
     expect(both).toHaveLength(2);
     expect(rasterized.map((seen) => seen.covered)).toEqual([false, true, false, true]);
   });
@@ -255,113 +324,104 @@ describe("Capture screen", () => {
   });
 });
 
+describe("crops", () => {
+  it("cover where an Instance is in both views", async () => {
+    // Ghost buttons draw 200px wider: "before" reaches further right than "after".
+    pixels({
+      layout: (node) => {
+        const box = layout(node);
+        return box && node.getAttribute("data-variant") === "ghost" ? { ...box, right: box.right + 200 } : box;
+      },
+    });
+    setUp();
+    const snapshot = await run(captureScreen);
+    expect(snapshot.crops.map((crop) => crop.after)).toEqual(["data:image/png;base64,1@76,576,256,856"]);
+  });
+
+  it("split a change taller than the viewport into one per Instance, top first, four at most, kept to the viewport", async () => {
+    setUp([0, 150, 300, 450, 600, 750].map((top): Box => [top, 600, 32, 40]));
+    const snapshot = await run(captureScreen);
+    expect(snapshot.crops.map((crop) => [crop.keyPath, crop.more, crop.after])).toEqual([
+      ["user_1", 0, "data:image/png;base64,1@0,576,64,656"],
+      ["user_2", 0, "data:image/png;base64,1@126,576,214,656"],
+      ["user_3", 0, "data:image/png;base64,1@276,576,364,656"],
+      ["user_4", 2, "data:image/png;base64,1@426,576,514,656"],
+    ]);
+  });
+
+  it("leave out an Instance excluded from the change", async () => {
+    setUp();
+    act(() => loupe.exclude(row(3), "group"));
+    const snapshot = await run(captureScreen);
+    expect(snapshot.crops.map((crop) => [crop.change, crop.after])).toEqual([
+      [`group:${TRIGGER}`, "data:image/png;base64,1@76,576,206,656"],
+    ]);
+  });
+});
+
 describe("in the Proposal and the Toolbar", () => {
   it("exports the Snapshots that aren't Outdated, and an export can take one of its own", async () => {
     setUp();
-    await capture();
+    await run(captureScreen);
     let proposal = await collectProposal({ title: "t" });
     expect(proposal.routes[0]?.screenshots.map((shot) => shot.id)).toEqual(["s1", "s2"]);
     expect(proposal.routes[0]?.changes.map((change) => change.screenshots)).toEqual([["s2"]]);
 
-    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "secondary", "group"));
+    act(() => loupe.set(row(1), "variant", "secondary", "group"));
     proposal = await collectProposal({ title: "t" });
     expect(proposal.routes[0]?.screenshots).toEqual([]);
 
-    await act(async () => {
-      proposal = await collectProposal({ title: "t", capture: true });
-    });
+    proposal = await run(() => collectProposal({ title: "t", capture: true }));
     expect(proposal.routes[0]?.screenshots.map((shot) => shot.caption)).toEqual([
       "Screen 1: /, 1024×768 at 1x",
       "c1: variant on 1st <Button> in MemberRowMenu, every Instance, screen 1",
     ]);
-    expect(snapshots().map((snapshot) => [snapshot.id, snapshot.auto])).toEqual([
+    expect(ids()).toEqual([
       [1, false],
       [2, true],
     ]);
   });
 
+  it("drops an export's own Snapshot that repeats a manual one, and the last export's own with it", async () => {
+    let image = "a";
+    pixels({
+      draw: () => {
+        draw();
+        return image;
+      },
+    });
+    setUp();
+    await run(captureScreen);
+    image = "b";
+    await run(captureForExport);
+    expect(ids()).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+
+    // The screen is as the manual Snapshot shows it again: that one stands for it.
+    image = "a";
+    const proposal = await run(() => collectProposal({ title: "t", capture: true }));
+    expect(ids()).toEqual([[1, false]]);
+    expect(proposal.routes[0]?.screenshots.map((shot) => shot.kind)).toEqual(["viewport", "crop"]);
+  });
+
   it("lists each Snapshot, marked Outdated once an Override it showed changes", async () => {
     setUp();
-    await capture();
-    const card = document.createElement("div");
-    document.body.append(card);
-    const cardRoot = createRoot(card);
-    act(() => cardRoot.render(h(SnapshotsCard)));
-    expect(card.textContent).toContain("Snapshot 1");
-    expect(card.textContent).toContain("/ · 1024×768 · 1 crop");
-    expect(card.textContent).not.toContain("Outdated");
+    await run(captureScreen);
+    const card = renderCard();
+    expect(card.card.textContent).toContain("Snapshot 1");
+    expect(card.card.textContent).toContain("/ · 1024×768 · 1 crop");
+    expect(card.card.textContent).not.toContain("Outdated");
 
-    act(() => loupe.set(instanceId(TRIGGER, "user_1"), "variant", "secondary", "group"));
-    act(() => cardRoot.render(h(SnapshotsCard)));
-    expect(card.textContent).toContain("Outdated");
+    act(() => loupe.set(row(1), "variant", "secondary", "group"));
+    card.rerender();
+    expect(card.card.textContent).toContain("Outdated");
 
-    act(() => (card.querySelector("button:last-child") as HTMLButtonElement).click());
-    act(() => cardRoot.render(h(SnapshotsCard)));
+    act(() => card.button("Remove")?.click());
+    card.rerender();
     expect(snapshots()).toEqual([]);
-    expect(card.textContent).toBe("");
-    act(() => cardRoot.unmount());
+    expect(card.card.textContent).toBe("");
     card.remove();
-  });
-});
-
-describe("crops", () => {
-  const entry = (id: string, top: number, height = 40) => ({
-    id,
-    keyPath: id,
-    after: { top, left: 10, bottom: top + height, right: 110 },
-    before: null,
-  });
-
-  it("is one padded crop around every Instance, kept to the viewport", () => {
-    expect(cropRects([entry("a", 10), entry("b", 200)], 800, 600)).toEqual([
-      { rect: { top: 0, left: 0, bottom: 264, right: 134 }, keyPath: null, more: 0 },
-    ]);
-  });
-
-  it("covers where an Instance is in both views", () => {
-    const moved = { ...entry("a", 100), before: { top: 100, left: 10, bottom: 140, right: 300 } };
-    expect(cropRects([moved], 800, 600)[0]?.rect.right).toBe(300 + CROP_PADDING);
-  });
-
-  it("splits a change taller than the viewport into one crop per Instance, four at most", () => {
-    const tall = ["a", "b", "c", "d", "e", "f"].map((id, index) => entry(id, index * 150));
-    const crops = cropRects(tall, 800, 600);
-    expect(crops.map((crop) => [crop.keyPath, crop.more])).toEqual([
-      ["a", 0],
-      ["b", 0],
-      ["c", 0],
-      ["d", 2],
-    ]);
-  });
-
-  it("names the changes on screen, skipping left-out Instances and State-only records", () => {
-    const mounted = ["user_1", "user_2"].map((key) => ({
-      id: instanceId(TRIGGER, key),
-      anchor: TRIGGER,
-      component: "Button",
-      hint: null,
-      keyPath: key,
-      stateProps: [],
-    }));
-    const dialog = { id: DIALOG, anchor: DIALOG, component: "Dialog", hint: null, keyPath: "", stateProps: ["open"] };
-    const box = { top: 0, left: 0, bottom: 10, right: 10 };
-    const boxes = new Map([...mounted, dialog].map((instance) => [instance.id, box]));
-    const changes = changesOnScreen(
-      [
-        { target: { scope: "group", anchor: TRIGGER }, values: { size: "sm" }, excluded: [instanceId(TRIGGER, "user_2")], suspended: null },
-        { target: { scope: "instance", id: DIALOG }, values: { open: true }, excluded: [], suspended: null },
-        {
-          target: { scope: "instance", id: instanceId(TRIGGER, "user_2") },
-          values: { variant: "outline" },
-          excluded: [],
-          suspended: { reason: "ambiguous", ids: [instanceId(TRIGGER, "user_2")] },
-        },
-      ],
-      [...mounted, dialog],
-      boxes,
-    );
-    expect(changes.map((change) => [change.key, change.covered.map((covered) => covered.keyPath)])).toEqual([
-      [`group:${TRIGGER}`, ["user_1"]],
-    ]);
   });
 });
