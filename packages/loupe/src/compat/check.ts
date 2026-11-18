@@ -1,4 +1,5 @@
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { NOTHING_WRITTEN } from "../dirty-tree.js";
 import { type DesignSystem, designSystemCandidates, grade } from "./grade.js";
 import { isAccepted, LEDGER_PATH, LedgerError, readLedger, recordAccepted } from "../init/ledger.js";
 import {
@@ -42,8 +43,6 @@ export type CheckResult = {
   /** The design system package directory, relative to the root; `full` mode only. */
   designSystem?: string;
 };
-
-const NOTHING_WRITTEN = "Nothing was written.";
 
 const STATUS = {
   supported: { mark: "✓", text: "supported" },
