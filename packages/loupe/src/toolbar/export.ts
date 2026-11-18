@@ -7,9 +7,9 @@
 // typed into the dialog, for the next export of the same session. A reload
 // clears the form, as it clears Snapshots.
 
-import { changeInWords } from "../proposal/build.js";
 import { proposalReport, REPORT_WARN_BYTES, reportFileName } from "../proposal/report.js";
 import type { Proposal } from "../proposal/types.js";
+import { changeInWords } from "../proposal/words.js";
 import { perPage } from "../runtime/slot.js";
 import { megabytes } from "./format.js";
 import { collectProposalKeyed, suggestedTitle } from "./proposal.js";

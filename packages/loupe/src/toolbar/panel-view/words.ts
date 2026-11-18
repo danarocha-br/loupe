@@ -67,7 +67,7 @@ export const REASON_TEXT: Record<InspectOnlyReason, string> = {
   server: "Rendered on the server",
   "overrides-off": "Overrides are off",
   "no-adapter": "No Adapter",
-  "no-editable": "No props with fixed options",
+  "no-editable": "No Editable prop",
 };
 
 export const NOT_GENERATED: StatusTag = { kind: "not-generated", text: "Not generated yet" };

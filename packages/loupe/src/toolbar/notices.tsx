@@ -9,12 +9,10 @@ import { Command } from "./command.js";
 import type { LayerStatus } from "../layer-status.js";
 import { formatNotice } from "../format-notice.js";
 import { readProductLayerStatus } from "./layer-server.js";
+import { warnOnce } from "./warn-once.js";
 
 /** At most one check this often while the page keeps changing; each one stats the sources. */
 const MIN_INTERVAL_MS = 2000;
-
-/** Logged once per message, so a re-check doesn't repeat it. Lives as long as the page. */
-const logged = new Set<string>();
 
 /**
  * The Product layer's status, checked when the panel opens, when the window gets
@@ -34,7 +32,7 @@ export function useLayerStatus(version: number): LayerStatus | null {
       readProductLayerStatus().then(
         (next) => setStatus((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next)),
         // A restarting dev server refuses the call; the next check tries again.
-        (error: unknown) => logOnce(`[loupe] Couldn't read the Product layer's status: ${String(error)}`, console.warn),
+        (error: unknown) => warnOnce(`[loupe] Couldn't read the Product layer's status: ${String(error)}`),
       );
     }, wait);
   }, []);
@@ -54,15 +52,9 @@ export function useLayerStatus(version: number): LayerStatus | null {
   useEffect(() => check(), [check, version]);
   useEffect(() => {
     if (status?.format == null) return;
-    logOnce(`[loupe] ${formatNotice(status.format)} ${status.command}`, console.error);
+    warnOnce(`[loupe] ${formatNotice(status.format)} ${status.command}`, console.error);
   }, [status]);
   return status;
-}
-
-function logOnce(message: string, log: (message: string) => void): void {
-  if (logged.has(message)) return;
-  logged.add(message);
-  log(message);
 }
 
 export function NotGeneratedNotice({ names, command }: { names: readonly string[]; command: string }) {

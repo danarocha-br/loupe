@@ -112,12 +112,22 @@ describe("the dirty-tree rule", () => {
     expect(read(root, "apps/web/next.config.ts")).toContain("// wip");
   });
 
+  it("lists a file --allow-dirty lets through once, though a first install asks the guard twice", async () => {
+    const root = committedRepo();
+    writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n# wip\n");
+    const { code, text } = await init(root, "--allow-dirty");
+    expect(code).toBe(0);
+    expect(text.match(/Proceeding with uncommitted changes/g)).toHaveLength(1);
+    expect(text.match(/^ {2}pnpm-lock\.yaml$/gm)).toHaveLength(1);
+  });
+
   it("only warns about other files, and refuses outside git even with --allow-dirty", async () => {
     const root = committedRepo();
     writeFileSync(path.join(root, "notes.md"), "x\n");
     const { code, text } = await init(root);
     expect(code).toBe(0);
-    expect(text).toContain("1 other file(s) have uncommitted changes");
+    // Once, though a first install asks the guard twice.
+    expect(text.match(/1 other file\(s\) have uncommitted changes/g)).toHaveLength(1);
 
     const bare = makeRepo({}, installable);
     const before = snapshot(bare);

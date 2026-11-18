@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { callSiteHint, callSiteId, instanceId } from "../call-site.js";
 import type { OverrideRecord } from "../runtime/store.js";
 import type { CallSiteWrites } from "../writes.js";
-import { buildProposal, buildProposalKeyed, ordinal, type ProposalInput, type Sighting, setOnKey, toJson } from "./build.js";
+import { buildProposal, buildProposalKeyed, type ProposalInput, type Sighting, setOnKey } from "./build.js";
 import { locationInWords, proposalMarkdown, REPORT_LINE } from "./markdown.js";
 import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
@@ -525,18 +525,6 @@ describe("Copy as Markdown", () => {
 });
 
 describe("helpers", () => {
-  it("writes ordinals", () => {
-    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 101].map(ordinal)).toEqual([
-      "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "23rd", "101st",
-    ]);
-  });
-
-  it("keeps JSON as it is and shows anything else as the Toolbar does", () => {
-    expect(toJson({ a: [1, "x", null] })).toEqual({ a: [1, "x", null] });
-    expect(toJson(function onSelect() {})).toBe("ƒ onSelect()");
-    expect(toJson(Number.NaN)).toBe("NaN");
-  });
-
   it("says where a call site is in words", () => {
     expect(
       locationInWords({ path: FILE, enclosing: "MemberRowMenu", component: "Button", nth: 3, total: 4, anchor: "", lineHint: null }),
@@ -572,13 +560,6 @@ describe("what the page last showed", () => {
     expect(Object.values(counts).sort()).toEqual([1, 3]);
     expect(Object.keys(counts)).toHaveLength(2);
     expectValid(proposal);
-  });
-
-  it("survives a value that refers to itself", () => {
-    const cyclic: Record<string, unknown> = { a: 1 };
-    cyclic.self = cyclic;
-    expect(toJson(cyclic)).toEqual({ a: 1, self: "[Circular]" });
-    expect(toJson({ left: [1], right: [1] })).toEqual({ left: [1], right: [1] });
   });
 
   it("says a value comes from code even when there is no expression text", () => {

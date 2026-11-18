@@ -126,7 +126,7 @@ describe("loading meta/ for an Instance with no Adapter", () => {
     await click(instance(CARD));
     await settle();
     expect(shadow().querySelector("[data-prop=children]")?.textContent).toContain("UNVERIFIED");
-    expect(warn).toHaveBeenCalled();
+    expect(warn.mock.calls).toEqual([["[loupe] Couldn't read meta/ for Card: Error: restarting"]]);
     warn.mockRestore();
   });
 });

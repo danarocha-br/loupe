@@ -3,6 +3,8 @@
 // uncommitted changes in a file the run would write, and it refuses before writing anything.
 // The guard owns git status, the offset between the git top and Loupe's root, what
 // `--allow-dirty` does and every word of its refusals; the commands decide which files they guard.
+// A command may ask it more than once in a run (`init` asks again once the app is known), so the
+// guard says each thing once: the Note, and each file `--allow-dirty` lets through.
 
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
@@ -12,6 +14,9 @@ import { LEDGER_PATH } from "./init/ledger.js";
 export const NOTHING_WRITTEN = "Nothing was written.";
 /** The one file both commands guard because a package manager rewrites it. */
 export const LOCKFILE = "pnpm-lock.yaml";
+
+/** The most files one list names; the rest are counted. */
+const MAX_LISTED = 20;
 
 export type GuardCommand = "init" | "remove";
 
@@ -32,7 +37,8 @@ export type Guard = {
    * Whether the run must stop. `guarded` lists the paths the run would write, from the root; one ending in
    * `/` stands for everything under it. It prints as it decides: a refusal gives its reasons and "Nothing
    * was written."; `--allow-dirty` lists the guarded files it lets through and returns false; with none
-   * of them dirty, `init` notes any other uncommitted changes.
+   * of them dirty, `init` notes any other uncommitted changes. Asked again, it repeats neither the
+   * Note nor a file it has already listed.
    */
   refuses(guarded: readonly string[], hints?: Hints): boolean;
 };
@@ -53,6 +59,9 @@ export function openGuard(command: GuardCommand, root: string, allowDirty: boole
   }
   // Where the root sits inside the git top, so a monorepo's other packages stay out of it.
   const prefix = path.relative(realpathSync(git), realpathSync(root)).split(path.sep).join("/");
+  // What this run has already said, so a second question doesn't say it again.
+  let noted = false;
+  const allowed = new Set<string>();
 
   return {
     refuses(guarded, hints = {}) {
@@ -60,21 +69,25 @@ export function openGuard(command: GuardCommand, root: string, allowDirty: boole
       const blocking = dirty.blocking.filter((f) => !hints.except?.includes(f));
       if (blocking.length === 0) {
         // `remove` leaves what an earlier run changed unremarked.
-        if (PER_COMMAND[command].notesOthers && dirty.other.length > 0) {
+        if (PER_COMMAND[command].notesOthers && dirty.other.length > 0 && !noted) {
+          noted = true;
           io.out(`Note: ${dirty.other.length} other file(s) have uncommitted changes; Loupe won't touch them.`);
         }
         return false;
       }
-      const list = (lead: string) => {
+      const list = (lead: string, files: readonly string[]) => {
         io.err(lead);
-        for (const f of blocking.slice(0, 20)) io.err(`  ${f}`);
-        if (blocking.length > 20) io.err(`  … and ${blocking.length - 20} more`);
+        for (const f of files.slice(0, MAX_LISTED)) io.err(`  ${f}`);
+        if (files.length > MAX_LISTED) io.err(`  … and ${files.length - MAX_LISTED} more`);
       };
       if (allowDirty) {
-        list("Proceeding with uncommitted changes (--allow-dirty) in:");
+        const fresh = blocking.filter((f) => !allowed.has(f));
+        // Only the names the list shows count as said: one it cut off comes up next time.
+        for (const f of fresh.slice(0, MAX_LISTED)) allowed.add(f);
+        if (fresh.length > 0) list("Proceeding with uncommitted changes (--allow-dirty) in:", fresh);
         return false;
       }
-      list(`These files have uncommitted changes, and loupe ${command} ${PER_COMMAND[command].action} them:`);
+      list(`These files have uncommitted changes, and loupe ${command} ${PER_COMMAND[command].action} them:`, blocking);
       const { upgrade } = hints;
       if (upgrade && blocking.some((f) => upgrade.bumped.includes(f))) {
         io.err(`${LEDGER_PATH} records Loupe ${upgrade.from}, and ${upgrade.to} is installed: commit the version bump, then rerun loupe init.`);
@@ -123,5 +136,7 @@ function dirtyPaths(root: string, prefix: string, guarded: readonly string[]): {
     }
   }
   const blocks = (f: string) => guarded.some((g) => (g.endsWith("/") ? f.startsWith(g) : f === g));
-  return { blocking: dirty.filter(blocks), other: dirty.filter((f) => !blocks(f)) };
+  // A path can come twice: a rename's source that is also a new file.
+  const unique = [...new Set(dirty)];
+  return { blocking: unique.filter(blocks), other: unique.filter((f) => !blocks(f)) };
 }

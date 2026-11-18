@@ -10,6 +10,7 @@
 
 import { createMetaLookup } from "../instance-meta.js";
 import type { InstanceMeta, MetaRequest } from "../runtime/instance-meta.js";
+import { warnOnce } from "./warn-once.js";
 
 /** A string only this module holds: `loupe doctor --build` looks for it to prove the action stayed out. */
 const MARKER = "loupe-instance-meta";
@@ -35,7 +36,7 @@ export async function readInstanceMeta(requests: MetaRequest[]): Promise<(Instan
     if (cached?.paths !== paths) cached = { paths, lookup: createMetaLookup({ root, adaptList }) };
     return cached.lookup(requests);
   } catch (error) {
-    console.warn(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
+    warnOnce(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

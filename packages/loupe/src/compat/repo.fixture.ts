@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { afterAll } from "vitest";
 import { run } from "../cli.js";
+import type { BuildRunner } from "../doctor/build.js";
 import { parseDoctorArgs, runDoctor } from "../doctor/command.js";
 import { parseInitArgs, runInit } from "../init/command.js";
 import { version } from "../version.js";
@@ -239,6 +240,8 @@ type CliOptions = {
   answers?: string[];
   /** Stands in for `pnpm install` during `loupe remove`. Not used with `version`, which covers `init` and `doctor` only. */
   install?: (root: string) => number;
+  /** Stands in for `next build` during `loupe doctor --build`. */
+  build?: BuildRunner;
   /** Runs `init` or `doctor` as this Loupe version would; `run` itself can't carry one. */
   version?: string;
 };
@@ -260,12 +263,12 @@ export async function cli(root: string, argv: readonly string[], options: CliOpt
   };
   const code =
     options.version === undefined
-      ? await run(argv, { ...io, install: options.install })
-      : await runAs(options.version, argv, io);
+      ? await run(argv, { ...io, install: options.install, build: options.build })
+      : await runAs(options.version, argv, io, options.build);
   return { code, text: out.join("\n"), questions };
 }
 
-async function runAs(pinned: string, argv: readonly string[], io: Parameters<typeof runInit>[1]): Promise<number> {
+async function runAs(pinned: string, argv: readonly string[], io: Parameters<typeof runInit>[1], build?: BuildRunner): Promise<number> {
   const [command, ...rest] = argv;
   if (command === "init") {
     const parsed = parseInitArgs(rest);
@@ -275,7 +278,7 @@ async function runAs(pinned: string, argv: readonly string[], io: Parameters<typ
   if (command === "doctor") {
     const parsed = parseDoctorArgs(rest);
     if (typeof parsed === "string") throw new Error(parsed);
-    return runDoctor(parsed, { out: io.out, err: io.err, cwd: io.cwd, nodeVersion: io.nodeVersion, version: pinned });
+    return runDoctor(parsed, { out: io.out, err: io.err, cwd: io.cwd, nodeVersion: io.nodeVersion, version: pinned, build });
   }
   throw new Error(`cli can pin a Loupe version for init and doctor, not for ${command}`);
 }

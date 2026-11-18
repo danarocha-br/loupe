@@ -13,10 +13,11 @@ import { HOST_ATTRIBUTE } from "./styles.js";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // The Server Action, answered by the test instead of the dev server's disk.
-const server = vi.hoisted(() => ({ status: null as LayerStatus | null, calls: 0 }));
+const server = vi.hoisted(() => ({ status: null as LayerStatus | null, calls: 0, refusal: null as Error | null }));
 vi.mock("./layer-server.js", () => ({
   readProductLayerStatus: async () => {
     server.calls += 1;
+    if (server.refusal) throw server.refusal;
     return server.status;
   },
 }));
@@ -48,6 +49,7 @@ beforeEach(() => {
   resetLoupe();
   server.status = null;
   server.calls = 0;
+  server.refusal = null;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -121,6 +123,23 @@ describe("the Product layer's notices", () => {
     act(() => window.dispatchEvent(new Event("focus")));
     await act(async () => await new Promise((resolve) => setTimeout(resolve, 2100)));
     expect(errors.mock.calls.filter((call) => String(call[0]).startsWith("[loupe]"))).toHaveLength(1);
+  });
+
+  it("keeps the last status when the dev server refuses the call, and warns once however often it asks", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    server.status = STALE;
+    await mount();
+    expect(shadow().querySelector("[data-testid=stale-notice]")).not.toBeNull();
+
+    // A restarting dev server: every check after this one is refused.
+    server.refusal = new Error("Failed to fetch");
+    for (let focus = 0; focus < 2; focus += 1) {
+      act(() => window.dispatchEvent(new Event("focus")));
+      await act(async () => await new Promise((resolve) => setTimeout(resolve, 2100)));
+    }
+    expect(server.calls).toBeGreaterThanOrEqual(3);
+    expect(shadow().querySelector("[data-testid=stale-notice]")).not.toBeNull();
+    expect(warn.mock.calls).toEqual([["[loupe] Couldn't read the Product layer's status: Error: Failed to fetch"]]);
   });
 
   it("stays quiet when withLoupe isn't active", async () => {

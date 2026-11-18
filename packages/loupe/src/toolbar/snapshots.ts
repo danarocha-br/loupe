@@ -17,7 +17,8 @@
 // unless it would repeat a manual one. Snapshots live until the page reloads.
 
 import { flushSync } from "react-dom";
-import { type ImagePair, type SnapshotInput, setOnKey, toJson } from "../proposal/build.js";
+import { type ImagePair, type SnapshotInput, setOnKey } from "../proposal/build.js";
+import { toJson } from "../proposal/json.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, emitChange, identityOf, type MountedInstance, registry, setView } from "../runtime/registry.js";
 import { type PerPageOptions, perPage } from "../runtime/slot.js";
