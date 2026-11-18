@@ -1,6 +1,6 @@
 {
   "name": "loupe",
   "version": "0.1.2",
-  "description": "Install, remove and check Loupe, the dev-only toolbar for inspecting and overriding the props of real components in a running Next.js app. Every write goes through the pinned loupe CLI.",
+  "description": "Install, upgrade, remove and check Loupe, the dev-only toolbar for inspecting and overriding the props of real components in a running Next.js app. The pinned loupe CLI makes every edit, except the one version bump an upgrade makes and commits.",
   "author": { "name": "Dana Rocha" }
 }

@@ -12,7 +12,8 @@ called the Component Playground.
 
 You install it with a Claude Code plugin, the Installer. The plugin explains
 each change, asks before making it, and runs Loupe's own `loupe` command, which
-does every write.
+makes the edits. The one exception is an upgrade's version bump, which the plugin
+makes and commits after a second yes.
 
 - [Is your setup supported?](#is-your-setup-supported)
 - [Install](#install)
@@ -290,25 +291,14 @@ loaded.
 
 ## Upgrade
 
-You upgrade Loupe in place: bump the version, install, commit, and rerun
-`loupe init`. Nothing is removed. For an app in `apps/app`:
+```
+/loupe:upgrade
+```
 
-1. In `apps/app/package.json`, change `@danarocha/loupe` to the new version.
-   Keep it exact, without `^`. Then run `pnpm install` from the repo root.
-2. Commit `apps/app/package.json` and `pnpm-lock.yaml`. `loupe init` won't run
-   while they have uncommitted changes, and says "commit the version bump, then
-   rerun" if you forget.
-3. From the repo root, run:
+The skill upgrades Loupe in place to the release your plugin installs. A newer
+Loupe therefore starts with the plugin:
 
-   ```bash
-   pnpm -C apps/app exec loupe init
-   ```
-
-   It rewrites its own files in `packages/loupe`, regenerates your components'
-   files for the new version, and ends with "Upgraded from Loupe <old> to <new>". Commit what it
-   wrote.
-4. Update the plugin too, so its skills match the new version, then restart
-   Claude Code:
+1. Update the plugin, then restart Claude Code:
 
    ```bash
    claude plugin marketplace update loupe
@@ -318,16 +308,44 @@ You upgrade Loupe in place: bump the version, install, commit, and rerun
    claude plugin update loupe@loupe
    ```
 
-5. Restart `next dev`, since a running dev server still has the old Loupe
-   loaded.
+2. Commit or stash any changes to the files the install touches (see
+   [What the install changes](#what-the-install-changes)) and to
+   `pnpm-lock.yaml`. `loupe init` won't run while they have uncommitted changes.
+3. Open Claude Code in the product repo and run `/loupe:upgrade`.
 
-If `loupe init` stops on a file that was edited by hand, the install stays on
-the old version until that's resolved. `/loupe:doctor` says which file and
-reports "Loupe versions differ". Restore the file with git, commit, and run
-`loupe init` again: it picks up where it stopped.
+The upgrade skill then:
 
-Loupe never moves an install to an older version: `loupe init` refuses when the
-installed version is older than the one it recorded.
+1. says where the upgrade stands: the Loupe your plugin installs, the one
+   recorded in the repo, and the one the app has. If the repo is already on the
+   plugin's version it says so and stops. It never moves Loupe to an older
+   version;
+2. tells you what it will change and asks "Shall I upgrade Loupe from `<old>` to
+   `<new>`?";
+3. on your yes, sets `@danarocha/loupe` in the app's `package.json` to the new
+   version, exact and without `^`, and runs `pnpm install`;
+4. runs the compatibility check again, and asks about any untested item once;
+5. shows what changed in `package.json` and `pnpm-lock.yaml` and, on a second
+   yes, commits those two files and nothing else;
+6. runs `loupe init`, which rewrites its own files in `packages/loupe`,
+   regenerates your components' files for the new version, and ends with
+   "Upgraded from Loupe `<old>` to `<new>`";
+7. runs `pnpm install` again, since `loupe init` rewrites the Product layer's own
+   `package.json`, which pins the Loupe version;
+8. runs `loupe doctor`, and offers to check in the browser that a component can
+   still be selected.
+
+It commits only the version bump. What `loupe init` wrote, and the lockfile
+change from the second install, are yours to review and commit. Restart `next
+dev` when it's done, since a running dev server still has the old Loupe loaded.
+
+If an upgrade stops, run `/loupe:upgrade` again: it picks up where it stopped.
+When `loupe init` stops on a file that was edited by hand, the install stays on
+the old version until that's resolved, and `/loupe:doctor` reports "Loupe
+versions differ". The skill says which file, and offers to restore it from
+before the edit with git, only on your yes.
+
+To upgrade by hand, without the skill, follow
+[Upgrading](packages/loupe/README.md#upgrading) in the CLI's README.
 
 ## Troubleshooting
 
@@ -387,7 +405,8 @@ reason for each prop, such as `ON THE SERVER` for a server-rendered instance.
 It refuses while a file it would change has uncommitted changes, and says which.
 Commit or stash them, then run it again. The skill offers `--allow-dirty` only
 when the changes are the install's own, for example removing an install you
-never committed.
+never committed, or finishing an upgrade that stopped partway: it names the
+files first and asks.
 
 ### Untracked `AGENTS.md` and `CLAUDE.md` in the app
 
@@ -405,7 +424,7 @@ the Toolbar's visual design, which will change how the panel looks.
 | Path | What it is |
 | -- | -- |
 | `packages/loupe` | Runtime, dev loader and the `loupe` CLI. Published to npm as `@danarocha/loupe`. Its [README](packages/loupe/README.md) is the CLI reference. |
-| `plugins/loupe` | The Installer: a thin Claude Code plugin (skills `install`, `remove`, `doctor` and a guard hook) that runs the CLI. See its [README](plugins/loupe/README.md). |
+| `plugins/loupe` | The Installer: a thin Claude Code plugin (skills `install`, `upgrade`, `remove`, `doctor` and a guard hook) that runs the CLI. See its [README](plugins/loupe/README.md). |
 | `fixture/app` | A Next 16.3 app that CI runs every check against. |
 | `fixture/design-system` | The fixture's tiny design system: shadcn-style components on Base UI and cva. It has no `components.json`, which is why the check grades it untested. |
 | `fixture/app/loupe` | The fixture's Product layer, written by `loupe generate` and checked by `generate --check` in CI. |

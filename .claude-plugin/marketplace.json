@@ -6,7 +6,7 @@
     {
       "name": "loupe",
       "source": "./plugins/loupe",
-      "description": "Install, remove and check Loupe, the dev-only toolbar for inspecting and overriding the props of real components in a running Next.js app."
+      "description": "Install, upgrade, remove and check Loupe, the dev-only toolbar for inspecting and overriding the props of real components in a running Next.js app."
     }
   ]
 }
