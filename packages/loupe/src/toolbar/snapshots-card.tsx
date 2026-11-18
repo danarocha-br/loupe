@@ -1,20 +1,20 @@
 // *Capture screen* and the Snapshot list (PER-138). The dock holds Capture screen
 // (PER-140); this card lists what it took. The list redraws with the panel, which
-// redraws on every registry change, so Outdated is re-read then.
+// redraws on every registry change, so Outdated is re-read then. What a Snapshot
+// is, and when it can be retaken, is `snapshots.ts`'s to say: the card only shows it.
 
 import { useState } from "react";
-import { currentRoute } from "../runtime/registry.js";
 import { megabytes } from "./format.js";
-import { captureScreen, isOutdated, removeSnapshot, type Snapshot, snapshots } from "./snapshots.js";
+import { captureScreen, removeSnapshot, retakeSnapshot, type Snapshot, snapshots } from "./snapshots.js";
 
 type Busy = { capturing: number | "new" | null; error: string | null };
 
 /** Capture screen, or Retake of one Snapshot: what is under way and what last failed. */
 export function useCapture() {
   const [busy, setBusy] = useState<Busy>({ capturing: null, error: null });
-  const run = (replace?: number) => {
-    setBusy({ capturing: replace ?? "new", error: null });
-    captureScreen(replace === undefined ? {} : { replace }).then(
+  const run = (retake?: number) => {
+    setBusy({ capturing: retake ?? "new", error: null });
+    (retake === undefined ? captureScreen() : retakeSnapshot(retake)).then(
       () => setBusy({ capturing: null, error: null }),
       (error: unknown) => {
         console.warn("[loupe] Capture screen failed:", error);
@@ -36,7 +36,6 @@ export function SnapshotsCard() {
   const { busy, run } = useCapture();
   const list = snapshots();
   if (list.length === 0) return null;
-  const route = currentRoute();
   return (
     <div className="card list-card">
       <div className="head">
@@ -45,8 +44,7 @@ export function SnapshotsCard() {
       </div>
       <ul className="snapshots" aria-label="Snapshots">
         {list.map((snapshot) => {
-          const outdated = isOutdated(snapshot);
-          const elsewhere = snapshot.route !== route;
+          const { outdated, elsewhere } = snapshot;
           return (
             <li key={snapshot.id} data-snapshot={snapshot.id}>
               <img

@@ -1,31 +1,32 @@
 // Snapshots (PER-138, per PER-99 §2–3): a before/after pair of the screen in view,
-// kept for the Proposal. Each capture rasterizes the viewport twice in the page
-// itself with `modern-screenshot` (no separate browser, no permission prompt), once
-// as it is and once in the "before" view: every Override off except State-prop
-// ones, so an open dialog stays open. A crop pair per change on screen is cut from
-// the two viewport images, so before and after always line up.
+// kept for the Proposal. Each capture rasterizes the viewport twice, once as it is
+// and once in the "before" view: every Override off except State-prop ones, so an
+// open dialog stays open. A crop pair per change on screen is cut from the two
+// viewport images, so before and after always line up.
 //
-// While "before" renders, a still of the page as it was covers it, so capturing
+// The Rasterizer (PER-217) measures nodes and draws the viewport: in the page,
+// `modern-screenshot` (`snapshots-raster.ts`); in tests, fixed pixels
+// (`snapshots.fixture.ts`). Everything else about a capture happens here.
+//
+// While the Before view renders, a still of the page as it was covers it, so capturing
 // doesn't visibly disturb the page. Nothing is drawn on the images.
 //
 // A Snapshot records the Overrides each Instance on screen showed. When one of
-// them changes, the Snapshot is Outdated and isn't exported. Snapshots live until
-// the page reloads.
+// them changes, the Snapshot is Outdated and isn't exported. Retake takes one again
+// in its place, from the page it shows only. An export takes its own Snapshot,
+// unless it would repeat a manual one. Snapshots live until the page reloads.
 
 import { flushSync } from "react-dom";
 import { type ImagePair, type SnapshotInput, setOnKey, toJson } from "../proposal/build.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, emitChange, identityOf, type MountedInstance, registry, setView } from "../runtime/registry.js";
 import { type InstanceIdentity, type OverrideRecord, reachOf } from "../runtime/store.js";
-import { HOST_ATTRIBUTE } from "./styles.js";
-
-/** Marks the still that covers the page while "before" renders; never captured. */
-export const CAPTURE_ATTRIBUTE = "data-loupe-capture";
+import { CAPTURE_ATTRIBUTE, screenshotRasterizer } from "./snapshots-raster.js";
 
 /** Around a crop, in CSS pixels. */
-export const CROP_PADDING = 24;
+const CROP_PADDING = 24;
 /** Per-Instance crops when a change's union is taller than the viewport. */
-export const MAX_INSTANCE_CROPS = 4;
+const MAX_INSTANCE_CROPS = 4;
 
 export type Snapshot = SnapshotInput & {
   /** 1-based, in capture order; kept by a Retake. */
@@ -43,78 +44,212 @@ export type Snapshot = SnapshotInput & {
   bytes: number;
 };
 
+/** A Snapshot as the list shows it, read when the list is. */
+export type ListedSnapshot = Snapshot & {
+  /** An Override one of its Instances showed has changed since: it isn't exported. */
+  outdated: boolean;
+  /** Taken on another route than this one: it can't be retaken from here. */
+  elsewhere: boolean;
+};
+
+/** A box in CSS pixels, from the viewport's top left corner. */
+export type Rect = { top: number; left: number; bottom: number; right: number };
+
+/** The viewport to draw: its size in CSS pixels, and the device pixel ratio. */
+export type Frame = { width: number; height: number; dpr: number };
+
+/** One drawing of the viewport. */
+export type Raster = {
+  /** Images on the page that didn't load, drawn as a placeholder. */
+  failed: number;
+  /** The drawing as an element: it covers the page while the Before view renders. */
+  still: HTMLElement;
+  /** The whole drawing, as a data URL. */
+  encode(): string;
+  /** The part of the drawing inside `rect`, as a data URL. */
+  cut(rect: Rect): string;
+};
+
+/** What draws the page. A capture reads the page itself only through this. */
+export type Rasterizer = {
+  /** Where a node is drawn; null when it draws nothing. */
+  measure(node: Element): Rect | null;
+  /** The viewport at the current scroll, without the Toolbar or what capturing adds to the page. */
+  rasterize(frame: Frame): Promise<Raster>;
+};
+
 type Store = { list: Snapshot[]; next: number; queue: Promise<unknown> };
 
 const GLOBAL_KEY = "__loupeSnapshots";
 
+type Host = typeof globalThis & { [GLOBAL_KEY]?: Store };
+
+/** What a page load starts with: no Snapshots, numbering from 1. */
+function emptyStore(): Store {
+  return { list: [], next: 1, queue: Promise.resolve() };
+}
+
+let current: Rasterizer = screenshotRasterizer;
+
+/**
+ * Draws the page with `next` from now on, starting over as a page load does: no
+ * Snapshots, numbering from 1. Tests draw fixed pixels this way; the page never
+ * calls it. A capture already queued still runs first, with the Rasterizer and
+ * into the list it was queued with: the page changes for one capture at a time,
+ * and the new list starts empty.
+ */
+export function setRasterizer(next: Rasterizer): void {
+  current = next;
+  const host = globalThis as Host;
+  host[GLOBAL_KEY] = { ...emptyStore(), queue: host[GLOBAL_KEY]?.queue ?? Promise.resolve() };
+}
+
 /** One list per page, kept on `globalThis` across a Fast Refresh; a reload clears it. */
 function store(): Store {
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Store };
-  host[GLOBAL_KEY] ??= { list: [], next: 1, queue: Promise.resolve() };
+  const host = globalThis as Host;
+  host[GLOBAL_KEY] ??= emptyStore();
   return host[GLOBAL_KEY];
 }
 
-export function snapshots(): readonly Snapshot[] {
-  return store().list;
+/** Every Snapshot this page load, oldest first, each as it reads now. */
+export function snapshots(): readonly ListedSnapshot[] {
+  return store().list.map((snapshot) => ({
+    ...snapshot,
+    outdated: isOutdated(snapshot),
+    elsewhere: takenElsewhere(snapshot),
+  }));
+}
+
+/** Takes a Snapshot of the screen in view. Captures run one at a time. */
+export function captureScreen(): Promise<Snapshot> {
+  return enqueue((session) => capture(session, {}));
+}
+
+/**
+ * Takes Snapshot `id` again, keeping its place and number. Refuses one taken on
+ * another page: it would be replaced with a picture of the wrong page.
+ */
+export function retakeSnapshot(id: number): Promise<Snapshot> {
+  return enqueue((session) => capture(session, { retake: id }));
 }
 
 export function removeSnapshot(id: number): void {
-  const state = store();
-  const kept = state.list.filter((snapshot) => snapshot.id !== id);
-  if (kept.length === state.list.length) return;
-  state.list = kept;
-  emitChange();
+  drop(store(), id);
+}
+
+/**
+ * The export's own Snapshot of the screen in view (PER-99 §3). It replaces the
+ * last export's Snapshot of this route. It is dropped when it repeats a manual
+ * one, so the Proposal doesn't show the same screen twice (PER-138). A failed
+ * capture is warned about and returned rather than thrown: the export goes on
+ * without it.
+ */
+export async function captureForExport(): Promise<{ failed: string | null }> {
+  try {
+    await enqueue(async (session) => {
+      const taken = await capture(session, { auto: true });
+      if (repeatsManual(session.state, taken)) drop(session.state, taken.id);
+      return taken;
+    });
+    return { failed: null };
+  } catch (error) {
+    console.warn("[loupe] The export's Snapshot failed; exporting without it.", error);
+    return { failed: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** The Snapshots an export carries, oldest first: every one that isn't Outdated. */
+export function exportableSnapshots(): SnapshotInput[] {
+  return kept(store()).map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
+}
+
+/**
+ * Roughly what the export's own Snapshot adds to the HTML report, in bytes: the
+ * newest kept Snapshot's size, or nothing when this route already has one, on the
+ * guess that the screen hasn't changed since and the export's own repeats that
+ * one or replaces the last. The export dialog warns past 25 MB (PER-139).
+ */
+export function exportCaptureBytes(): number {
+  const list = kept(store());
+  const route = currentRoute();
+  return list.some((snapshot) => snapshot.route === route) ? 0 : (list.at(-1)?.bytes ?? 0);
 }
 
 /** The Overrides that reach an Instance, sorted and as JSON, so two readings compare as strings. */
-export function overridesShown(identity: InstanceIdentity): string {
+function overridesShown(identity: InstanceIdentity): string {
   const { overrides } = registry().store.resolve({ ...identity, current: {} });
   const sorted = Object.fromEntries(Object.keys(overrides).sort().map((key) => [key, toJson(overrides[key])]));
   return JSON.stringify(sorted);
 }
 
 /** Whether an Override one of its Instances showed has changed since: then it isn't exported. */
-export function isOutdated(snapshot: Pick<Snapshot, "shown">): boolean {
+function isOutdated(snapshot: Snapshot): boolean {
   return snapshot.shown.some((entry) => overridesShown(entry.identity) !== entry.overrides);
 }
 
-/** The Snapshots an export carries, oldest first. */
-export function exportableSnapshots(): SnapshotInput[] {
-  return snapshots()
-    .filter((snapshot) => !isOutdated(snapshot))
-    .map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
+/** The Snapshots that aren't Outdated. */
+function kept(state: Store): Snapshot[] {
+  return state.list.filter((snapshot) => !isOutdated(snapshot));
 }
 
-/** What the kept Snapshots add to a report, in bytes. The export dialog warns past 25 MB (PER-139). */
-export function snapshotBytes(): number {
-  return snapshots()
-    .filter((snapshot) => !isOutdated(snapshot))
-    .reduce((sum, snapshot) => sum + snapshot.bytes, 0);
+function drop(state: Store, id: number): void {
+  const rest = state.list.filter((snapshot) => snapshot.id !== id);
+  if (rest.length === state.list.length) return;
+  state.list = rest;
+  emitChange();
 }
 
-export type CaptureOptions = {
-  /** Retake: replace this Snapshot, keeping its place and number. */
-  replace?: number;
-  /** Taken by an export: replaces the last export's Snapshot of the same route. */
-  auto?: boolean;
-};
+/** Retake works only on the page a Snapshot shows. */
+function takenElsewhere(snapshot: Snapshot): boolean {
+  return snapshot.route !== currentRoute();
+}
 
-/** Takes a Snapshot of the screen in view. Captures run one at a time. */
-export function captureScreen(options: CaptureOptions = {}): Promise<Snapshot> {
-  const state = store();
-  const run = state.queue.then(() => capture(options));
-  state.queue = run.catch(() => {});
+/**
+ * Whether an export's own Snapshot shows nothing a manual one of its route doesn't:
+ * the same screen, and every crop it adds, for the same change. A crop for a change
+ * since set differently, say per Instance rather than as a group, is new: the
+ * Proposal only places a crop with the change it was taken for.
+ */
+function repeatsManual(state: Store, taken: Snapshot): boolean {
+  return kept(state).some(
+    (other) =>
+      !other.auto &&
+      other.route === taken.route &&
+      samePair(other.viewport, taken.viewport) &&
+      taken.crops.every((crop) =>
+        other.crops.some((had) => had.change === crop.change && had.keyPath === crop.keyPath && samePair(had, crop)),
+      ),
+  );
+}
+
+function samePair(a: { before: string; after: string }, b: { before: string; after: string }): boolean {
+  return a.before === b.before && a.after === b.after;
+}
+
+/** What a capture works with: the list and the Rasterizer as they were when it was queued. */
+type Session = { state: Store; rasterizer: Rasterizer };
+
+/** Runs `job` once every capture before it has finished. */
+function enqueue(job: (session: Session) => Promise<Snapshot>): Promise<Snapshot> {
+  const session: Session = { state: store(), rasterizer: current };
+  const run = session.state.queue.then(() => job(session));
+  session.state.queue = run.catch(() => {});
   return run;
 }
 
-type Rect = { top: number; left: number; bottom: number; right: number };
+type CaptureOptions = {
+  /** Retake: replace this Snapshot, keeping its place and number. */
+  retake?: number;
+  /** The export's own: replaces the last export's Snapshot of the same route. */
+  auto?: boolean;
+};
 
 type Covered = { id: string; keyPath: string; after: Rect; before: Rect | null };
 
 /** A change on screen: one record, and the Instances it reaches that are in view. */
 type ChangeOnScreen = { key: string; covered: Covered[] };
 
-async function capture(options: CaptureOptions): Promise<Snapshot> {
+async function capture({ state, rasterizer }: Session, options: CaptureOptions): Promise<Snapshot> {
   if (typeof window === "undefined") throw new Error("[loupe] Capture screen runs in the browser.");
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -124,19 +259,22 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   const reg = registry();
   const debug = debugOf();
   const dpr = window.devicePixelRatio || 1;
+  const frame: Frame = { width, height, dpr };
   const route = currentRoute();
   const url = location.href;
-  const state = store();
-  const replaced = options.replace === undefined ? undefined : state.list.find((s) => s.id === options.replace);
-  if (replaced && replaced.route !== route) {
+  const replaced = options.retake === undefined ? undefined : state.list.find((s) => s.id === options.retake);
+  if (options.retake !== undefined && !replaced) {
+    throw new Error(`[loupe] There is no Snapshot ${options.retake} to retake.`);
+  }
+  if (replaced && takenElsewhere(replaced)) {
     throw new Error(`[loupe] Snapshot ${replaced.id} was taken on ${replaced.route}: open that page to retake it.`);
   }
 
   const mounted = [...reg.instances.values()];
   const boxes = new Map<string, Rect>();
   for (const instance of mounted) {
-    const box = boxOf(debug, instance.id);
-    if (box && onScreen(box, width, height)) boxes.set(instance.id, box);
+    const box = boxOf(rasterizer, debug, instance.id);
+    if (box && onScreen(box, frame)) boxes.set(instance.id, box);
   }
   const changes = changesOnScreen(reg.store.records(), mounted, boxes);
   const shown = mounted
@@ -151,16 +289,16 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   let after: Raster;
   let before: Raster;
   try {
-    after = await rasterize(width, height, dpr);
-    const unfreeze = freeze(after.canvas, width, height);
+    after = await rasterizer.rasterize(frame);
+    const unfreeze = freeze(after.still, frame);
     try {
       flushSync(() => setView("before"));
       await settle();
       // A change can move its Instance: crop the union of where it is in both views.
       for (const change of changes) {
-        for (const entry of change.covered) entry.before = boxOf(debug, entry.id);
+        for (const entry of change.covered) entry.before = boxOf(rasterizer, debug, entry.id);
       }
-      before = await rasterize(width, height, dpr);
+      before = await rasterizer.rasterize(frame);
     } finally {
       flushSync(() => setView("proposed"));
       await settle();
@@ -171,13 +309,13 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   }
 
   const viewport: ImagePair = {
-    before: encode(before.canvas),
-    after: encode(after.canvas),
+    before: before.encode(),
+    after: after.encode(),
     failedImages: Math.max(before.failed, after.failed),
   };
   const crops = changes.flatMap((change) =>
-    cropRects(change.covered, width, height).map((crop) => {
-      const pair = { before: cut(before.canvas, crop.rect, dpr), after: cut(after.canvas, crop.rect, dpr) };
+    cropRects(change.covered, frame).map((crop) => {
+      const pair = { before: before.cut(crop.rect), after: after.cut(crop.rect) };
       // Which crop holds a failed image isn't known: the viewport pair says it.
       return { change: change.key, keyPath: crop.keyPath, more: crop.more, ...pair, failedImages: 0 };
     }),
@@ -211,7 +349,7 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
  * Per record with a non-State prop, the Instances on screen in its Reach: the
  * change's crop covers them.
  */
-export function changesOnScreen(
+function changesOnScreen(
   records: readonly OverrideRecord[],
   mounted: readonly Pick<MountedInstance, "id" | "anchor" | "component" | "hint" | "keyPath" | "stateProps">[],
   boxes: ReadonlyMap<string, Rect>,
@@ -238,19 +376,19 @@ type Crop = { rect: Rect; keyPath: string | null; more: number };
  * that is taller than the viewport, one per Instance, top first, up to
  * MAX_INSTANCE_CROPS, the last saying how many more there were.
  */
-export function cropRects(covered: readonly Covered[], width: number, height: number): Crop[] {
+function cropRects(covered: readonly Covered[], frame: Frame): Crop[] {
   const boxes = covered.map((entry) => ({ entry, box: entry.before ? union([entry.after, entry.before]) : entry.after }));
   const whole = union(boxes.map(({ box }) => box));
-  if (whole.bottom - whole.top <= height) {
-    const rect = clamp(pad(whole), width, height);
+  if (whole.bottom - whole.top <= frame.height) {
+    const rect = clamp(pad(whole), frame);
     return rect ? [{ rect, keyPath: null, more: 0 }] : [];
   }
   const sorted = [...boxes].sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left);
-  const kept = sorted.slice(0, MAX_INSTANCE_CROPS);
-  const more = sorted.length - kept.length;
-  return kept.flatMap(({ entry, box }, index) => {
-    const rect = clamp(pad(box), width, height);
-    return rect ? [{ rect, keyPath: entry.keyPath || entry.id, more: index === kept.length - 1 ? more : 0 }] : [];
+  const first = sorted.slice(0, MAX_INSTANCE_CROPS);
+  const more = sorted.length - first.length;
+  return first.flatMap(({ entry, box }, index) => {
+    const rect = clamp(pad(box), frame);
+    return rect ? [{ rect, keyPath: entry.keyPath || entry.id, more: index === first.length - 1 ? more : 0 }] : [];
   });
 }
 
@@ -273,26 +411,23 @@ function pad(rect: Rect): Rect {
 }
 
 /** Kept to the viewport; null when nothing is left. */
-function clamp(rect: Rect, width: number, height: number): Rect | null {
-  const kept = {
+function clamp(rect: Rect, { width, height }: Frame): Rect | null {
+  const inside = {
     top: Math.max(0, Math.floor(rect.top)),
     left: Math.max(0, Math.floor(rect.left)),
     bottom: Math.min(height, Math.ceil(rect.bottom)),
     right: Math.min(width, Math.ceil(rect.right)),
   };
-  return kept.bottom > kept.top && kept.right > kept.left ? kept : null;
+  return inside.bottom > inside.top && inside.right > inside.left ? inside : null;
 }
 
-function onScreen(rect: Rect, width: number, height: number): boolean {
+function onScreen(rect: Rect, { width, height }: Frame): boolean {
   return rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width;
 }
 
 /** The box around every node an Instance renders; null when it draws nothing. */
-function boxOf(debug: LoupeDebug, id: string): Rect | null {
-  const rects = debug
-    .nodes(id)
-    .map((node) => node.getBoundingClientRect())
-    .filter((rect) => rect.width > 0 || rect.height > 0);
+function boxOf(rasterizer: Rasterizer, debug: LoupeDebug, id: string): Rect | null {
+  const rects = debug.nodes(id).flatMap((node) => rasterizer.measure(node) ?? []);
   return rects.length === 0 ? null : union(rects);
 }
 
@@ -300,58 +435,11 @@ function debugOf(): LoupeDebug {
   return (window as typeof window & { __loupe?: LoupeDebug }).__loupe ?? createDebug();
 }
 
-type Raster = { canvas: HTMLCanvasElement; failed: number };
-
-const PLACEHOLDER = `data:image/svg+xml,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40"><rect width="100%" height="100%" fill="#f1f3f3" stroke="#999" stroke-dasharray="4"/><text x="50%" y="55%" font-family="system-ui,sans-serif" font-size="11" fill="#555" text-anchor="middle">Image not captured</text></svg>',
-)}`;
-
-/** The viewport at the current scroll, without the Toolbar, at device pixel ratio. */
-async function rasterize(width: number, height: number, dpr: number): Promise<Raster> {
-  const { domToCanvas } = await import("modern-screenshot");
-  let failed = 0;
-  const root = document.documentElement;
-  const canvas = await domToCanvas(root, {
-    width,
-    height,
-    scale: dpr,
-    backgroundColor: pageBackground(),
-    // The window's scroll: the root grows by it and moves up and left by it, so
-    // the image starts where the viewport does. Fixed elements stay put.
-    style: {
-      width: `${width + window.scrollX}px`,
-      height: `${height + window.scrollY}px`,
-      marginTop: `${-window.scrollY}px`,
-      marginLeft: `${-window.scrollX}px`,
-      overflow: "hidden",
-    },
-    filter: (node) =>
-      !(node instanceof Element) ||
-      !(node.hasAttribute(HOST_ATTRIBUTE) || node.hasAttribute(CAPTURE_ATTRIBUTE) || node.localName === "nextjs-portal"),
-    fetch: {
-      placeholderImage: () => {
-        failed++;
-        return PLACEHOLDER;
-      },
-    },
-  });
-  return { canvas, failed };
-}
-
-/** What shows behind a transparent page: the body's background, else the root's, else white. */
-function pageBackground(): string {
-  for (const element of [document.body, document.documentElement]) {
-    const color = getComputedStyle(element).backgroundColor;
-    if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") return color;
-  }
-  return "#fff";
-}
-
 /**
  * Covers the page with a still of it, above everything but the Toolbar's panel,
- * while "before" renders underneath. Returns what takes it away.
+ * while the Before view renders underneath. Returns what takes it away.
  */
-function freeze(still: HTMLCanvasElement, width: number, height: number): () => void {
+function freeze(still: HTMLElement, { width, height }: Frame): () => void {
   const cover = document.createElement("div");
   cover.setAttribute(CAPTURE_ATTRIBUTE, "");
   cover.setAttribute("aria-hidden", "true");
@@ -393,31 +481,29 @@ function settle(): Promise<void> {
   });
 }
 
-function cut(source: HTMLCanvasElement, rect: Rect, dpr: number): string {
-  const canvas = document.createElement("canvas");
-  const x = Math.round(rect.left * dpr);
-  const y = Math.round(rect.top * dpr);
-  canvas.width = Math.max(1, Math.round((rect.right - rect.left) * dpr));
-  canvas.height = Math.max(1, Math.round((rect.bottom - rect.top) * dpr));
-  canvas.getContext("2d")?.drawImage(source, x, y, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-  return encode(canvas);
-}
-
-/** WebP at 0.9, or PNG where the browser can't encode WebP. */
-function encode(canvas: HTMLCanvasElement): string {
-  const webp = canvas.toDataURL("image/webp", 0.9);
-  return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/png");
-}
-
-/** Adds `capture`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
-export function exposeSnapshots(): void {
-  if (typeof window === "undefined") return;
+/** Adds `capture`, `retake`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
+function exposeSnapshots(): void {
   const debug = debugOf() as LoupeDebug & {
-    capture?: (options?: CaptureOptions) => Promise<Snapshot>;
-    snapshots?: () => (Snapshot & { outdated: boolean })[];
+    capture?: (options?: unknown) => Promise<Snapshot>;
+    retake?: (id: number) => Promise<Snapshot>;
+    snapshots?: () => readonly ListedSnapshot[];
     removeSnapshot?: (id: number) => void;
   };
-  debug.capture ??= captureScreen;
-  debug.snapshots ??= () => snapshots().map((snapshot) => ({ ...snapshot, outdated: isOutdated(snapshot) }));
+  // It once took `{ replace }` and `{ auto }`: a call that still passes them says so
+  // rather than quietly taking a new Snapshot.
+  debug.capture ??= (options?: unknown) =>
+    options === undefined
+      ? captureScreen()
+      : Promise.reject(
+          new Error(
+            "[loupe] __loupe.capture() takes no options. Retake a Snapshot with __loupe.retake(id); " +
+              "__loupe.proposal({ capture: true }) takes the export's own.",
+          ),
+        );
+  debug.retake ??= retakeSnapshot;
+  debug.snapshots ??= snapshots;
   debug.removeSnapshot ??= removeSnapshot;
 }
+
+// With the Toolbar, like `__loupe.proposal()`.
+if (typeof window !== "undefined") exposeSnapshots();

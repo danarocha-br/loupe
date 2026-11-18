@@ -23,21 +23,13 @@ vi.mock("./notices.js", () => ({
   NotGeneratedNotice: () => null,
 }));
 
-// What each rasterization "draws": the same label means the same pixels.
+// What each rasterization draws: the same text means the same pixels.
 let pixels = "screen";
-vi.mock("modern-screenshot", () => ({
-  domToCanvas: vi.fn(async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    canvas.dataset.raster = pixels;
-    return canvas;
-  }),
-}));
 
 const { default: Toolbar } = await import("./index.js");
 const { startTracking } = await import("./proposal.js");
-const { captureScreen, snapshots } = await import("./snapshots.js");
+const { captureScreen, setRasterizer, snapshots } = await import("./snapshots.js");
+const { fixedPixels } = await import("./snapshots.fixture.js");
 const { exportForm } = await import("./export.js");
 const { HOST_ATTRIBUTE } = await import("./styles.js");
 
@@ -111,30 +103,25 @@ async function openDialog(): Promise<void> {
   await until(() => dialog()?.querySelector(".counts") != null);
 }
 
-async function capture(options?: Parameters<typeof captureScreen>[0]) {
+async function capture() {
   await act(async () => {
-    await captureScreen(options);
+    await captureScreen();
   });
 }
 
 beforeEach(async () => {
   delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
-  delete (globalThis as { __loupeSnapshots?: unknown }).__loupeSnapshots;
   delete (globalThis as { __loupeExportForm?: unknown }).__loupeExportForm;
   pixels = "screen";
   downloads = [];
-  // jsdom lays nothing out: the member buttons are on screen, everything else is nowhere.
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-    const on = this.tagName === "BUTTON" && this.closest("main") !== null;
-    const [top, left, width, height] = on ? [100, 100, 80, 32] : [0, 0, 0, 0];
-    return { top, left, width, height, bottom: top + height, right: left + width, x: left, y: top, toJSON() {} } as DOMRect;
-  });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
-    () => ({ drawImage: () => {} }) as unknown as CanvasRenderingContext2D,
+  setRasterizer(
+    fixedPixels({
+      // jsdom lays nothing out: the member buttons are on screen, everything else is nowhere.
+      layout: (node) =>
+        node.tagName === "BUTTON" && node.closest("main") !== null ? { top: 100, left: 100, bottom: 132, right: 180 } : null,
+      draw: () => pixels,
+    }),
   );
-  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (this: HTMLCanvasElement, kind?: string) {
-    return `data:${kind ?? "image/png"};base64,${this.dataset.raster ?? "crop"}`;
-  });
   const blobs = new Map<string, Blob>();
   URL.createObjectURL = (blob: Blob) => {
     const url = `blob:test/${blobs.size}`;
@@ -279,8 +266,9 @@ describe("the export dialog", () => {
     expect(dialog()?.querySelector(".counts")?.textContent).toBe(
       "1 change · 0 without a screenshot · 0 held for review · 2 outdated Snapshots",
     );
-    // Two kept pairs of 7 MB images; the export's own Snapshot would replace or repeat one, so it adds nothing.
-    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toMatch(/about 28\.\d MB, over 25 MB/);
+    // Two kept Snapshots, each a viewport pair and a crop pair of 7 MB images; the
+    // export's own Snapshot would replace or repeat one, so it adds nothing.
+    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toMatch(/about 56\.\d MB, over 25 MB/);
     expect(button("Export", dialog() as HTMLDialogElement)?.disabled).toBe(false);
   });
 
