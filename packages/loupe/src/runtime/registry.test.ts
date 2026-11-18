@@ -1,49 +1,77 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+// The registry is the page's (PER-218). A Fast Refresh that evaluates this module
+// again finds it, and after a `resetLoupe()` nothing of the old one listens.
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { callSiteId, instanceId } from "../call-site.js";
-import { type MountedInstance, type Registry, registry } from "./registry.js";
+import { type MountedInstance, registry } from "./registry.js";
+import { resetLoupe } from "./slot.js";
 
-const GLOBAL_KEY = "__loupeRegistry";
 const ANCHOR = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Button", ordinal: 1 });
 const ID = instanceId(ANCHOR, "");
+const ON_THIS_PAGE = { scope: "page", route: "/", component: "Button" } as const;
 
-afterEach(() => {
-  delete (globalThis as { [GLOBAL_KEY]?: unknown })[GLOBAL_KEY];
+beforeEach(() => {
+  resetLoupe();
+  history.replaceState(null, "", "/");
 });
 
-/** A registry as a version before Override resolution kept it: status and view beside a store with no `render`. */
-function keepOldRegistry(status: Registry["store"]["status"], view: "proposed" | "before") {
+/** A mounted Instance as the registry holds one, with a spy for its rerenders. */
+function mount() {
   const notify = vi.fn();
   const instance = { id: ID, anchor: ANCHOR, component: "Button", hint: null, notify } as unknown as MountedInstance;
-  const old = {
-    store: { records: () => [], subscribe: () => () => {} },
-    instances: new Map([[ID, instance]]),
-    departed: new Map(),
-    listeners: new Set(),
-    instanceMeta: new Map(),
-    status,
-    view,
-  };
-  (globalThis as { [GLOBAL_KEY]?: unknown })[GLOBAL_KEY] = old;
-  return { old, notify };
+  registry().instances.set(ID, instance);
+  return notify;
 }
 
-describe("the registry across a Fast Refresh", () => {
-  it("moves an older registry's status and view into a new store, and keeps its Instances", () => {
-    const { old } = keepOldRegistry({ overrides: false, reason: "React reported no fiber." }, "before");
+const navigated = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("the registry", () => {
+  it("is the same one after a Fast Refresh evaluates its module again", async () => {
     const value = registry();
-    expect(value).toBe(old);
-    expect(value.instances.has(ID)).toBe(true);
-    expect(value.store.status).toEqual({ overrides: false, reason: "React reported no fiber." });
-    expect(value.store.view).toBe("before");
-    expect("status" in value).toBe(false);
-    expect("view" in value).toBe(false);
+    vi.resetModules();
+    const again = await import("./registry.js");
+    expect(again.registry()).toBe(value);
   });
 
-  it("rerenders a kept Instance when an Override in the new store reaches it", () => {
-    const { notify } = keepOldRegistry({ overrides: true }, "proposed");
+  it("is a new, empty one after resetLoupe(), as after a reload", () => {
     const value = registry();
-    value.store.set({ scope: "group", anchor: ANCHOR }, "variant", "destructive");
+    value.store.set({ scope: "instance", id: ID }, "variant", "destructive");
+    resetLoupe();
+    expect(registry()).not.toBe(value);
+    expect(registry().store.records()).toEqual([]);
+  });
+});
+
+describe("watching the route", () => {
+  it("rerenders the Instances a page Override reaches after a navigation", async () => {
+    const notify = mount();
+    registry().store.set(ON_THIS_PAGE, "variant", "destructive");
+    notify.mockClear();
+    history.pushState(null, "", "/billing");
+    await navigated();
     expect(notify).toHaveBeenCalledOnce();
+  });
+
+  it("reads the registry of the moment, so a reset leaves nothing listening on the old one", async () => {
+    const old = mount();
+    registry().store.set(ON_THIS_PAGE, "variant", "destructive");
+    resetLoupe();
+    const notify = mount();
+    registry().store.set(ON_THIS_PAGE, "variant", "destructive");
+    old.mockClear();
+    notify.mockClear();
+    history.pushState(null, "", "/billing");
+    await navigated();
+    expect(notify).toHaveBeenCalledOnce();
+    expect(old).not.toHaveBeenCalled();
+  });
+
+  it("does nothing while no page Override is set", async () => {
+    const notify = mount();
+    registry().store.set({ scope: "instance", id: ID }, "variant", "destructive");
+    notify.mockClear();
+    history.pushState(null, "", "/billing");
+    await navigated();
+    expect(notify).not.toHaveBeenCalled();
   });
 });

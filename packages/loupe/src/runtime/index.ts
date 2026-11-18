@@ -2,7 +2,7 @@
 // Adapter module imports. Development only: the loader that swaps Adapters in
 // never runs outside `next dev`, so nothing here reaches a production build.
 
-import { installDebug } from "./debug.js";
+import { debugOf } from "./debug.js";
 
 export { type AdapterOptions, createAdapter } from "./adapter.js";
 export type { Authorship } from "./authored.js";
@@ -23,4 +23,6 @@ export type {
   Suspension,
 } from "./store.js";
 
-installDebug();
+// `window.__loupe` from the first Adapter on, so the console reaches the page
+// before the Toolbar loads.
+if (typeof window !== "undefined") debugOf();

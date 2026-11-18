@@ -9,6 +9,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { devMount } from "../mount.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import { disableOverrides, onRegistryChange } from "../runtime/registry.js";
 import Toolbar from "./index.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
@@ -23,7 +24,7 @@ let root: Root;
 let loupe: LoupeDebug;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

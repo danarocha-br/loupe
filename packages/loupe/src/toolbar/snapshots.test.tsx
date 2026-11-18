@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId, instanceId } from "../call-site.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import { disableOverrides, registry } from "../runtime/registry.js";
 import type { FixedPixelsOptions } from "./snapshots.fixture.js";
 
@@ -84,7 +85,7 @@ function startOver(options: FixedPixelsOptions = {}) {
 }
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   startOver();
   rasterized.length = 0;
   container = document.createElement("div");

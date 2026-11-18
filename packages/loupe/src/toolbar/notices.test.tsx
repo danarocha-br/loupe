@@ -7,6 +7,7 @@ import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
@@ -45,7 +46,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   server.status = null;
   server.calls = 0;
   container = document.createElement("div");

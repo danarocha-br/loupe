@@ -29,6 +29,7 @@ import { type Authorship, splitAuthored } from "./authored.js";
 import { type Discovery, discover, type FoundInstance } from "./discovery.js";
 import { identityOf, type LastSeen, type MountedInstance, registry } from "./registry.js";
 import { type Inspection, inspect } from "./inspect.js";
+import { perPage } from "./slot.js";
 import { loadedMeta } from "./instance-meta.js";
 import { textScopeRefusal } from "./label-text.js";
 import { describeStates, type StateProp, stateScopeRefusal } from "./state.js";
@@ -367,8 +368,18 @@ export function createDebug(): LoupeDebug {
   };
 }
 
-export function installDebug(): void {
-  if (typeof window === "undefined") return;
+/**
+ * The page's `window.__loupe`: whatever is there, a test's stand-in included, or
+ * one made now and kept in the page's slot, which `resetLoupe()` takes away again.
+ * Browser only.
+ */
+export function debugOf(): LoupeDebug {
+  if (typeof window === "undefined") throw new Error("[loupe] __loupe exists in the browser only.");
   const host = window as typeof window & { __loupe?: LoupeDebug };
-  host.__loupe ??= createDebug();
+  host.__loupe ??= perPage("debug", createDebug, {
+    stop(debug) {
+      if (host.__loupe === debug) delete host.__loupe;
+    },
+  });
+  return host.__loupe;
 }

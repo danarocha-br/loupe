@@ -6,6 +6,7 @@ import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUT
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import { registry } from "../runtime/registry.js";
 import { memoryRequest, memorySource } from "./flags.fixture.js";
 import { setFlagSource } from "./flags-store.js";
@@ -83,7 +84,7 @@ const footerButton = (text: string) =>
   [...shadow().querySelectorAll<HTMLButtonElement>(".footer button")].find((button) => button.textContent === text);
 
 beforeEach(async () => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

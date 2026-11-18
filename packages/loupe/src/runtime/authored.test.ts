@@ -8,8 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { encodeCallSiteWrites, type CallSiteWrites } from "../writes.js";
 import { createAdapter } from "./adapter.js";
-import { createDebug, type LoupeDebug } from "./debug.js";
+import { debugOf, type LoupeDebug } from "./debug.js";
 import { stateScopeRefusal } from "./state.js";
+import { resetLoupe } from "./slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,11 +49,11 @@ let root: Root;
 let loupe: LoupeDebug;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
+  loupe = debugOf();
 });
 
 afterEach(() => {

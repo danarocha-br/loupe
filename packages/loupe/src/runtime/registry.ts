@@ -1,6 +1,6 @@
 // The Instance registry: every mounted adapted Instance, and the Override store,
-// which holds the self-check result and the view. One per page, kept on
-// `globalThis` so that a Fast Refresh that re-evaluates this module finds the same
+// which holds the self-check result and the view. One per page, in the page's slot
+// (`slot.ts`), so a Fast Refresh that evaluates this module again finds the same
 // Instances and Overrides.
 
 import type { Fiber } from "./fiber.js";
@@ -10,13 +10,13 @@ import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
 import type { Split } from "./authored.js";
+import { perPage } from "./slot.js";
 import {
   createOverrideStore,
   type InstanceIdentity,
   type OverrideStore,
   type Props,
   inScope,
-  type Status,
   type View,
 } from "./store.js";
 
@@ -74,59 +74,32 @@ export type Registry = {
   instanceMeta: Map<string, Readonly<Record<string, PropMeta>>>;
 };
 
-const GLOBAL_KEY = "__loupeRegistry";
-
+/** The page's registry, made on first use. */
 export function registry(): Registry {
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry };
-  let value = host[GLOBAL_KEY];
-  // One made by an earlier version of this module, kept across a Fast Refresh.
-  if (value && typeof value.store.render !== "function") {
-    // Its store predates Override resolution: the status and view it kept move into a
-    // new store. Its records can't (their pins and suspensions would be lost), so they go.
-    const old = value as Registry & { status?: Status; view?: View };
-    value.store = createOverrideStore(old.status ? { status: old.status } : {});
-    if (old.view) value.store.setView(old.view);
-    delete old.status;
-    delete old.view;
-    connect(value);
-  }
-  if (value && !value.listeners) value.listeners = new Set();
-  if (value && !value.departed) value.departed = new Map();
-  if (value && !value.instanceMeta) value.instanceMeta = new Map();
-  if (!value) {
-    const problem = internalsProblem();
-    value = {
-      store: createOverrideStore(problem === null ? {} : { status: { overrides: false, reason: problem } }),
-      instances: new Map(),
-      departed: new Map(),
-      listeners: new Set(),
-      instanceMeta: new Map(),
-    };
-    const created = value;
-    connect(created);
-    watchRoute(() => {
-      // A page Override is per route: Instances that outlive a navigation (a layout's)
-      // stop or start matching one.
-      if (!created.store.records().some((record) => record.target.scope === "page")) return;
-      for (const instance of created.instances.values()) instance.notify();
-    });
-    if (problem !== null) warnInspectOnly(problem);
-    host[GLOBAL_KEY] = value;
-  }
-  return value;
+  return perPage("registry", createRegistry);
 }
 
-/** Rerenders the Instances a store change can touch, and forgets departed ones no record names. */
-function connect(value: Registry): void {
-  const { store } = value;
-  store.subscribe((target) => {
+function createRegistry(): Registry {
+  const problem = internalsProblem();
+  const value: Registry = {
+    store: createOverrideStore(problem === null ? {} : { status: { overrides: false, reason: problem } }),
+    instances: new Map(),
+    departed: new Map(),
+    listeners: new Set(),
+    instanceMeta: new Map(),
+  };
+  // Rerenders the Instances a store change can touch, and forgets departed ones no record names.
+  value.store.subscribe((target) => {
     for (const instance of value.instances.values()) {
       if (inScope(target, identityOf(instance))) instance.notify();
     }
-    const named = recordedIds(store);
+    const named = recordedIds(value.store);
     for (const id of value.departed.keys()) if (!named.has(id)) value.departed.delete(id);
     emitChange();
   });
+  watchRoute();
+  if (problem !== null) warnInspectOnly(problem);
+  return value;
 }
 
 /**
@@ -142,9 +115,7 @@ export function onRegistryChange(listener: () => void): () => void {
 }
 
 export function emitChange(): void {
-  // Read off the global, not `registry()`, so a change while it is being created is a no-op.
-  const value = (globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry })[GLOBAL_KEY];
-  for (const listener of value?.listeners ?? []) listener();
+  for (const listener of registry().listeners) listener();
 }
 
 /** The page's route, as a page-scope Override keys it: the pathname. */
@@ -166,22 +137,33 @@ export function identityOf(
 }
 
 const WRAPPED = Symbol.for("loupe.historyWrapped");
+const WATCHED = Symbol.for("loupe.routeWatched");
 const HISTORY_EVENT = "loupe:history";
 
 /**
- * Calls `onChange` after the pathname changes. Next's client navigations go through
- * `history.pushState`/`replaceState`, which fire no event, so both are wrapped once
- * per page to fire one. Next calls them from an insertion effect, where React
- * forbids scheduling updates, so the check waits for a microtask.
+ * Rerenders the Instances on the page after the pathname changes, while a page
+ * Override is set: Instances that outlive a navigation (a layout's) stop or start
+ * matching one. Next's client navigations go through `history.pushState` and
+ * `replaceState`, which fire no event, so both are wrapped to fire one. Next calls
+ * them from an insertion effect, where React forbids scheduling updates, so the
+ * check waits for a microtask.
+ *
+ * Once per page, like the wrap: the check reads the registry of the moment, so a
+ * `resetLoupe()` leaves no listener behind on an old one.
  */
-function watchRoute(onChange: () => void): void {
+function watchRoute(): void {
   if (typeof window === "undefined" || typeof history === "undefined") return;
+  const host = window as typeof window & { [WATCHED]?: true };
+  if (host[WATCHED]) return;
+  host[WATCHED] = true;
   let last = currentRoute();
   const check = () => {
     const route = currentRoute();
     if (route === last) return;
     last = route;
-    onChange();
+    const value = registry();
+    if (!value.store.records().some((record) => record.target.scope === "page")) return;
+    for (const instance of value.instances.values()) instance.notify();
   };
   for (const method of ["pushState", "replaceState"] as const) {
     const original = history[method] as History["pushState"] & { [WRAPPED]?: true };

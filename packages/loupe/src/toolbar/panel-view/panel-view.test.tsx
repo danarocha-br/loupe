@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { instanceId } from "../../call-site.js";
 import type { LayerStatus } from "../../layer-status.js";
 import { createDebug, type LoupeDebug } from "../../runtime/debug.js";
+import { resetLoupe } from "../../runtime/slot.js";
 import { disableOverrides } from "../../runtime/registry.js";
 import type { Scope } from "../../runtime/store.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, GROUP, MENU, members, Page, site } from "../members.fixture.js";
@@ -23,7 +24,7 @@ let loupe: LoupeDebug;
 let seen: SeenComponents;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   history.replaceState(null, "", "/");
   container = document.createElement("div");
   document.body.append(container);

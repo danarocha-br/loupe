@@ -8,6 +8,7 @@ import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
@@ -33,7 +34,7 @@ let root: Root;
 const doc = document as unknown as Record<string, unknown>;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   readInstanceMeta.mockReset();
   readInstanceMeta.mockResolvedValue([
     {

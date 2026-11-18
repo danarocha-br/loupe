@@ -8,9 +8,10 @@ import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUT
 import type { LayerStatus } from "../layer-status.js";
 import { type InspectorBody, type ListBody, panelView } from "../toolbar/panel-view/index.js";
 import { createAdapter } from "./adapter.js";
-import { createDebug, type LoupeDebug, UNADAPTED_REASON } from "./debug.js";
+import { debugOf, type LoupeDebug, UNADAPTED_REASON } from "./debug.js";
 import { loadedMeta, metaRequestOf, rememberMeta } from "./instance-meta.js";
 import { onRegistryChange } from "./registry.js";
+import { resetLoupe } from "./slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,14 +49,14 @@ let loupe: LoupeDebug;
 const doc = document as unknown as Record<string, unknown>;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   // Next hydrates the document; `rootFibers` looks for a container there.
   const key = Object.keys(container).find((name) => name.startsWith("__reactContainer$")) as string;
   doc.__reactContainer$test = (container as unknown as Record<string, unknown>)[key];
-  loupe = createDebug();
+  loupe = debugOf();
 });
 
 afterEach(() => {
