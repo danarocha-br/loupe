@@ -1,97 +1,29 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
-import { run } from "../cli.js";
-import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
+import { describe, expect, it } from "vitest";
+import {
+  biome,
+  cli,
+  committedRepo,
+  editLedger,
+  type Files,
+  git,
+  installable,
+  installedRepo,
+  link,
+  makeRepo,
+  snapshot,
+} from "../compat/repo.fixture.js";
 import { version } from "../version.js";
 import type { BuildRunner } from "./build.js";
 import { runDoctor } from "./command.js";
 
-const LEDGER = "packages/loupe/loupe.ledger.json";
-const temps: string[] = [];
-afterAll(() => {
-  for (const dir of temps) rmSync(dir, { recursive: true, force: true });
-});
-
-const layout = `import type { ReactNode } from "react";
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        {children}
-      </body>
-    </html>
-  );
-}
-`;
-
-const repoFiles: Files = {
-  ...supportedRepo,
-  ".gitignore": "node_modules\n.next\n",
-  "apps/web/package.json": {
-    name: "web",
-    scripts: { dev: "next dev -p 3000" },
-    dependencies: { "@repo/design-system": "workspace:*", next: "16.3.6", react: "19.2.4" },
-  },
-  "apps/web/tsconfig.json": { compilerOptions: { jsx: "preserve", strict: true } },
-  "apps/web/next.config.ts": 'import type { NextConfig } from "next";\n\nconst nextConfig: NextConfig = {};\n\nexport default nextConfig;\n',
-  "apps/web/app/layout.tsx": layout,
-  "packages/design-system/tsconfig.json": { compilerOptions: { jsx: "preserve", strict: true } },
-  "packages/design-system/components/ui/button.tsx":
-    'export function Button(props: { variant?: "default" | "ghost" }) {\n  return <button data-variant={props.variant} />;\n}\n',
-  "biome.jsonc": '{\n  "files": {\n    "includes": ["**/*"]\n  }\n}\n',
-  "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
-};
-
-type Output = { code: number; text: string; questions: string[] };
-
-async function cli(root: string, argv: string[]): Promise<Output> {
-  const out: string[] = [];
-  const questions: string[] = [];
-  const code = await run(argv, {
-    out: (line) => out.push(line),
-    err: (line) => out.push(line),
-    ask: async (q) => {
-      questions.push(q);
-      return "";
-    },
-    cwd: root,
-    nodeVersion: "22.22.2",
-  });
-  return { code, text: out.join("\n"), questions };
-}
-
 const doctor = (root: string, ...argv: string[]) => cli(root, ["doctor", ...argv]);
-
-/** What `pnpm install` would link after `init`. */
-function link(root: string, loupeVersion = version): void {
-  const pkg = (dir: string, json: object) => {
-    mkdirSync(path.join(root, dir), { recursive: true });
-    writeFileSync(path.join(root, dir, "package.json"), JSON.stringify(json));
-  };
-  pkg("apps/web/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: loupeVersion });
-  pkg("apps/web/node_modules/@repo/loupe", { name: "@repo/loupe" });
-  pkg("packages/loupe/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: loupeVersion });
-  for (const name of ["@repo/design-system", "next", "react"]) {
-    pkg(`packages/loupe/node_modules/${name}`, { name });
-  }
-}
 
 /** A committed repo with Loupe installed and linked. */
 async function installed(files: Files = {}): Promise<string> {
-  const root = makeRepo({ ...repoFiles, ...files });
-  temps.push(root);
-  git(root, "init", "-q", "-b", "main");
-  git(root, "add", "-A");
-  git(root, "commit", "-q", "-m", "start");
-  const { code, text } = await cli(root, ["init"]);
-  expect(text).toContain("Recorded in");
-  expect(code).toBe(0);
-  link(root);
-  git(root, "add", "-A");
-  git(root, "commit", "-q", "-m", "install");
+  const { root } = await installedRepo({ files, link: true });
   return root;
 }
 
@@ -136,11 +68,7 @@ describe("loupe doctor on a healthy install", () => {
 
   it("lists a manual touch point as such", async () => {
     const fnConfig = 'import type { NextConfig } from "next";\n\nexport default (phase: string): NextConfig => ({});\n';
-    const root = makeRepo({ ...repoFiles, "apps/web/next.config.ts": fnConfig });
-    temps.push(root);
-    git(root, "init", "-q", "-b", "main");
-    git(root, "add", "-A");
-    git(root, "commit", "-q", "-m", "start");
+    const root = committedRepo({ "apps/web/next.config.ts": fnConfig });
     expect((await cli(root, ["init"])).code).toBe(2);
 
     const pending = await doctor(root);
@@ -172,13 +100,7 @@ describe("loupe doctor reporting drift", () => {
   });
 
   it("reads a package.json hash Loupe 0.0.4 recorded, with the version in it, as intact", async () => {
-    const root = await installed();
-    edit(root, LEDGER, (t) => {
-      const ledger = JSON.parse(t);
-      const old = createHash("sha256").update(JSON.stringify([["@danarocha/loupe", version], ["@repo/loupe", "workspace:*"]])).digest("hex");
-      for (const entry of ledger.touchPoints) if (entry.id === "package-json") entry.sha256 = old;
-      return `${JSON.stringify(ledger, null, 2)}\n`;
-    });
+    const { root } = await installedRepo({ oldHash: true, link: true });
     const { code, text } = await doctor(root);
     expect(text).toMatch(/✓ package-json /);
     expect(code).toBe(0);
@@ -187,10 +109,8 @@ describe("loupe doctor reporting drift", () => {
   it("reports an automatic touch point recorded without a hash as drift, not as a manual step", async () => {
     // init records `auto` with no hash when a touch point can't find the edit it just made.
     const root = await installed();
-    edit(root, "packages/loupe/loupe.ledger.json", (t) => {
-      const ledger = JSON.parse(t);
+    editLedger(root, (ledger) => {
       for (const entry of ledger.touchPoints) if (entry.id === "root-layout") entry.sha256 = null;
-      return `${JSON.stringify(ledger, null, 2)}\n`;
     });
     const { code, text } = await doctor(root);
     expect(text).toMatch(/✗ root-layout +apps\/web\/app\/layout\.tsx: drift, changed by hand since loupe init recorded it/);
@@ -200,7 +120,7 @@ describe("loupe doctor reporting drift", () => {
 
   it("reports a touch point whose Loupe edit is gone", async () => {
     const root = await installed();
-    edit(root, "biome.jsonc", () => repoFiles["biome.jsonc"] as string);
+    edit(root, "biome.jsonc", () => biome);
     const { code, text } = await doctor(root);
     expect(text).toMatch(/✗ biome-config +biome\.jsonc: Loupe's edit is missing/);
     expect(code).toBe(1);
@@ -273,8 +193,7 @@ describe("loupe doctor reporting drift", () => {
 
 describe("loupe doctor on a broken install", () => {
   it("says Loupe isn't installed when there is no ledger", async () => {
-    const root = makeRepo(repoFiles);
-    temps.push(root);
+    const root = makeRepo({}, installable);
     const { code, text } = await doctor(root);
     expect(text).toContain("Loupe isn't installed here");
     expect(code).toBe(1);
@@ -282,7 +201,7 @@ describe("loupe doctor on a broken install", () => {
 
   it("reports versions that differ", async () => {
     const root = await installed();
-    link(root, "9.9.9");
+    link(root, { app: "9.9.9", layer: "9.9.9" });
     const { code, text } = await doctor(root);
     expect(text).toContain("✗ Loupe versions differ");
     expect(text).toContain("apps/web/node_modules: 9.9.9");
@@ -291,7 +210,9 @@ describe("loupe doctor on a broken install", () => {
 
   it("points to loupe init when only the ledger is behind, as an unfinished upgrade leaves it", async () => {
     const root = await installed();
-    edit(root, LEDGER, (t) => t.replace(`"version": "${version}"`, '"version": "0.0.1"'));
+    editLedger(root, (ledger) => {
+      ledger.loupe = { package: "@danarocha/loupe", version: "0.0.1" };
+    });
     const { code, text } = await doctor(root);
     expect(text).toContain("✗ Loupe versions differ");
     expect(text).toContain("the ledger: 0.0.1");
@@ -302,7 +223,9 @@ describe("loupe doctor on a broken install", () => {
 
   it("reports a ledger format it can't read", async () => {
     const root = await installed();
-    edit(root, LEDGER, (t) => t.replace('"formatVersion": 1', '"formatVersion": 2'));
+    editLedger(root, (ledger) => {
+      ledger.formatVersion = 2;
+    });
     const { code, text } = await doctor(root);
     expect(text).toContain("formatVersion 2, this Loupe reads 1");
     expect(code).toBe(1);

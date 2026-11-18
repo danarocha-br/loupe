@@ -1,149 +1,42 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
-import { run } from "../cli.js";
-import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
-import { runDoctor } from "../doctor/command.js";
-import { EXIT_MANUAL, parseInitArgs, runInit } from "./command.js";
-import { type Ledger as LedgerFile, serialiseLedger } from "./ledger.js";
+import { describe, expect, it } from "vitest";
+import {
+  biome,
+  bump,
+  cli,
+  commit,
+  committedRepo,
+  git,
+  installable,
+  installedRepo,
+  LEDGER,
+  type LedgerJson,
+  link,
+  makeRepo,
+  nextConfig,
+  snapshot,
+} from "../compat/repo.fixture.js";
+import { EXIT_MANUAL } from "./command.js";
 import { sha256 } from "./syntax.js";
 
-const LEDGER = "packages/loupe/loupe.ledger.json";
-const temps: string[] = [];
-afterAll(() => {
-  for (const dir of temps) rmSync(dir, { recursive: true, force: true });
-});
-
-const layout = `import type { ReactNode } from "react";
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        {children}
-      </body>
-    </html>
-  );
-}
-`;
-
-const nextConfig = `import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {};
-
-export default nextConfig;
-`;
-
-const biome = `{
-  "files": {
-    "includes": [
-      "**/*",
-      // Generated.
-      "!dist"
-    ]
-  }
-}
-`;
-
-const repoFiles: Files = {
-  ...supportedRepo,
-  "apps/web/package.json": {
-    name: "web",
-    scripts: { dev: "next dev -p 3000" },
-    dependencies: { "@repo/design-system": "workspace:*", next: "16.3.6", react: "19.2.4" },
-    devDependencies: { typescript: "^5.9.3" },
-  },
-  "apps/web/tsconfig.json": { compilerOptions: { jsx: "preserve", strict: true } },
-  "apps/web/next.config.ts": nextConfig,
-  "apps/web/app/layout.tsx": layout,
-  "packages/design-system/tsconfig.json": { compilerOptions: { jsx: "preserve", strict: true } },
-  "biome.jsonc": biome,
-  "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
-};
-
-/** A committed repo, so the touch points start clean. */
-function gitRepo(files: Files = {}): string {
-  const root = makeRepo({ ...repoFiles, ...files });
-  temps.push(root);
-  git(root, "init", "-q", "-b", "main");
-  git(root, "add", "-A");
-  git(root, "commit", "-q", "-m", "start");
-  return root;
-}
-
-function commit(root: string): void {
-  git(root, "add", "-A");
-  git(root, "commit", "-q", "-m", "step");
-}
-
-async function init(root: string, ...argv: string[]) {
-  return initAnswering(root, [], ...argv);
-}
-
-async function initAnswering(root: string, answers: string[], ...argv: string[]) {
-  const out: string[] = [];
-  const code = await run(["init", ...argv], {
-    out: (line) => out.push(line),
-    err: (line) => out.push(line),
-    ask: async () => answers.shift() ?? "",
-    cwd: root,
-    nodeVersion: "22.22.2",
-  });
-  return { code, text: out.join("\n") };
-}
+const init = (root: string, ...argv: string[]) => cli(root, ["init", ...argv]);
 
 /** `loupe init` as the given installed Loupe version would run it. */
-async function initAt(root: string, version: string, ...argv: string[]) {
-  const options = parseInitArgs(argv);
-  if (typeof options === "string") throw new Error(options);
-  const out: string[] = [];
-  const code = await runInit(options, {
-    out: (line) => out.push(line),
-    err: (line) => out.push(line),
-    ask: async () => "",
-    cwd: root,
-    nodeVersion: "22.22.2",
-    version,
-  });
-  return { code, text: out.join("\n") };
-}
+const initAt = (root: string, version: string, ...argv: string[]) => cli(root, ["init", ...argv], { version });
 
 /** `loupe doctor` as the given installed Loupe version would run it. */
-async function doctorAt(root: string, version: string) {
-  const out: string[] = [];
-  const code = await runDoctor(
-    { build: false },
-    { out: (line) => out.push(line), err: (line) => out.push(line), cwd: root, nodeVersion: "22.22.2", version },
-  );
-  return { code, text: out.join("\n") };
-}
-
-/** What `pnpm install` leaves behind: the app's copy of Loupe, and the Product layer's own. */
-function installCopies(root: string, copies: { app: string; layer: string }): void {
-  const pkg = (dir: string, json: object) => {
-    mkdirSync(path.join(root, dir), { recursive: true });
-    writeFileSync(path.join(root, dir, "package.json"), JSON.stringify(json));
-  };
-  pkg("apps/web/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: copies.app });
-  pkg("apps/web/node_modules/@repo/loupe", { name: "@repo/loupe" });
-  pkg("packages/loupe/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: copies.layer });
-  for (const name of ["@repo/design-system", "next", "react"]) pkg(`packages/loupe/node_modules/${name}`, { name });
-}
+const doctorAt = (root: string, version: string) => cli(root, ["doctor"], { version });
 
 const read = (root: string, file: string) => readFileSync(path.join(root, file), "utf8");
-type Ledger = {
-  touchPoints: { id: string; file: string; mode: string; sha256: string | null }[];
-  files: { path: string; sha256: string }[];
-  productLayer: unknown;
-  loupe?: { package: string; version: string };
-};
-const ledger = (root: string) => JSON.parse(read(root, LEDGER)) as Ledger;
+const ledger = (root: string) => JSON.parse(read(root, LEDGER)) as LedgerJson;
 
 describe("loupe init on a clean repo", () => {
   it("makes the four edits, records each in a sorted ledger and leaves the lockfile alone", async () => {
-    const root = gitRepo();
+    const root = committedRepo();
     const { code, text } = await init(root);
     expect(text).toContain("Result: works here.");
+    expect(text).toContain(`Recorded in ${LEDGER}.`);
     expect(code).toBe(0);
 
     expect(JSON.parse(read(root, "apps/web/package.json")).devDependencies).toEqual({
@@ -186,7 +79,7 @@ describe("loupe init on a clean repo", () => {
   });
 
   it("reapplies a touch point that went missing and leaves a changed one alone", async () => {
-    const root = gitRepo();
+    const root = committedRepo();
     await init(root);
     writeFileSync(path.join(root, "biome.jsonc"), biome);
     const layoutFile = path.join(root, "apps/web/app/layout.tsx");
@@ -204,7 +97,7 @@ describe("loupe init on a clean repo", () => {
 
 describe("the dirty-tree rule", () => {
   it("refuses an uncommitted touch point and writes nothing; --allow-dirty proceeds", async () => {
-    const root = gitRepo();
+    const root = committedRepo();
     writeFileSync(path.join(root, "apps/web/next.config.ts"), `${nextConfig}// wip\n`);
     const before = snapshot(root);
     const refused = await init(root);
@@ -220,14 +113,13 @@ describe("the dirty-tree rule", () => {
   });
 
   it("only warns about other files, and refuses outside git even with --allow-dirty", async () => {
-    const root = gitRepo();
+    const root = committedRepo();
     writeFileSync(path.join(root, "notes.md"), "x\n");
     const { code, text } = await init(root);
     expect(code).toBe(0);
     expect(text).toContain("1 other file(s) have uncommitted changes");
 
-    const bare = makeRepo(repoFiles);
-    temps.push(bare);
+    const bare = makeRepo({}, installable);
     const before = snapshot(bare);
     const outside = await init(bare, "--allow-dirty");
     expect(outside.code).toBe(1);
@@ -239,7 +131,7 @@ describe("the dirty-tree rule", () => {
 describe("a touch point with an unexpected shape", () => {
   it("is recorded manual with the snippet printed, then adopted with --adopt", async () => {
     const fnConfig = 'import type { NextConfig } from "next";\n\nexport default (phase: string): NextConfig => ({});\n';
-    const root = gitRepo({ "apps/web/next.config.ts": fnConfig });
+    const root = committedRepo({ "apps/web/next.config.ts": fnConfig });
     const first = await init(root);
     expect(first.code).toBe(EXIT_MANUAL);
     expect(first.text).toContain("manual step needed: apps/web/next.config.ts exports a function");
@@ -285,7 +177,7 @@ describe("a touch point with an unexpected shape", () => {
 
 describe("the ledger", () => {
   it("refuses a ledger from a newer format", async () => {
-    const root = gitRepo({ [LEDGER]: { formatVersion: 2 } });
+    const root = committedRepo({ [LEDGER]: { formatVersion: 2 } });
     const before = snapshot(root);
     const newer = await init(root);
     expect(newer.code).toBe(1);
@@ -294,8 +186,8 @@ describe("the ledger", () => {
   });
 
   it("keeps a yes the check records during the same run", async () => {
-    const root = gitRepo({ "apps/web/.babelrc": "{}\n" });
-    const { code, text } = await initAnswering(root, ["yes"]);
+    const root = committedRepo({ "apps/web/.babelrc": "{}\n" });
+    const { code, text } = await cli(root, ["init"], { answers: ["yes"] });
     expect(text).toContain("Recorded your yes");
     expect(code).toBe(0);
     const l = JSON.parse(read(root, LEDGER));
@@ -305,7 +197,7 @@ describe("the ledger", () => {
 
   it("keeps the compatibility check's field", async () => {
     const accepted = [{ app: "apps/web", item: "bundler", seen: ".babelrc", acceptedAt: "2026-11-11T00:00:00.000Z" }];
-    const root = gitRepo({ [LEDGER]: { formatVersion: 1, untestedAccepted: accepted } });
+    const root = committedRepo({ [LEDGER]: { formatVersion: 1, untestedAccepted: accepted } });
     await init(root);
     expect(JSON.parse(read(root, LEDGER)).untestedAccepted).toEqual(accepted);
   });
@@ -318,24 +210,7 @@ describe("upgrading by rerunning loupe init", () => {
   const peer = (root: string) => JSON.parse(read(root, "packages/loupe/package.json")).peerDependencies["@danarocha/loupe"];
 
   /** An install as Loupe 0.0.4 left it, committed: its package-json hash carries the version. */
-  async function installedAt004(): Promise<string> {
-    const root = gitRepo();
-    expect((await initAt(root, "0.0.4")).code).toBe(0);
-    const l = JSON.parse(read(root, LEDGER)) as LedgerFile;
-    for (const t of l.touchPoints ?? []) {
-      if (t.id === "package-json") t.sha256 = sha256(JSON.stringify([["@danarocha/loupe", "0.0.4"], ["@repo/loupe", "workspace:*"]]));
-    }
-    writeFileSync(path.join(root, LEDGER), serialiseLedger(l));
-    commit(root);
-    return root;
-  }
-
-  /** The person's half: the version bump in the app's package.json (pnpm install updates the lockfile too). */
-  function bump(root: string, version: string): void {
-    const json = JSON.parse(read(root, PKG));
-    json.devDependencies["@danarocha/loupe"] = version;
-    writeFileSync(path.join(root, PKG), `${JSON.stringify(json, null, 2)}\n`);
-  }
+  const installedAt004 = async () => (await installedRepo({ at: "0.0.4", oldHash: true })).root;
 
   it("moves an install to the newer version and re-records the old-format hash", async () => {
     const root = await installedAt004();
@@ -474,7 +349,7 @@ describe("upgrading by rerunning loupe init", () => {
 
   it("makes doctor fail while the layer resolves an older Loupe than its peer, until pnpm install", async () => {
     const root = await installedAt004();
-    installCopies(root, { app: "0.0.4", layer: "0.0.4" });
+    link(root, { app: "0.0.4", layer: "0.0.4" });
     expect((await doctorAt(root, "0.0.4")).code).toBe(0);
 
     bump(root, "0.0.5");
@@ -482,14 +357,14 @@ describe("upgrading by rerunning loupe init", () => {
     expect((await initAt(root, "0.0.5")).code).toBe(0);
 
     // The person's first install moved the app's copy; the layer's own stays until the second one.
-    installCopies(root, { app: "0.0.5", layer: "0.0.4" });
+    link(root, { app: "0.0.5", layer: "0.0.4" });
     const stale = await doctorAt(root, "0.0.5");
     expect(stale.code).toBe(1);
     expect(stale.text).toContain("✗ packages/loupe pins Loupe 0.0.5 in peerDependencies, and resolves 0.0.4");
     expect(stale.text).toContain("Run pnpm install, then commit pnpm-lock.yaml.");
     expect(stale.text).toContain("Result: 1 problem.");
 
-    installCopies(root, { app: "0.0.5", layer: "0.0.5" });
+    link(root, { app: "0.0.5", layer: "0.0.5" });
     const fixed = await doctorAt(root, "0.0.5");
     expect(fixed.text).toContain("✓ packages/loupe resolves Loupe 0.0.5, the version its peerDependencies pin");
     expect(fixed.text).toContain("Result: healthy.");

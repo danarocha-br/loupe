@@ -1,20 +1,26 @@
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
-import { run } from "../cli.js";
-import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
+import { describe, expect, it } from "vitest";
+import {
+  cli as loupe,
+  commit,
+  editLedger,
+  type Files,
+  git,
+  installable,
+  type InstallOptions,
+  installedRepo,
+  LEDGER,
+  makeRepo,
+  nextConfig,
+  snapshot,
+} from "../compat/repo.fixture.js";
 import { touchPoints } from "../init/touch-points.js";
-import { version } from "../version.js";
 import { undo } from "./undo.js";
 
-const LEDGER = "packages/loupe/loupe.ledger.json";
 const LAYOUT = "apps/web/app/layout.tsx";
-const temps: string[] = [];
-afterAll(() => {
-  for (const dir of temps) rmSync(dir, { recursive: true, force: true });
-});
 
+// The app already mounts an Agentation of its own in the layout, where Loupe's mount goes next to it.
 const layout = `import type { ReactNode } from "react";
 import { Agentation } from "agentation";
 
@@ -31,72 +37,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   );
 }
 `;
+const agentation: Files = { [LAYOUT]: layout };
 
-const nextConfig = `import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {};
-
-export default nextConfig;
-`;
-
-const biome = `{
-  "files": {
-    "includes": [
-      "**/*",
-      // Generated.
-      "!dist"
-    ]
-  }
-}
-`;
-
-const repoFiles: Files = {
-  ...supportedRepo,
-  "apps/web/package.json": {
-    name: "web",
-    scripts: { dev: "next dev -p 3000" },
-    dependencies: { "@repo/design-system": "workspace:*", next: "16.3.6", react: "19.2.4" },
-    devDependencies: { typescript: "^5.9.3" },
-  },
-  "apps/web/tsconfig.json": { compilerOptions: { jsx: "preserve", strict: true } },
-  "apps/web/next.config.ts": nextConfig,
-  [LAYOUT]: layout,
-  "packages/design-system/tsconfig.json": { compilerOptions: { jsx: "preserve", strict: true } },
-  "packages/design-system/components/ui/button.tsx":
-    'export type ButtonProps = { variant?: "default" | "ghost" };\nexport function Button(_props: ButtonProps) {\n  return null;\n}\n',
-  "biome.jsonc": biome,
-  ".gitignore": "node_modules/\n*.log\n",
-  "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
-};
-
-function commit(root: string, message = "step"): void {
-  git(root, "add", "-A");
-  git(root, "commit", "-q", "--allow-empty", "-m", message);
-}
-
-/** A committed repo with `loupe init` run and committed; returns the starting commit too. */
-async function installed(files: Files = {}): Promise<{ root: string; start: string }> {
-  const root = makeRepo({ ...repoFiles, ...files });
-  temps.push(root);
-  git(root, "init", "-q", "-b", "main");
-  commit(root, "start");
-  const start = git(root, "rev-parse", "HEAD").trim();
-  const init = await cli(root, ["init"]);
-  expect(init.code, init.text).toBe(0);
+/**
+ * The shared installed repo, with the Agentation layout, and the lockfile as `pnpm install` leaves it after init
+ * (so a remove that restores it leaves no diff against `start`).
+ */
+async function installed(options: InstallOptions = {}): Promise<{ root: string; start: string }> {
+  const { root, start } = await installedRepo({ ...options, files: { ...agentation, ...options.files } });
   // What the install skill's pnpm install would do.
   writeFileSync(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\nimporters: loupe\n");
-  commit(root, "init");
+  commit(root, "install");
   return { root, start };
 }
 
+/** `loupe <argv>`, with a `pnpm install` that records where it ran and exits with `status`. */
 async function cli(root: string, argv: string[], installs: string[] = [], status = 0) {
-  const out: string[] = [];
-  const code = await run(argv, {
-    out: (line) => out.push(line),
-    err: (line) => out.push(line),
-    ask: async () => "",
-    cwd: root,
-    nodeVersion: "22.22.2",
+  return loupe(root, argv, {
     install: (at) => {
       installs.push(at);
       // pnpm's own lockfile write, back to the starting one.
@@ -104,7 +61,6 @@ async function cli(root: string, argv: string[], installs: string[] = [], status
       return status;
     },
   });
-  return { code, text: out.join("\n") };
 }
 
 const read = (root: string, file: string) => readFileSync(path.join(root, file), "utf8");
@@ -141,12 +97,7 @@ describe("loupe remove after init", () => {
   });
 
   it("undoes a package.json edit whose hash Loupe 0.0.4 recorded, with the version in it", async () => {
-    const { root, start } = await installed();
-    const ledger = JSON.parse(read(root, LEDGER));
-    const old = createHash("sha256").update(JSON.stringify([["@danarocha/loupe", version], ["@repo/loupe", "workspace:*"]])).digest("hex");
-    for (const entry of ledger.touchPoints) if (entry.id === "package-json") entry.sha256 = old;
-    writeFileSync(path.join(root, LEDGER), `${JSON.stringify(ledger, null, 2)}\n`);
-    commit(root);
+    const { root, start } = await installed({ oldHash: true });
     const { code, text } = await cli(root, ["remove"]);
     expect(code, text).toBe(0);
     expect(diff(root, start)).toBe("");
@@ -298,9 +249,9 @@ describe("what stays", () => {
 
   it("keeps a manual step never adopted, and stops before the Product layer", async () => {
     const { root } = await installed();
-    const l = JSON.parse(read(root, LEDGER));
-    for (const t of l.touchPoints) if (t.id === "next-config") Object.assign(t, { mode: "manual", sha256: null });
-    writeFileSync(path.join(root, LEDGER), `${JSON.stringify(l, null, 2)}\n`);
+    editLedger(root, (l) => {
+      for (const t of l.touchPoints) if (t.id === "next-config") Object.assign(t, { mode: "manual", sha256: null });
+    });
     commit(root);
     const { code, text } = await cli(root, ["remove"]);
     expect(code).toBe(1);
@@ -321,8 +272,10 @@ describe("what stays", () => {
 
   it("refuses a ledger that points outside the Product layer, or from a newer format", async () => {
     const { root } = await installed();
-    const l = JSON.parse(read(root, LEDGER));
-    writeFileSync(path.join(root, LEDGER), `${JSON.stringify({ ...l, productLayer: { ...l.productLayer, path: "." } }, null, 2)}\n`);
+    const recorded = read(root, LEDGER);
+    editLedger(root, (l) => {
+      l.productLayer.path = ".";
+    });
     commit(root);
     const before = snapshot(root);
     const outside = await cli(root, ["remove"]);
@@ -330,13 +283,15 @@ describe("what stays", () => {
     expect(outside.text).toContain("isn't one loupe init wrote");
     expect(snapshot(root)).toEqual(before);
 
-    writeFileSync(path.join(root, LEDGER), `${JSON.stringify({ ...l, formatVersion: 2 }, null, 2)}\n`);
+    writeFileSync(path.join(root, LEDGER), recorded);
+    editLedger(root, (l) => {
+      l.formatVersion = 2;
+    });
     expect((await cli(root, ["remove"])).text).toContain("formatVersion 2");
   });
 
   it("says so when there is no ledger", async () => {
-    const root = makeRepo(repoFiles);
-    temps.push(root);
+    const root = makeRepo(agentation, installable);
     git(root, "init", "-q");
     const { code, text } = await cli(root, ["remove"]);
     expect(code).toBe(0);
@@ -390,8 +345,7 @@ describe("each undo restores the file byte for byte", () => {
   for (const [id, shapes] of Object.entries(cases)) {
     for (const [shape, text] of Object.entries(shapes)) {
       it(`${id}: ${shape}`, () => {
-        const root = makeRepo(repoFiles);
-        temps.push(root);
+        const root = makeRepo(agentation, installable);
         const tp = ctx(root).find((t) => t.id === id);
         if (!tp) throw new Error(id);
         const edited = tp.edit(text);
