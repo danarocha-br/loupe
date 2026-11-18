@@ -2,23 +2,32 @@
 // mounted in development as the last child of <body>.
 
 import ts from "typescript";
-import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
-import { bindsName, canonical, findImport, indentAt, insertImport, lineStart, parse, unwrap } from "../syntax.js";
 import {
-  type Candidates,
+  bindsName,
+  canonical,
   canonicalImport,
-  cut,
   defaultExportAssignment,
   findAll,
+  findImport,
   findNode,
   hasDefaultModifier,
-  lines,
-  revertTo,
-} from "./shared.js";
+  indentAt,
+  insertImport,
+  lineStart,
+  parse,
+  unwrap,
+} from "../syntax.js";
+import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
+import { type Candidates, cut, lines, revertToCandidate } from "./shared.js";
 
-const MOUNT_IMPORT = `import { LoupeMount } from "${PRODUCT_LAYER.name}/mount";`;
+const MOUNT_MODULE = `${PRODUCT_LAYER.name}/mount`;
+const MOUNT_IMPORT = `import { LoupeMount } from "${MOUNT_MODULE}";`;
 const MOUNT_BLOCK = `{process.env.NODE_ENV === "development" && <LoupeMount />}`;
 
+/** A `{…}` block that renders a LoupeMount. */
+const isMountBlock = (n: ts.Node) => ts.isJsxExpression(n) && containsMount(n);
+
+/** The touch point in `file`, the app's root layout. */
 export function rootLayout(file: string): TouchPoint {
   const tp: TouchPoint = {
     id: "root-layout",
@@ -33,8 +42,8 @@ export function rootLayout(file: string): TouchPoint {
     revertByHand: `remove the LoupeMount import and the {process.env.NODE_ENV === "development" && <LoupeMount />} block`,
     find(text) {
       const sf = parse(file, text);
-      const imp = findImport(sf, "LoupeMount", `${PRODUCT_LAYER.name}/mount`);
-      const block = findNode(sf, (n) => ts.isJsxExpression(n) && containsMount(n));
+      const imp = findImport(sf, "LoupeMount", MOUNT_MODULE);
+      const block = findNode(sf, isMountBlock);
       if (!imp && !block) return undefined;
       const fn = defaultExportFunction(sf);
       const bodies = fn ? bodyElements(fn) : [];
@@ -71,11 +80,11 @@ export function rootLayout(file: string): TouchPoint {
       const sameLine = !text.slice(at, close).includes("\n");
       const insertion = `\n${childIndent}${MOUNT_BLOCK}${sameLine ? `\n${closeIndent}` : ""}`;
       const mounted = `${text.slice(0, at)}${insertion}${text.slice(at)}`;
-      const withImport = insertImport(mounted, parse(file, mounted), MOUNT_IMPORT, `${PRODUCT_LAYER.name}/mount`);
+      const withImport = insertImport(mounted, parse(file, mounted), MOUNT_IMPORT, MOUNT_MODULE);
       return { text: withImport, summary: "mounted <LoupeMount /> as the last child of <body>" };
     },
     revert(text) {
-      return revertTo(tp, text, candidates(file, text), "removed <LoupeMount /> and its import");
+      return revertToCandidate(tp, text, candidates(file, text), "removed <LoupeMount /> and its import");
     },
   };
   return tp;
@@ -83,8 +92,8 @@ export function rootLayout(file: string): TouchPoint {
 
 function candidates(file: string, text: string): Candidates {
   const sf = parse(file, text);
-  const imp = findImport(sf, "LoupeMount", `${PRODUCT_LAYER.name}/mount`);
-  const blocks = findAll(sf, (n) => ts.isJsxExpression(n) && containsMount(n));
+  const imp = findImport(sf, "LoupeMount", MOUNT_MODULE);
+  const blocks = findAll(sf, isMountBlock);
   const block = blocks[0];
   if (!imp || blocks.length !== 1 || !block) return { manual: "the LoupeMount import or block isn't where loupe init put it" };
   const start = block.getStart(sf);

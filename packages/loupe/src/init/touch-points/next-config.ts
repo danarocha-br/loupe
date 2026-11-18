@@ -2,24 +2,29 @@
 // wrapped around the default export, outermost.
 
 import ts from "typescript";
-import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
-import { bindsName, canonical, findImport, insertImport, parse, unwrap } from "../syntax.js";
 import {
-  type Candidates,
+  bindsName,
+  canonical,
   canonicalImport,
-  cut,
   defaultExportAssignment,
   findAll,
+  findImport,
   findNode,
   hasDefaultModifier,
+  insertImport,
   isIdentifier,
-  lines,
-  type Range,
-  revertTo,
-} from "./shared.js";
+  parse,
+  unwrap,
+} from "../syntax.js";
+import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
+import { type Candidates, cut, lines, type Range, revertToCandidate } from "./shared.js";
 
-const NEXT_IMPORT = `import { withLoupe } from "${PRODUCT_LAYER.name}/next";`;
+const NEXT_MODULE = `${PRODUCT_LAYER.name}/next`;
+const NEXT_IMPORT = `import { withLoupe } from "${NEXT_MODULE}";`;
 
+const isWithLoupeCall = (n: ts.Node) => ts.isCallExpression(n) && isIdentifier(n.expression, "withLoupe");
+
+/** The touch point in `file`, the app's next.config. */
 export function nextConfig(file: string): TouchPoint {
   const tp: TouchPoint = {
     id: "next-config",
@@ -34,8 +39,8 @@ export function nextConfig(file: string): TouchPoint {
     revertByHand: "remove the withLoupe import and unwrap the default export: withLoupe(<your config>) becomes <your config>",
     find(text) {
       const sf = parse(file, text);
-      const imp = findImport(sf, "withLoupe", `${PRODUCT_LAYER.name}/next`);
-      const call = findNode(sf, (n) => ts.isCallExpression(n) && isIdentifier(n.expression, "withLoupe"));
+      const imp = findImport(sf, "withLoupe", NEXT_MODULE);
+      const call = findNode(sf, isWithLoupeCall);
       if (!imp && !call) return undefined;
       const exported = defaultExportAssignment(sf);
       const outer = exported ? unwrap(exported.expression) : undefined;
@@ -77,11 +82,11 @@ export function nextConfig(file: string): TouchPoint {
       const expr = assignment.expression;
       const start = expr.getStart(sf);
       const wrapped = `${text.slice(0, start)}withLoupe(${text.slice(start, expr.end)})${text.slice(expr.end)}`;
-      const withImport = insertImport(wrapped, parse(file, wrapped), NEXT_IMPORT, `${PRODUCT_LAYER.name}/next`);
+      const withImport = insertImport(wrapped, parse(file, wrapped), NEXT_IMPORT, NEXT_MODULE);
       return { text: withImport, summary: "wrapped the default export in withLoupe" };
     },
     revert(text) {
-      return revertTo(tp, text, candidates(file, text), "unwrapped the default export and removed the withLoupe import");
+      return revertToCandidate(tp, text, candidates(file, text), "unwrapped the default export and removed the withLoupe import");
     },
   };
   return tp;
@@ -89,8 +94,8 @@ export function nextConfig(file: string): TouchPoint {
 
 function candidates(file: string, text: string): Candidates {
   const sf = parse(file, text);
-  const imp = findImport(sf, "withLoupe", `${PRODUCT_LAYER.name}/next`);
-  const calls = findAll(sf, (n) => ts.isCallExpression(n) && isIdentifier(n.expression, "withLoupe"));
+  const imp = findImport(sf, "withLoupe", NEXT_MODULE);
+  const calls = findAll(sf, isWithLoupeCall);
   const call = calls[0];
   if (!imp || calls.length !== 1 || !call || !ts.isCallExpression(call) || call.arguments.length !== 1) {
     return { manual: "withLoupe isn't one call with one argument, as loupe init wrote it" };

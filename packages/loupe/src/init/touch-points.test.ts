@@ -22,9 +22,9 @@ const point = (id: TouchPointId) => {
   return found;
 };
 
-function applied(edit: Applied): string {
-  if ("unexpected" in edit) throw new Error(edit.unexpected);
-  return edit.text;
+function applied(result: Applied): string {
+  if ("unexpected" in result) throw new Error(result.unexpected);
+  return result.text;
 }
 
 const orbixNextConfig = `import { withToolbar } from "@repo/feature-flags/lib/toolbar";

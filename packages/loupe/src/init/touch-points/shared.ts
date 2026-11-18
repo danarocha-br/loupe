@@ -1,22 +1,24 @@
-// What the touch points share: JSON and TypeScript helpers, and how a revert is
-// checked (PER-126). Each revert proposes candidates for the original; the one
-// its own `apply` turns back into today's text byte for byte is the file as it
-// was before `init`. When none does (a hand edit moved things), the revert's own
+// What the touch points share: how a revert is checked (PER-126), and the JSON
+// helpers. Each revert proposes candidates for the original; the one its own
+// `apply` turns back into today's text byte for byte is the file as it was
+// before `init`. When none does (a hand edit moved things), the revert's own
 // fallback is used, which takes out only what Loupe wrote.
 
 // jsonc-parser ships UMD as `main`, which Node can't read named exports from.
 import jsonc from "jsonc-parser";
-import ts from "typescript";
+import { lineStart } from "../syntax.js";
 import type { Reverted, TouchPoint } from "../touch-points.js";
-import { canonical, lineStart, parse } from "../syntax.js";
 
 // ── Reverting ────────────────────────────────────────────────────────────────
 
 /** Likeliest original first; `fallback` is what to use when no candidate redoes exactly. */
 export type Candidates = { candidates: string[]; fallback: string } | { manual: string };
 
-/** The candidate `tp` would turn back into `text`, else the fallback, unless that still holds a Loupe edit. */
-export function revertTo(tp: Pick<TouchPoint, "find" | "apply">, text: string, proposed: Candidates, summary: string): Reverted {
+/**
+ * The first candidate that holds no Loupe edit and that `tp.apply` turns back into `text` byte for byte;
+ * else the fallback, unless that still holds a Loupe edit, which makes it a manual step.
+ */
+export function revertToCandidate(tp: Pick<TouchPoint, "find" | "apply">, text: string, proposed: Candidates, summary: string): Reverted {
   if ("manual" in proposed) return proposed;
   const exact = proposed.candidates.find((c) => {
     if (tp.find(c) !== undefined) return false;
@@ -28,6 +30,7 @@ export function revertTo(tp: Pick<TouchPoint, "find" | "apply">, text: string, p
   return { text: proposed.fallback, summary };
 }
 
+/** A span of text, as offsets. */
 export type Range = [start: number, end: number];
 
 /** Replaces ranges, which must not overlap, with `replacements` (default: nothing). */
@@ -55,59 +58,17 @@ export function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** `text` parsed as JSON with comments, when it is an object. */
 export function readObject(text: string): JsonObject | undefined {
   const errors: jsonc.ParseError[] = [];
   const value: unknown = jsonc.parse(text, errors);
   return errors.length === 0 && isRecord(value) ? value : undefined;
 }
 
+/** How jsonc-parser should format an insertion so it matches `text`'s indentation. */
 export function jsonFormatting(text: string): jsonc.FormattingOptions {
   const indent = /\n([ \t]+)"/.exec(text)?.[1] ?? "  ";
   return indent.startsWith("\t")
     ? { insertSpaces: false, tabSize: 1, eol: "\n" }
     : { insertSpaces: true, tabSize: indent.length, eol: "\n" };
-}
-
-// ── TypeScript ───────────────────────────────────────────────────────────────
-
-export function hasDefaultModifier(node: ts.Node): boolean {
-  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-  return modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) ?? false;
-}
-
-export function isIdentifier(node: ts.Node, name: string): boolean {
-  return ts.isIdentifier(node) && node.text === name;
-}
-
-export function defaultExportAssignment(sf: ts.SourceFile): ts.ExportAssignment | undefined {
-  return sf.statements.find((s): s is ts.ExportAssignment => ts.isExportAssignment(s) && !s.isExportEquals);
-}
-
-/** The first node, depth first, that passes `test`. */
-export function findNode(root: ts.Node, test: (n: ts.Node) => boolean): ts.Node | undefined {
-  let found: ts.Node | undefined;
-  const visit = (n: ts.Node): void => {
-    if (found) return;
-    if (test(n)) found = n;
-    else ts.forEachChild(n, visit);
-  };
-  visit(root);
-  return found;
-}
-
-/** Every node that passes `test`, without looking inside one that does. */
-export function findAll(root: ts.Node, test: (n: ts.Node) => boolean): ts.Node[] {
-  const found: ts.Node[] = [];
-  const visit = (n: ts.Node): void => {
-    if (test(n)) found.push(n);
-    else ts.forEachChild(n, visit);
-  };
-  visit(root);
-  return found;
-}
-
-/** An import line as `canonical` prints it. */
-export function canonicalImport(line: string): string {
-  const sf = parse("import.ts", line);
-  return canonical(sf.statements[0] as ts.Statement, sf);
 }

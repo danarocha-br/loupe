@@ -19,7 +19,7 @@ import {
   readLedger,
   type TouchPointEntry,
 } from "../init/ledger.js";
-import { PRODUCT_LAYER, type Role, type TouchPoint, type TouchPointId } from "../init/touch-points.js";
+import { type Change, PRODUCT_LAYER, type Role, type TouchPoint, type TouchPointId } from "../init/touch-points.js";
 import { touchPoints } from "../init/touch-points/list.js";
 import { version as installedVersion } from "../version.js";
 
@@ -57,11 +57,12 @@ export type RemoveIo = {
 };
 
 /** What `remove` does with one touch point. */
-type Removal = { kind: "absent" } | { kind: "revert"; text: string; summary: string } | { kind: "kept"; why: string };
+type Removal = { kind: "absent" } | ({ kind: "revert" } & Change) | { kind: "kept"; why: string };
 
+/** Which recorded touch point a step is for: its role decides when the step runs, `file` is where the ledger recorded it. */
 type Placed = { id: TouchPointId; role: Role; file: string };
 /** `before`: the file as it is now, to put back if the install after it fails. */
-type Revert = Placed & { kind: "revert"; text: string; summary: string; before: string };
+type Revert = Placed & { kind: "revert"; before: string } & Change;
 /** `byHand`: how to take Loupe's edit out by hand. */
 type Kept = Placed & { kind: "kept"; why: string; byHand: string };
 type Step = Revert | Kept;
@@ -81,6 +82,8 @@ type Plan = {
 const LAYER = PRODUCT_LAYER.path;
 const isRevert = (s: Step): s is Revert => s.kind === "revert";
 const isKept = (s: Step): s is Kept => s.kind === "kept";
+/** The touch points of `role` the plan reverts. */
+const reverted = (plan: Plan, role: Role): Revert[] => plan.steps.filter(isRevert).filter((s) => s.role === role);
 
 export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<number> {
   const root = findRoot(path.resolve(io.cwd));
@@ -99,13 +102,12 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
     io.out(NOTHING_WRITTEN);
     return 1;
   }
-  const reverts = plan.steps.filter(isRevert);
-  const installs = reverts.some((s) => s.role === "adds-dependencies");
+  const installs = reverted(plan, "adds-dependencies").length > 0;
 
   // The dirty-tree rule, for the files this run would change only, so a second
   // run isn't stopped by what the first one left uncommitted.
   const guarded = [
-    ...reverts.map((s) => s.file),
+    ...plan.steps.filter(isRevert).map((s) => s.file),
     ...plan.layer.filter((f) => f.delete).map((f) => f.path),
     ...(installs ? [LOCKFILE] : []),
     ...(plan.clear ? [LEDGER_PATH] : []),
@@ -115,21 +117,21 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
   return execute(root, plan, io);
 }
 
-/** Reads the ledger and refuses one `remove` can't trust with deletes, or whose touch points it can't place. */
+/** Reads the ledger and refuses one `remove` can't trust with deletes, or one recording touch points without their app. */
 function readRemovableLedger(root: string): Ledger {
   const ledger = readLedger(root);
   const tooNew = formatTooNew(ledger, installedVersion);
   if (tooNew) throw new LedgerError(tooNew);
   const layer = ledger.productLayer?.path;
   // init records the app before any touch point, and the app says where each touch point is.
-  const unplaced = (ledger.touchPoints?.length ?? 0) > 0 && typeof ledger.productLayer?.app !== "string";
-  if ((layer !== undefined && layer !== LAYER) || !arrayOrMissing(ledger.touchPoints) || !arrayOrMissing(ledger.files) || unplaced) {
-    throw notInits();
+  const withoutApp = (ledger.touchPoints?.length ?? 0) > 0 && typeof ledger.productLayer?.app !== "string";
+  if ((layer !== undefined && layer !== LAYER) || !arrayOrMissing(ledger.touchPoints) || !arrayOrMissing(ledger.files) || withoutApp) {
+    throw notWrittenByInit();
   }
   return ledger;
 }
 
-function notInits(): LedgerError {
+function notWrittenByInit(): LedgerError {
   return new LedgerError(`${LEDGER_PATH} isn't one loupe init wrote. Fix or restore it with git, then rerun.`);
 }
 
@@ -140,16 +142,16 @@ function arrayOrMissing(value: unknown): boolean {
 /**
  * Works out the whole run: the touch points a role at a time (those that import the Product layer, then
  * the layer, then the one that excludes it, then the dependencies), each role in the reverse of init's order.
- * Throws a LedgerError for a recorded touch point it can't place.
+ * Throws a LedgerError for a recorded touch point this Loupe doesn't list while its file is there.
  */
 function planRemoval(root: string, ledger: Ledger): Plan {
   const entries = ledger.touchPoints ?? [];
   const app = ledger.productLayer?.app;
-  const listed = app === undefined ? [] : touchPoints({ root, app, version: installedVersion, workspaceProtocol: "" });
+  const listed = touchPoints({ root, app, version: installedVersion, workspaceProtocol: "" });
   // A root touch point goes unlisted when the repo has no file for it, and its edit went with the file.
   // A recorded file that is still there although nothing lists it means the ledger was edited.
   for (const entry of entries) {
-    if (!listed.some((t) => t.id === entry.id) && existsSync(path.join(root, entry.file))) throw notInits();
+    if (!listed.some((t) => t.id === entry.id) && existsSync(path.join(root, entry.file))) throw notWrittenByInit();
   }
   const plan: Plan = { steps: [], holding: [], layer: [], clear: false };
   const add = (role: Role, override: (v: Removal) => Removal = (v) => v) => {
@@ -277,7 +279,7 @@ function execute(root: string, plan: Plan, io: RemoveIo): number {
     io.out("Biome exclusion and dependencies");
     report(plan.steps.filter((s) => s.role !== "imports-layer"));
 
-    const dependencies = plan.steps.filter(isRevert).filter((s) => s.role === "adds-dependencies");
+    const dependencies = reverted(plan, "adds-dependencies");
     if (dependencies.length > 0) {
       io.out("");
       io.out("Running pnpm install, which updates the lockfile…");
@@ -299,7 +301,7 @@ function execute(root: string, plan: Plan, io: RemoveIo): number {
   }
 
   io.out("");
-  if (importers.some(isRevert)) {
+  if (reverted(plan, "imports-layer").length > 0) {
     io.out("Restart the dev server: a running next dev still has Loupe loaded. .next is left alone.");
   }
   const problems = plan.steps.filter(isKept).length + plan.layer.filter((f) => !f.delete).length;

@@ -3,7 +3,7 @@
 // jsonc-parser ships UMD as `main`, which Node can't read named exports from.
 import jsonc from "jsonc-parser";
 import { NPM_PACKAGE, type TouchPoint } from "../touch-points.js";
-import { type Candidates, isRecord, jsonFormatting, readObject, revertTo } from "./shared.js";
+import { type Candidates, isRecord, jsonFormatting, readObject, revertToCandidate } from "./shared.js";
 
 /** `wanted`: each devDependency Loupe adds, and the version it adds. */
 export function packageJson(file: string, wanted: Record<string, string>): TouchPoint {
@@ -63,7 +63,7 @@ export function packageJson(file: string, wanted: Record<string, string>): Touch
       return { text: next, summary: `added ${added.join(" and ")} to devDependencies` };
     },
     revert(text) {
-      return revertTo(tp, text, candidates(text, names), "removed the two Loupe devDependencies");
+      return revertToCandidate(tp, text, candidates(text, names), "removed the two Loupe devDependencies");
     },
   };
   return tp;
