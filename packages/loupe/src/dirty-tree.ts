@@ -15,6 +15,9 @@ export const NOTHING_WRITTEN = "Nothing was written.";
 /** The one file both commands guard because a package manager rewrites it. */
 export const LOCKFILE = "pnpm-lock.yaml";
 
+/** The most files one list names; the rest are counted. */
+const MAX_LISTED = 20;
+
 export type GuardCommand = "init" | "remove";
 
 export type GuardIo = { out: (line: string) => void; err: (line: string) => void };
@@ -74,12 +77,13 @@ export function openGuard(command: GuardCommand, root: string, allowDirty: boole
       }
       const list = (lead: string, files: readonly string[]) => {
         io.err(lead);
-        for (const f of files.slice(0, 20)) io.err(`  ${f}`);
-        if (files.length > 20) io.err(`  … and ${files.length - 20} more`);
+        for (const f of files.slice(0, MAX_LISTED)) io.err(`  ${f}`);
+        if (files.length > MAX_LISTED) io.err(`  … and ${files.length - MAX_LISTED} more`);
       };
       if (allowDirty) {
         const fresh = blocking.filter((f) => !allowed.has(f));
-        for (const f of fresh) allowed.add(f);
+        // Only the names the list shows count as said: one it cut off comes up next time.
+        for (const f of fresh.slice(0, MAX_LISTED)) allowed.add(f);
         if (fresh.length > 0) list("Proceeding with uncommitted changes (--allow-dirty) in:", fresh);
         return false;
       }
@@ -132,5 +136,7 @@ function dirtyPaths(root: string, prefix: string, guarded: readonly string[]): {
     }
   }
   const blocks = (f: string) => guarded.some((g) => (g.endsWith("/") ? f.startsWith(g) : f === g));
-  return { blocking: dirty.filter(blocks), other: dirty.filter((f) => !blocks(f)) };
+  // A path can come twice: a rename's source that is also a new file.
+  const unique = [...new Set(dirty)];
+  return { blocking: unique.filter(blocks), other: unique.filter((f) => !blocks(f)) };
 }

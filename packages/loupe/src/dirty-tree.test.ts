@@ -175,6 +175,23 @@ describe("asked twice in one run", () => {
     ]);
   });
 
+  it("lists a path once even when git reports it twice, as a rename's source and as a new file", () => {
+    const root = repo({ "a.txt": "a\n" });
+    git(root, "mv", "a.txt", "b.txt");
+    write(root, { "a.txt": "new\n" });
+    const { lines } = askTwice(root, ["a.txt", "b.txt"], ["a.txt", "b.txt"], true);
+    expect(lines).toEqual(["Proceeding with uncommitted changes (--allow-dirty) in:", "  b.txt", "  a.txt"]);
+  });
+
+  it("lists a file the first ask cut off after twenty, on the second ask", () => {
+    const names = Array.from({ length: 22 }, (_, i) => `f${String(i).padStart(2, "0")}.txt`);
+    const root = repo(Object.fromEntries(names.map((name) => [name, "a\n"])));
+    write(root, Object.fromEntries(names.map((name) => [name, "changed\n"])));
+    const { lines } = askTwice(root, names, names, true);
+    expect(lines.slice(0, 22)).toEqual(["Proceeding with uncommitted changes (--allow-dirty) in:", ...names.slice(0, 20).map((n) => `  ${n}`), "  … and 2 more"]);
+    expect(lines.slice(22)).toEqual(["Proceeding with uncommitted changes (--allow-dirty) in:", "  f20.txt", "  f21.txt"]);
+  });
+
   it("says nothing the second time when it has nothing new to list", () => {
     const root = repo({ "a.txt": "a\n" });
     write(root, { "a.txt": "changed\n" });
