@@ -31,23 +31,23 @@ describe("readProductLayerStatus", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it("answers null and warns once while the same read keeps failing, as after a branch switch", async () => {
-    layer.read = () => {
-      throw new Error("ENOENT: no such file, open '/repo/packages/loupe/adapt-list.json'");
+  it("answers null and warns once while the same read keeps failing, as after a branch switch, and again for another failure", async () => {
+    const fail = (message: string) => {
+      layer.read = () => {
+        throw new Error(message);
+      };
     };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fail("ENOENT: no such file, open '/repo/packages/loupe/adapt-list.json'");
     for (let focus = 0; focus < 3; focus += 1) expect(await readProductLayerStatus()).toBeNull();
     expect(warn.mock.calls).toEqual([
       ["[loupe] loupe-layer-status: ENOENT: no such file, open '/repo/packages/loupe/adapt-list.json'"],
     ]);
-  });
 
-  it("warns again for a different failure", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    layer.read = () => {
-      throw new Error("a different failure");
-    };
+    fail("a different failure");
     await readProductLayerStatus();
-    expect(warn.mock.calls).toEqual([["[loupe] loupe-layer-status: a different failure"]]);
+    await readProductLayerStatus();
+    expect(warn.mock.calls.at(-1)).toEqual(["[loupe] loupe-layer-status: a different failure"]);
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });

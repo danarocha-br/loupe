@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProposalCallSite, ProposalChange } from "./types.js";
+import type { ProposalCallSite } from "./types.js";
 import { changeInWords, ordinal, siteCount } from "./words.js";
 
 const site = (nth: number, total: number | null): ProposalCallSite => ({
@@ -26,8 +26,12 @@ describe("words", () => {
   });
 
   it("captions a change by its scope", () => {
-    const change = (scope: ProposalChange["scope"], callSites: ProposalCallSite[]) =>
-      ({ scope, component: "Button", props: [{ name: "variant" }, { name: "children" }], callSites }) as unknown as ProposalChange;
+    const change = (scope: "instance" | "call-site" | "page", callSites: ProposalCallSite[]) => ({
+      scope,
+      component: "Button",
+      props: [{ name: "variant" }, { name: "children" }],
+      callSites,
+    });
     expect(changeInWords(change("instance", [site(1, 4)]))).toBe("variant, text on 1st of 4 <Button> in MemberRowMenu");
     expect(changeInWords(change("call-site", [site(1, 4)]))).toBe("variant, text on 1st of 4 <Button> in MemberRowMenu, every Instance");
     expect(changeInWords(change("page", [site(1, 4), site(2, 4)]))).toBe("variant, text on every <Button> on the page");

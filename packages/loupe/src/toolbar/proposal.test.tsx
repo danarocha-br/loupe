@@ -17,7 +17,7 @@ import { HOST_ATTRIBUTE } from "./styles.js";
 const project = vi.hoisted(() => ({
   read: async (): Promise<unknown> => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
 }));
-const KNOWN_PROJECT = project.read;
+const knownProject = project.read;
 vi.mock("./project-server.js", () => ({ readProjectContext: () => project.read() }));
 // The override cookie holds one flag preview, which the app doesn't declare.
 setFlagSource(memorySource(memoryRequest({ overrides: { "new-roles": true } })));
@@ -87,7 +87,7 @@ const footerButton = (text: string) =>
 
 beforeEach(async () => {
   resetLoupe();
-  project.read = KNOWN_PROJECT;
+  project.read = knownProject;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

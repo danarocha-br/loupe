@@ -2,7 +2,7 @@
 // Markdown summary, the HTML report and the export dialog all read from it, and it
 // reads nothing but the Proposal's own types.
 
-import type { ProposalCallSite, ProposalChange } from "./types.js";
+import type { ProposalCallSite, ProposalChange, ProposalProp } from "./types.js";
 
 /** "1st", "2nd", "3rd", "11th". */
 export function ordinal(n: number): string {
@@ -16,8 +16,11 @@ export function siteCount(site: Pick<ProposalCallSite, "nth" | "total">): string
   return site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
 }
 
+/** What a caption reads of a change. */
+type Captioned = Pick<ProposalChange, "scope" | "component" | "callSites"> & { props: readonly Pick<ProposalProp, "name">[] };
+
 /** "variant on 1st of 4 <Button> in MemberRowMenu", plain text for a caption. */
-export function changeInWords(change: ProposalChange): string {
+export function changeInWords(change: Captioned): string {
   const props = change.props.map((prop) => (prop.name === "children" ? "text" : prop.name)).join(", ");
   if (change.scope === "page") return `${props} on every <${change.component}> on the page`;
   const site = change.callSites[0];
