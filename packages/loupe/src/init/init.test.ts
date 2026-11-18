@@ -1,8 +1,9 @@
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { run } from "../cli.js";
 import { type Files, git, makeRepo, snapshot, supportedRepo } from "../compat/repo.fixture.js";
+import { runDoctor } from "../doctor/command.js";
 import { EXIT_MANUAL, parseInitArgs, runInit } from "./command.js";
 import { type Ledger as LedgerFile, serialiseLedger } from "./ledger.js";
 import { sha256 } from "./syntax.js";
@@ -105,6 +106,28 @@ async function initAt(root: string, version: string, ...argv: string[]) {
     version,
   });
   return { code, text: out.join("\n") };
+}
+
+/** `loupe doctor` as the given installed Loupe version would run it. */
+async function doctorAt(root: string, version: string) {
+  const out: string[] = [];
+  const code = await runDoctor(
+    { build: false },
+    { out: (line) => out.push(line), err: (line) => out.push(line), cwd: root, nodeVersion: "22.22.2", version },
+  );
+  return { code, text: out.join("\n") };
+}
+
+/** What `pnpm install` leaves behind: the app's copy of Loupe, and the Product layer's own. */
+function installCopies(root: string, copies: { app: string; layer: string }): void {
+  const pkg = (dir: string, json: object) => {
+    mkdirSync(path.join(root, dir), { recursive: true });
+    writeFileSync(path.join(root, dir, "package.json"), JSON.stringify(json));
+  };
+  pkg("apps/web/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: copies.app });
+  pkg("apps/web/node_modules/@repo/loupe", { name: "@repo/loupe" });
+  pkg("packages/loupe/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: copies.layer });
+  for (const name of ["@repo/design-system", "next", "react"]) pkg(`packages/loupe/node_modules/${name}`, { name });
 }
 
 const read = (root: string, file: string) => readFileSync(path.join(root, file), "utf8");
@@ -405,6 +428,72 @@ describe("upgrading by rerunning loupe init", () => {
     expect(text).toContain(`${LEDGER} was written by Loupe 0.0.4; this is 0.0.3.`);
     expect(text).toContain("Install @danarocha/loupe@0.0.4");
     expect(snapshot(root)).toEqual(before);
+  });
+
+  it("asks for pnpm install when it rewrites the layer's peer, and says nothing on a rerun with nothing to do", async () => {
+    const root = await installedAt004();
+    bump(root, "0.0.5");
+    commit(root);
+
+    const { code, text } = await initAt(root, "0.0.5");
+    expect(code).toBe(0);
+    expect(peer(root)).toBe("0.0.5");
+    // The app's package.json is untouched during an upgrade: this is the layer's own, rewritten.
+    expect(text).not.toMatch(/package-json +apps\/web\/package\.json: \+/);
+    expect(text).toContain(
+      "Next: run pnpm install so @repo/loupe resolves Loupe 0.0.5, then commit pnpm-lock.yaml. Loupe never writes the lockfile.",
+    );
+
+    commit(root);
+    const again = await initAt(root, "0.0.5");
+    expect(again.text).toContain("Nothing to do");
+    expect(again.text).not.toContain("Next:");
+  });
+
+  it("still asks once a rerun finishes an upgrade that a hand-edited file blocked", async () => {
+    const root = await installedAt004();
+    const original = read(root, LAYOUT);
+    writeFileSync(path.join(root, LAYOUT), original.replace("<LoupeMount />", "<LoupeMount debug />"));
+    bump(root, "0.0.5");
+    commit(root);
+
+    // The blocked run rewrites the layer's package.json but is not an upgrade yet: it asks for the fix, not the install.
+    const blocked = await initAt(root, "0.0.5");
+    expect(blocked.code).toBe(1);
+    expect(peer(root)).toBe("0.0.5");
+    expect(blocked.text).not.toContain("Next: run pnpm install");
+
+    // The rerun rewrites nothing in the layer, yet the layer still resolves the old copy.
+    writeFileSync(path.join(root, LAYOUT), original);
+    commit(root);
+    const rerun = await initAt(root, "0.0.5");
+    expect(rerun.code).toBe(0);
+    expect(rerun.text).toContain("Upgraded from Loupe 0.0.4 to 0.0.5.");
+    expect(rerun.text).toContain("Next: run pnpm install so @repo/loupe resolves Loupe 0.0.5");
+  });
+
+  it("makes doctor fail while the layer resolves an older Loupe than its peer, until pnpm install", async () => {
+    const root = await installedAt004();
+    installCopies(root, { app: "0.0.4", layer: "0.0.4" });
+    expect((await doctorAt(root, "0.0.4")).code).toBe(0);
+
+    bump(root, "0.0.5");
+    commit(root);
+    expect((await initAt(root, "0.0.5")).code).toBe(0);
+
+    // The person's first install moved the app's copy; the layer's own stays until the second one.
+    installCopies(root, { app: "0.0.5", layer: "0.0.4" });
+    const stale = await doctorAt(root, "0.0.5");
+    expect(stale.code).toBe(1);
+    expect(stale.text).toContain("✗ packages/loupe pins Loupe 0.0.5 in peerDependencies, and resolves 0.0.4");
+    expect(stale.text).toContain("Run pnpm install, then commit pnpm-lock.yaml.");
+    expect(stale.text).toContain("Result: 1 problem.");
+
+    installCopies(root, { app: "0.0.5", layer: "0.0.5" });
+    const fixed = await doctorAt(root, "0.0.5");
+    expect(fixed.text).toContain("✓ packages/loupe resolves Loupe 0.0.5, the version its peerDependencies pin");
+    expect(fixed.text).toContain("Result: healthy.");
+    expect(fixed.code).toBe(0);
   });
 
   it("asks for the version bump to be committed first", async () => {

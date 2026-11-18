@@ -207,6 +207,8 @@ class Run {
   manual = 0;
   wrote = false;
   packageJsonChanged = false;
+  /** The Product layer's own package.json was written: its dependencies and Loupe peer need an install. */
+  layerPackageJsonChanged = false;
 
   constructor(
     readonly root: string,
@@ -266,6 +268,7 @@ class Run {
     // Missing, or ours and unedited but out of date: recorded first, then written.
     this.setFile({ path: file, sha256: want });
     this.write(repoPath, content);
+    if (file === "package.json") this.layerPackageJsonChanged = true;
     line("+", verdict.kind === "missing" ? (entry ? "restored" : "written") : "updated");
   }
 
@@ -382,7 +385,12 @@ class Run {
     }
     io.out(`Recorded in ${LEDGER_PATH}.`);
     if (upgraded) io.out(`Upgraded from Loupe ${upgrade.from} to ${upgrade.to}.`);
-    if (this.packageJsonChanged) {
+    if (upgraded) {
+      // The layer's package.json pins the new version as a peer, and nothing installs it: until pnpm install
+      // runs, the layer keeps resolving the old Loupe and `pnpm install --frozen-lockfile` fails. A rerun after
+      // a blocked upgrade writes nothing more, so this can't wait for a write to happen.
+      io.out(`Next: run pnpm install so ${PRODUCT_LAYER.name} resolves Loupe ${upgrade.to}, then commit pnpm-lock.yaml. Loupe never writes the lockfile.`);
+    } else if (this.packageJsonChanged || this.layerPackageJsonChanged) {
       io.out(`Next: run pnpm install to link ${PRODUCT_LAYER.name}. Loupe never writes the lockfile.`);
     }
     if (this.manual > 0) {
