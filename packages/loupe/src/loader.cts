@@ -33,6 +33,10 @@ function loupeLoader(this: LoaderContext, source: string): void {
           if (this.emitWarning) this.emitWarning(warning);
           else console.warn(warning.message);
         }
+        // Turbopack caches the untouched file for as long as nothing it depends on
+        // changes. Depend on adapt-list.json even though it is missing or broken, so
+        // the file comes back transformed once the adapt list does.
+        if (options?.adaptList) this.addDependency?.(options.adaptList);
         callback(null, source);
       },
     );
