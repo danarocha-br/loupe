@@ -6,9 +6,7 @@
 import { useEffect } from "react";
 import { metaRequestOf, rememberMeta } from "../runtime/instance-meta.js";
 import { readInstanceMeta } from "./meta-server.js";
-
-/** Logged once per message, so a re-selection doesn't repeat it. Lives as long as the page. */
-const logged = new Set<string>();
+import { warnOnce } from "./warn-once.js";
 
 /** `anchor`: the selected Instance's, when no Adapter carries its metadata (`PanelView.metaAnchor`). */
 export function useInstanceMeta(anchor: string | null): void {
@@ -21,12 +19,7 @@ export function useInstanceMeta(anchor: string | null): void {
         if (results) rememberMeta([request], results);
       },
       // A restarting dev server refuses the call; the rows stay as they were until the next selection.
-      (error: unknown) => {
-        const message = `[loupe] Couldn't read meta/ for ${request.component}: ${String(error)}`;
-        if (logged.has(message)) return;
-        logged.add(message);
-        console.warn(message);
-      },
+      (error: unknown) => warnOnce(`[loupe] Couldn't read meta/ for ${request.component}: ${String(error)}`),
     );
   }, [anchor]);
 }

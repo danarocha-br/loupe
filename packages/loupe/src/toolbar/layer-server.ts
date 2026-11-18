@@ -8,6 +8,7 @@
 // `<LoupeMount />`'s development-only import, so a production build holds neither.
 
 import { type LayerStatus, readLayerStatus } from "../layer-status.js";
+import { warnOnce } from "./warn-once.js";
 
 /** A string only this module holds: `loupe doctor --build` looks for it to prove the action stayed out. */
 const MARKER = "loupe-layer-status";
@@ -21,7 +22,7 @@ export async function readProductLayerStatus(): Promise<LayerStatus | null> {
   try {
     return readLayerStatus({ root, adaptList, app });
   } catch (error) {
-    console.warn(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
+    warnOnce(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }
