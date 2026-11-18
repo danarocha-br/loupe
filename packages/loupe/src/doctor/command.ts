@@ -18,7 +18,8 @@ import {
   LedgerError,
   readLedger,
 } from "../init/ledger.js";
-import { NPM_PACKAGE, PRODUCT_LAYER, touchPoints } from "../init/touch-points.js";
+import { NPM_PACKAGE, PRODUCT_LAYER } from "../init/touch-points.js";
+import { touchPoints } from "../init/touch-points/list.js";
 import { compare } from "../meta/sources.js";
 import { compareVersions, version as installedVersion } from "../version.js";
 import { type BuildRunner, nextBuild, scanBuild } from "./build.js";
@@ -255,7 +256,7 @@ function touchPointChecks(report: Report, root: string, ledger: Ledger, app: str
         break;
     }
   }
-  if (!ids.has("biome-config")) report.ok("No root Biome config, so no Biome exclusion is needed");
+  if (!points.some((t) => t.role === "excludes-layer")) report.ok("No root Biome config, so no Biome exclusion is needed");
   // A ledger entry for a file that no longer exists, such as a deleted biome.jsonc.
   for (const entry of recorded) {
     if (!ids.has(entry.id)) report.fail(`${entry.id.padEnd(13)}${entry.file}: the file is gone`, ["Restore it, or run loupe init."]);

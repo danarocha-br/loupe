@@ -19,16 +19,9 @@ import {
   readLedger,
   type TouchPointEntry,
 } from "../init/ledger.js";
-import {
-  biomeConfig,
-  EXCLUSION,
-  PRODUCT_LAYER,
-  type TouchPoint,
-  type TouchPointId,
-  touchPoints,
-} from "../init/touch-points.js";
+import { type Change, PRODUCT_LAYER, type Role, type TouchPoint, type TouchPointId } from "../init/touch-points.js";
+import { touchPoints } from "../init/touch-points/list.js";
 import { version as installedVersion } from "../version.js";
-import { undo, undoByHand } from "./undo.js";
 
 export type RemoveOptions = { allowDirty: boolean; help?: boolean };
 
@@ -64,16 +57,21 @@ export type RemoveIo = {
 };
 
 /** What `remove` does with one touch point. */
-type Removal = { kind: "absent" } | { kind: "undo"; text: string } | { kind: "kept"; why: string };
+type Removal = { kind: "absent" } | ({ kind: "revert" } & Change) | { kind: "kept"; why: string };
 
-type Write = { id: TouchPointId; file: string; text: string; before: string };
-type Kept = { id: TouchPointId; file: string; why: string };
+/** Which recorded touch point a step is for: its role decides when the step runs, `file` is where the ledger recorded it. */
+type Placed = { id: TouchPointId; role: Role; file: string };
+/** `before`: the file as it is now, to put back if the install after it fails. */
+type Revert = Placed & { kind: "revert"; before: string } & Change;
+/** `byHand`: how to take Loupe's edit out by hand. */
+type Kept = Placed & { kind: "kept"; why: string; byHand: string };
+type Step = Revert | Kept;
 type LayerFile = { path: string; delete: boolean; why?: string };
 
 /** Everything a run will do, worked out before anything is written. */
 type Plan = {
-  writes: Write[];
-  kept: Kept[];
+  /** One per recorded touch point with something left to do, in the order they run. */
+  steps: Step[];
   /** Touch points left that import the Product layer: everything after them waits. */
   holding: string[];
   layer: LayerFile[];
@@ -81,15 +79,11 @@ type Plan = {
   clear: boolean;
 };
 
-/** The touch points that import the Product layer: while one stays, the layer must stay. */
-const IMPORTERS: TouchPointId[] = ["root-layout", "next-config"];
 const LAYER = PRODUCT_LAYER.path;
-const SUMMARY: Record<TouchPointId, string> = {
-  "root-layout": "removed <LoupeMount /> and its import",
-  "next-config": "unwrapped the default export and removed the withLoupe import",
-  "biome-config": `removed the ${EXCLUSION} exclusion`,
-  "package-json": "removed the two Loupe devDependencies",
-};
+const isRevert = (s: Step): s is Revert => s.kind === "revert";
+const isKept = (s: Step): s is Kept => s.kind === "kept";
+/** The touch points of `role` the plan reverts. */
+const reverted = (plan: Plan, role: Role): Revert[] => plan.steps.filter(isRevert).filter((s) => s.role === role);
 
 export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<number> {
   const root = findRoot(path.resolve(io.cwd));
@@ -99,23 +93,21 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
     io.out(`Nothing to remove: there is no ${LEDGER_PATH}, so loupe init hasn't run here.`);
     return 0;
   }
-  let ledger: Ledger;
+  let plan: Plan;
   try {
-    ledger = readRemovableLedger(root);
+    plan = planRemoval(root, readRemovableLedger(root));
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     io.err(error.message);
     io.out(NOTHING_WRITTEN);
     return 1;
   }
-
-  const plan = planRemoval(root, ledger);
-  const installs = plan.writes.some((w) => w.id === "package-json");
+  const installs = reverted(plan, "adds-dependencies").length > 0;
 
   // The dirty-tree rule, for the files this run would change only, so a second
   // run isn't stopped by what the first one left uncommitted.
   const guarded = [
-    ...plan.writes.map((w) => w.file),
+    ...plan.steps.filter(isRevert).map((s) => s.file),
     ...plan.layer.filter((f) => f.delete).map((f) => f.path),
     ...(installs ? [LOCKFILE] : []),
     ...(plan.clear ? [LEDGER_PATH] : []),
@@ -125,56 +117,75 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
   return execute(root, plan, io);
 }
 
-/** Reads the ledger and refuses one `remove` can't trust with deletes. */
+/** Reads the ledger and refuses one `remove` can't trust with deletes, or one recording touch points without their app. */
 function readRemovableLedger(root: string): Ledger {
   const ledger = readLedger(root);
   const tooNew = formatTooNew(ledger, installedVersion);
   if (tooNew) throw new LedgerError(tooNew);
   const layer = ledger.productLayer?.path;
-  if ((layer !== undefined && layer !== LAYER) || !arrayOrMissing(ledger.touchPoints) || !arrayOrMissing(ledger.files)) {
-    throw new LedgerError(`${LEDGER_PATH} isn't one loupe init wrote. Fix or restore it with git, then rerun.`);
+  // init records the app before any touch point, and the app says where each touch point is.
+  const withoutApp = (ledger.touchPoints?.length ?? 0) > 0 && typeof ledger.productLayer?.app !== "string";
+  if ((layer !== undefined && layer !== LAYER) || !arrayOrMissing(ledger.touchPoints) || !arrayOrMissing(ledger.files) || withoutApp) {
+    throw notWrittenByInit();
   }
   return ledger;
+}
+
+function notWrittenByInit(): LedgerError {
+  return new LedgerError(`${LEDGER_PATH} isn't one loupe init wrote. Fix or restore it with git, then rerun.`);
 }
 
 function arrayOrMissing(value: unknown): boolean {
   return value === undefined || Array.isArray(value);
 }
 
+/**
+ * Works out the whole run: the touch points a role at a time (those that import the Product layer, then
+ * the layer, then the one that excludes it, then the dependencies), each role in the reverse of init's order.
+ * Throws a LedgerError for a recorded touch point this Loupe doesn't list while its file is there.
+ */
 function planRemoval(root: string, ledger: Ledger): Plan {
   const entries = ledger.touchPoints ?? [];
-  const app = ledger.productLayer?.app ?? appOf(entries);
-  const points = new Map(
-    (app === undefined ? [] : touchPoints({ root, app, version: installedVersion, workspaceProtocol: "" })).map((t) => [t.id, t]),
-  );
-  const plan: Plan = { writes: [], kept: [], holding: [], layer: [], clear: false };
-  const add = (id: TouchPointId, override?: (v: Removal) => Removal) => {
-    const entry = entries.find((e) => e.id === id);
-    if (!entry) return;
-    const tp = points.get(id) ?? (id === "biome-config" ? biomeConfig(entry.file) : undefined);
-    const v = (override ?? ((x) => x))(judge(root, ledger, entry, tp));
-    const abs = path.join(root, entry.file);
-    if (v.kind === "undo") plan.writes.push({ id, file: entry.file, text: v.text, before: readFileSync(abs, "utf8") });
-    else if (v.kind === "kept") plan.kept.push({ id, file: entry.file, why: v.why });
+  const app = ledger.productLayer?.app;
+  const listed = touchPoints({ root, app, version: installedVersion, workspaceProtocol: "" });
+  // A root touch point goes unlisted when the repo has no file for it, and its edit went with the file.
+  // A recorded file that is still there although nothing lists it means the ledger was edited.
+  for (const entry of entries) {
+    if (!listed.some((t) => t.id === entry.id) && existsSync(path.join(root, entry.file))) throw notWrittenByInit();
+  }
+  const plan: Plan = { steps: [], holding: [], layer: [], clear: false };
+  const add = (role: Role, override: (v: Removal) => Removal = (v) => v) => {
+    for (const tp of listed.filter((t) => t.role === role).reverse()) {
+      const entry = entries.find((e) => e.id === tp.id);
+      if (!entry) continue;
+      const v = override(judge(root, ledger, entry, tp));
+      const placed: Placed = { id: tp.id, role, file: entry.file };
+      if (v.kind === "revert") {
+        const before = readFileSync(path.join(root, entry.file), "utf8");
+        plan.steps.push({ ...placed, kind: "revert", text: v.text, summary: v.summary, before });
+      } else if (v.kind === "kept") {
+        plan.steps.push({ ...placed, kind: "kept", why: v.why, byHand: tp.revertByHand });
+      }
+    }
   };
 
-  for (const id of IMPORTERS) add(id);
-  plan.holding = plan.kept.map((k) => k.file);
+  add("imports-layer");
+  plan.holding = plan.steps.filter(isKept).map((k) => k.file);
   if (plan.holding.length === 0) {
     plan.layer = layerInventory(root, ledger);
     const layerStays = plan.layer.some((f) => !f.delete);
-    add("biome-config", (v) =>
-      layerStays && v.kind === "undo" ? { kind: "kept", why: `${LAYER} still has files, so its exclusion stays` } : v,
+    add("excludes-layer", (v) =>
+      layerStays && v.kind === "revert" ? { kind: "kept", why: `${LAYER} still has files, so its exclusion stays` } : v,
     );
-    add("package-json");
+    add("adds-dependencies");
   }
-  plan.clear = plan.holding.length === 0 && plan.kept.length === 0 && plan.layer.every((f) => f.delete);
+  plan.clear = plan.holding.length === 0 && !plan.steps.some(isKept) && plan.layer.every((f) => f.delete);
   return plan;
 }
 
-function judge(root: string, ledger: Ledger, entry: TouchPointEntry, tp: TouchPoint | undefined): Removal {
+function judge(root: string, ledger: Ledger, entry: TouchPointEntry, tp: TouchPoint): Removal {
   // A touch point now drawn from another file doesn't answer for this entry.
-  const point = tp?.file === entry.file ? tp : undefined;
+  const point = tp.file === entry.file ? tp : undefined;
   const verdict = judgeTouchPoint(root, ledger, entry, point);
   switch (verdict.kind) {
     case "unrecognised":
@@ -188,8 +199,8 @@ function judge(root: string, ledger: Ledger, entry: TouchPointEntry, tp: TouchPo
       return { kind: "kept", why: "changed since loupe init recorded it" };
     case "intact": {
       if (!point) throw new Error(`${entry.id}: judged intact without its touch point`);
-      const u = undo(point, verdict.text);
-      return "manual" in u ? { kind: "kept", why: u.manual } : { kind: "undo", text: u.text };
+      const reverted = point.revert(verdict.text);
+      return "manual" in reverted ? { kind: "kept", why: reverted.manual } : { kind: "revert", ...reverted };
     }
     case "unclaimed":
     case "not-loupes":
@@ -225,22 +236,23 @@ function layerInventory(root: string, ledger: Ledger): LayerFile[] {
 
 function execute(root: string, plan: Plan, io: RemoveIo): number {
   const line = (mark: string, label: string, what: string) => io.out(`  ${mark} ${label.padEnd(13)}${what}`);
-  const report = (id: TouchPointId) => {
-    const w = plan.writes.find((x) => x.id === id);
-    if (w) {
-      writeFileSync(path.join(root, w.file), w.text);
-      line("-", id, `${w.file}: ${SUMMARY[id]}`);
+  /** Runs the steps under a heading, or says there is nothing left. */
+  const report = (steps: Step[]) => {
+    for (const s of steps) {
+      if (isRevert(s)) {
+        writeFileSync(path.join(root, s.file), s.text);
+        line("-", s.id, `${s.file}: ${s.summary}`);
+      } else {
+        line("✗", s.id, `${s.file}: ${s.why}; left as is`);
+        io.out(`      Undo your edit, or ${s.byHand}; then rerun loupe remove.`);
+      }
     }
-    const k = plan.kept.find((x) => x.id === id);
-    if (k) {
-      line("✗", id, `${k.file}: ${k.why}; left as is`);
-      io.out(`      Undo your edit, or ${undoByHand[id]}; then rerun loupe remove.`);
-    }
-    return Boolean(w || k);
+    if (steps.length === 0) io.out("  Nothing left to remove.");
   };
+  const importers = plan.steps.filter((s) => s.role === "imports-layer");
 
   io.out("Mount and wrapper");
-  if (!IMPORTERS.map(report).some(Boolean)) io.out("  Nothing left to remove.");
+  report(importers);
   io.out("");
 
   let installFailed = false;
@@ -265,20 +277,19 @@ function execute(root: string, plan: Plan, io: RemoveIo): number {
     io.out("");
 
     io.out("Biome exclusion and dependencies");
-    const biome = report("biome-config");
-    const deps = report("package-json");
-    if (!biome && !deps) io.out("  Nothing left to remove.");
+    report(plan.steps.filter((s) => s.role !== "imports-layer"));
 
-    const pkg = plan.writes.find((w) => w.id === "package-json");
-    if (pkg) {
+    const dependencies = reverted(plan, "adds-dependencies");
+    if (dependencies.length > 0) {
       io.out("");
       io.out("Running pnpm install, which updates the lockfile…");
       const status = (io.install ?? pnpmInstall)(root);
       if (status !== 0) {
         installFailed = true;
         // Put the dependencies back, so the next run retries the install instead of skipping it.
-        writeFileSync(path.join(root, pkg.file), pkg.before);
-        io.err(`pnpm install exited with ${status}, so ${pkg.file} keeps the Loupe dependencies. Fix pnpm, then rerun loupe remove.`);
+        for (const s of dependencies) writeFileSync(path.join(root, s.file), s.before);
+        const files = dependencies.map((s) => s.file).join(" and ");
+        io.err(`pnpm install exited with ${status}, so ${files} keep${dependencies.length === 1 ? "s" : ""} the Loupe dependencies. Fix pnpm, then rerun loupe remove.`);
       }
     }
   }
@@ -290,10 +301,10 @@ function execute(root: string, plan: Plan, io: RemoveIo): number {
   }
 
   io.out("");
-  if (plan.writes.some((w) => IMPORTERS.includes(w.id))) {
+  if (reverted(plan, "imports-layer").length > 0) {
     io.out("Restart the dev server: a running next dev still has Loupe loaded. .next is left alone.");
   }
-  const problems = plan.kept.length + plan.layer.filter((f) => !f.delete).length;
+  const problems = plan.steps.filter(isKept).length + plan.layer.filter((f) => !f.delete).length;
   if (problems > 0) {
     io.err(`${problems} item${problems === 1 ? " was" : "s were"} left as is; loupe remove never overwrites a hand edit. Undo ${problems === 1 ? "it" : "them"}, then rerun loupe remove.`);
     return 1;
@@ -313,11 +324,6 @@ function pruneEmptyDirs(dir: string): boolean {
   }
   if (empty) rmdirSync(dir);
   return empty;
-}
-
-function appOf(entries: TouchPointEntry[]): string | undefined {
-  const pkg = entries.find((e) => e.id === "package-json")?.file;
-  return pkg ? path.posix.dirname(pkg) : undefined;
 }
 
 function pnpmInstall(root: string): number {

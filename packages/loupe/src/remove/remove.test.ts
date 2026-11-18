@@ -15,8 +15,6 @@ import {
   nextConfig,
   snapshot,
 } from "../compat/repo.fixture.js";
-import { touchPoints } from "../init/touch-points.js";
-import { undo } from "./undo.js";
 
 const LAYOUT = "apps/web/app/layout.tsx";
 
@@ -94,6 +92,15 @@ describe("loupe remove after init", () => {
     expect(again.code).toBe(0);
     expect(again.text).toContain("Nothing to remove");
     expect(installs).toHaveLength(1);
+  });
+
+  it("takes out the devDependencies init created, when the app had none", async () => {
+    const app = { ...(installable["apps/web/package.json"] as Record<string, unknown>) };
+    delete app.devDependencies;
+    const { root, start } = await installed({ files: { "apps/web/package.json": app } });
+    const { code, text } = await cli(root, ["remove"]);
+    expect(code, text).toBe(0);
+    expect(diff(root, start)).toBe("");
   });
 
   it("undoes a package.json edit whose hash Loupe 0.0.4 recorded, with the version in it", async () => {
@@ -290,6 +297,47 @@ describe("what stays", () => {
     expect((await cli(root, ["remove"])).text).toContain("formatVersion 2");
   });
 
+  it("refuses a ledger whose touch points it can't place", async () => {
+    const { root } = await installed();
+    const recorded = read(root, LEDGER);
+    editLedger(root, (l) => {
+      delete (l.productLayer as { app?: string }).app;
+    });
+    commit(root);
+    const before = snapshot(root);
+    const noApp = await cli(root, ["remove"]);
+    expect(noApp.code).toBe(1);
+    expect(noApp.text).toContain("isn't one loupe init wrote");
+    expect(snapshot(root)).toEqual(before);
+
+    // A Biome config recorded somewhere init never looks, while the root has none.
+    writeFileSync(path.join(root, LEDGER), recorded);
+    editLedger(root, (l) => {
+      for (const t of l.touchPoints) if (t.id === "biome-config") t.file = "config/biome.jsonc";
+    });
+    mkdirSync(path.join(root, "config"));
+    git(root, "mv", "biome.jsonc", "config/biome.jsonc");
+    commit(root);
+    const elsewhere = snapshot(root);
+    const moved = await cli(root, ["remove"]);
+    expect(moved.code).toBe(1);
+    expect(moved.text).toContain("isn't one loupe init wrote");
+    expect(snapshot(root)).toEqual(elsewhere);
+
+    // A touch point this Loupe doesn't know, in a file that is there: removing the rest would drop its record.
+    writeFileSync(path.join(root, LEDGER), recorded);
+    git(root, "mv", "config/biome.jsonc", "biome.jsonc");
+    editLedger(root, (l) => {
+      l.touchPoints.push({ id: "tsconfig", file: "apps/web/tsconfig.json", mode: "auto", sha256: "0" });
+    });
+    commit(root);
+    const unknown = snapshot(root);
+    const later = await cli(root, ["remove"]);
+    expect(later.code).toBe(1);
+    expect(later.text).toContain("isn't one loupe init wrote");
+    expect(snapshot(root)).toEqual(unknown);
+  });
+
   it("says so when there is no ledger", async () => {
     const root = makeRepo(agentation, installable);
     git(root, "init", "-q");
@@ -319,39 +367,4 @@ describe("when a hand edit moved things, each undo takes out only Loupe's lines"
     expect(read(root, LAYOUT)).toBe(layout.replace("        )}\n      </body>", "        )}\n        <footer />\n      </body>"));
     expect(git(root, "diff", start, "--name-only").trim()).toBe(LAYOUT);
   });
-});
-
-describe("each undo restores the file byte for byte", () => {
-  const ctx = (root: string) => touchPoints({ root, app: "apps/web", version: "0.0.1", workspaceProtocol: "workspace:*" });
-  const cases: Record<string, Record<string, string>> = {
-    "root-layout": {
-      "a multi-line <body>": layout,
-      "an empty <body>": 'export default function L() {\n  return (\n    <html>\n      <body></body>\n    </html>\n  );\n}\n',
-      "a directive and no imports": '"use client";\nexport default function L({ children }) {\n  return <html><body>{children}</body></html>;\n}\n',
-    },
-    "next-config": {
-      "no imports": "export default {};\n",
-      "a call and comments": 'import type { NextConfig } from "next";\nimport { withX } from "x";\n\n// config\nexport default withX({ /* a */ });\n',
-    },
-    "package-json": {
-      "no devDependencies": '{\n  "name": "web",\n  "dependencies": {\n    "next": "16.3.6"\n  }\n}\n',
-      "tabs and later devDependencies": '{\n\t"name": "web",\n\t"devDependencies": {\n\t\t"@types/node": "22",\n\t\t"zod": "4"\n\t}\n}\n',
-    },
-    "biome-config": {
-      "a trailing comma": '{\n  "files": {\n    "includes": [\n      "**/*",\n      "!dist",\n    ],\n  },\n}\n',
-      "one line": '{ "files": { "includes": ["**/*"] } }\n',
-    },
-  };
-  for (const [id, shapes] of Object.entries(cases)) {
-    for (const [shape, text] of Object.entries(shapes)) {
-      it(`${id}: ${shape}`, () => {
-        const root = makeRepo(agentation, installable);
-        const tp = ctx(root).find((t) => t.id === id);
-        if (!tp) throw new Error(id);
-        const edited = tp.edit(text);
-        if (!("text" in edited)) throw new Error(edited.unexpected);
-        expect(undo(tp, edited.text)).toEqual({ text });
-      });
-    }
-  }
 });

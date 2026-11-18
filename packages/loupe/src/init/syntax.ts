@@ -40,6 +40,48 @@ export function unwrap(node: ts.Expression): ts.Expression {
   return ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node;
 }
 
+export function hasDefaultModifier(node: ts.Node): boolean {
+  const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+  return modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) ?? false;
+}
+
+export function isIdentifier(node: ts.Node, name: string): boolean {
+  return ts.isIdentifier(node) && node.text === name;
+}
+
+export function defaultExportAssignment(sf: ts.SourceFile): ts.ExportAssignment | undefined {
+  return sf.statements.find((s): s is ts.ExportAssignment => ts.isExportAssignment(s) && !s.isExportEquals);
+}
+
+/** The first node, depth first, that passes `test`. */
+export function findNode(root: ts.Node, test: (n: ts.Node) => boolean): ts.Node | undefined {
+  let found: ts.Node | undefined;
+  const visit = (n: ts.Node): void => {
+    if (found) return;
+    if (test(n)) found = n;
+    else ts.forEachChild(n, visit);
+  };
+  visit(root);
+  return found;
+}
+
+/** Every node that passes `test`, without looking inside one that does. */
+export function findAll(root: ts.Node, test: (n: ts.Node) => boolean): ts.Node[] {
+  const found: ts.Node[] = [];
+  const visit = (n: ts.Node): void => {
+    if (test(n)) found.push(n);
+    else ts.forEachChild(n, visit);
+  };
+  visit(root);
+  return found;
+}
+
+/** An import line as `canonical` prints it. */
+export function canonicalImport(line: string): string {
+  const sf = parse("import.ts", line);
+  return canonical(sf.statements[0] as ts.Statement, sf);
+}
+
 /** The import declaration that brings `name` in from `from`, if any. */
 export function findImport(sf: ts.SourceFile, name: string, from: string): ts.ImportDeclaration | undefined {
   return sf.statements.find(

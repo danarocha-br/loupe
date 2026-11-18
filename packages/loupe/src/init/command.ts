@@ -19,13 +19,15 @@ import {
   LEDGER_PATH,
   type Ledger,
   LedgerError,
+  pendingFiles,
   readLedger,
   saveLedger,
   type TouchPointEntry,
 } from "./ledger.js";
 import { productLayerFiles } from "./product-layer.js";
 import { fileHash, sha256 } from "./syntax.js";
-import { NPM_PACKAGE, PRODUCT_LAYER, type TouchPoint, touchPoints } from "./touch-points.js";
+import { NPM_PACKAGE, PRODUCT_LAYER, type TouchPoint } from "./touch-points.js";
+import { touchPoints } from "./touch-points/list.js";
 
 export type InitOptions = { app?: string; allowDirty: boolean; adopt: boolean; help?: boolean };
 
@@ -206,7 +208,8 @@ class Run {
   problems = 0;
   manual = 0;
   wrote = false;
-  packageJsonChanged = false;
+  /** The app's dependencies changed: the Product layer needs linking. */
+  dependenciesChanged = false;
   /** The Product layer's own package.json was written: its dependencies and Loupe peer need an install. */
   layerPackageJsonChanged = false;
 
@@ -340,24 +343,24 @@ class Run {
   }
 
   private apply(tp: TouchPoint, text: string | undefined, line: (m: string, w: string) => void, verb: string): void {
-    const edit = tp.edit(text);
-    if ("unexpected" in edit) {
+    const applied = tp.apply(text);
+    if ("unexpected" in applied) {
       this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: null });
       this.manual += 1;
-      line("!", `manual step needed: ${edit.unexpected}`);
+      line("!", `manual step needed: ${applied.unexpected}`);
       this.printManual(tp, "Make this edit by hand, then run loupe init --adopt:");
       return;
     }
-    const found = tp.find(edit.text);
+    const found = tp.find(applied.text);
     this.setTouchPoint({ id: tp.id, file: tp.file, mode: "auto", sha256: found ? sha256(found.canonical) : null });
-    this.write(tp.file, edit.text);
-    if (tp.id === "package-json") this.packageJsonChanged = true;
-    line("+", verb ? `${verb}: ${edit.summary}` : edit.summary);
+    this.write(tp.file, applied.text);
+    if (tp.role === "adds-dependencies") this.dependenciesChanged = true;
+    line("+", verb ? `${verb}: ${applied.summary}` : applied.summary);
   }
 
   private printManual(tp: TouchPoint, lead: string): void {
     this.io.out(`    ${lead}`);
-    for (const l of tp.snippet) this.io.out(`    ${l}`);
+    for (const l of tp.applyByHand) this.io.out(`    ${l}`);
   }
 
   finish(): number {
@@ -390,7 +393,7 @@ class Run {
       // runs, the layer keeps resolving the old Loupe and `pnpm install --frozen-lockfile` fails. A rerun after
       // a blocked upgrade writes nothing more, so this can't wait for a write to happen.
       io.out(`Next: run pnpm install so ${PRODUCT_LAYER.name} resolves Loupe ${upgrade.to}, then commit pnpm-lock.yaml. Loupe never writes the lockfile.`);
-    } else if (this.packageJsonChanged || this.layerPackageJsonChanged) {
+    } else if (this.dependenciesChanged || this.layerPackageJsonChanged) {
       io.out(`Next: run pnpm install to link ${PRODUCT_LAYER.name}. Loupe never writes the lockfile.`);
     }
     if (this.manual > 0) {
@@ -408,15 +411,9 @@ class Run {
 
 /** The files whose uncommitted changes stop `init`: what it may write, and the lockfile. */
 function protectedPaths(root: string, app: string | undefined, version: string): string[] {
-  const points = touchPoints({ root, app: app ?? "", version, workspaceProtocol: "" });
-  // Without the app, only the root Biome config is known yet.
-  const known = app === undefined ? points.filter((t) => t.id === "biome-config") : points;
-  return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...known.map((t) => t.file)];
-}
-
-/** The files with a manual step the ledger still waits on: a dirty one is likely that step, just made. */
-function pendingFiles(ledger: Ledger): string[] {
-  return (ledger.touchPoints ?? []).filter((t) => t.mode === "manual" && !t.sha256).map((t) => t.file);
+  // Without the app, only the touch points at the root are known yet.
+  const points = touchPoints({ root, app, version, workspaceProtocol: "" });
+  return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...points.map((t) => t.file)];
 }
 
 function dependency(json: PackageJson, name: string): string | undefined {
