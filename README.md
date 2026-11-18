@@ -221,6 +221,12 @@ The `loupe` command is installed in the app, not at the repo root, so a plain
 `pnpm exec loupe` from the root answers "Command "loupe" not found". You can
 also ask Claude to run it. It rewrites only what changed. Commit what it writes.
 
+If the panel says **Product layer missing**, `adapt-list.json` is gone, as after a
+branch switch to a branch without it. Restore the file with git, or write it again:
+run `generate` and name the folders it can no longer read from that file, by adding
+`--design-system <dir> --app <dir>` to the command in the panel. Then restart the
+dev server: files that reloaded without the file stay without Adapters until you do.
+
 ## What the install changes
 
 Loupe edits at most four of your files, three when the repo has no root Biome

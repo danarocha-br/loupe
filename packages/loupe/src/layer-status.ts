@@ -1,7 +1,8 @@
 // What the Toolbar warns about in the Product layer (PER-133), read from disk on
 // the dev server: components whose source changed since `loupe generate` hashed
 // it (PER-100 §5), components it would add if it ran now ("not generated yet",
-// PER-179), and a `formatVersion` this Loupe doesn't write (PER-85).
+// PER-179), a `formatVersion` this Loupe doesn't write (PER-85), and an
+// `adapt-list.json` that went missing while the dev server ran (PER-227).
 // Read-only: regeneration stays explicit, so nothing here writes.
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -23,15 +24,25 @@ export type StaleModule = {
 };
 
 export type LayerStatus = {
-  /** The command that rewrites the Product layer, run from the repo root. */
+  /**
+   * The command that rewrites the Product layer, run from the repo root. While `missing`,
+   * the one that writes it again: `generate` reads its roots from the file that is gone,
+   * so that run has to name them.
+   */
   command: string;
+  /**
+   * True when `adapt-list.json` is gone, as after a branch switch. `withLoupe` can't
+   * start without it, so a file missing here was there when the dev server began.
+   * Nothing else in the status can be read then: `format` is null, `stale` empty and `notGenerated` null.
+   */
+  missing: boolean;
   /** Null when the Product layer's format is the one this Loupe reads. */
   format: FormatNotice | null;
-  /** Empty while `format` is set: an older or newer `meta/` can't be trusted. */
+  /** Empty while `format` is set or the Product layer is missing: an older or newer `meta/` can't be trusted. */
   stale: StaleModule[];
   /**
    * Component-cased names exported by a file `generate` reads that `meta/` doesn't
-   * list, sorted: what the next run would add. Null while `format` is set or the roots can't be read.
+   * list, sorted: what the next run would add. Null while `format` is set, the Product layer is missing or the roots can't be read.
    */
   notGenerated: string[] | null;
 };
@@ -55,11 +66,26 @@ export function generateCommand({ root, adaptList, app }: LayerPaths): string {
   return `${appRel === "" ? "pnpm" : `pnpm -C ${appRel}`} exec loupe generate${out}`;
 }
 
+/** What `generate` asks for the first time, and again once `adapt-list.json` no longer holds the roots. */
+const NAME_THE_ROOTS = " --design-system <dir> --app <dir>";
+
+/**
+ * Only a file that isn't there is a status of its own; any other failure to read it
+ * (a permission, a directory in its place) throws, and the caller decides what to say.
+ */
 export function readLayerStatus(paths: LayerPaths): LayerStatus {
   const command = generateCommand(paths);
-  const text = readFileSync(paths.adaptList, "utf8");
+  let text: string;
+  try {
+    text = readFileSync(paths.adaptList, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { command: `${command}${NAME_THE_ROOTS}`, missing: true, format: null, stale: [], notGenerated: null };
+    }
+    throw error;
+  }
   const format = formatOf(text);
-  if (format !== null) return { command, format, stale: [], notGenerated: null };
+  if (format !== null) return { command, missing: false, format, stale: [], notGenerated: null };
   const stale: StaleModule[] = [];
   const bySource = new Map<string, Meta>();
   for (const file of metaFiles(path.join(path.dirname(paths.adaptList), "meta"))) {
@@ -72,7 +98,7 @@ export function readLayerStatus(paths: LayerPaths): LayerStatus {
     if (changed.length > 0) stale.push({ source: meta.source, components: meta.components, changed });
   }
   stale.sort((a, b) => compare(a.source, b.source));
-  return { command, format: null, stale, notGenerated: notGenerated(paths, text, bySource) };
+  return { command, missing: false, format: null, stale, notGenerated: notGenerated(paths, text, bySource) };
 }
 
 /**

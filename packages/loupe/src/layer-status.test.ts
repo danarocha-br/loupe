@@ -57,6 +57,7 @@ describe("readLayerStatus", () => {
     const { paths } = repo();
     expect(readLayerStatus(paths)).toEqual({
       command: "pnpm -C apps/app exec loupe generate",
+      missing: false,
       format: null,
       stale: [],
       notGenerated: [],
@@ -148,10 +149,70 @@ describe("readLayerStatus", () => {
     touch(path.join(root, "packages/loupe/adapt-list.json"));
     expect(readLayerStatus(paths)).toEqual({
       command: "pnpm -C apps/app exec loupe generate",
+      missing: false,
       format: { layer: 0, runtime: 1, newer: false },
       stale: [],
       notGenerated: null,
     });
+  });
+});
+
+describe("readLayerStatus when adapt-list.json is gone (PER-227)", () => {
+  // `generate` reads the roots from the file that is gone, so the command that writes it again names them.
+  const MISSING = {
+    command: "pnpm -C apps/app exec loupe generate --design-system <dir> --app <dir>",
+    missing: true,
+    format: null,
+    stale: [],
+    notGenerated: null,
+  };
+
+  it("is a status of its own on the first read, with nothing else to report", () => {
+    const { paths } = repo();
+    rmSync(paths.adaptList);
+    expect(readLayerStatus(paths)).toEqual(MISSING);
+  });
+
+  it("follows the file: normal, missing after a branch switch, normal again once it is written back", () => {
+    const { write, paths } = repo();
+    const text = readFileSync(paths.adaptList, "utf8");
+    expect(readLayerStatus(paths).missing).toBe(false);
+
+    rmSync(paths.adaptList);
+    expect(readLayerStatus(paths)).toEqual(MISSING);
+    // The sources and `meta/` are still on disk, but they can't be judged without the roots.
+    write("ds/components/ui/card.tsx", `export function Card() { return null; }\n`);
+    expect(readLayerStatus(paths)).toEqual(MISSING);
+
+    write("packages/loupe/adapt-list.json", text);
+    expect(readLayerStatus(paths)).toEqual({
+      command: "pnpm -C apps/app exec loupe generate",
+      missing: false,
+      format: null,
+      stale: [],
+      notGenerated: ["Card"],
+    });
+  });
+
+  it("counts the whole Product layer directory gone as missing too", () => {
+    const { root, paths } = repo();
+    rmSync(path.join(root, "packages/loupe"), { recursive: true });
+    expect(readLayerStatus(paths)).toEqual(MISSING);
+  });
+
+  it("keeps --out in the command for a layer outside packages/loupe", () => {
+    const { paths } = repo("apps/app/loupe");
+    rmSync(paths.adaptList);
+    expect(readLayerStatus(paths).command).toBe(
+      "pnpm -C apps/app exec loupe generate --out loupe --design-system <dir> --app <dir>",
+    );
+  });
+
+  it("still throws when the read fails for another reason, for the caller to report", () => {
+    const { paths } = repo();
+    rmSync(paths.adaptList);
+    mkdirSync(paths.adaptList);
+    expect(() => readLayerStatus(paths)).toThrow(/EISDIR/);
   });
 });
 

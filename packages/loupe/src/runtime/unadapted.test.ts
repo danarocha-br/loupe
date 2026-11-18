@@ -302,7 +302,7 @@ describe("anchored client Instances without an Adapter", () => {
 
   it("says Not generated yet for a component generate hasn't read, in the list and on the Instance's badge", () => {
     render([h(Button, { key: "b", ...loader("Button") }, "Save"), h(NewCard, { key: "c", ...loader("NewCard") })]);
-    const layer: LayerStatus = { command: "pnpm exec loupe generate", format: null, stale: [], notGenerated: ["NewCard"] };
+    const layer: LayerStatus = { command: "pnpm exec loupe generate", missing: false, format: null, stale: [], notGenerated: ["NewCard"] };
     const list = panelView({ debug: loupe, layer, selected: null, scope: "instance", seen: NONE_SEEN }).body as ListBody;
     const card = list.groups.find((group) => group.component === "NewCard");
     expect(card?.verdict).toMatchObject({ supported: false, reason: "not-generated", status: { kind: "not-generated", text: "Not generated yet" } });

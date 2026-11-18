@@ -1,8 +1,9 @@
 // The Product layer's notices (PER-133): components whose source changed since
 // the last `loupe generate`, components on the page it has never read (PER-179),
-// and a Product layer in another format. Regeneration stays explicit (PER-100 §5),
-// so each notice names the command and runs nothing. Amber for the first two, red
-// for the format, below the page or Instance card (PER-140).
+// a Product layer in another format, and one that went missing (PER-227).
+// Regeneration stays explicit (PER-100 §5), so each notice names the command and
+// runs nothing. Amber for the first two, red for the format and the missing layer,
+// below the page or Instance card (PER-140).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command } from "./command.js";
@@ -85,6 +86,28 @@ export function NotGeneratedNotice({ names, command }: { names: readonly string[
 
 export function LayerNotices({ status }: { status: LayerStatus | null }) {
   if (status === null) return null;
+  // The loader hands files back untouched while the file is gone, so Instances leave the
+  // panel as their modules reload; this says why. It doesn't track the file, so those
+  // modules stay untouched after it is back, until the dev server restarts.
+  if (status.missing) {
+    return (
+      <div className="card notice-card" role="alert" data-testid="missing-notice">
+        <div className="head">
+          <div className="title">
+            <span className="dot red" />
+            Product layer missing
+          </div>
+        </div>
+        <p className="body">
+          adapt-list.json is gone, so files that reload lose their Adapters and their Instances drop out of this panel. A
+          branch switch can remove it. Restore it with git, or write it again with the command below, which names the
+          design system and the app. Then restart the dev server: files that reloaded without it stay without Adapters
+          until you do.
+        </p>
+        <Command text={status.command} />
+      </div>
+    );
+  }
   if (status.format !== null) {
     const { layer, runtime, newer } = status.format;
     return (

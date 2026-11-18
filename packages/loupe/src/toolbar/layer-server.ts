@@ -13,14 +13,26 @@ import { warnOnce } from "./warn-once.js";
 /** A string only this module holds: `loupe doctor --build` looks for it to prove the action stayed out. */
 const MARKER = "loupe-layer-status";
 
-/** Null when `withLoupe` isn't active, so there is no Product layer to read. */
+/**
+ * Null when `withLoupe` isn't active, so there is no Product layer to read, and when
+ * the read fails for a reason the Toolbar can't act on. A Product layer that went
+ * missing is a status of its own (PER-227): the Toolbar says so, and this says it
+ * once in the terminal, for the life of the dev server like every `warnOnce`.
+ */
 export async function readProductLayerStatus(): Promise<LayerStatus | null> {
   const root = process.env.LOUPE_ROOT;
   const adaptList = process.env.LOUPE_ADAPT_LIST;
   const app = process.env.LOUPE_APP;
   if (!root || !adaptList || !app) return null;
   try {
-    return readLayerStatus({ root, adaptList, app });
+    const status = readLayerStatus({ root, adaptList, app });
+    if (status.missing) {
+      warnOnce(
+        `[loupe] ${MARKER}: ${adaptList} is missing. Restore it with git, or write it again with ${status.command}. ` +
+          "Then restart the dev server: files that reloaded without it stay without Adapters until you do.",
+      );
+    }
+    return status;
   } catch (error) {
     warnOnce(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
     return null;
