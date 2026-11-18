@@ -94,6 +94,15 @@ describe("loupe remove after init", () => {
     expect(installs).toHaveLength(1);
   });
 
+  it("takes out the devDependencies init created, when the app had none", async () => {
+    const app = { ...(installable["apps/web/package.json"] as Record<string, unknown>) };
+    delete app.devDependencies;
+    const { root, start } = await installed({ files: { "apps/web/package.json": app } });
+    const { code, text } = await cli(root, ["remove"]);
+    expect(code, text).toBe(0);
+    expect(diff(root, start)).toBe("");
+  });
+
   it("undoes a package.json edit whose hash Loupe 0.0.4 recorded, with the version in it", async () => {
     const { root, start } = await installed({ oldHash: true });
     const { code, text } = await cli(root, ["remove"]);

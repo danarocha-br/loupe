@@ -311,6 +311,10 @@ describe("apply, then revert, gives back the original bytes", () => {
     return judgeTouchPoint(root, {}, undefined, tp);
   };
 
+  // remove's touch points: built with the Loupe that runs remove, which may be newer than init's, and no
+  // workspace protocol. A revert must not depend on what this Loupe would write.
+  const removing = touchPoints({ root, app: "apps/app", version: "9.9.9", workspaceProtocol: "" });
+
   it("has originals for every touch point", () => {
     for (const tp of list(root)) expect(Object.keys(originals[tp.id]).length, tp.id).toBeGreaterThan(0);
   });
@@ -322,7 +326,7 @@ describe("apply, then revert, gives back the original bytes", () => {
         const text = applied(tp.apply(original));
         // What init records as intact: Loupe's edit, exactly as apply writes it.
         expect(judged(tp, text)).toMatchObject({ kind: "unclaimed", claim: { found: { exact: true } } });
-        const reverted = tp.revert(text);
+        const reverted = removing.find((t) => t.id === tp.id)?.revert(text);
         expect(reverted).toEqual({ text: original, summary: expect.any(String) });
         expect(judged(tp, original).kind).toBe("not-loupes");
       });
