@@ -92,8 +92,8 @@ describe("the list", () => {
     expect(item?.count).toBe("×1");
     // An Adapter with no prop that can be Editable.
     expect(item?.verdict).toMatchObject({ supported: false, reason: "no-editable", status: { text: "Inspect only" } });
-    expect(item?.notes).toEqual([{ kind: "reason", text: "No props with fixed options" }]);
-    expect(item?.statusTitle).toBe("No props with fixed options");
+    expect(item?.notes).toEqual([{ kind: "reason", text: "No Editable prop" }]);
+    expect(item?.statusTitle).toBe("No Editable prop");
 
     click("Menu");
     const body = listOf(view());
