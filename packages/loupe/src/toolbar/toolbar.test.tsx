@@ -274,6 +274,7 @@ describe("the Toolbar", () => {
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
     await settle();
     expect(shadow().querySelector(".banner")?.textContent).toContain("Everything is inspect-only");
+    expect(shadow().querySelector(".banner")?.textContent).toContain("(React reported no fiber while an Adapter rendered.)");
     const reset = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Reset all") as HTMLButtonElement;
     expect(reset.disabled).toBe(true);
     await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
