@@ -9,8 +9,8 @@ import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { encodeCallSiteWrites, type CallSiteWrites } from "../writes.js";
 import { createAdapter } from "./adapter.js";
 import { debugOf, type LoupeDebug } from "./debug.js";
-import { stateScopeRefusal } from "./state.js";
 import { resetLoupe } from "./slot.js";
+import { stateScopeRefusal } from "./state.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

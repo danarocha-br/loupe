@@ -1,14 +1,18 @@
 // Loupe's page state (PER-218): one hidden slot on `globalThis` that holds every
-// value Loupe keeps for a page load. That covers the Instance registry, the Proposal
-// tracker, the Snapshots, the export form, and the `window.__loupe` the page made.
-// A module that Fast Refresh evaluates again finds the same values here, so
-// Instances, Overrides and Snapshots survive an edit. A reload starts the page
-// over, and `resetLoupe()` does the same for tests.
+// value Loupe keeps for a page load. That covers the Instance registry, the route
+// watching, the Proposal tracker, the Snapshots, the export form, and the
+// `window.__loupe` the page made. A module that Fast Refresh evaluates again
+// finds the same values here, so Instances, Overrides and Snapshots survive an
+// edit. A reload starts the page over, and `resetLoupe()` does the same for tests.
 //
 // The key is a `Symbol.for`, not a property name. The symbol registry is global,
 // so a module evaluated again finds the same key, and the slot stays out of the
-// console's autocomplete beside `__loupe`. This file imports nothing of Loupe's,
-// so any of its modules can keep a value here.
+// console's autocomplete beside `__loupe`.
+//
+// This file imports nothing of Loupe's, so any of its modules can keep a value
+// here. That's why `debugOf()` lives beside `createDebug` in `debug.ts` rather
+// than here: `debug.ts` imports the registry, which keeps its value here, so the
+// import the other way would be a cycle.
 
 export type PerPageOptions<T> = {
   /** Called when `resetLoupe()` drops the value: stop listening, clear timers. */

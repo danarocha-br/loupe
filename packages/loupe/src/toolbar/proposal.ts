@@ -44,14 +44,14 @@ type Tracker = {
 
 const REFRESH_MS = 100;
 
-const TRACKER: PerPageOptions<Tracker> = { stop: (tracker) => tracker.stop() };
+const ON_RESET: PerPageOptions<Tracker> = { stop: (tracker) => tracker.stop() };
 
 /**
  * Starts remembering what the page shows, once per page. The tracker is kept in the
  * page's slot across a Fast Refresh, and `resetLoupe()` stops it.
  */
 export function startTracking(): Tracker {
-  return perPage("tracker", makeTracker, TRACKER);
+  return perPage("tracker", makeTracker, ON_RESET);
 }
 
 function makeTracker(): Tracker {
@@ -148,6 +148,11 @@ export function suggestedTitle(proposal: Proposal): string {
   return `${change.component} ${props} ${where}`;
 }
 
+/** The Copy as Markdown text of the Proposal. */
+export function collectProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
+  return collectProposal(options).then(proposalMarkdown);
+}
+
 /** The Proposal for the whole Override store, every route. */
 export async function collectProposal(options: ProposalOptions = {}): Promise<Proposal> {
   return (await collectProposalKeyed(options)).proposal;
@@ -208,7 +213,7 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
  * claimed during the click even though building the Proposal awaits the server.
  */
 export async function copyProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
-  const text = collectProposal(options).then(proposalMarkdown);
+  const text = collectProposalMarkdown(options);
   try {
     if (typeof navigator.clipboard === "undefined") {
       throw new Error("The clipboard is only available on a secure origin, localhost or HTTPS.");

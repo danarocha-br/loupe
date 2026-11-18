@@ -91,7 +91,7 @@ function emptyStore(): Store {
  * queue. A capture already queued finishes into the list it was queued with, and
  * the page changes for one capture at a time.
  */
-const SNAPSHOTS: PerPageOptions<Store> = { restart: (old) => ({ ...emptyStore(), queue: old.queue }) };
+const ON_RESET: PerPageOptions<Store> = { restart: (old) => ({ ...emptyStore(), queue: old.queue }) };
 
 let current: Rasterizer = screenshotRasterizer;
 
@@ -106,7 +106,7 @@ export function setRasterizer(next: Rasterizer): void {
 
 /** One list per page, kept in the page's slot across a Fast Refresh. A reload clears it. */
 function store(): Store {
-  return perPage("snapshots", emptyStore, SNAPSHOTS);
+  return perPage("snapshots", emptyStore, ON_RESET);
 }
 
 /** Every Snapshot this page load, oldest first, each as it reads now. */
@@ -121,6 +121,20 @@ export function snapshots(): readonly ListedSnapshot[] {
 /** Takes a Snapshot of the screen in view. Captures run one at a time. */
 export function captureScreen(): Promise<Snapshot> {
   return enqueue((session) => capture(session, {}));
+}
+
+/**
+ * `__loupe.capture()`: Capture screen. It once took `{ replace }` and `{ auto }`,
+ * and a call that still passes them says so, rather than quietly taking a new Snapshot.
+ */
+export function captureFromConsole(options?: unknown): Promise<Snapshot> {
+  if (options === undefined) return captureScreen();
+  return Promise.reject(
+    new Error(
+      "[loupe] __loupe.capture() takes no options. Retake a Snapshot with __loupe.retake(id); " +
+        "__loupe.proposal({ capture: true }) takes the export's own.",
+    ),
+  );
 }
 
 /**

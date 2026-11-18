@@ -15,8 +15,8 @@ beforeEach(() => {
   history.replaceState(null, "", "/");
 });
 
-/** A mounted Instance as the registry holds one, with a spy for its rerenders. */
-function mount() {
+/** Puts a stand-in for a mounted Instance in the registry, and returns the spy for its rerenders. */
+function addInstance() {
   const notify = vi.fn();
   const instance = { id: ID, anchor: ANCHOR, component: "Button", hint: null, notify } as unknown as MountedInstance;
   registry().instances.set(ID, instance);
@@ -44,7 +44,7 @@ describe("the registry", () => {
 
 describe("watching the route", () => {
   it("rerenders the Instances a page Override reaches after a navigation", async () => {
-    const notify = mount();
+    const notify = addInstance();
     registry().store.set(ON_THIS_PAGE, "variant", "destructive");
     notify.mockClear();
     history.pushState(null, "", "/billing");
@@ -53,10 +53,10 @@ describe("watching the route", () => {
   });
 
   it("reads the registry of the moment, so a reset leaves nothing listening on the old one", async () => {
-    const old = mount();
+    const old = addInstance();
     registry().store.set(ON_THIS_PAGE, "variant", "destructive");
     resetLoupe();
-    const notify = mount();
+    const notify = addInstance();
     registry().store.set(ON_THIS_PAGE, "variant", "destructive");
     old.mockClear();
     notify.mockClear();
@@ -67,7 +67,7 @@ describe("watching the route", () => {
   });
 
   it("does nothing while no page Override is set", async () => {
-    const notify = mount();
+    const notify = addInstance();
     registry().store.set({ scope: "instance", id: ID }, "variant", "destructive");
     notify.mockClear();
     history.pushState(null, "", "/billing");

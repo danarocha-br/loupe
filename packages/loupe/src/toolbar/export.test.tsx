@@ -8,8 +8,8 @@ import { REPORT_DATA_ID } from "../proposal/report.js";
 import type { Proposal } from "../proposal/types.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
-import { resetLoupe } from "../runtime/slot.js";
 import { registry } from "../runtime/registry.js";
+import { resetLoupe } from "../runtime/slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

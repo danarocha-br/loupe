@@ -10,7 +10,7 @@ import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
 import type { Split } from "./authored.js";
-import { perPage } from "./slot.js";
+import { type PerPageOptions, perPage } from "./slot.js";
 import {
   createOverrideStore,
   type InstanceIdentity,
@@ -55,7 +55,7 @@ export type MountedInstance = {
   readonly route: string;
 };
 
-/** What only the registry writes: `register` and `committed` keep these fields. */
+/** A MountedInstance with every field writable: only `register` and `committed` use it. */
 type Writable = { -readonly [K in keyof MountedInstance]: MountedInstance[K] };
 
 /** An Instance as it last rendered before it unmounted: what the Toolbar shows for a record it holds. */
@@ -146,25 +146,29 @@ export function identityOf(
 }
 
 const WRAPPED = Symbol.for("loupe.historyWrapped");
-const WATCHED = Symbol.for("loupe.routeWatched");
 const HISTORY_EVENT = "loupe:history";
+
+/** Route watching outlives `resetLoupe()`, like the `history` wrap: it reads the registry of the moment. */
+const ROUTE_ON_RESET: PerPageOptions<true> = { restart: (watching) => watching };
 
 /**
  * Rerenders the Instances on the page after the pathname changes, while a page
- * Override is set: Instances that outlive a navigation (a layout's) stop or start
- * matching one. Next's client navigations go through `history.pushState` and
- * `replaceState`, which fire no event, so both are wrapped to fire one. Next calls
- * them from an insertion effect, where React forbids scheduling updates, so the
- * check waits for a microtask.
- *
- * Once per page, like the wrap: the check reads the registry of the moment, so a
- * `resetLoupe()` leaves no listener behind on an old one.
+ * Override is set: Instances that outlive a navigation (a layout's) come into its
+ * Reach or fall out of it. Once per page, in the page's slot.
  */
 function watchRoute(): void {
   if (typeof window === "undefined" || typeof history === "undefined") return;
-  const host = window as typeof window & { [WATCHED]?: true };
-  if (host[WATCHED]) return;
-  host[WATCHED] = true;
+  perPage("routeWatch", startWatchingRoute, ROUTE_ON_RESET);
+}
+
+/**
+ * Next's client navigations go through `history.pushState` and `replaceState`,
+ * which fire no event, so both are wrapped to fire one. Next calls them from an
+ * insertion effect, where React forbids scheduling updates, so the check waits
+ * for a microtask. The check reads the registry of the moment, so a
+ * `resetLoupe()` leaves no listener behind on an old one.
+ */
+function startWatchingRoute(): true {
   let last = currentRoute();
   const check = () => {
     const route = currentRoute();
@@ -186,6 +190,7 @@ function watchRoute(): void {
   }
   window.addEventListener(HISTORY_EVENT, check);
   window.addEventListener("popstate", check);
+  return true;
 }
 
 /**
@@ -224,8 +229,9 @@ function recordedIds(store: OverrideStore): Set<string> {
 /**
  * Registers a mounted Instance under `baseId`, or `baseId~2`, `~3`… when another
  * mounted Instance already holds it (the same call site, rendered twice with no
- * key to tell them apart). Returns the id it got, then runs the hop guard.
- * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
+ * key to tell them apart), and runs the hop guard. Returns the Instance, with the
+ * id it got. `~n` is mount order, so a record naming any id of a duplicated base
+ * is suspended.
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id" | "renders" | "route">): MountedInstance {
   const { instances, departed, store } = registry();

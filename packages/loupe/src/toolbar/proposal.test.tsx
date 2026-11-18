@@ -6,8 +6,8 @@ import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUT
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
-import { resetLoupe } from "../runtime/slot.js";
 import { registry } from "../runtime/registry.js";
+import { resetLoupe } from "../runtime/slot.js";
 import { memoryRequest, memorySource } from "./flags.fixture.js";
 import { setFlagSource } from "./flags-store.js";
 import Toolbar from "./index.js";

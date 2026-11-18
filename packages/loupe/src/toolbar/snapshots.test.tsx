@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId, instanceId } from "../call-site.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
-import { resetLoupe } from "../runtime/slot.js";
 import { disableOverrides, registry } from "../runtime/registry.js";
+import { resetLoupe } from "../runtime/slot.js";
 import type { FixedPixelsOptions } from "./snapshots.fixture.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
