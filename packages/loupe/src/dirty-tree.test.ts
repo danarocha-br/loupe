@@ -145,6 +145,44 @@ describe("changes to files outside the guarded ones", () => {
   });
 });
 
+describe("asked twice in one run", () => {
+  /** `init` asks again once the app is known: the same guard, a second question. */
+  function askTwice(root: string, first: string[], second: string[], allowDirty = false) {
+    const lines: string[] = [];
+    const guard = openGuard("init", root, allowDirty, { out: (l) => lines.push(l), err: (l) => lines.push(l) });
+    const refused = [guard?.refuses(first), guard?.refuses(second)];
+    return { refused, lines };
+  }
+
+  it("notes other changes once", () => {
+    const root = repo({ "a.txt": "a\n", "b.txt": "b\n" });
+    write(root, { "notes.md": "x\n" });
+    const { refused, lines } = askTwice(root, ["a.txt"], ["a.txt", "b.txt"]);
+    expect(refused).toEqual([false, false]);
+    expect(lines).toEqual(["Note: 1 other file(s) have uncommitted changes; Loupe won't touch them."]);
+  });
+
+  it("lists each file --allow-dirty lets through once", () => {
+    const root = repo({ "a.txt": "a\n", "b.txt": "b\n" });
+    write(root, { "a.txt": "changed\n", "b.txt": "changed\n" });
+    const { refused, lines } = askTwice(root, ["a.txt"], ["a.txt", "b.txt"], true);
+    expect(refused).toEqual([false, false]);
+    expect(lines).toEqual([
+      "Proceeding with uncommitted changes (--allow-dirty) in:",
+      "  a.txt",
+      "Proceeding with uncommitted changes (--allow-dirty) in:",
+      "  b.txt",
+    ]);
+  });
+
+  it("says nothing the second time when it has nothing new to list", () => {
+    const root = repo({ "a.txt": "a\n" });
+    write(root, { "a.txt": "changed\n" });
+    const { lines } = askTwice(root, ["a.txt"], ["a.txt"], true);
+    expect(lines).toEqual(["Proceeding with uncommitted changes (--allow-dirty) in:", "  a.txt"]);
+  });
+});
+
 describe("a root below the top of the git repository", () => {
   /** `outer/` is the git repo; Loupe's root is `outer/mono/`. */
   function nested(): { outer: string; mono: string } {
