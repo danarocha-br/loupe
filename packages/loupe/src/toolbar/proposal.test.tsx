@@ -7,6 +7,8 @@ import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
+import { memoryRequest, memorySource } from "./flags.fixture.js";
+import { setFlagSource } from "./flags-store.js";
 import Toolbar from "./index.js";
 import { collectProposal, pageTheme, startTracking } from "./proposal.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
@@ -14,10 +16,8 @@ import { HOST_ATTRIBUTE } from "./styles.js";
 vi.mock("./project-server.js", () => ({
   readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
 }));
-vi.mock("./flags.js", () => ({
-  previewedFlags: async () => [{ key: "new-roles", value: true }],
-  FlagsCard: () => null,
-}));
+// The override cookie holds one flag preview, which the app doesn't declare.
+setFlagSource(memorySource(memoryRequest({ overrides: { "new-roles": true } })));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

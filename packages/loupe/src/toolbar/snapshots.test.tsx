@@ -17,7 +17,6 @@ const rasterized: Seen[] = [];
 vi.mock("./project-server.js", () => ({
   readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1", dirty: false, playgroundVersion: "0.0.3" }),
 }));
-vi.mock("./flags.js", () => ({ previewedFlags: async () => [], FlagsCard: () => null }));
 
 vi.mock("modern-screenshot", () => ({
   domToCanvas: vi.fn(async () => {
