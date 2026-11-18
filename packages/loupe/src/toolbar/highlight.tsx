@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
-import type { Member } from "./scopes.js";
+import type { Member } from "./panel-view/index.js";
 
 /** `hover`: dashed grey; `out`: left out of the scope, dashed. */
 type Kind = "ring" | "hover" | "out";

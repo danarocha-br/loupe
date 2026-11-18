@@ -1,0 +1,56 @@
+// The panel's view (PER-214): one call takes the page and the selection and
+// returns, as typed data with its words, everything the panel shows. The Toolbar's
+// components only render it. This file is the only one they import.
+
+import { createReads } from "./reads.js";
+import { inspectorBody } from "./inspector.js";
+import { listBody } from "./list.js";
+import { readPage } from "./page.js";
+import { present, scopeView } from "./scopes.js";
+import type { PanelInput, PanelView } from "./types.js";
+import { footerCount, OVERRIDES_OFF_TITLE, overridesOffBanner } from "./words.js";
+
+export type * from "./types.js";
+export { TEXT } from "./words.js";
+
+/**
+ * Reads the page through `input.debug`, each Instance at most once, and decides
+ * what the panel shows. It writes nothing, and never throws because an Instance
+ * has gone: the selected one then reads "Not on the page now".
+ */
+export function panelView(input: PanelInput): PanelView {
+  const { selected } = input;
+  const reads = createReads(input.debug);
+  const page = readPage(input.debug, input.seen, input.layer);
+  const row = selected === null ? null : (page.rows.find((candidate) => candidate.id === selected) ?? null);
+  // The picked scope applies while the Instance has it: mounted, adapted, with a call
+  // site for a group, and Overrides on. Otherwise This instance does.
+  const view =
+    row !== null && row.adapted && input.scope !== "instance" && page.status.overrides
+      ? scopeView(page.rows, page.records, row, input.scope)
+      : null;
+  const scoped = view && present(view, reads);
+  const scope = scoped ? input.scope : "instance";
+  return {
+    scope,
+    seen: page.seen,
+    // An Adapter carries its own metadata.
+    metaAnchor: row && !row.adapted ? row.anchor : null,
+    outline: {
+      label: selected === null ? null : (reads.inspect(selected)?.component ?? null),
+      members: scoped?.members ?? null,
+    },
+    instanceCount: page.instanceCount,
+    header: { exportEnabled: page.records.length > 0 },
+    banner: page.status.overrides ? null : { title: OVERRIDES_OFF_TITLE, body: overridesOffBanner(page.status.reason) },
+    footer: {
+      countText: footerCount(page.overrideCount),
+      hasOverrides: page.overrideCount > 0,
+      copyEnabled: page.records.length > 0,
+      // `discard` takes a record's target, so it also drops a record whose Instance
+      // isn't mounted, where `reset(id)` throws (PER-128).
+      resetAll: page.overrideCount > 0 && page.status.overrides ? page.records.map((record) => record.target) : [],
+    },
+    body: selected === null ? listBody(page, reads) : inspectorBody(selected, row, page, reads, { scope, scoped }),
+  };
+}

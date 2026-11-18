@@ -5,8 +5,8 @@ import { act, createElement as h, memo, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
-import { snapshot } from "../toolbar/page.js";
-import { scopeView } from "../toolbar/scopes.js";
+import type { LayerStatus } from "../layer-status.js";
+import { type InspectorBody, type ListBody, panelView } from "../toolbar/panel-view/index.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug, UNADAPTED_REASON } from "./debug.js";
 import { loadedMeta, metaRequestOf, rememberMeta } from "./instance-meta.js";
@@ -63,6 +63,8 @@ afterEach(() => {
   container.remove();
   delete doc.__reactContainer$test;
 });
+
+const NONE_SEEN = { route: "", components: new Set<string>() };
 
 const render = (element: ReactNode) => act(() => root.render(h("main", null, element)));
 
@@ -276,17 +278,50 @@ describe("anchored client Instances without an Adapter", () => {
       ["Button", true],
       ["Button", false],
     ]);
-    const view = scopeView(loupe, rows, [], rows[0] as (typeof rows)[number], "page");
-    expect(view?.members.map((member) => member.id)).toEqual([instanceId(at("Button"), "b")]);
-    expect(view?.label).toMatch(/· 1$/);
+    const view = panelView({ debug: loupe, layer: null, selected: instanceId(at("Button"), "b"), scope: "page", seen: NONE_SEEN });
+    expect(view.scope).toBe("page");
+    expect(view.outline.members?.map((member) => member.id)).toEqual([instanceId(at("Button"), "b")]);
+    expect((view.body as InspectorBody).editing?.scopes?.find((option) => option.scope === "page")?.label).toMatch(/· 1$/);
   });
 
   it("decides Coverage badges without inspecting Instances that have no Adapter", () => {
     render([h(Button, { key: "b", ...loader("Button") }, "Save"), h(NewCard, { key: "c", ...loader("NewCard") })]);
     const inspect = vi.spyOn(loupe, "inspect");
-    const page = snapshot(loupe, { route: "", components: new Set() });
-    expect(page.groups.find((group) => group.component === "NewCard")).toMatchObject({ supported: false, reason: "No Adapter" });
+    const view = panelView({ debug: loupe, layer: null, selected: null, scope: "instance", seen: NONE_SEEN });
+    const card = (view.body as ListBody).groups.find((group) => group.component === "NewCard");
+    expect(card?.verdict).toEqual({
+      supported: false,
+      reason: "no-adapter",
+      reasonText: "No Adapter",
+      status: { kind: "inspect-only", text: "Inspect only" },
+    });
+    expect(card?.notes).toContainEqual({ kind: "reason", text: "No Adapter" });
     expect(inspect.mock.calls.map(([id]) => id)).not.toContain(at("NewCard"));
+  });
+
+  it("says Not generated yet for a component generate hasn't read, in the list and on the Instance's badge", () => {
+    render([h(Button, { key: "b", ...loader("Button") }, "Save"), h(NewCard, { key: "c", ...loader("NewCard") })]);
+    const layer: LayerStatus = { command: "pnpm exec loupe generate", format: null, stale: [], notGenerated: ["NewCard"] };
+    const list = panelView({ debug: loupe, layer, selected: null, scope: "instance", seen: NONE_SEEN }).body as ListBody;
+    const card = list.groups.find((group) => group.component === "NewCard");
+    expect(card?.verdict).toMatchObject({ supported: false, reason: "not-generated", status: { kind: "not-generated", text: "Not generated yet" } });
+    // The tag says it; the reason line would repeat it.
+    expect(card?.notes.some((note) => note.kind === "reason")).toBe(false);
+    expect(card?.statusTitle).toBe("pnpm exec loupe generate");
+    expect(list.notGenerated).toEqual({ names: ["NewCard"], command: "pnpm exec loupe generate" });
+
+    const body = panelView({ debug: loupe, layer, selected: at("NewCard"), scope: "instance", seen: NONE_SEEN }).body as InspectorBody;
+    expect(body.verdict).toMatchObject({ reason: "not-generated", status: { kind: "not-generated", text: "Not generated yet" } });
+    expect(body.coverage.notGenerated).toEqual({ tag: { kind: "not-generated", text: "Not generated yet" }, command: "pnpm exec loupe generate" });
+    // Not "no prop can be Editable": generate hasn't judged its props yet.
+    expect(body.note).toBeNull();
+
+    // Once generate has read it, the missing Adapter is the reason, and the note explains it.
+    const generated = { ...layer, notGenerated: [] };
+    const read = panelView({ debug: loupe, layer: generated, selected: at("NewCard"), scope: "instance", seen: NONE_SEEN }).body as InspectorBody;
+    expect(read.verdict).toMatchObject({ reason: "no-adapter", status: { text: "Inspect only" } });
+    expect(read.coverage.notGenerated).toBeNull();
+    expect(read.note).toMatchObject({ kind: "unadapted", title: "Inspect only · No Adapter" });
   });
 
   it("lists nothing for unanchored components or plain elements", () => {

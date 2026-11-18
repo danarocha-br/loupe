@@ -1,141 +1,22 @@
 // @vitest-environment jsdom
-import { act, type ReactNode, useState } from "react";
+// The Toolbar's wiring (PER-214): that the panel redraws as the page changes, that
+// selecting, Pick, Hide and the outline work, and that each button makes the
+// `__loupe` call its data names. What the panel shows is `panel-view.test.tsx`'s,
+// asked of `panelView()` directly.
+
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
-import type { PropMeta } from "../meta/types.js";
 import { devMount } from "../mount.js";
-import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { disableOverrides, onRegistryChange } from "../runtime/registry.js";
 import Toolbar from "./index.js";
+import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const META: Record<string, PropMeta> = {
-  children: { editable: true, from: "@types/react", kind: "text" },
-  variant: { editable: true, from: "repo", kind: "options", status: "verified", options: ["default", "ghost"] },
-  render: { editable: false, from: "@base-ui/react", reason: "STRUCTURAL" },
-};
-
-type ButtonProps = { variant?: string; children?: ReactNode; onClick?: () => void; "aria-expanded"?: boolean };
-const Button = createAdapter(
-  "Button",
-  ({ variant = "default", ...props }: ButtonProps) => <button type="button" {...props} data-variant={variant} />,
-  { props: META },
-);
-type DialogProps = { open?: boolean; onOpenChange?: (open: boolean) => void; children?: ReactNode };
-const Dialog = createAdapter(
-  "Dialog",
-  ({ open, onOpenChange, children }: DialogProps) =>
-    open ? (
-      <div role="dialog">
-        {children}
-        <button type="button" onClick={() => onOpenChange?.(false)}>
-          Fechar
-        </button>
-      </div>
-    ) : null,
-  {
-    props: {
-      open: { editable: true, from: "@base-ui/react", kind: "options", status: "type-only", options: [false, true], state: true },
-      onOpenChange: { editable: false, from: "@base-ui/react", reason: "FUNCTION" },
-      // The two sources of its default disagree: no pill may be guessed.
-      modal: {
-        editable: true,
-        from: "repo",
-        kind: "options",
-        status: "verified",
-        options: [false, true],
-        default: { source: "conflict", value: true, defaultVariants: false },
-      },
-    },
-  },
-);
-const MenuItem = createAdapter("MenuItem", (props: { children?: ReactNode }) => <div role="menuitem">{props.children}</div>);
-
-// A call site inside `Members`, by component and ordinal.
-const membersSite = (component: string, ordinal: number) =>
-  ({ path: "app/members.tsx", enclosing: "Members", component, ordinal }) as const;
-const members = (component: string, ordinal: number) => callSiteId(membersSite(component, ordinal));
-
-// What the loader writes at a call site.
-const site = (n: number, names: string[], children = "text") => ({
-  [ANCHOR_ATTRIBUTE]: members("Button", n),
-  [SOURCE_ATTRIBUTE]: callSiteHint(membersSite("Button", n), { line: 10 + n, column: 9, total: 2 }),
-  "data-ds-writes": JSON.stringify({ attributes: names.map((name) => ({ name, writtenAs: "literal" })), spreads: false, children }),
-});
-
 const LoupeMount = devMount(Toolbar);
-
-// The dialog's confirm Button: `total` is the call site's use count, which an edit
-// above it changes; `twice` renders it twice with no key, so one id names both.
-const confirmSite = (total: number) => ({
-  [ANCHOR_ATTRIBUTE]: members("Button", 3),
-  [SOURCE_ATTRIBUTE]: callSiteHint(membersSite("Button", 3), { line: 40, column: 11, total }),
-  "data-ds-writes": JSON.stringify({ attributes: [{ name: "variant", writtenAs: "literal" }], spreads: false, children: "text" }),
-});
-
-function Page({
-  onRowClick,
-  confirmTotal = 3,
-  twice = false,
-}: {
-  onRowClick: (member: string) => void;
-  confirmTotal?: number;
-  twice?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <main>
-      <ul>
-        {["ana", "bia", "caio", "dani"].map((member) => (
-          <li key={member}>
-            <Button {...(site(1, ["variant", "onClick"]) as object)} variant="ghost" onClick={() => onRowClick(member)} aria-expanded={false}>
-              {member}
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <Button {...(site(2, ["onClick"]) as object)} onClick={() => setOpen(!open)}>
-        Menu
-      </Button>
-      {open && (
-        <MenuItem {...({ [ANCHOR_ATTRIBUTE]: members("MenuItem", 1) } as object)}>Remover</MenuItem>
-      )}
-      <button type="button" onClick={() => setConfirming(true)}>
-        Abrir
-      </button>
-      <Dialog
-        {...({
-          [ANCHOR_ATTRIBUTE]: members("Dialog", 1),
-          "data-ds-writes": JSON.stringify({
-            attributes: [
-              { name: "open", writtenAs: "expression", expression: "confirming" },
-              { name: "onOpenChange", writtenAs: "expression", expression: "setConfirming" },
-            ],
-            spreads: false,
-            children: "text",
-          }),
-        } as object)}
-        open={confirming}
-        onOpenChange={setConfirming}
-      >
-        Remover membro?
-        <Button {...(confirmSite(confirmTotal) as object)} variant="ghost">
-          Confirmar
-        </Button>
-        {twice && (
-          <Button {...(confirmSite(confirmTotal) as object)} variant="ghost">
-            Confirmar
-          </Button>
-        )}
-      </Dialog>
-    </main>
-  );
-}
 
 let container: HTMLDivElement;
 let root: Root;
@@ -161,7 +42,7 @@ afterEach(() => {
 /** Lets the lazy Toolbar, its effects and its once-a-frame refresh settle. */
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 
-async function mount(onRowClick: (member: string) => void = () => {}, page: { confirmTotal?: number; twice?: boolean } = {}) {
+async function mount(onRowClick: (member: string) => void = () => {}, page: { confirmTotal?: number } = {}) {
   act(() =>
     root.render(
       <>
@@ -181,10 +62,36 @@ const clickInPanel = async (element: Element) => {
   act(() => element.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true })));
   await settle();
 };
+const hover = async (element: Element) => {
+  act(() => element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true })));
+  await settle();
+};
 const pageButton = (text: string) => [...container.querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+const panelButton = (text: string) =>
+  [...shadow().querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+const select = async (id: string) =>
+  clickInPanel(instanceButtons().find((button) => button.dataset.instance === id) as HTMLButtonElement);
+const backToList = async () => clickInPanel(panelButton("All components"));
+const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
+const inRow = (prop: string, text: string) =>
+  [...row(prop).querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+const pill = (prop: string, option: string) =>
+  row(prop).querySelector<HTMLButtonElement>(`button[data-option='${option}']`) as HTMLButtonElement;
+const textField = () => row("children").querySelector("textarea") as HTMLTextAreaElement;
+const type = async (field: HTMLTextAreaElement, text: string) => {
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await settle();
+};
+const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
+const member = (id: string) => shadow().querySelector<HTMLInputElement>(`input[data-member="${id}"]`) as HTMLInputElement;
+const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>(".ring")].map((ring) => ring.dataset.ring);
+const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
 
 describe("the Toolbar", () => {
-  it("lists every Instance on the page and updates as a menu mounts and unmounts", async () => {
+  it("redraws the list as a menu mounts and unmounts", async () => {
     await mount();
     expect(panelText()).toContain("Button ×5");
     expect(panelText()).not.toContain("MenuItem");
@@ -196,25 +103,19 @@ describe("the Toolbar", () => {
     act(() => pageButton("Menu").click());
     await settle();
     expect(panelText()).not.toContain("MenuItem ×1");
-    expect(panelText()).toContain("Appears on interaction");
   });
 
-  it("selects from the list and shows identity, call site, Coverage and the library's props in one line", async () => {
+  it("selects from the list, and goes back to it", async () => {
     await mount();
-    const bia = instanceButtons().find((button) => button.dataset.instance?.endsWith("#bia")) as HTMLButtonElement;
-    await clickInPanel(bia);
-
-    expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe("app/members.tsx › Members › Button[1]#bia");
-    expect(panelText()).toContain("members.tsx:11 · use 1 of 2");
-    expect(shadow().querySelector("[data-testid=coverage]")?.textContent).toBe("2 editable props · 2 inspect only");
-    const onClick = shadow().querySelector("[data-prop=onClick]")?.textContent ?? "";
-    expect(onClick).toContain("FUNCTION");
-    expect(shadow().querySelector("[data-prop=render]")?.textContent).toContain("STRUCTURAL");
-    // Injected by "the library": one collapsed line, not a row.
-    expect(shadow().querySelector("[data-prop=aria-expanded]")).toBeNull();
+    await select(BIA);
+    expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe(BIA);
+    // What a library set: one collapsed line.
     const injected = [...shadow().querySelectorAll("details")].at(-1) as HTMLDetailsElement;
     expect(injected.querySelector("summary")?.textContent).toBe("1 set by the library");
     expect(injected.open).toBe(false);
+    await backToList();
+    expect(shadow().querySelector("[data-testid=instance-id]")).toBeNull();
+    expect(panelText()).toContain("On this page");
   });
 
   it("picks the right one of four repeated row Instances by clicking the page, without the page reacting", async () => {
@@ -256,38 +157,15 @@ describe("the Toolbar", () => {
     expect(shadow().querySelector(".panel")).toBeNull();
   });
 
-  it("keeps showing a selected Instance's place while its menu is closed", async () => {
+  it("shows the Overrides-off banner and turns Reset all off when the React self-check fails", async () => {
     await mount();
-    act(() => pageButton("Menu").click());
-    await settle();
-    const item = instanceButtons().find((button) => button.dataset.instance?.includes("MenuItem")) as HTMLButtonElement;
-    await clickInPanel(item);
-    expect(panelText()).toContain("MenuItem");
-
-    act(() => pageButton("Menu").click());
-    await settle();
-    expect(panelText()).toContain("Not on the page now");
-  });
-
-  it("goes inspect-only as a whole when the React self-check fails", async () => {
-    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+    });
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
     await settle();
     expect(shadow().querySelector(".banner")?.textContent).toContain("Everything is inspect-only");
-    expect(shadow().querySelector(".banner")?.textContent).toContain("(React reported no fiber while an Adapter rendered.)");
-    const reset = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Reset all") as HTMLButtonElement;
-    expect(reset.disabled).toBe(true);
-    await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
-    expect(shadow().querySelector("[data-testid=coverage]")?.textContent).toBe("0 editable props · 4 inspect only");
-  });
-
-  it("says Overrides are off once, in the panel's banner, with an Instance selected (PER-184)", async () => {
-    await mount();
-    act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
-    await settle();
-    await select(BIA);
-    const said = panelText().match(/everything is inspect-only/gi)?.length ?? 0;
-    expect(said).toBe(1);
+    expect(panelButton("Reset all").disabled).toBe(true);
   });
 
   it("Reset all drops every record, including one whose Instance isn't mounted", async () => {
@@ -304,8 +182,7 @@ describe("the Toolbar", () => {
     expect(() => loupe.reset(item)).toThrow(/No mounted Instance/);
     expect(panelText()).toContain("2 Overrides on this page");
 
-    const reset = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Reset all") as HTMLButtonElement;
-    await clickInPanel(reset);
+    await clickInPanel(panelButton("Reset all"));
     expect(loupe.records()).toEqual([]);
     expect(panelText()).toContain("0 Overrides on this page");
   });
@@ -320,42 +197,20 @@ describe("the Toolbar", () => {
   });
 });
 
-const BIA = instanceId(members("Button", 1), "bia");
-const DIALOG = members("Dialog", 1);
-const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
-const inRow = (prop: string, text: string) =>
-  [...row(prop).querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
-const textField = () => row("children").querySelector("textarea") as HTMLTextAreaElement;
-const type = async (field: HTMLTextAreaElement, text: string) => {
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, text);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await settle();
-};
-const select = async (id: string) =>
-  clickInPanel(instanceButtons().find((button) => button.dataset.instance === id) as HTMLButtonElement);
-
 describe("controls at This instance", () => {
-  it("overrides an option on one Instance, shows the Current value beside it, and resets it", async () => {
+  it("overrides an option on one Instance and resets it", async () => {
     await mount();
     await select(BIA);
-    expect(inRow("variant", '"ghost"').getAttribute("aria-pressed")).toBe("true");
-    expect(row("variant").classList.contains("overridden")).toBe(false);
-
-    await clickInPanel(inRow("variant", '"default"'));
+    await clickInPanel(pill("variant", '"default"'));
     expect(loupe.props(BIA).overrides).toEqual({ variant: "default" });
     expect(pageButton("bia").dataset.variant).toBe("default");
     // Only this Instance: the other rows keep the app's value.
     expect(pageButton("ana").dataset.variant).toBe("ghost");
-    expect(row("variant").classList.contains("overridden")).toBe(true);
-    expect(inRow("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
     expect(row("variant").querySelector("[data-testid=current]")?.textContent).toBe('Current: "ghost"');
 
     await clickInPanel(inRow("variant", "Reset"));
     expect(loupe.props(BIA).overrides).toEqual({});
     expect(pageButton("bia").dataset.variant).toBe("ghost");
-    expect(row("variant").querySelector("[data-testid=current]")).toBeNull();
   });
 
   it("edits label text in a field and resets the whole Instance", async () => {
@@ -364,12 +219,11 @@ describe("controls at This instance", () => {
     const field = textField();
     expect(field.value).toBe("bia");
     await type(field, "Bianca");
-    await clickInPanel(inRow("variant", '"default"'));
+    await clickInPanel(pill("variant", '"default"'));
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca", variant: "default" });
     expect(container.textContent).toContain("Bianca");
-    expect(row("children").querySelector("[data-testid=current]")?.textContent).toBe('Current: "bia"');
 
-    const resetInstance = [...shadow().querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement;
+    const resetInstance = panelButton("Reset this Instance");
     expect(resetInstance.disabled).toBe(false);
     await clickInPanel(resetInstance);
     expect(loupe.records()).toEqual([]);
@@ -377,37 +231,6 @@ describe("controls at This instance", () => {
     expect(resetInstance.disabled).toBe(true);
   });
 
-  it("tags a State prop and says when the app tries to change a held value, while Current tracks the app", async () => {
-    await mount();
-    await select(DIALOG);
-    expect(row("open").textContent).toContain("STATE");
-    expect(row("modal").querySelectorAll("button[aria-pressed=true]")).toHaveLength(0);
-    await clickInPanel(inRow("open", "true"));
-    expect(container.querySelector("[role=dialog]")).not.toBeNull();
-    expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: false");
-    expect(row("open").querySelector("[data-testid=held]")).toBeNull();
-
-    // The app's own state moves: Current follows it.
-    act(() => pageButton("Abrir").click());
-    await settle();
-    expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: true");
-
-    // The app tries to close it: the Override holds, and the row says so.
-    act(() => pageButton("Fechar").click());
-    await settle();
-    expect(container.querySelector("[role=dialog]")).not.toBeNull();
-    expect(row("open").querySelector("[data-testid=current]")?.textContent).toBe("Current: false");
-    expect(row("open").querySelector("[data-testid=held]")?.textContent).toBe(
-      "Your Override holds this at true; the app tried to set false. Reset",
-    );
-
-    await clickInPanel(inRow("open", "Reset"));
-    expect(container.querySelector("[role=dialog]")).toBeNull();
-    expect(row("open").querySelector("[data-testid=held]")).toBeNull();
-  });
-});
-
-describe("controls at This instance, edge cases", () => {
   it("offers Reset this Instance for a selected Instance that isn't mounted, through discard", async () => {
     await mount();
     act(() => pageButton("Menu").click());
@@ -420,84 +243,57 @@ describe("controls at This instance, edge cases", () => {
     act(() => pageButton("Menu").click());
     await settle();
     expect(panelText()).toContain("Not on the page now");
-    const reset = [...shadow().querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement;
-    await clickInPanel(reset);
+    await clickInPanel(panelButton("Reset this Instance"));
     expect(loupe.records()).toEqual([]);
+    expect(loupe.lastSeen(item)).toBeNull();
   });
 
-  it("shows a group Override as chosen, says where it comes from, with no Instance Reset", async () => {
+  it("resets a held State prop from its notice", async () => {
     await mount();
-    act(() => {
-      loupe.set(BIA, "variant", "default", "group");
-    });
-    await select(BIA);
-    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from All in Members · Button 1 of 2");
-    expect(row("variant").querySelector("[data-testid=current]")?.textContent).toBe('Current: "ghost"');
-    expect(inRow("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
-    expect(inRow("variant", "Reset")).toBeUndefined();
+    await select(DIALOG);
+    await clickInPanel(pill("open", "true"));
+    expect(container.querySelector("[role=dialog]")).not.toBeNull();
+    act(() => pageButton("Abrir").click());
+    await settle();
+    // The app tries to close it: the Override holds, and the row says so, with its Reset.
+    act(() => pageButton("Fechar").click());
+    await settle();
+    const notice = row("open").querySelector("[data-testid=held]") as HTMLElement;
+    expect(notice.textContent).toBe("Your Override holds this at true; the app tried to set false. Reset");
+    await clickInPanel([...notice.querySelectorAll("button")].find((button) => button.textContent === "Reset") as HTMLButtonElement);
+    expect(container.querySelector("[role=dialog]")).toBeNull();
+    expect(row("open").querySelector("[data-testid=held]")).toBeNull();
   });
 });
-
-const ANA = instanceId(members("Button", 1), "ana");
-const MENU = members("Button", 2);
-const GROUP = "All in Members · Button 1 of 2";
-const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
-const pill = (prop: string, option: string) =>
-  row(prop).querySelector<HTMLButtonElement>(`button[data-option='${option}']`) as HTMLButtonElement;
-const member = (id: string) => shadow().querySelector<HTMLInputElement>(`input[data-member="${id}"]`) as HTMLInputElement;
-const panelButton = (text: string) =>
-  [...shadow().querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
-const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>(".ring")].map((ring) => ring.dataset.ring);
-const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
-const backToList = async () => clickInPanel(panelButton("All components"));
 
 describe("group and page scopes", () => {
   beforeEach(() => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
   });
 
-  it("opens at This instance and offers each scope with its size", async () => {
+  it("switches to a group, rings and changes all four, and opens a new selection at This instance", async () => {
     await mount();
     await select(BIA);
-    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
-    expect(scopeButton("instance").textContent).toBe("This instance");
-    expect(scopeButton("group").textContent).toBe(`${GROUP} · 4`);
-    expect(scopeButton("page").textContent).toBe("All on page · 5");
     expect(ringKinds()).toEqual(["ring"]);
-  });
-
-  it("rings every Instance of a call-site group, applies to all four, and leaves the other call site alone", async () => {
-    await mount();
-    await select(BIA);
     await clickInPanel(scopeButton("group"));
+    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
     expect(ringKinds()).toEqual(["ring", "ring", "ring", "ring"]);
-    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe("SAME ON ALL 4");
-    expect(pill("variant", '"ghost"').getAttribute("aria-pressed")).toBe("true");
-    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from the app");
 
     await clickInPanel(pill("variant", '"default"'));
-    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe(`from ${GROUP}`);
     expect(variants()).toEqual(["default", "default", "default", "default"]);
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "group", anchor: members("Button", 1) }]);
     expect(loupe.props(MENU).overrides).toEqual({});
-    // The pills keep counting the app's own values after the Override is set.
-    expect(pill("variant", '"ghost"').textContent).toBe('"ghost" 4');
-    expect(pill("variant", '"default"').getAttribute("aria-pressed")).toBe("true");
 
     // Hovering one row of the Instances list rings only that one.
-    act(() => member(ANA).closest("li")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true })));
-    await settle();
+    await hover(member(ANA).closest("li") as HTMLElement);
     expect(ringKinds()).toEqual(["ring"]);
 
-    // A new selection opens at This instance again, and says which scope its value comes from.
     await backToList();
     await select(ANA);
     expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
-    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe(`from ${GROUP}`);
-    expect(shadow().querySelector("[data-testid=chips]")?.textContent).toBe(GROUP);
   });
 
-  it("leaves one Instance out at its own value, and resetting the group keeps an Instance Override", async () => {
+  it("leaves one Instance out with its box, rings it dashed, and resetting the group keeps an Instance Override", async () => {
     await mount();
     await select(BIA);
     await clickInPanel(scopeButton("group"));
@@ -506,10 +302,8 @@ describe("group and page scopes", () => {
     expect(member(BIA).checked).toBe(false);
     expect(variants()).toEqual(["default", "ghost", "default", "default"]);
     expect(ringKinds().filter((kind) => kind === "out")).toHaveLength(1);
-    expect(pill("variant", '"ghost"').textContent).toBe('"ghost" 3');
     // Hovering the left-out row rings it alone, still dashed.
-    act(() => member(BIA).closest("li")?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true })));
-    await settle();
+    await hover(member(BIA).closest("li") as HTMLElement);
     expect(ringKinds()).toEqual(["out"]);
 
     // Ana gets her own value on top of the group's.
@@ -517,10 +311,8 @@ describe("group and page scopes", () => {
     await select(ANA);
     await clickInPanel(pill("variant", '"ghost"'));
     expect(inRow("variant", "Reset to group value")).toBeTruthy();
-    expect(row("variant").querySelector("[data-testid=source]")?.textContent).toBe("from This instance");
 
     await clickInPanel(scopeButton("group"));
-    expect(row("variant").querySelector(".keeping")?.textContent).toBe("1 of 3 keeps its own value");
     await clickInPanel(panelButton("Reset this scope"));
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "instance", id: ANA }]);
     expect(variants()).toEqual(["ghost", "ghost", "ghost", "ghost"]);
@@ -541,18 +333,6 @@ describe("group and page scopes", () => {
     await clickInPanel(row("children").querySelector(".keeping") as HTMLButtonElement);
     expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe(ANA);
     expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
-    expect(inRow("children", "Reset to group value")).toBeTruthy();
-  });
-
-  it("notes a narrower value only where this scope overrides the prop", async () => {
-    await mount();
-    act(() => {
-      loupe.set(ANA, "variant", "default");
-    });
-    await select(BIA);
-    await clickInPanel(scopeButton("group"));
-    expect(row("variant").querySelector(".keeping")).toBeNull();
-    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe("SAME ON ALL 4");
   });
 
   it("opens at This instance again when a scoped Instance comes back after unmounting", async () => {
@@ -570,33 +350,16 @@ describe("group and page scopes", () => {
     expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("counts differing Current values at page scope and leaves a whole call site out in one click", async () => {
+  it("leaves a whole call site out of the page scope in one click", async () => {
     await mount();
     await select(BIA);
     await clickInPanel(scopeButton("page"));
-    expect(row("variant").querySelector("[data-testid=counts]")?.textContent).toBe('"ghost" 4 · not set 1');
     expect(ringKinds()).toHaveLength(5);
-    expect(shadow().querySelectorAll("fieldset.site")).toHaveLength(2);
-
     await clickInPanel(shadow().querySelector(`input[data-site="${MENU}"]`) as HTMLInputElement);
     expect(loupe.records()[0]?.excluded).toEqual([MENU]);
     await clickInPanel(pill("variant", '"default"'));
     expect(loupe.props(MENU).overrides).toEqual({});
     expect(variants()).toEqual(["default", "default", "default", "default"]);
-
-    await backToList();
-    await select(MENU);
-    expect(shadow().querySelector("[data-testid=chips]")?.textContent).toBe("Left out of All on page");
-  });
-
-  it("offers a State prop at This instance only", async () => {
-    await mount();
-    await select(DIALOG);
-    await clickInPanel(scopeButton("group"));
-    expect(row("open").querySelector("[data-testid=state-only]")?.textContent).toBe("Change it on one Instance.");
-    expect(row("open").querySelectorAll(".pills")).toHaveLength(0);
-    // `modal` isn't a State prop: it keeps its pills, and its conflicting default selects none.
-    expect(row("modal").querySelectorAll(".pills")).toHaveLength(1);
   });
 });
 
@@ -625,7 +388,6 @@ describe("the Text row (PER-137)", () => {
     await type(textField(), "");
     expect(loupe.props(BIA).overrides).toEqual({ children: "" });
     expect(row("children").querySelector("[data-testid=empty]")?.textContent).toBe("empty");
-    expect(row("children").querySelector("[data-testid=current]")?.textContent).toBe('Current: "bia"');
 
     await clickInPanel(inRow("children", "Reset"));
     expect(loupe.props(BIA).overrides).toEqual({});
@@ -648,161 +410,28 @@ describe("the Text row (PER-137)", () => {
     expect(loupe.records()).toEqual([]);
     expect(pageButton("ana")).toBeTruthy();
   });
-
-  it("is not offered at page scope", async () => {
-    await mount();
-    await select(BIA);
-    await clickInPanel(scopeButton("page"));
-    expect(textField()).toBeNull();
-    expect(row("children").querySelector("[data-testid=per-call-site]")?.textContent).toBe("Change it per call site.");
-    // The row still shows the text each Button says.
-    expect(row("children").querySelector("[data-testid=counts]")?.textContent).toBe('"ana" 1 · "bia" 1 · "caio" 1 · "dani" 1 · "Menu" 1');
-    // Other props keep their page-scope control.
-    expect(row("variant").querySelectorAll(".pills")).toHaveLength(1);
-  });
-
-  it.each([
-    ["from-code", "FROM CODE"],
-    ["mixed", "MIXED"],
-  ])("shows text a call site writes as %s inspect-only, tagged %s, with no field", async (children, tag) => {
-    act(() =>
-      root.render(
-        <>
-          <Button {...(site(1, [], children) as object)}>{"Remover"}</Button>
-          <LoupeMount />
-        </>,
-      ),
-    );
-    await settle();
-    await settle();
-    await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
-    expect(row("children").querySelector(".tag")?.textContent).toBe(tag);
-    expect(textField()).toBeNull();
-    // Coverage counts it as inspect only.
-    expect(row("children").closest(".card")?.querySelector("h3")?.textContent).toBe("Inspect only");
-  });
 });
 
-const CONFIRM = members("Button", 3);
-const card = (heading: string) =>
-  [...shadow().querySelectorAll<HTMLElement>(".card")].find((candidate) => candidate.querySelector("h3")?.textContent === heading);
-const toggleDialog = async () => {
-  const open = container.querySelector("[role=dialog]");
-  act(() => (open ? pageButton("Fechar") : pageButton("Abrir")).click());
-  await settle();
-};
-
-describe("closed and held-for-review Overrides", () => {
-  it("lists a closed dialog's Button as No Instance mounted while it holds an Override, with its Current value last seen", async () => {
+describe("held for review", () => {
+  it("Discard clears a record held for review", async () => {
     await mount();
-    await toggleDialog();
-    act(() => {
-      loupe.set(CONFIRM, "variant", "default");
-    });
-    await toggleDialog();
-    expect(loupe.list().some((candidate) => candidate.id === CONFIRM)).toBe(false);
-
-    const held = shadow().querySelector<HTMLElement>(`[data-instance="${CONFIRM}"]`) as HTMLElement;
-    expect(held.closest("li")?.textContent).toContain("No Instance mounted");
-    expect(held.closest("li")?.textContent).toContain('variant "default" · Current "ghost" (last seen)');
-    // Nothing in the Toolbar opens the dialog: the Instance applies again only when the app opens it.
-    expect(container.querySelector("[role=dialog]")).toBeNull();
-
-    await toggleDialog();
-    expect(pageButton("Confirmar").dataset.variant).toBe("default");
-    // Mounted again: one ordinary row, no held one beside it.
-    expect(shadow().querySelectorAll(`[data-instance="${CONFIRM}"]`)).toHaveLength(1);
-    expect(panelText()).not.toContain("No Instance mounted");
-  });
-
-  it("does not list a closed Instance that holds nothing", async () => {
-    await mount();
-    await toggleDialog();
-    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).not.toBeNull();
-    await toggleDialog();
-    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).toBeNull();
-    expect(panelText()).not.toContain("No Instance mounted");
-    // Nothing is kept for it either.
-    expect(loupe.lastSeen(CONFIRM)).toBeNull();
-  });
-
-  it("lists a held Instance on the route it mounted on, even when it unmounts after a navigation", async () => {
-    await mount();
-    await toggleDialog();
-    act(() => {
-      loupe.set(CONFIRM, "variant", "default");
-    });
-    // The URL moves before the old page's Instances unmount.
-    act(() => history.pushState(null, "", "/outro"));
-    await toggleDialog();
-    expect(loupe.lastSeen(CONFIRM)?.route).toBe("/");
-    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)).toBeNull();
-
-    act(() => history.pushState(null, "", "/"));
-    act(() => pageButton("Menu").click());
+    act(() => pageButton("Abrir").click());
     await settle();
-    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("No Instance mounted");
-  });
-
-  it("holds a record for review when its call site's total changes, says why, and Discard clears it", async () => {
-    await mount();
-    await toggleDialog();
     act(() => {
       loupe.set(CONFIRM, "variant", "default");
     });
-    await toggleDialog();
-    // A same-component call was added above it: the call site now has four uses.
+    act(() => pageButton("Fechar").click());
+    await settle();
+    // A same-component call was added above it: the call site now has four uses, which
+    // its next render finds.
     await mount(() => {}, { confirmTotal: 4 });
-    await toggleDialog();
-    expect(pageButton("Confirmar").dataset.variant).toBe("ghost");
-
-    const review = card("Held for review") as HTMLElement;
-    expect(review.textContent).toContain("Members › Button[3]");
-    expect(review.textContent).toContain("Code changed here: this call site had 3 uses, now 4.");
-
-    // Closed again: its row says it is held, and its values show once, on the card.
-    await toggleDialog();
-    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("Held for review");
-    expect(shadow().querySelectorAll("[data-testid=held-values]")).toHaveLength(1);
-    const discard = [...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement;
-    await clickInPanel(discard);
-    expect(loupe.records()).toEqual([]);
-    expect(card("Held for review")).toBeUndefined();
-  });
-
-  it("holds a record for review when its id matches more than one Instance", async () => {
-    await mount();
-    await toggleDialog();
-    act(() => {
-      loupe.set(CONFIRM, "variant", "default");
-    });
-    await toggleDialog();
-    await mount(() => {}, { twice: true });
-    await toggleDialog();
-
-    const review = card("Held for review") as HTMLElement;
-    expect(review.textContent).toContain(`Matches more than one Instance (${CONFIRM}): discard it and set it again on the one you mean.`);
-    // Its id is mounted, on two elements: there is no last-seen Current value to show.
-    expect(review.querySelector("[data-testid=held-values]")?.textContent).toBe('variant "default"');
-    expect(shadow().querySelector(`[data-instance="${CONFIRM}"]`)?.closest("li")?.textContent).toContain("Held for review");
+    act(() => pageButton("Abrir").click());
+    await settle();
+    const review = shadow().querySelector("[data-testid=held-for-review]") as HTMLElement;
+    expect(review.textContent).toContain("Code changed here");
     await clickInPanel([...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement);
     expect(loupe.records()).toEqual([]);
-  });
-
-  it("shows a held value with its last-seen Current value on the selected Instance's card", async () => {
-    await mount();
-    await toggleDialog();
-    await select(CONFIRM);
-    act(() => {
-      loupe.set(CONFIRM, "variant", "default");
-    });
-    await toggleDialog();
-    const missing = card("Not on the page now") as HTMLElement;
-    expect(missing.textContent).toContain("No Instance mounted");
-    expect(missing.textContent).toContain('variant "default" · Current "ghost" (last seen)');
-
-    await clickInPanel([...missing.querySelectorAll("button")].find((b) => b.textContent === "Reset this Instance") as HTMLButtonElement);
-    expect(loupe.lastSeen(CONFIRM)).toBeNull();
+    expect(shadow().querySelector("[data-testid=held-for-review]")).toBeNull();
   });
 });
 

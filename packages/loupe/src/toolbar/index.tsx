@@ -11,10 +11,11 @@ import type { Scope } from "../runtime/store.js";
 import { Highlight } from "./highlight.js";
 import { CaptureIcon, CursorIcon, LayersIcon, PanelIcon } from "./icons.js";
 import { useInstanceMeta } from "./instance-meta.js";
+import { useLayerStatus } from "./notices.js";
+import { useDebug, usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
+import { panelView, type SeenComponents } from "./panel-view/index.js";
 import { usePicker } from "./picker.js";
-import { type SeenComponents, safeInspect, snapshot, useDebug, usePageVersion } from "./page.js";
-import { scopeView } from "./scopes.js";
 import { useCapture } from "./snapshots-card.js";
 import { CSS, HOST_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
 
@@ -148,25 +149,27 @@ function ToolbarOpen({
 }) {
   const debug = useDebug();
   const version = usePageVersion(host);
-  const seen = useRef<SeenComponents>({ route: "", components: new Set() }).current;
-  const page = useMemo(() => snapshot(debug, seen), [debug, seen, version]);
-  useInstanceMeta(page, selected);
+  const layer = useLayerStatus(version);
+  // "Appears on interaction" remembers components across page versions: `panelView()`
+  // takes what it returned last time and returns the next.
+  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
+  // `version` is the trigger: it moves whenever the registry or the page changes.
+  const view = useMemo(
+    () => panelView({ debug, layer, selected, scope, seen: seen.current }),
+    [debug, layer, selected, scope, version],
+  );
+  seen.current = view.seen;
+  useInstanceMeta(view.metaAnchor);
   const [hovered, setHovered] = useState<string[]>([]);
   const picker = usePicker(debug, host, (id) => {
     onSelect(id);
     setHovered([]);
   });
-  const selectedLabel = selected === null ? null : (safeInspect(debug, selected)?.component ?? null);
-  const view = useMemo(() => {
-    if (selected === null || scope === "instance" || !debug.status.overrides) return null;
-    const row = page.rows.find((candidate) => candidate.id === selected && candidate.adapted);
-    return row ? scopeView(debug, page.rows, page.records, row, scope) : null;
-  }, [debug, page, selected, scope]);
-  // The Instance left (its dialog closed, say): when it comes back it opens at This instance.
+  // The picked scope can't be reached (the Instance left, say): store the one that
+  // applies, so the Instance opens at This instance when it comes back.
   useEffect(() => {
-    if (scope !== "instance" && view === null) onScope("instance");
-  }, [scope, view, onScope]);
-  const instances = page.groups.reduce((sum, group) => sum + group.instances.length, 0);
+    if (view.scope !== scope) onScope(view.scope);
+  }, [view.scope, scope, onScope]);
 
   return (
     <>
@@ -174,19 +177,16 @@ function ToolbarOpen({
         debug={debug}
         version={version}
         selected={selected}
-        selectedLabel={selectedLabel}
+        selectedLabel={view.outline.label}
         hovered={picker.picking ? (picker.hovered ? [picker.hovered] : []) : hovered}
-        members={view && !picker.picking ? view.members : null}
+        members={picker.picking ? null : view.outline.members}
       />
       <Panel
         debug={debug}
-        version={version}
-        page={page}
-        selected={selected}
-        onSelect={onSelect}
-        scope={view ? scope : "instance"}
-        onScope={onScope}
         view={view}
+        layer={layer}
+        onSelect={onSelect}
+        onScope={onScope}
         onHover={setHovered}
         onHide={onHide}
         theme={theme}
@@ -196,7 +196,7 @@ function ToolbarOpen({
         picking={picker.picking}
         onPick={picker.toggle}
         listing={selected === null}
-        instances={instances}
+        instances={view.instanceCount}
         onList={() => onSelect(null)}
         onHide={onHide}
       />

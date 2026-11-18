@@ -30,8 +30,12 @@ An Instance rendered in the browser from an anchored call site, but with no Adap
 **Server-rendered Instance**:
 An Instance a Server Component rendered. Loupe finds it through React's development record of the Server Component, and never overrides it.
 
+**Supported**:
+An Instance that can take Overrides: it rendered in the browser, it has an Adapter, Overrides are on for the page, and at least one of its props is Editable. A component is Supported when one of its mounted Instances is.
+_Avoid_: editable, enabled
+
 **Inspect only**:
-An Instance that can be inspected but not overridden: it has no Adapter, it rendered on the server, or Overrides are off for the page.
+An Instance that can be inspected but not overridden, for the first of these reasons that holds: `generate` hasn't read its component yet ("Not generated yet"), it rendered on the server, Overrides are off for the page, it has no Adapter, or none of its props is Editable. A component with no Supported Instance takes the reason of the Instance closest to Supported, the last in that order.
 
 **State prop**:
 A prop the app controls through a change handler, such as `open` with `onOpenChange`. It can be held on one Instance only.
