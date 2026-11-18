@@ -88,8 +88,10 @@ needed. On 2 it prints the file and the exact snippet; make that edit, then run
 compatibility check, compares the Loupe version in the app's `package.json`, the
 ledger, `node_modules` and the CLI, checks each touch point and Product layer
 file against its recorded hash, lists generated files that are older than their
-sources, and checks that the Product layer resolves what it imports. A touch
-point or generated file changed by hand is listed as drift and left as it is.
+sources, and checks that the Product layer resolves what it imports, and that
+the Loupe copy it resolves is the version its `peerDependencies` pin (after an
+upgrade that takes one more `pnpm install`). A touch point or generated file
+changed by hand is listed as drift and left as it is.
 
 ```bash
 pnpm exec loupe doctor           # exits 1 when something needs attention
@@ -176,7 +178,11 @@ ledger before writing it. It rewrites its own unedited files in
 `packages/loupe` (that `package.json` pins the version in `peerDependencies`),
 reapplies a touch point that went missing, and runs `generate`, which rewrites
 the Adapters and `meta/`. The ledger's `loupe.version` moves last, and only when
-nothing was left blocked: then `init` prints "Upgraded from Loupe <old> to <new>".
+nothing was left blocked: then `init` prints "Upgraded from Loupe <old> to <new>"
+and "Next: run pnpm install". `init` never runs the package manager, and the
+`package.json` it rewrote pins the new version, so until you install, the layer
+keeps resolving the old Loupe and `pnpm install --frozen-lockfile` fails.
+`doctor` reports a layer in that state. Commit the lockfile with what `init` wrote.
 `init` refuses to start while the app's `package.json` still pins the old
 version, as when a newer release runs through `pnpm dlx`.
 

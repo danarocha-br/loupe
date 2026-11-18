@@ -73,7 +73,8 @@ function link(root: string, loupeVersion = version): void {
   };
   pkg("apps/web/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: loupeVersion });
   pkg("apps/web/node_modules/@repo/loupe", { name: "@repo/loupe" });
-  for (const name of ["@danarocha/loupe", "@repo/design-system", "next", "react"]) {
+  pkg("packages/loupe/node_modules/@danarocha/loupe", { name: "@danarocha/loupe", version: loupeVersion });
+  for (const name of ["@repo/design-system", "next", "react"]) {
     pkg(`packages/loupe/node_modules/${name}`, { name });
   }
 }
@@ -111,6 +112,7 @@ describe("loupe doctor on a healthy install", () => {
     expect(text).toContain("✓ 4 files from loupe init match the ledger");
     expect(text).toMatch(/✓ \d+ files from loupe generate, none edited by hand/);
     expect(text).toContain("✓ packages/loupe resolves @danarocha/loupe, @repo/design-system, next, react");
+    expect(text).toContain(`✓ packages/loupe resolves Loupe ${version}, the version its peerDependencies pin`);
     expect(text).toContain("✓ apps/web resolves @danarocha/loupe, @repo/loupe");
     expect(text).toContain("Result: healthy. loupe doctor changed nothing.");
     expect(code).toBe(0);

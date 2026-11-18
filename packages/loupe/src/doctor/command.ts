@@ -173,11 +173,10 @@ function versions(
 ): void {
   report.heading("Versions");
   const appJson = readJson<PackageJson>(path.join(root, app, "package.json")) ?? {};
-  const installed = packageDir(path.join(root, app), NPM_PACKAGE);
   const seen: [string, string | undefined][] = [
     [`${app}/package.json`, appJson.devDependencies?.[NPM_PACKAGE] ?? appJson.dependencies?.[NPM_PACKAGE]],
     ["the ledger", ledger.loupe?.version],
-    [`${app}/node_modules`, installed && readJson<PackageJson & { version?: string }>(path.join(installed, "package.json"))?.version],
+    [`${app}/node_modules`, resolvedVersion(path.join(root, app), NPM_PACKAGE)],
     ["this CLI", cli],
   ];
   const values = new Set(seen.map(([, v]) => v));
@@ -383,6 +382,22 @@ function resolution(report: Report, root: string, layerPath: string, app: string
     if (unresolved.length === 0) report.ok(`${label} resolves ${names.join(", ")}`);
     else report.fail(`${label} can't resolve ${unresolved.join(", ")}`, ["Run pnpm install."]);
   }
+
+  // `init` pins Loupe's version as the layer's peer and never installs it, so an upgrade leaves the layer on
+  // the old copy, and `pnpm install --frozen-lockfile` failing, until the next `pnpm install`.
+  const pinned = layerJson?.peerDependencies?.[NPM_PACKAGE];
+  const resolved = resolvedVersion(layerAbs, NPM_PACKAGE);
+  // Only the exact version `init` writes; a range or `catalog:` is the person's own way to name it, and a
+  // copy that doesn't resolve, or names no version, is reported above.
+  if (pinned !== undefined && /^\d/.test(pinned) && resolved !== undefined) {
+    if (pinned === resolved) report.ok(`${layerPath} resolves Loupe ${resolved}, the version its peerDependencies pin`);
+    else {
+      report.fail(`${layerPath} pins Loupe ${pinned} in peerDependencies, and resolves ${resolved}`, [
+        "A Loupe upgrade leaves the Product layer on the old copy until it is installed.",
+        "Run pnpm install, then commit pnpm-lock.yaml.",
+      ]);
+    }
+  }
 }
 
 // 10. Opt-in: a production build, scanned.
@@ -425,6 +440,12 @@ export function packageDir(from: string, name: string): string | undefined {
     if (existsSync(path.join(candidate, "package.json"))) return candidate;
     if (path.dirname(dir) === dir) return undefined;
   }
+}
+
+/** The version of the copy of `name` that Node resolves from `from`; undefined when none resolves or it names none. */
+function resolvedVersion(from: string, name: string): string | undefined {
+  const dir = packageDir(from, name);
+  return dir && readJson<PackageJson & { version?: string }>(path.join(dir, "package.json"))?.version;
 }
 
 function walk(dir: string): string[] {
