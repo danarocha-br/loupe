@@ -120,6 +120,105 @@ describe("the flag store", () => {
     const view = flagsView();
     expect(view.status === "ready" && view.overrides).toEqual({});
   });
+
+  describe("when a read fails during an export (PER-226)", () => {
+    const PRO = { key: "plan", value: "pro", label: "Pro", description: "Pricing plan" };
+    let warn: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    /**
+     * A page whose flags have been read once, holding `plan: pro`, and the ways its next read can go wrong.
+     * `warnOnce` says a message once per page, so each test fails with a reason of its own.
+     */
+    const readyPage = async () => {
+      const request = memoryRequest({ ...declared, overrides: { plan: "pro" } });
+      const source = memorySource(request);
+      const fetched = request.fetch;
+      let refusal: string | null = null;
+      setFlagSource({ ...source, read: () => (refusal ? Promise.reject(new Error(refusal)) : source.read()) });
+      await loadFlags();
+      expect(flagsView().status).toBe("ready");
+      return {
+        request,
+        /** The call is refused, as a restarting dev server does. */
+        refuse: (message: string) => void (refusal = message),
+        /** Discovery answers with `status`. */
+        discoveryAnswers: (status: number) => void (request.fetch = async () => new Response("boom", { status })),
+        repair: () => {
+          refusal = null;
+          request.fetch = fetched;
+        },
+      };
+    };
+
+    it("keeps a ready view, and records what it showed, when the call is refused", async () => {
+      const page = await readyPage();
+      page.refuse("fetch failed");
+
+      expect(await previewedFlags()).toEqual([PRO]);
+
+      expect(flagsView().status).toBe("ready");
+      expect(warn).toHaveBeenCalledWith("[loupe] Couldn't re-read the flag previews: fetch failed");
+    });
+
+    it("keeps a ready view, and records what it showed, when discovery answers badly", async () => {
+      const page = await readyPage();
+      page.discoveryAnswers(500);
+
+      expect(await previewedFlags()).toEqual([PRO]);
+
+      expect(flagsView().status).toBe("ready");
+      expect(warn).toHaveBeenCalledWith("[loupe] Couldn't re-read the flag previews: /.well-known/vercel/flags answered 500.");
+    });
+
+    it("says so once, however many exports fail", async () => {
+      const page = await readyPage();
+      page.refuse("connection reset");
+
+      await previewedFlags();
+      await previewedFlags();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads again at the next export, so a recovered server's cookie is what gets recorded", async () => {
+      const page = await readyPage();
+      page.refuse("link down");
+      await previewedFlags();
+
+      page.repair();
+      await writePreview(page.request, { plan: "starter" }, []);
+
+      expect(await previewedFlags()).toEqual([{ key: "plan", value: "starter", label: "Starter", description: "Pricing plan" }]);
+    });
+
+    it("drops a failure from a source it has since left, without a warning", async () => {
+      let refuse: (error: Error) => void = () => {};
+      setFlagSource({ read: () => new Promise((_, reject) => (refuse = reject)), write: async () => ({ ok: true, overrides: {} }) });
+      const stale = loadFlags();
+
+      setFlagSource(memorySource(memoryRequest(declared)));
+      await loadFlags();
+      refuse(new Error("the old page's server is gone"));
+      await stale;
+
+      expect(flagsView().status).toBe("ready");
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it("still says why when the first read fails, since there is no view to keep", async () => {
+      setFlagSource({ read: () => Promise.reject(new Error("first load refused")), write: async () => ({ ok: true, overrides: {} }) });
+
+      expect(await previewedFlags()).toEqual([]);
+
+      expect(flagsView()).toEqual({ status: "unavailable", reason: "first load refused" });
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("the Feature flags card", () => {
@@ -224,6 +323,19 @@ describe("the Feature flags card", () => {
     expect(container.querySelector('[aria-label="Feature flags"]')?.textContent).toContain(
       "A preview lasts 8 hours, in a cookie every app on localhost shares. Clear it before switching projects.",
     );
+  });
+
+  it("stays ready when a read fails during an export, since the page still has the preview (PER-226)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    pageLoad({ overrides: { plan: "pro" } });
+    act(() => root.render(<FlagsCard />));
+    await idle();
+
+    request.fetch = async () => new Response("boom", { status: 502 });
+    await act(async () => void (await previewedFlags()));
+
+    expect(container.textContent).not.toContain("Flag previews are off");
+    expect(pill("plan", "Pro").getAttribute("aria-pressed")).toBe("true");
   });
 
   it("explains why previews are unavailable", async () => {
