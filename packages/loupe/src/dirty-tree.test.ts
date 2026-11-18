@@ -1,14 +1,9 @@
-import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
-import { git, makeRepo } from "./compat/repo.fixture.js";
+import { describe, expect, it } from "vitest";
+import { committedRepo, git, makeRepo } from "./compat/repo.fixture.js";
 import { type GuardCommand, type Hints, NOTHING_WRITTEN, openGuard } from "./dirty-tree.js";
 import { LEDGER_PATH } from "./init/ledger.js";
-
-const temps: string[] = [];
-afterAll(() => {
-  for (const dir of temps) rmSync(dir, { recursive: true, force: true });
-});
 
 function write(root: string, files: Record<string, string>): void {
   for (const [file, content] of Object.entries(files)) {
@@ -19,18 +14,12 @@ function write(root: string, files: Record<string, string>): void {
 
 /** A directory holding `files` only; the repo fixture's supported-repo files are left out. */
 function tempDir(files: Record<string, string> = {}): string {
-  const dir = makeRepo(files, {});
-  temps.push(dir);
-  return dir;
+  return makeRepo(files, {});
 }
 
 /** A committed git repo holding `files`. */
 function repo(files: Record<string, string>): string {
-  const root = tempDir(files);
-  git(root, "init", "-q", "-b", "main");
-  git(root, "add", "-A");
-  git(root, "commit", "-q", "-m", "start");
-  return root;
+  return committedRepo(files, {});
 }
 
 /** One run of a command at `root`: what the guard said, and whether it stopped. */
