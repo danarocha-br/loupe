@@ -2,6 +2,7 @@
 // mounted in development as the last child of <body>.
 
 import ts from "typescript";
+import { PRODUCT_LAYER } from "../../names.js";
 import {
   bindsName,
   canonical,
@@ -17,7 +18,7 @@ import {
   parse,
   unwrap,
 } from "../syntax.js";
-import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
+import type { TouchPoint } from "../touch-points.js";
 import { type Candidates, cut, lines, revertToCandidate } from "./shared.js";
 
 const MOUNT_MODULE = `${PRODUCT_LAYER.name}/mount`;

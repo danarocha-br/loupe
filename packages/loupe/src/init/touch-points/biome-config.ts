@@ -3,8 +3,9 @@
 
 // jsonc-parser ships UMD as `main`, which Node can't read named exports from.
 import jsonc from "jsonc-parser";
+import { PRODUCT_LAYER } from "../../names.js";
 import { indentAt, lineStart } from "../syntax.js";
-import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
+import type { TouchPoint } from "../touch-points.js";
 import { type Candidates, cut, lines, type Range, revertToCandidate } from "./shared.js";
 
 const EXCLUSION = `!${PRODUCT_LAYER.path}`;

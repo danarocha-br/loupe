@@ -2,7 +2,7 @@
 // `@repo/loupe`. `generate` fills `adapters/`, `meta/` and `adapt-list.json`;
 // `init` writes only the package's own entry points.
 
-import { NPM_PACKAGE, PRODUCT_LAYER } from "./touch-points.js";
+import { NPM_PACKAGE, PRODUCT_LAYER } from "../names.js";
 
 export type ProductLayerInput = {
   version: string;

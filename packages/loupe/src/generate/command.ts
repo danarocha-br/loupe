@@ -4,12 +4,13 @@ import { parseAdaptList } from "../adapt-list.js";
 import { extract } from "../meta/command.js";
 import { collectSources, compare, DESIGN_SYSTEM_INCLUDE } from "../meta/sources.js";
 import type { ModuleMeta } from "../meta/types.js";
+import { PRODUCT_LAYER } from "../names.js";
 import { apply, type Change, diff, type Refusal } from "./apply.js";
 import { readHeader } from "./header.js";
 import { type CoverageEntry, MissingSpecifierError, plan } from "./plan.js";
 
 export type GenerateOptions = {
-  /** Product layer directory (default `packages/loupe` under the repo root). */
+  /** Product layer directory (default `PRODUCT_LAYER.path` under the repo root). */
   out?: string;
   /** Design-system package root; read from the existing adapt-list.json when omitted. */
   designSystem?: string;
@@ -39,7 +40,7 @@ Writes Adapters, meta/ and adapt-list.json into the Product layer. Writes only
 files whose bytes differ, and nothing at all when a generated file was edited by hand.
 
 Options:
-  --out <dir>             Product layer directory (default: packages/loupe)
+  --out <dir>             Product layer directory (default: ${PRODUCT_LAYER.path})
   --design-system <dir>   design-system package root (default: from adapt-list.json)
   --app <dir>             app root (default: from adapt-list.json)
   --specifier <name>      import specifier of the Product layer (default: its package.json name)
@@ -75,7 +76,7 @@ export function parseGenerateArgs(argv: readonly string[]): GenerateOptions | st
 export function runGenerate(options: GenerateOptions, cwd: string): GenerateResult {
   const repoRoot = path.resolve(cwd, options.root ?? findRepoRoot(cwd));
   const toRepo = (absolute: string) => path.relative(repoRoot, absolute).split(path.sep).join("/");
-  const outAbs = path.resolve(cwd, options.out ?? path.join(repoRoot, "packages/loupe"));
+  const outAbs = path.resolve(cwd, options.out ?? path.join(repoRoot, PRODUCT_LAYER.path));
   const outDir = toRepo(outAbs);
   if (outDir.startsWith("..")) throw new Error(`--out ${options.out} is outside the repo at ${repoRoot}`);
 

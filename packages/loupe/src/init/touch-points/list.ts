@@ -2,7 +2,8 @@
 
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { NPM_PACKAGE, PRODUCT_LAYER, type TouchPoint, type TouchPointContext } from "../touch-points.js";
+import { NPM_PACKAGE, PRODUCT_LAYER } from "../../names.js";
+import type { TouchPoint, TouchPointContext } from "../touch-points.js";
 import { biomeConfig } from "./biome-config.js";
 import { nextConfig } from "./next-config.js";
 import { packageJson } from "./package-json.js";

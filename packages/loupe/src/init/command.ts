@@ -8,6 +8,7 @@ import { type CheckIo, checkCompatibility } from "../compat/check.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
 import { LOCKFILE, NOTHING_WRITTEN, openGuard } from "../dirty-tree.js";
 import { runGenerate } from "../generate/command.js";
+import { NPM_PACKAGE, PRODUCT_LAYER } from "../names.js";
 import { compareVersions, version as installedVersion } from "../version.js";
 import {
   claimOf,
@@ -26,7 +27,7 @@ import {
 } from "./ledger.js";
 import { productLayerFiles } from "./product-layer.js";
 import { fileHash, sha256 } from "./syntax.js";
-import { NPM_PACKAGE, PRODUCT_LAYER, type TouchPoint } from "./touch-points.js";
+import type { TouchPoint } from "./touch-points.js";
 import { touchPoints } from "./touch-points/list.js";
 
 export type InitOptions = { app?: string; allowDirty: boolean; adopt: boolean; help?: boolean };

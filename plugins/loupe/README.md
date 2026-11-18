@@ -17,7 +17,7 @@ For how a designer installs, uses and removes Loupe, see the
 | `skills/remove` | `loupe remove`, what it kept, and putting back the lockfile peers that installing Loupe re-resolved. |
 | `skills/doctor` | `loupe doctor` and, on request, `doctor --build`. |
 | `hooks/hooks.json` | One `PreToolUse` guard (`scripts/guard.mjs`): Claude's Edit and Write are refused inside a Product layer, pointing at `generate`. |
-| `scripts/pin.mjs` | The exact Loupe release this plugin installs. A test keeps it equal to `packages/loupe`'s version. |
+| `scripts/pin.mjs` | The exact Loupe release this plugin installs, and the names it installs under. A test keeps them equal to `packages/loupe`'s version and `src/names.ts`. |
 | `scripts/loupe.mjs` | Runs the right CLI: the app's own copy once installed, `pnpm dlx` of the exact release before that. |
 | `scripts/lockfile.mjs` | Reports what an install or removal did to `pnpm-lock.yaml` beyond Loupe's own entries, and restores a peer-only residue. |
 | `scripts/upgrade.mjs` | `status` says where an upgrade stands (`not-installed`, `up-to-date`, `plugin-behind`, `app-pin-not-plain`, `upgrade` or `resume`) and writes nothing. `bump` sets the app's `@danarocha/loupe` to the pin, exact, and writes only that line. |
