@@ -6,6 +6,7 @@ import { ANCHOR_ATTRIBUTE, callSiteId, instanceId } from "../call-site.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { disableOverrides, registry } from "../runtime/registry.js";
+import type { FixedPixelsOptions } from "./snapshots.fixture.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -73,14 +74,17 @@ function draw(): string {
   return String(rasterized.length);
 }
 
-/** Draws with fixed pixels, `layout` and `draw` unless the test says otherwise. Starts the list over. */
-function pixels(options: Parameters<typeof fixedPixels>[0] = {}) {
+/**
+ * Starts over as a page load does, with no Snapshots, drawing fixed pixels with
+ * `layout` and `draw` unless the test says otherwise.
+ */
+function startOver(options: FixedPixelsOptions = {}) {
   setRasterizer(fixedPixels({ layout, draw, ...options }));
 }
 
 beforeEach(() => {
   delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
-  pixels();
+  startOver();
   rasterized.length = 0;
   container = document.createElement("div");
   document.body.append(container);
@@ -189,7 +193,7 @@ describe("Capture screen", () => {
   });
 
   it("counts the images that didn't load on the viewport pair, the more of the two, and none on crops", async () => {
-    pixels({ failed: [1, 3] });
+    startOver({ failed: [1, 3] });
     setUp();
     const snapshot = await run(captureScreen);
     expect(snapshot.viewport.failedImages).toBe(3);
@@ -197,7 +201,7 @@ describe("Capture screen", () => {
   });
 
   it("leaves the page as it was, and the list, when a drawing fails", async () => {
-    pixels({
+    startOver({
       draw: () => {
         const image = draw();
         if (image === "4") throw new Error("The canvas is tainted.");
@@ -327,7 +331,7 @@ describe("Capture screen", () => {
 describe("crops", () => {
   it("cover where an Instance is in both views", async () => {
     // Ghost buttons draw 200px wider: "before" reaches further right than "after".
-    pixels({
+    startOver({
       layout: (node) => {
         const box = layout(node);
         return box && node.getAttribute("data-variant") === "ghost" ? { ...box, right: box.right + 200 } : box;
@@ -347,6 +351,18 @@ describe("crops", () => {
       ["user_3", 0, "data:image/png;base64,1@276,576,364,656"],
       ["user_4", 2, "data:image/png;base64,1@426,576,514,656"],
     ]);
+  });
+
+  it("make none for a record held back as ambiguous", async () => {
+    setUp();
+    act(() => loupe.set(row(2), "variant", "secondary"));
+    const before = await run(captureScreen);
+    expect(before.crops.map((crop) => crop.change)).toEqual([`instance:${row(2)}`, `group:${TRIGGER}`]);
+
+    // As the registry does once two Instances turn out to share the id.
+    act(() => registry().store.suspendAmbiguous((id) => id === row(2)));
+    const after = await run(captureScreen);
+    expect(after.crops.map((crop) => crop.change)).toEqual([`group:${TRIGGER}`]);
   });
 
   it("leave out an Instance excluded from the change", async () => {
@@ -384,7 +400,7 @@ describe("in the Proposal and the Toolbar", () => {
 
   it("drops an export's own Snapshot that repeats a manual one, and the last export's own with it", async () => {
     let image = "a";
-    pixels({
+    startOver({
       draw: () => {
         draw();
         return image;

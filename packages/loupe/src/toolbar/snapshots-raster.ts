@@ -6,7 +6,7 @@
 import type { Rasterizer, Rect } from "./snapshots.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
-/** Marks what capturing adds to the page (the still, the style that stops transitions); never captured. */
+/** Marks what capturing adds to the page (the cover holding the still, the style that stops transitions); never captured. */
 export const CAPTURE_ATTRIBUTE = "data-loupe-capture";
 
 const PLACEHOLDER = `data:image/svg+xml,${encodeURIComponent(

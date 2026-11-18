@@ -8,7 +8,7 @@
 // `modern-screenshot` (`snapshots-raster.ts`); in tests, fixed pixels
 // (`snapshots.fixture.ts`). Everything else about a capture happens here.
 //
-// While "before" renders, a still of the page as it was covers it, so capturing
+// While the Before view renders, a still of the page as it was covers it, so capturing
 // doesn't visibly disturb the page. Nothing is drawn on the images.
 //
 // A Snapshot records the Overrides each Instance on screen showed. When one of
@@ -62,7 +62,7 @@ export type Frame = { width: number; height: number; dpr: number };
 export type Raster = {
   /** Images on the page that didn't load, drawn as a placeholder. */
   failed: number;
-  /** The drawing as an element: it covers the page while "before" renders. */
+  /** The drawing as an element: it covers the page while the Before view renders. */
   still: HTMLElement;
   /** The whole drawing, as a data URL. */
   encode(): string;
@@ -82,7 +82,14 @@ type Store = { list: Snapshot[]; next: number; queue: Promise<unknown> };
 
 const GLOBAL_KEY = "__loupeSnapshots";
 
-let rasterizer: Rasterizer = screenshotRasterizer;
+type Host = typeof globalThis & { [GLOBAL_KEY]?: Store };
+
+/** What a page load starts with: no Snapshots, numbering from 1. */
+function emptyStore(): Store {
+  return { list: [], next: 1, queue: Promise.resolve() };
+}
+
+let current: Rasterizer = screenshotRasterizer;
 
 /**
  * Draws the page with `next` from now on, starting over as a page load does: no
@@ -90,15 +97,14 @@ let rasterizer: Rasterizer = screenshotRasterizer;
  * calls it.
  */
 export function setRasterizer(next: Rasterizer): void {
-  rasterizer = next;
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Store };
-  host[GLOBAL_KEY] = { list: [], next: 1, queue: Promise.resolve() };
+  current = next;
+  (globalThis as Host)[GLOBAL_KEY] = emptyStore();
 }
 
 /** One list per page, kept on `globalThis` across a Fast Refresh; a reload clears it. */
 function store(): Store {
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Store };
-  host[GLOBAL_KEY] ??= { list: [], next: 1, queue: Promise.resolve() };
+  const host = globalThis as Host;
+  host[GLOBAL_KEY] ??= emptyStore();
   return host[GLOBAL_KEY];
 }
 
@@ -126,16 +132,16 @@ export function retakeSnapshot(id: number): Promise<Snapshot> {
 
 export function removeSnapshot(id: number): void {
   const state = store();
-  const kept = state.list.filter((snapshot) => snapshot.id !== id);
-  if (kept.length === state.list.length) return;
-  state.list = kept;
+  const rest = state.list.filter((snapshot) => snapshot.id !== id);
+  if (rest.length === state.list.length) return;
+  state.list = rest;
   emitChange();
 }
 
 /**
  * The export's own Snapshot of the screen in view (PER-99 §3). It replaces the
  * last export's Snapshot of this route. It is dropped when it repeats a manual
- * one, so the report doesn't show the same screen twice (PER-138). A failed
+ * one, so the Proposal doesn't show the same screen twice (PER-138). A failed
  * capture is warned about and returned rather than thrown: the export goes on
  * without it.
  */
@@ -159,9 +165,10 @@ export function exportableSnapshots(): SnapshotInput[] {
 }
 
 /**
- * Roughly what the export's own Snapshot adds to the report, in bytes: the newest
- * kept Snapshot's size, and nothing when this route already has one, which it
- * replaces or repeats. The export dialog warns past 25 MB (PER-139).
+ * Roughly what the export's own Snapshot adds to the HTML report, in bytes: the
+ * newest kept Snapshot's size, or nothing when this route already has one, on the
+ * guess that the screen hasn't changed since and the export's own repeats that
+ * one or replaces the last. The export dialog warns past 25 MB (PER-139).
  */
 export function exportCaptureBytes(): number {
   const list = kept();
@@ -231,7 +238,7 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   }
   const reg = registry();
   const debug = debugOf();
-  const draw = rasterizer;
+  const rasterizer = current;
   const dpr = window.devicePixelRatio || 1;
   const frame: Frame = { width, height, dpr };
   const route = currentRoute();
@@ -248,8 +255,8 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   const mounted = [...reg.instances.values()];
   const boxes = new Map<string, Rect>();
   for (const instance of mounted) {
-    const box = boxOf(draw, debug, instance.id);
-    if (box && onScreen(box, width, height)) boxes.set(instance.id, box);
+    const box = boxOf(rasterizer, debug, instance.id);
+    if (box && onScreen(box, frame)) boxes.set(instance.id, box);
   }
   const changes = changesOnScreen(reg.store.records(), mounted, boxes);
   const shown = mounted
@@ -264,16 +271,16 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   let after: Raster;
   let before: Raster;
   try {
-    after = await draw.rasterize(frame);
-    const unfreeze = freeze(after.still, width, height);
+    after = await rasterizer.rasterize(frame);
+    const unfreeze = freeze(after.still, frame);
     try {
       flushSync(() => setView("before"));
       await settle();
       // A change can move its Instance: crop the union of where it is in both views.
       for (const change of changes) {
-        for (const entry of change.covered) entry.before = boxOf(draw, debug, entry.id);
+        for (const entry of change.covered) entry.before = boxOf(rasterizer, debug, entry.id);
       }
-      before = await draw.rasterize(frame);
+      before = await rasterizer.rasterize(frame);
     } finally {
       flushSync(() => setView("proposed"));
       await settle();
@@ -289,7 +296,7 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
     failedImages: Math.max(before.failed, after.failed),
   };
   const crops = changes.flatMap((change) =>
-    cropRects(change.covered, width, height).map((crop) => {
+    cropRects(change.covered, frame).map((crop) => {
       const pair = { before: before.cut(crop.rect), after: after.cut(crop.rect) };
       // Which crop holds a failed image isn't known: the viewport pair says it.
       return { change: change.key, keyPath: crop.keyPath, more: crop.more, ...pair, failedImages: 0 };
@@ -351,19 +358,19 @@ type Crop = { rect: Rect; keyPath: string | null; more: number };
  * that is taller than the viewport, one per Instance, top first, up to
  * MAX_INSTANCE_CROPS, the last saying how many more there were.
  */
-function cropRects(covered: readonly Covered[], width: number, height: number): Crop[] {
+function cropRects(covered: readonly Covered[], frame: Frame): Crop[] {
   const boxes = covered.map((entry) => ({ entry, box: entry.before ? union([entry.after, entry.before]) : entry.after }));
   const whole = union(boxes.map(({ box }) => box));
-  if (whole.bottom - whole.top <= height) {
-    const rect = clamp(pad(whole), width, height);
+  if (whole.bottom - whole.top <= frame.height) {
+    const rect = clamp(pad(whole), frame);
     return rect ? [{ rect, keyPath: null, more: 0 }] : [];
   }
   const sorted = [...boxes].sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left);
-  const kept = sorted.slice(0, MAX_INSTANCE_CROPS);
-  const more = sorted.length - kept.length;
-  return kept.flatMap(({ entry, box }, index) => {
-    const rect = clamp(pad(box), width, height);
-    return rect ? [{ rect, keyPath: entry.keyPath || entry.id, more: index === kept.length - 1 ? more : 0 }] : [];
+  const first = sorted.slice(0, MAX_INSTANCE_CROPS);
+  const more = sorted.length - first.length;
+  return first.flatMap(({ entry, box }, index) => {
+    const rect = clamp(pad(box), frame);
+    return rect ? [{ rect, keyPath: entry.keyPath || entry.id, more: index === first.length - 1 ? more : 0 }] : [];
   });
 }
 
@@ -386,23 +393,23 @@ function pad(rect: Rect): Rect {
 }
 
 /** Kept to the viewport; null when nothing is left. */
-function clamp(rect: Rect, width: number, height: number): Rect | null {
-  const kept = {
+function clamp(rect: Rect, { width, height }: Frame): Rect | null {
+  const inside = {
     top: Math.max(0, Math.floor(rect.top)),
     left: Math.max(0, Math.floor(rect.left)),
     bottom: Math.min(height, Math.ceil(rect.bottom)),
     right: Math.min(width, Math.ceil(rect.right)),
   };
-  return kept.bottom > kept.top && kept.right > kept.left ? kept : null;
+  return inside.bottom > inside.top && inside.right > inside.left ? inside : null;
 }
 
-function onScreen(rect: Rect, width: number, height: number): boolean {
+function onScreen(rect: Rect, { width, height }: Frame): boolean {
   return rect.bottom > 0 && rect.right > 0 && rect.top < height && rect.left < width;
 }
 
 /** The box around every node an Instance renders; null when it draws nothing. */
-function boxOf(draw: Rasterizer, debug: LoupeDebug, id: string): Rect | null {
-  const rects = debug.nodes(id).flatMap((node) => draw.measure(node) ?? []);
+function boxOf(rasterizer: Rasterizer, debug: LoupeDebug, id: string): Rect | null {
+  const rects = debug.nodes(id).flatMap((node) => rasterizer.measure(node) ?? []);
   return rects.length === 0 ? null : union(rects);
 }
 
@@ -412,9 +419,9 @@ function debugOf(): LoupeDebug {
 
 /**
  * Covers the page with a still of it, above everything but the Toolbar's panel,
- * while "before" renders underneath. Returns what takes it away.
+ * while the Before view renders underneath. Returns what takes it away.
  */
-function freeze(still: HTMLElement, width: number, height: number): () => void {
+function freeze(still: HTMLElement, { width, height }: Frame): () => void {
   const cover = document.createElement("div");
   cover.setAttribute(CAPTURE_ATTRIBUTE, "");
   cover.setAttribute("aria-hidden", "true");

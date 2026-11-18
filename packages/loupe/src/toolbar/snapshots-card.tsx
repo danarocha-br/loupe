@@ -12,9 +12,9 @@ type Busy = { capturing: number | "new" | null; error: string | null };
 /** Capture screen, or Retake of one Snapshot: what is under way and what last failed. */
 export function useCapture() {
   const [busy, setBusy] = useState<Busy>({ capturing: null, error: null });
-  const run = (replace?: number) => {
-    setBusy({ capturing: replace ?? "new", error: null });
-    (replace === undefined ? captureScreen() : retakeSnapshot(replace)).then(
+  const run = (retake?: number) => {
+    setBusy({ capturing: retake ?? "new", error: null });
+    (retake === undefined ? captureScreen() : retakeSnapshot(retake)).then(
       () => setBusy({ capturing: null, error: null }),
       (error: unknown) => {
         console.warn("[loupe] Capture screen failed:", error);
