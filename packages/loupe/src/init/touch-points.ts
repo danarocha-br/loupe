@@ -57,9 +57,6 @@ export type TouchPoint = {
   revertByHand: string;
 };
 
-export const PRODUCT_LAYER = { name: "@repo/loupe", path: "packages/loupe" } as const;
-export const NPM_PACKAGE = "@danarocha/loupe";
-
 export type TouchPointContext = {
   root: string;
   /** The app's directory, relative to the root; without it, only the touch points at the root are listed. */

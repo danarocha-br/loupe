@@ -12,10 +12,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readHeader } from "../generate/header.js";
 import { compare } from "../meta/sources.js";
+import { LEDGER_PATH } from "../names.js";
 import { fileHash, sha256 } from "./syntax.js";
 import type { Found, TouchPoint, TouchPointId } from "./touch-points.js";
 
-export const LEDGER_PATH = "packages/loupe/loupe.ledger.json";
+export { LEDGER_PATH };
 export const LEDGER_FORMAT_VERSION = 1;
 
 export type TouchPointEntry = {

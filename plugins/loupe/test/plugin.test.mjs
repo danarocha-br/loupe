@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { LEDGER, LOUPE_PACKAGE, LOUPE_VERSION, PRODUCT_LAYER, PRODUCT_LAYER_PACKAGE } from "../scripts/pin.mjs";
 
 const plugin = fileURLToPath(new URL("..", import.meta.url));
@@ -17,14 +17,13 @@ describe("the Installer plugin", () => {
     assert.equal(LOUPE_VERSION, loupe.version);
   });
 
-  it("names the Product layer and its ledger as the CLI does", () => {
-    const src = (file) => readFileSync(path.join(repo, "packages/loupe/src", file), "utf8");
-    assert.match(
-      src("init/touch-points.ts"),
-      new RegExp(`PRODUCT_LAYER = \\{ name: "${PRODUCT_LAYER_PACKAGE}", path: "${PRODUCT_LAYER}" \\}`),
-    );
-    assert.match(src("init/touch-points.ts"), new RegExp(`NPM_PACKAGE = "${LOUPE_PACKAGE}"`));
-    assert.match(src("init/ledger.ts"), new RegExp(`LEDGER_PATH = "${LEDGER}"`));
+  it("names the Product layer and its ledger as the CLI does", async () => {
+    // Node (22.18 and later) runs names.ts as it is, so this fails when it imports
+    // another source file (by its `.js` name) or uses syntax Node can't strip.
+    const names = await import(pathToFileURL(path.join(repo, "packages/loupe/src/names.ts")).href);
+    assert.deepEqual(names.PRODUCT_LAYER, { name: PRODUCT_LAYER_PACKAGE, path: PRODUCT_LAYER });
+    assert.equal(names.NPM_PACKAGE, LOUPE_PACKAGE);
+    assert.equal(names.LEDGER_PATH, LEDGER);
   });
 
   it("has a manifest, a marketplace entry, and no bin/ and no npm dependencies", () => {

@@ -11,6 +11,7 @@ import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "./adapt-list.js";
 import type { FormatNotice } from "./format-notice.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./generate/header.js";
 import { compare, DESIGN_SYSTEM_INCLUDE, hashFile, sourceFiles, statStamp } from "./meta/sources.js";
+import { PRODUCT_LAYER } from "./names.js";
 
 export type StaleModule = {
   /** Repo-relative path of the module `generate` read. */
@@ -46,14 +47,11 @@ export type LayerPaths = {
 
 const toPosix = (file: string) => file.split(path.sep).join("/");
 
-/** `generate`'s default `--out`, as `init`'s PRODUCT_LAYER.path; not imported, since that module loads TypeScript. */
-const DEFAULT_LAYER = "packages/loupe";
-
 /** `pnpm -C apps/app exec loupe generate`, with `--out` only when the layer isn't the default `packages/loupe`. */
 export function generateCommand({ root, adaptList, app }: LayerPaths): string {
   const layer = path.dirname(adaptList);
   const appRel = toPosix(path.relative(root, app));
-  const out = path.resolve(root, DEFAULT_LAYER) === layer ? "" : ` --out ${toPosix(path.relative(app, layer)) || "."}`;
+  const out = path.resolve(root, PRODUCT_LAYER.path) === layer ? "" : ` --out ${toPosix(path.relative(app, layer)) || "."}`;
   return `${appRel === "" ? "pnpm" : `pnpm -C ${appRel}`} exec loupe generate${out}`;
 }
 

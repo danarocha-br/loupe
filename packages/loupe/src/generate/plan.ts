@@ -7,10 +7,11 @@ import { ADAPT_LIST_FORMAT_VERSION, type AdaptList } from "../adapt-list.js";
 import { compare } from "../meta/sources.js";
 import type { ComponentExport, ComponentShape, ModuleMeta } from "../meta/types.js";
 import { stableJson } from "../meta/write.js";
+import { NPM_PACKAGE } from "../names.js";
 import { stampJson, stampModule } from "./header.js";
 
 /** Where Adapters import `createAdapter` from (the runtime, PER-120). */
-export const RUNTIME_SPECIFIER = "@danarocha/loupe/runtime";
+export const RUNTIME_SPECIFIER = `${NPM_PACKAGE}/runtime`;
 
 /** Shapes `createAdapter` wraps (PER-100 §2); every other shape is skipped and reported. */
 const SUPPORTED_SHAPES: ReadonlySet<ComponentShape> = new Set(["function", "forwardRef", "memo"]);

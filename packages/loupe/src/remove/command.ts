@@ -19,8 +19,9 @@ import {
   readLedger,
   type TouchPointEntry,
 } from "../init/ledger.js";
-import { type Change, PRODUCT_LAYER, type Role, type TouchPoint, type TouchPointId } from "../init/touch-points.js";
+import type { Change, Role, TouchPoint, TouchPointId } from "../init/touch-points.js";
 import { touchPoints } from "../init/touch-points/list.js";
+import { PRODUCT_LAYER } from "../names.js";
 import { version as installedVersion } from "../version.js";
 
 export type RemoveOptions = { allowDirty: boolean; help?: boolean };

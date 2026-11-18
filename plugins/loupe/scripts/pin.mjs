@@ -1,6 +1,7 @@
 // The one Loupe release this plugin release installs, never "latest": the CLI
 // that writes the Product layer must match the runtime that reads it.
-// `test/plugin.test.mjs` keeps these equal to the CLI's own constants.
+// `test/plugin.test.mjs` keeps these equal to the CLI's own, in
+// `packages/loupe/src/names.ts` and `packages/loupe/package.json`.
 
 export const LOUPE_PACKAGE = "@danarocha/loupe";
 export const LOUPE_VERSION = "0.0.5";

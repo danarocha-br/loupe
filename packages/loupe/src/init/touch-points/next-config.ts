@@ -2,6 +2,7 @@
 // wrapped around the default export, outermost.
 
 import ts from "typescript";
+import { PRODUCT_LAYER } from "../../names.js";
 import {
   bindsName,
   canonical,
@@ -16,7 +17,7 @@ import {
   parse,
   unwrap,
 } from "../syntax.js";
-import { PRODUCT_LAYER, type TouchPoint } from "../touch-points.js";
+import type { TouchPoint } from "../touch-points.js";
 import { type Candidates, cut, lines, type Range, revertToCandidate } from "./shared.js";
 
 const NEXT_MODULE = `${PRODUCT_LAYER.name}/next`;

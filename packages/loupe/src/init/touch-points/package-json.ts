@@ -2,7 +2,8 @@
 
 // jsonc-parser ships UMD as `main`, which Node can't read named exports from.
 import jsonc from "jsonc-parser";
-import { type Applied, NPM_PACKAGE, type TouchPoint } from "../touch-points.js";
+import { NPM_PACKAGE } from "../../names.js";
+import type { Applied, TouchPoint } from "../touch-points.js";
 import { type Candidates, isRecord, jsonFormatting, readObject, revertToCandidate } from "./shared.js";
 
 /** `wanted`: each devDependency Loupe adds, and the version it adds. */
