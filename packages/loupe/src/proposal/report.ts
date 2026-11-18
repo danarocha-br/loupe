@@ -9,7 +9,6 @@
 
 import { callSiteLabels } from "../call-site.js";
 import { plural } from "../toolbar/format.js";
-import { ordinal } from "./build.js";
 import type {
   JsonValue,
   Proposal,
@@ -20,6 +19,7 @@ import type {
   ProposalScreenshot,
   WrittenAs,
 } from "./types.js";
+import { siteCount } from "./words.js";
 
 export const REPORT_DATA_ID = "loupe-proposal";
 
@@ -109,11 +109,10 @@ function propRow(prop: ProposalProp): string {
 
 /** "1st of 2 <Button> in MemberRowMenu", the path, the anchor and the line hint. */
 function siteHtml(site: ProposalCallSite): string {
-  const count = site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
   const where = site.enclosing ? ` in ${code(site.enclosing)}` : "";
   const hint = site.lineHint ? ` · line ${escapeHtml(site.lineHint)} at export, a hint` : "";
   return (
-    `<strong>${count} ${code(`<${site.component}>`)}${where}</strong>` +
+    `<strong>${siteCount(site)} ${code(`<${site.component}>`)}${where}</strong>` +
     `<div class="muted">${code(site.path)}${hint}</div>` +
     `<div class="muted">Anchor: ${code(site.anchor)}</div>`
   );

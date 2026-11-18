@@ -3,8 +3,8 @@
 // images and no JSON. The exported HTML (PER-139) is the full report.
 
 import { formatCurrent } from "../toolbar/format.js";
-import { ordinal } from "./build.js";
 import type { Proposal, ProposalCallSite, ProposalChange, ProposalProp, ProposalRoute } from "./types.js";
+import { siteCount } from "./words.js";
 
 export const REPORT_LINE = "Full report with screenshots: attach the exported HTML.";
 
@@ -14,9 +14,8 @@ function fileOf(path: string): string {
 
 /** "1st of 4 `<Button>` in `MemberRowMenu` (member-row-menu.tsx)". */
 export function locationInWords(site: ProposalCallSite): string {
-  const count = site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
   const where = site.enclosing ? ` in \`${site.enclosing}\`` : "";
-  return `${count} \`<${site.component}>\`${where} (${fileOf(site.path)})`;
+  return `${siteCount(site)} \`<${site.component}>\`${where} (${fileOf(site.path)})`;
 }
 
 function changeLocation(change: ProposalChange): string {

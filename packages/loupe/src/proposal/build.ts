@@ -12,6 +12,7 @@ import { keyOf, type OverrideRecord, type Props, type ScopeTarget } from "../run
 import { stateSiblingName } from "../state-prop.js";
 import { formatCurrent } from "../toolbar/format.js";
 import type { CallSiteWrites } from "../writes.js";
+import { toJson } from "./json.js";
 import {
   FORMAT_VERSION,
   HOW_TO_APPLY,
@@ -27,6 +28,7 @@ import {
   type ProposalStateShown,
   type WrittenAs,
 } from "./types.js";
+import { changeInWords } from "./words.js";
 
 /** What the page last showed of one Instance. Kept after it unmounts: "last seen". */
 export type Sighting = {
@@ -111,31 +113,6 @@ const NOT_SET = "not set";
 /** The key `setOn` uses for a record's target. */
 export function setOnKey(target: ScopeTarget): string {
   return `${target.scope}:${keyOf(target)}`;
-}
-
-/** "1st", "2nd", "3rd", "11th". */
-export function ordinal(n: number): string {
-  const teen = n % 100 >= 11 && n % 100 <= 13;
-  const suffix = teen ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
-  return `${n}${suffix}`;
-}
-
-/** A value as JSON: functions, elements and other non-JSON values become how the Toolbar shows them. */
-export function toJson(value: unknown, seen: WeakSet<object> = new WeakSet()): JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : String(value);
-  const plain =
-    Array.isArray(value) ||
-    (typeof value === "object" && !("$$typeof" in value) && Object.getPrototypeOf(value) === Object.prototype);
-  if (!plain) return formatCurrent(value);
-  const object = value as object;
-  if (seen.has(object)) return "[Circular]";
-  seen.add(object);
-  const result: JsonValue = Array.isArray(object)
-    ? object.map((inner) => toJson(inner, seen))
-    : Object.fromEntries(Object.entries(object).map(([key, inner]) => [key, toJson(inner, seen)]));
-  seen.delete(object);
-  return result;
 }
 
 function proposedOf(value: unknown): Pick<ProposalProp, "proposed" | "proposedUnset"> {
@@ -493,17 +470,6 @@ function screenSize(snapshot: SnapshotInput): string {
 
 function failedNote(count: number): string {
   return count === 0 ? "" : ` (${count} image${count === 1 ? "" : "s"} could not be captured, shown as a placeholder)`;
-}
-
-/** "variant on 1st of 4 <Button> in MemberRowMenu", plain text for a caption. */
-export function changeInWords(change: ProposalChange): string {
-  const props = change.props.map((prop) => (prop.name === "children" ? "text" : prop.name)).join(", ");
-  if (change.scope === "page") return `${props} on every <${change.component}> on the page`;
-  const site = change.callSites[0];
-  if (!site) return `${props} on <${change.component}>`;
-  const count = site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
-  const where = site.enclosing ? ` in ${site.enclosing}` : "";
-  return `${props} on ${count} <${site.component}>${where}${change.scope === "call-site" ? ", every Instance" : ""}`;
 }
 
 /** The covered Instances' Current value for a prop: one value, or counts when they differ. */
