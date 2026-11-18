@@ -186,10 +186,9 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
       mounted: true,
     });
   }
-  const [project, flags] = await Promise.all([
-    readProjectContext().catch(() => UNKNOWN_PROJECT),
-    previewedFlags().catch(() => []),
-  ]);
+  // A restarting dev server refuses the project call: the Proposal says "unknown commit". Flags
+  // never reject, since `previewedFlags` turns a refused call into "no flags".
+  const [project, flags] = await Promise.all([readProjectContext().catch(() => UNKNOWN_PROJECT), previewedFlags()]);
   const input = {
     title: options.title?.trim() || "Proposal",
     designer: options.designer ?? null,

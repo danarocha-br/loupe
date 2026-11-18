@@ -11,12 +11,14 @@ import { resetLoupe } from "../runtime/slot.js";
 import { memoryRequest, memorySource } from "./flags.fixture.js";
 import { setFlagSource } from "./flags-store.js";
 import Toolbar from "./index.js";
-import { collectProposal, pageTheme, startTracking } from "./proposal.js";
+import { collectProposal, collectProposalMarkdown, pageTheme, startTracking } from "./proposal.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
-vi.mock("./project-server.js", () => ({
-  readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
+const project = vi.hoisted(() => ({
+  read: async (): Promise<unknown> => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
 }));
+const KNOWN_PROJECT = project.read;
+vi.mock("./project-server.js", () => ({ readProjectContext: () => project.read() }));
 // The override cookie holds one flag preview, which the app doesn't declare.
 setFlagSource(memorySource(memoryRequest({ overrides: { "new-roles": true } })));
 
@@ -85,6 +87,7 @@ const footerButton = (text: string) =>
 
 beforeEach(async () => {
   resetLoupe();
+  project.read = KNOWN_PROJECT;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -127,6 +130,18 @@ describe("the Proposal from the page", () => {
     const proposal = await collectProposal();
     expect(proposal.title).toBe("Button variant in MemberRow");
     expect(registry().store.records()).toEqual(before);
+  });
+
+  it("builds the Proposal with an unknown project when the dev server refuses the project call", async () => {
+    project.read = async () => {
+      throw new Error("restarting");
+    };
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+
+    const proposal = await collectProposal();
+    expect(proposal.project).toEqual({ repo: null, commit: null, dirty: null, playgroundVersion: null });
+    expect(proposal.routes[0]?.changes).toHaveLength(1);
+    expect(await collectProposalMarkdown()).toContain("unknown commit");
   });
 
   it("copies the Markdown summary from the footer", async () => {
