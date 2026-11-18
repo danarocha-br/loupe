@@ -9,6 +9,7 @@
 
 import type { FlagDefinition, FlagOverrides, FlagsResult, FlagValue, OverridesResult } from "./flags-preview.js";
 import { readFlags, writeFlagOverrides } from "./flags-server.js";
+import { warnOnce } from "./warn-once.js";
 
 export type FlagsView =
   | { status: "loading" }
@@ -55,6 +56,8 @@ export function onFlagsChange(listener: () => void): () => void {
 /**
  * The Proposal's record: every override the cookie holds, declared by the app or
  * not, sorted by key. Read fresh, so it doesn't depend on the card having mounted.
+ * When the read fails it gives the previews the store last read, or none if it never
+ * did (PER-226).
  */
 export async function previewedFlags(): Promise<PreviewedFlag[]> {
   await loadFlags();
@@ -75,9 +78,19 @@ export async function previewedFlags(): Promise<PreviewedFlag[]> {
     });
 }
 
+/**
+ * Reads the flags and publishes the answer, except a failure over a ready view (PER-226):
+ * the source answered before, so a refused call or a bad discovery response is a dev
+ * server restarting, not a reason to turn the card off. That view stays and the console
+ * says so once. Any other view takes the failure, so a first load says why previews are off.
+ */
 export async function loadFlags(): Promise<void> {
   const result = await ask((from) => from.read());
   if (!result) return;
+  if (!result.ok && view.status === "ready") {
+    warnOnce(`[loupe] Couldn't re-read the flag previews: ${result.reason}`);
+    return;
+  }
   publish(
     result.ok
       ? { status: "ready", definitions: result.definitions, overrides: result.overrides, error: null }
