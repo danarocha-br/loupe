@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { findRoot } from "../compat/repo.js";
-import { dirtyPaths, gitTop, LOCKFILE, NOTHING_WRITTEN } from "../init/command.js";
+import { LOCKFILE, NOTHING_WRITTEN, openGuard } from "../dirty-tree.js";
 import {
   formatTooNew,
   judgeLayerFile,
@@ -93,12 +93,8 @@ const SUMMARY: Record<TouchPointId, string> = {
 
 export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<number> {
   const root = findRoot(path.resolve(io.cwd));
-  const git = gitTop(root);
-  if (!git) {
-    io.err(`${root} isn't inside a git repository. Loupe removes only what git can restore.`);
-    io.out(NOTHING_WRITTEN);
-    return 1;
-  }
+  const guard = openGuard("remove", root, options.allowDirty, io);
+  if (!guard) return 1;
   if (!existsSync(path.join(root, LEDGER_PATH))) {
     io.out(`Nothing to remove: there is no ${LEDGER_PATH}, so loupe init hasn't run here.`);
     return 0;
@@ -124,17 +120,7 @@ export async function runRemove(options: RemoveOptions, io: RemoveIo): Promise<n
     ...(installs ? [LOCKFILE] : []),
     ...(plan.clear ? [LEDGER_PATH] : []),
   ];
-  const dirty = dirtyPaths(root, git, guarded).blocking;
-  if (dirty.length > 0) {
-    io.err(options.allowDirty ? "Proceeding with uncommitted changes (--allow-dirty) in:" : "These files have uncommitted changes, and loupe remove would change them:");
-    for (const f of dirty.slice(0, 20)) io.err(`  ${f}`);
-    if (dirty.length > 20) io.err(`  … and ${dirty.length - 20} more`);
-    if (!options.allowDirty) {
-      io.err("Commit or stash them, or rerun with --allow-dirty.");
-      io.out(NOTHING_WRITTEN);
-      return 1;
-    }
-  }
+  if (guard.refuses(guarded)) return 1;
 
   return execute(root, plan, io);
 }

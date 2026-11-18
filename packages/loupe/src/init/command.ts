@@ -2,11 +2,11 @@
 // the four touch points and `generate`, each init-written file recorded in the
 // ledger before it is written. It never runs the package manager, so it never writes the lockfile.
 
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type CheckIo, checkCompatibility } from "../compat/check.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
+import { LOCKFILE, NOTHING_WRITTEN, openGuard } from "../dirty-tree.js";
 import { runGenerate } from "../generate/command.js";
 import { compareVersions, version as installedVersion } from "../version.js";
 import {
@@ -31,9 +31,6 @@ export type InitOptions = { app?: string; allowDirty: boolean; adopt: boolean; h
 
 /** A touch point needs a hand edit, then `loupe init --adopt`. */
 export const EXIT_MANUAL = 2;
-
-export const NOTHING_WRITTEN = "Nothing was written.";
-export const LOCKFILE = "pnpm-lock.yaml";
 
 export const initUsage = `Usage: loupe init [options]
 
@@ -74,12 +71,8 @@ export type InitIo = CheckIo & { cwd: string; nodeVersion: string; version?: str
 export async function runInit(options: InitOptions, io: InitIo): Promise<number> {
   const version = io.version ?? installedVersion;
   const root = findRoot(path.resolve(io.cwd));
-  const git = gitTop(root);
-  if (!git) {
-    io.err(`${root} isn't inside a git repository. Loupe edits only files git can restore.`);
-    io.out(NOTHING_WRITTEN);
-    return 1;
-  }
+  const guard = openGuard("init", root, options.allowDirty, io);
+  if (!guard) return 1;
 
   let ledger: Ledger;
   try {
@@ -120,9 +113,8 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   }
   // Before the check, so a refusal records nothing, and again once the app is known.
   // `--adopt` writes only the ledger and generate's output, so it skips this.
-  const guard = !options.adopt;
-  const bump = upgrade && knownApp !== undefined ? { ...upgrade, files: [LOCKFILE, `${knownApp}/package.json`] } : undefined;
-  if (guard && refuseDirty(dirtyPaths(root, git, protectedPaths(root, knownApp, version)), options, io, ledger, bump)) {
+  const bump = upgrade && knownApp !== undefined ? { ...upgrade, bumped: [LOCKFILE, `${knownApp}/package.json`] } : undefined;
+  if (!options.adopt && guard.refuses(protectedPaths(root, knownApp, version), { upgrade: bump, pending: pendingFiles(ledger) })) {
     return 1;
   }
 
@@ -137,11 +129,9 @@ export async function runInit(options: InitOptions, io: InitIo): Promise<number>
   const app = check.app;
   // The check may have just recorded a yes in the ledger.
   ledger = readLedger(root);
-  if (guard && knownApp === undefined) {
-    // The ledger was clean before the check, which may have just written its yes there.
-    const dirty = dirtyPaths(root, git, protectedPaths(root, app, version));
-    dirty.blocking = dirty.blocking.filter((f) => f !== LEDGER_PATH);
-    if (refuseDirty(dirty, options, io, ledger)) return 1;
+  // The ledger was clean before the check, which may have just written its yes there.
+  if (!options.adopt && knownApp === undefined && guard.refuses(protectedPaths(root, app, version), { except: [LEDGER_PATH], pending: pendingFiles(ledger) })) {
+    return 1;
   }
   if (!check.designSystem) {
     io.err(`Couldn't tell which design system ${app} uses.`);
@@ -416,73 +406,9 @@ function protectedPaths(root: string, app: string | undefined, version: string):
   return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...known.map((t) => t.file)];
 }
 
-export type Dirty = { blocking: string[]; other: string[] };
-
-export function dirtyPaths(root: string, git: string, guarded: string[]): Dirty {
-  const out = execFileSync("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
-    cwd: root,
-    encoding: "utf8",
-  });
-  const prefix = path.relative(realpathSync(git), realpathSync(root)).split(path.sep).join("/");
-  const entries = out.split("\0");
-  const dirty: string[] = [];
-  for (let i = 0; i < entries.length; i += 1) {
-    const entry = entries[i] ?? "";
-    if (entry.length < 4) continue;
-    const status = entry.slice(0, 2);
-    const files = [entry.slice(3)];
-    // A rename's source follows as its own entry, and is a change too.
-    if (status.startsWith("R") || status.startsWith("C")) files.push(entries[++i] ?? "");
-    for (const file of files) {
-      if (!prefix) dirty.push(file);
-      else if (file.startsWith(`${prefix}/`)) dirty.push(file.slice(prefix.length + 1));
-    }
-  }
-  const blocks = (f: string) => guarded.some((g) => (g.endsWith("/") ? f.startsWith(g) : f === g));
-  return { blocking: dirty.filter(blocks), other: dirty.filter((f) => !blocks(f)) };
-}
-
-/** An upgrade, and the files its version bump changes. */
-type Bump = Upgrade & { files: string[] };
-
-function refuseDirty(dirty: Dirty, options: InitOptions, io: InitIo, ledger: Ledger, bump?: Bump): boolean {
-  if (dirty.blocking.length === 0) {
-    if (dirty.other.length > 0) io.out(`Note: ${dirty.other.length} other file(s) have uncommitted changes; Loupe won't touch them.`);
-    return false;
-  }
-  const list = (lead: string) => {
-    io.err(lead);
-    for (const f of dirty.blocking.slice(0, 20)) io.err(`  ${f}`);
-    if (dirty.blocking.length > 20) io.err(`  … and ${dirty.blocking.length - 20} more`);
-  };
-  if (options.allowDirty) {
-    list("Proceeding with uncommitted changes (--allow-dirty) in:");
-    return false;
-  }
-  list("These files have uncommitted changes, and loupe init may write them:");
-  if (bump && dirty.blocking.some((f) => bump.files.includes(f))) {
-    io.err(`${LEDGER_PATH} records Loupe ${bump.from}, and ${bump.to} is installed: commit the version bump, then rerun loupe init.`);
-  } else {
-    io.err("Commit or stash them, or rerun with --allow-dirty.");
-  }
-  const pending = (ledger.touchPoints ?? []).filter((t) => t.mode === "manual" && !t.sha256);
-  if (pending.some((t) => dirty.blocking.includes(t.file))) {
-    io.err("If that is a manual step you just made, record it with loupe init --adopt.");
-  }
-  io.out(NOTHING_WRITTEN);
-  return true;
-}
-
-export function gitTop(root: string): string | undefined {
-  try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return undefined;
-  }
+/** The files with a manual step the ledger still waits on: a dirty one is likely that step, just made. */
+function pendingFiles(ledger: Ledger): string[] {
+  return (ledger.touchPoints ?? []).filter((t) => t.mode === "manual" && !t.sha256).map((t) => t.file);
 }
 
 function dependency(json: PackageJson, name: string): string | undefined {
