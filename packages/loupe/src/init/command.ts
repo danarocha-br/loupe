@@ -25,7 +25,8 @@ import {
 } from "./ledger.js";
 import { productLayerFiles } from "./product-layer.js";
 import { fileHash, sha256 } from "./syntax.js";
-import { NPM_PACKAGE, PRODUCT_LAYER, type TouchPoint, touchPoints } from "./touch-points.js";
+import { NPM_PACKAGE, PRODUCT_LAYER, type TouchPoint } from "./touch-points.js";
+import { touchPoints } from "./touch-points/list.js";
 
 export type InitOptions = { app?: string; allowDirty: boolean; adopt: boolean; help?: boolean };
 
@@ -340,24 +341,24 @@ class Run {
   }
 
   private apply(tp: TouchPoint, text: string | undefined, line: (m: string, w: string) => void, verb: string): void {
-    const edit = tp.edit(text);
-    if ("unexpected" in edit) {
+    const applied = tp.apply(text);
+    if ("unexpected" in applied) {
       this.setTouchPoint({ id: tp.id, file: tp.file, mode: "manual", sha256: null });
       this.manual += 1;
-      line("!", `manual step needed: ${edit.unexpected}`);
+      line("!", `manual step needed: ${applied.unexpected}`);
       this.printManual(tp, "Make this edit by hand, then run loupe init --adopt:");
       return;
     }
-    const found = tp.find(edit.text);
+    const found = tp.find(applied.text);
     this.setTouchPoint({ id: tp.id, file: tp.file, mode: "auto", sha256: found ? sha256(found.canonical) : null });
-    this.write(tp.file, edit.text);
+    this.write(tp.file, applied.text);
     if (tp.id === "package-json") this.packageJsonChanged = true;
-    line("+", verb ? `${verb}: ${edit.summary}` : edit.summary);
+    line("+", verb ? `${verb}: ${applied.summary}` : applied.summary);
   }
 
   private printManual(tp: TouchPoint, lead: string): void {
     this.io.out(`    ${lead}`);
-    for (const l of tp.snippet) this.io.out(`    ${l}`);
+    for (const l of tp.applyByHand) this.io.out(`    ${l}`);
   }
 
   finish(): number {

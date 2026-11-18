@@ -19,7 +19,8 @@ import {
   type TouchPointEntry,
 } from "./ledger.js";
 import { fileHash, sha256 } from "./syntax.js";
-import { type TouchPoint, touchPoints } from "./touch-points.js";
+import type { TouchPoint } from "./touch-points.js";
+import { touchPoints } from "./touch-points/list.js";
 
 // The ledger module reads files but never runs git, so a plain tmp dir is enough.
 

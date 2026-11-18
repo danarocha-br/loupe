@@ -18,7 +18,8 @@ import {
   LedgerError,
   readLedger,
 } from "../init/ledger.js";
-import { NPM_PACKAGE, PRODUCT_LAYER, touchPoints } from "../init/touch-points.js";
+import { NPM_PACKAGE, PRODUCT_LAYER } from "../init/touch-points.js";
+import { touchPoints } from "../init/touch-points/list.js";
 import { compare } from "../meta/sources.js";
 import { compareVersions, version as installedVersion } from "../version.js";
 import { type BuildRunner, nextBuild, scanBuild } from "./build.js";
