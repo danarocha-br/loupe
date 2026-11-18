@@ -18,22 +18,6 @@ vi.mock("./project-server.js", () => ({
   readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1", dirty: false, playgroundVersion: "0.0.3" }),
 }));
 
-vi.mock("modern-screenshot", () => ({
-  domToCanvas: vi.fn(async () => {
-    rasterized.push({
-      variants: [...document.querySelectorAll("button")].map((node) => node.dataset.variant ?? ""),
-      dialog: document.querySelector("[data-open]")?.getAttribute("data-open") ?? null,
-      covered: document.querySelector("div[data-loupe-capture]") !== null,
-      transitions: ![...document.querySelectorAll("style")].some((style) => style.textContent?.includes("transition: none")),
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    canvas.dataset.raster = String(rasterized.length);
-    return canvas;
-  }),
-}));
-
 const {
   captureScreen,
   changesOnScreen,
@@ -42,9 +26,11 @@ const {
   isOutdated,
   removeSnapshot,
   snapshotBytes,
+  setRasterizer,
   snapshots,
   CROP_PADDING,
 } = await import("./snapshots.js");
+const { fixedPixels } = await import("./snapshots.fixture.js");
 const { collectProposal } = await import("./proposal.js");
 const { SnapshotsCard } = await import("./snapshots-card.js");
 
@@ -68,34 +54,34 @@ const DIALOG_ID = instanceId(DIALOG, "dialog");
 let container: HTMLDivElement;
 let root: Root;
 let loupe: LoupeDebug;
-const drawn: number[][] = [];
+
+/** jsdom lays nothing out: each node says where it is. */
+function layout(node: Element) {
+  const box = node.getAttribute("data-box");
+  if (box === null) return null;
+  const [top = 0, left = 0, width = 0, height = 0] = box.split(",").map(Number);
+  return { top, left, bottom: top + height, right: left + width };
+}
+
+/** Each drawing records what the page showed; its image is its number. */
+function draw(): string {
+  rasterized.push({
+    variants: [...document.querySelectorAll("button")].map((node) => node.dataset.variant ?? ""),
+    dialog: document.querySelector("[data-open]")?.getAttribute("data-open") ?? null,
+    covered: document.querySelector("div[data-loupe-capture]") !== null,
+    transitions: ![...document.querySelectorAll("style")].some((style) => style.textContent?.includes("transition: none")),
+  });
+  return String(rasterized.length);
+}
 
 beforeEach(() => {
   delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
-  delete (globalThis as { __loupeSnapshots?: unknown }).__loupeSnapshots;
+  setRasterizer(fixedPixels({ layout, draw }));
   rasterized.length = 0;
-  drawn.length = 0;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
   loupe = createDebug();
-  // jsdom lays nothing out: each node says where it is.
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-    const [top = 0, left = 0, width = 0, height = 0] = (this.getAttribute("data-box") ?? "").split(",").map(Number);
-    return { top, left, width, height, bottom: top + height, right: left + width, x: left, y: top, toJSON() {} } as DOMRect;
-  });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (this: HTMLCanvasElement) {
-    const target = this;
-    return {
-      drawImage: (source: HTMLCanvasElement, ...args: number[]) => {
-        target.dataset.from = source.dataset.raster;
-        drawn.push(args);
-      },
-    } as unknown as CanvasRenderingContext2D;
-  } as never);
-  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (this: HTMLCanvasElement, type?: string) {
-    return `data:${type ?? "image/png"};base64,${this.dataset.raster ?? `crop-of-${this.dataset.from}`}`;
-  });
 });
 
 afterEach(() => {
@@ -155,31 +141,31 @@ describe("Capture screen", () => {
     expect(document.querySelector("style")).toBeNull();
 
     expect(snapshot.viewport).toEqual({
-      before: "data:image/webp;base64,2",
-      after: "data:image/webp;base64,1",
+      before: "data:image/png;base64,2",
+      after: "data:image/png;base64,1",
       failedImages: 0,
     });
-    // One crop pair for the group change, around the three rows on screen; State
-    // props make no crop of their own.
+    // One crop pair for the group change, cut from both images around the three
+    // rows on screen, padded; State props make no crop of their own.
+    const p = CROP_PADDING;
+    const rect = `${100 - p},${600 - p},${232 + p},${632 + p}`;
     expect(snapshot.crops).toEqual([
       {
         change: `group:${TRIGGER}`,
         keyPath: null,
         more: 0,
-        before: "data:image/webp;base64,crop-of-2",
-        after: "data:image/webp;base64,crop-of-1",
+        before: `data:image/png;base64,2@${rect}`,
+        after: `data:image/png;base64,1@${rect}`,
         failedImages: 0,
       },
     ]);
-    const p = CROP_PADDING;
-    expect(drawn[0]).toEqual([600 - p, 100 - p, 32 + 2 * p, 132 + 2 * p, 0, 0, 32 + 2 * p, 132 + 2 * p]);
     expect(snapshot.shown.map((entry) => entry.identity.id)).toEqual([
       instanceId(TRIGGER, "user_1"),
       instanceId(TRIGGER, "user_2"),
       instanceId(TRIGGER, "user_3"),
       DIALOG_ID,
     ]);
-    expect(snapshot.bytes).toBe(snapshot.viewport.before.length * 2 + 2 * "data:image/webp;base64,crop-of-1".length);
+    expect(snapshot.bytes).toBe(2 * "data:image/png;base64,1".length + 2 * `data:image/png;base64,1@${rect}`.length);
     expect(snapshotBytes()).toBe(snapshot.bytes);
   });
 

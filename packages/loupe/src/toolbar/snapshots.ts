@@ -1,9 +1,12 @@
 // Snapshots (PER-138, per PER-99 §2–3): a before/after pair of the screen in view,
-// kept for the Proposal. Each capture rasterizes the viewport twice in the page
-// itself with `modern-screenshot` (no separate browser, no permission prompt), once
-// as it is and once in the "before" view: every Override off except State-prop
-// ones, so an open dialog stays open. A crop pair per change on screen is cut from
-// the two viewport images, so before and after always line up.
+// kept for the Proposal. Each capture rasterizes the viewport twice, once as it is
+// and once in the "before" view: every Override off except State-prop ones, so an
+// open dialog stays open. A crop pair per change on screen is cut from the two
+// viewport images, so before and after always line up.
+//
+// The Rasterizer (PER-217) measures nodes and draws the viewport: in the page,
+// `modern-screenshot` (`snapshots-raster.ts`); in tests, fixed pixels
+// (`snapshots.fixture.ts`). Everything else about a capture happens here.
 //
 // While "before" renders, a still of the page as it was covers it, so capturing
 // doesn't visibly disturb the page. Nothing is drawn on the images.
@@ -17,10 +20,7 @@ import { type ImagePair, type SnapshotInput, setOnKey, toJson } from "../proposa
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, emitChange, identityOf, type MountedInstance, registry, setView } from "../runtime/registry.js";
 import { type InstanceIdentity, type OverrideRecord, reachOf } from "../runtime/store.js";
-import { HOST_ATTRIBUTE } from "./styles.js";
-
-/** Marks the still that covers the page while "before" renders; never captured. */
-export const CAPTURE_ATTRIBUTE = "data-loupe-capture";
+import { CAPTURE_ATTRIBUTE, screenshotRasterizer } from "./snapshots-raster.js";
 
 /** Around a crop, in CSS pixels. */
 export const CROP_PADDING = 24;
@@ -43,9 +43,48 @@ export type Snapshot = SnapshotInput & {
   bytes: number;
 };
 
+/** A box in CSS pixels, from the viewport's top left corner. */
+export type Rect = { top: number; left: number; bottom: number; right: number };
+
+/** The viewport to draw: its size in CSS pixels, and the device pixel ratio. */
+export type Frame = { width: number; height: number; dpr: number };
+
+/** One drawing of the viewport. */
+export type Raster = {
+  /** Images on the page that didn't load, drawn as a placeholder. */
+  failed: number;
+  /** The drawing as an element: it covers the page while "before" renders. */
+  still: HTMLElement;
+  /** The whole drawing, as a data URL. */
+  encode(): string;
+  /** The part of the drawing inside `rect`, as a data URL. */
+  cut(rect: Rect): string;
+};
+
+/** What draws the page. A capture reads the page itself only through this. */
+export type Rasterizer = {
+  /** Where a node is drawn; null when it draws nothing. */
+  measure(node: Element): Rect | null;
+  /** The viewport at the current scroll, without the Toolbar or what capturing adds to the page. */
+  rasterize(frame: Frame): Promise<Raster>;
+};
+
 type Store = { list: Snapshot[]; next: number; queue: Promise<unknown> };
 
 const GLOBAL_KEY = "__loupeSnapshots";
+
+let rasterizer: Rasterizer = screenshotRasterizer;
+
+/**
+ * Draws the page with `next` from now on, starting over as a page load does: no
+ * Snapshots, numbering from 1. Tests draw fixed pixels this way; the page never
+ * calls it.
+ */
+export function setRasterizer(next: Rasterizer): void {
+  rasterizer = next;
+  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Store };
+  host[GLOBAL_KEY] = { list: [], next: 1, queue: Promise.resolve() };
+}
 
 /** One list per page, kept on `globalThis` across a Fast Refresh; a reload clears it. */
 function store(): Store {
@@ -107,8 +146,6 @@ export function captureScreen(options: CaptureOptions = {}): Promise<Snapshot> {
   return run;
 }
 
-type Rect = { top: number; left: number; bottom: number; right: number };
-
 type Covered = { id: string; keyPath: string; after: Rect; before: Rect | null };
 
 /** A change on screen: one record, and the Instances it reaches that are in view. */
@@ -123,7 +160,9 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   }
   const reg = registry();
   const debug = debugOf();
+  const draw = rasterizer;
   const dpr = window.devicePixelRatio || 1;
+  const frame: Frame = { width, height, dpr };
   const route = currentRoute();
   const url = location.href;
   const state = store();
@@ -135,7 +174,7 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   const mounted = [...reg.instances.values()];
   const boxes = new Map<string, Rect>();
   for (const instance of mounted) {
-    const box = boxOf(debug, instance.id);
+    const box = boxOf(draw, debug, instance.id);
     if (box && onScreen(box, width, height)) boxes.set(instance.id, box);
   }
   const changes = changesOnScreen(reg.store.records(), mounted, boxes);
@@ -151,16 +190,16 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   let after: Raster;
   let before: Raster;
   try {
-    after = await rasterize(width, height, dpr);
-    const unfreeze = freeze(after.canvas, width, height);
+    after = await draw.rasterize(frame);
+    const unfreeze = freeze(after.still, width, height);
     try {
       flushSync(() => setView("before"));
       await settle();
       // A change can move its Instance: crop the union of where it is in both views.
       for (const change of changes) {
-        for (const entry of change.covered) entry.before = boxOf(debug, entry.id);
+        for (const entry of change.covered) entry.before = boxOf(draw, debug, entry.id);
       }
-      before = await rasterize(width, height, dpr);
+      before = await draw.rasterize(frame);
     } finally {
       flushSync(() => setView("proposed"));
       await settle();
@@ -171,13 +210,13 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   }
 
   const viewport: ImagePair = {
-    before: encode(before.canvas),
-    after: encode(after.canvas),
+    before: before.encode(),
+    after: after.encode(),
     failedImages: Math.max(before.failed, after.failed),
   };
   const crops = changes.flatMap((change) =>
     cropRects(change.covered, width, height).map((crop) => {
-      const pair = { before: cut(before.canvas, crop.rect, dpr), after: cut(after.canvas, crop.rect, dpr) };
+      const pair = { before: before.cut(crop.rect), after: after.cut(crop.rect) };
       // Which crop holds a failed image isn't known: the viewport pair says it.
       return { change: change.key, keyPath: crop.keyPath, more: crop.more, ...pair, failedImages: 0 };
     }),
@@ -288,11 +327,8 @@ function onScreen(rect: Rect, width: number, height: number): boolean {
 }
 
 /** The box around every node an Instance renders; null when it draws nothing. */
-function boxOf(debug: LoupeDebug, id: string): Rect | null {
-  const rects = debug
-    .nodes(id)
-    .map((node) => node.getBoundingClientRect())
-    .filter((rect) => rect.width > 0 || rect.height > 0);
+function boxOf(draw: Rasterizer, debug: LoupeDebug, id: string): Rect | null {
+  const rects = debug.nodes(id).flatMap((node) => draw.measure(node) ?? []);
   return rects.length === 0 ? null : union(rects);
 }
 
@@ -300,58 +336,11 @@ function debugOf(): LoupeDebug {
   return (window as typeof window & { __loupe?: LoupeDebug }).__loupe ?? createDebug();
 }
 
-type Raster = { canvas: HTMLCanvasElement; failed: number };
-
-const PLACEHOLDER = `data:image/svg+xml,${encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40"><rect width="100%" height="100%" fill="#f1f3f3" stroke="#999" stroke-dasharray="4"/><text x="50%" y="55%" font-family="system-ui,sans-serif" font-size="11" fill="#555" text-anchor="middle">Image not captured</text></svg>',
-)}`;
-
-/** The viewport at the current scroll, without the Toolbar, at device pixel ratio. */
-async function rasterize(width: number, height: number, dpr: number): Promise<Raster> {
-  const { domToCanvas } = await import("modern-screenshot");
-  let failed = 0;
-  const root = document.documentElement;
-  const canvas = await domToCanvas(root, {
-    width,
-    height,
-    scale: dpr,
-    backgroundColor: pageBackground(),
-    // The window's scroll: the root grows by it and moves up and left by it, so
-    // the image starts where the viewport does. Fixed elements stay put.
-    style: {
-      width: `${width + window.scrollX}px`,
-      height: `${height + window.scrollY}px`,
-      marginTop: `${-window.scrollY}px`,
-      marginLeft: `${-window.scrollX}px`,
-      overflow: "hidden",
-    },
-    filter: (node) =>
-      !(node instanceof Element) ||
-      !(node.hasAttribute(HOST_ATTRIBUTE) || node.hasAttribute(CAPTURE_ATTRIBUTE) || node.localName === "nextjs-portal"),
-    fetch: {
-      placeholderImage: () => {
-        failed++;
-        return PLACEHOLDER;
-      },
-    },
-  });
-  return { canvas, failed };
-}
-
-/** What shows behind a transparent page: the body's background, else the root's, else white. */
-function pageBackground(): string {
-  for (const element of [document.body, document.documentElement]) {
-    const color = getComputedStyle(element).backgroundColor;
-    if (color && color !== "transparent" && color !== "rgba(0, 0, 0, 0)") return color;
-  }
-  return "#fff";
-}
-
 /**
  * Covers the page with a still of it, above everything but the Toolbar's panel,
  * while "before" renders underneath. Returns what takes it away.
  */
-function freeze(still: HTMLCanvasElement, width: number, height: number): () => void {
+function freeze(still: HTMLElement, width: number, height: number): () => void {
   const cover = document.createElement("div");
   cover.setAttribute(CAPTURE_ATTRIBUTE, "");
   cover.setAttribute("aria-hidden", "true");
@@ -391,22 +380,6 @@ function settle(): Promise<void> {
     // A hidden tab runs no frames.
     setTimeout(finish, 150);
   });
-}
-
-function cut(source: HTMLCanvasElement, rect: Rect, dpr: number): string {
-  const canvas = document.createElement("canvas");
-  const x = Math.round(rect.left * dpr);
-  const y = Math.round(rect.top * dpr);
-  canvas.width = Math.max(1, Math.round((rect.right - rect.left) * dpr));
-  canvas.height = Math.max(1, Math.round((rect.bottom - rect.top) * dpr));
-  canvas.getContext("2d")?.drawImage(source, x, y, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-  return encode(canvas);
-}
-
-/** WebP at 0.9, or PNG where the browser can't encode WebP. */
-function encode(canvas: HTMLCanvasElement): string {
-  const webp = canvas.toDataURL("image/webp", 0.9);
-  return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/png");
 }
 
 /** Adds `capture`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
