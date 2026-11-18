@@ -10,6 +10,7 @@ import { createAdapter } from "./adapter.js";
 import { type AdaptedInstance, discover } from "./discovery.js";
 import type { DebugInfo, Fiber } from "./fiber.js";
 import { registry } from "./registry.js";
+import { resetLoupe } from "./slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -50,7 +51,7 @@ describe("with React rendering in the browser", () => {
   let root: Root;
 
   beforeEach(() => {
-    delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+    resetLoupe();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);

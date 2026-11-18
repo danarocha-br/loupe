@@ -7,8 +7,9 @@ import { devMount } from "../mount.js";
 import { REPORT_DATA_ID } from "../proposal/report.js";
 import type { Proposal } from "../proposal/types.js";
 import { createAdapter } from "../runtime/adapter.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
+import { resetLoupe } from "../runtime/slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -27,7 +28,6 @@ vi.mock("./notices.js", () => ({
 let pixels = "screen";
 
 const { default: Toolbar } = await import("./index.js");
-const { startTracking } = await import("./proposal.js");
 const { captureScreen, setRasterizer, snapshots } = await import("./snapshots.js");
 const { fixedPixels } = await import("./snapshots.fixture.js");
 const { exportForm } = await import("./export.js");
@@ -110,8 +110,7 @@ async function capture() {
 }
 
 beforeEach(async () => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
-  delete (globalThis as { __loupeExportForm?: unknown }).__loupeExportForm;
+  resetLoupe();
   pixels = "screen";
   downloads = [];
   setRasterizer(
@@ -136,9 +135,7 @@ beforeEach(async () => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
-  (window as { __loupe?: LoupeDebug }).__loupe = loupe;
-  startTracking();
+  loupe = debugOf();
   act(() =>
     root.render(
       <>
@@ -155,7 +152,6 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
-  delete (window as { __loupe?: LoupeDebug }).__loupe;
   vi.restoreAllMocks();
 });
 

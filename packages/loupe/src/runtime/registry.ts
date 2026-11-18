@@ -1,6 +1,6 @@
 // The Instance registry: every mounted adapted Instance, and the Override store,
-// which holds the self-check result and the view. One per page, kept on
-// `globalThis` so that a Fast Refresh that re-evaluates this module finds the same
+// which holds the self-check result and the view. One per page, in the page's slot
+// (`slot.ts`), so a Fast Refresh that evaluates this module again finds the same
 // Instances and Overrides.
 
 import type { Fiber } from "./fiber.js";
@@ -10,13 +10,13 @@ import { WRITES_ATTRIBUTE } from "../writes.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
 import type { Split } from "./authored.js";
+import { type PerPageOptions, perPage } from "./slot.js";
 import {
   createOverrideStore,
   type InstanceIdentity,
   type OverrideStore,
   type Props,
   inScope,
-  type Status,
   type View,
 } from "./store.js";
 
@@ -25,8 +25,8 @@ export type MountedInstance = {
   id: string;
   /** The call-site id the loader wrote (`data-ds-anchor`). */
   anchor: string;
-  /** `path:line:col n/total`, display only (`data-ds-source`). */
-  hint: string | null;
+  /** `path:line:col n/total`, display only (`data-ds-source`), as of the latest commit. */
+  readonly hint: string | null;
   component: string;
   keyPath: string;
   /**
@@ -44,10 +44,19 @@ export type MountedInstance = {
   attempts: Map<string, unknown>;
   /** Rerender this Instance. */
   notify(): void;
-  /** The fiber of the latest render, to map a picked DOM node back. */
-  fiber: Fiber | null;
-  renders: number;
+  /** The fiber of the latest commit, to map a picked DOM node back. */
+  readonly fiber: Fiber | null;
+  /** How many times it has committed. */
+  readonly renders: number;
+  /**
+   * The pathname it mounted on. At unmount, `location` may already be the next
+   * page's: a client navigation changes it before the old page's cleanups run.
+   */
+  readonly route: string;
 };
+
+/** A MountedInstance with every field writable: only `register` and `committed` use it. */
+type Writable = { -readonly [K in keyof MountedInstance]: MountedInstance[K] };
 
 /** An Instance as it last rendered before it unmounted: what the Toolbar shows for a record it holds. */
 export type LastSeen = {
@@ -74,59 +83,32 @@ export type Registry = {
   instanceMeta: Map<string, Readonly<Record<string, PropMeta>>>;
 };
 
-const GLOBAL_KEY = "__loupeRegistry";
-
+/** The page's registry, made on first use. */
 export function registry(): Registry {
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry };
-  let value = host[GLOBAL_KEY];
-  // One made by an earlier version of this module, kept across a Fast Refresh.
-  if (value && typeof value.store.render !== "function") {
-    // Its store predates Override resolution: the status and view it kept move into a
-    // new store. Its records can't (their pins and suspensions would be lost), so they go.
-    const old = value as Registry & { status?: Status; view?: View };
-    value.store = createOverrideStore(old.status ? { status: old.status } : {});
-    if (old.view) value.store.setView(old.view);
-    delete old.status;
-    delete old.view;
-    connect(value);
-  }
-  if (value && !value.listeners) value.listeners = new Set();
-  if (value && !value.departed) value.departed = new Map();
-  if (value && !value.instanceMeta) value.instanceMeta = new Map();
-  if (!value) {
-    const problem = internalsProblem();
-    value = {
-      store: createOverrideStore(problem === null ? {} : { status: { overrides: false, reason: problem } }),
-      instances: new Map(),
-      departed: new Map(),
-      listeners: new Set(),
-      instanceMeta: new Map(),
-    };
-    const created = value;
-    connect(created);
-    watchRoute(() => {
-      // A page Override is per route: Instances that outlive a navigation (a layout's)
-      // stop or start matching one.
-      if (!created.store.records().some((record) => record.target.scope === "page")) return;
-      for (const instance of created.instances.values()) instance.notify();
-    });
-    if (problem !== null) warnInspectOnly(problem);
-    host[GLOBAL_KEY] = value;
-  }
-  return value;
+  return perPage("registry", createRegistry);
 }
 
-/** Rerenders the Instances a store change can touch, and forgets departed ones no record names. */
-function connect(value: Registry): void {
-  const { store } = value;
-  store.subscribe((target) => {
+function createRegistry(): Registry {
+  const problem = internalsProblem();
+  const value: Registry = {
+    store: createOverrideStore(problem === null ? {} : { status: { overrides: false, reason: problem } }),
+    instances: new Map(),
+    departed: new Map(),
+    listeners: new Set(),
+    instanceMeta: new Map(),
+  };
+  // Rerenders the Instances a store change can touch, and forgets departed ones no record names.
+  value.store.subscribe((target) => {
     for (const instance of value.instances.values()) {
       if (inScope(target, identityOf(instance))) instance.notify();
     }
-    const named = recordedIds(store);
+    const named = recordedIds(value.store);
     for (const id of value.departed.keys()) if (!named.has(id)) value.departed.delete(id);
     emitChange();
   });
+  watchRoute();
+  if (problem !== null) warnInspectOnly(problem);
+  return value;
 }
 
 /**
@@ -142,9 +124,7 @@ export function onRegistryChange(listener: () => void): () => void {
 }
 
 export function emitChange(): void {
-  // Read off the global, not `registry()`, so a change while it is being created is a no-op.
-  const value = (globalThis as typeof globalThis & { [GLOBAL_KEY]?: Registry })[GLOBAL_KEY];
-  for (const listener of value?.listeners ?? []) listener();
+  for (const listener of registry().listeners) listener();
 }
 
 /** The page's route, as a page-scope Override keys it: the pathname. */
@@ -168,20 +148,35 @@ export function identityOf(
 const WRAPPED = Symbol.for("loupe.historyWrapped");
 const HISTORY_EVENT = "loupe:history";
 
+/** Route watching outlives `resetLoupe()`, like the `history` wrap: it reads the registry of the moment. */
+const ROUTE_ON_RESET: PerPageOptions<true> = { restart: (watching) => watching };
+
 /**
- * Calls `onChange` after the pathname changes. Next's client navigations go through
- * `history.pushState`/`replaceState`, which fire no event, so both are wrapped once
- * per page to fire one. Next calls them from an insertion effect, where React
- * forbids scheduling updates, so the check waits for a microtask.
+ * Rerenders the Instances on the page after the pathname changes, while a page
+ * Override is set: Instances that outlive a navigation (a layout's) come into its
+ * Reach or fall out of it. Once per page, in the page's slot.
  */
-function watchRoute(onChange: () => void): void {
+function watchRoute(): void {
   if (typeof window === "undefined" || typeof history === "undefined") return;
+  perPage("routeWatch", startWatchingRoute, ROUTE_ON_RESET);
+}
+
+/**
+ * Next's client navigations go through `history.pushState` and `replaceState`,
+ * which fire no event, so both are wrapped to fire one. Next calls them from an
+ * insertion effect, where React forbids scheduling updates, so the check waits
+ * for a microtask. The check reads the registry of the moment, so a
+ * `resetLoupe()` leaves no listener behind on an old one.
+ */
+function startWatchingRoute(): true {
   let last = currentRoute();
   const check = () => {
     const route = currentRoute();
     if (route === last) return;
     last = route;
-    onChange();
+    const value = registry();
+    if (!value.store.records().some((record) => record.target.scope === "page")) return;
+    for (const instance of value.instances.values()) instance.notify();
   };
   for (const method of ["pushState", "replaceState"] as const) {
     const original = history[method] as History["pushState"] & { [WRAPPED]?: true };
@@ -195,6 +190,7 @@ function watchRoute(onChange: () => void): void {
   }
   window.addEventListener(HISTORY_EVENT, check);
   window.addEventListener("popstate", check);
+  return true;
 }
 
 /**
@@ -231,29 +227,43 @@ function recordedIds(store: OverrideStore): Set<string> {
 }
 
 /**
- * The route each Instance mounted on. Read at unmount, `location` may already
- * be the next page's: a client navigation changes it before the old page's cleanups run.
- */
-const mountedOn = new WeakMap<MountedInstance, string>();
-
-/**
  * Registers a mounted Instance under `baseId`, or `baseId~2`, `~3`… when another
  * mounted Instance already holds it (the same call site, rendered twice with no
- * key to tell them apart). Returns the id it got.
- * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
+ * key to tell them apart), and runs the hop guard. Returns the Instance, with the
+ * id it got. `~n` is mount order, so a record naming any id of a duplicated base
+ * is suspended.
  */
-export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
+export function register(baseId: string, entry: Omit<MountedInstance, "id" | "renders" | "route">): MountedInstance {
   const { instances, departed, store } = registry();
   const id = uniqueId(baseId, instances);
-  const instance: MountedInstance = { ...entry, id };
+  const instance: MountedInstance = { ...entry, id, renders: 1, route: currentRoute() };
   instances.set(id, instance);
-  mountedOn.set(instance, currentRoute());
   departed.delete(id);
   // Also when this one took the free base id while a `~n` is still mounted.
   const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
   if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
   emitChange();
+  observe(instance);
   return instance;
+}
+
+/**
+ * What a committed render writes to a mounted Instance: the fiber and hint it
+ * rendered with, and one more render. Then the hop guard runs, and the Toolbar
+ * redraws, since its Current values are live.
+ */
+export function committed(instance: MountedInstance, fiber: Fiber | null, hint: string | null): void {
+  const writable = instance as Writable;
+  writable.fiber = fiber;
+  writable.hint = hint;
+  writable.renders++;
+  observe(instance);
+  emitChange();
+}
+
+/** The hop guard. Runs before paint, so a suspended Override is never shown. */
+function observe(instance: MountedInstance): void {
+  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: parseHint(instance.hint)?.total ?? null });
 }
 
 export function unregister(instance: MountedInstance): void {
@@ -266,7 +276,7 @@ export function unregister(instance: MountedInstance): void {
       component: instance.component,
       anchor: instance.anchor,
       hint: instance.hint,
-      route: mountedOn.get(instance) ?? currentRoute(),
+      route: instance.route,
       current: instance.live().current,
     });
   }

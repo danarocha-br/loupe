@@ -9,8 +9,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { instanceId } from "../../call-site.js";
 import type { LayerStatus } from "../../layer-status.js";
-import { createDebug, type LoupeDebug } from "../../runtime/debug.js";
+import { debugOf, type LoupeDebug } from "../../runtime/debug.js";
 import { disableOverrides } from "../../runtime/registry.js";
+import { resetLoupe } from "../../runtime/slot.js";
 import type { Scope } from "../../runtime/store.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, GROUP, MENU, members, Page, site } from "../members.fixture.js";
 import { type GoneBody, type InspectorBody, type ListBody, panelView, type PanelView, type PropItem, type SeenComponents } from "./index.js";
@@ -23,12 +24,12 @@ let loupe: LoupeDebug;
 let seen: SeenComponents;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   history.replaceState(null, "", "/");
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
+  loupe = debugOf();
   seen = { route: "", components: new Set() };
 });
 

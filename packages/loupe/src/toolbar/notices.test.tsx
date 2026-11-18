@@ -6,7 +6,7 @@ import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
@@ -45,20 +45,18 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   server.status = null;
   server.calls = 0;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  (window as { __loupe?: LoupeDebug }).__loupe = createDebug();
 });
 
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
-  delete (window as { __loupe?: LoupeDebug }).__loupe;
   vi.restoreAllMocks();
   vi.useRealTimers();
 });

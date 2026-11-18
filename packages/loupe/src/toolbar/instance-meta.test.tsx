@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
@@ -33,7 +33,7 @@ let root: Root;
 const doc = document as unknown as Record<string, unknown>;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   readInstanceMeta.mockReset();
   readInstanceMeta.mockResolvedValue([
     {
@@ -53,7 +53,6 @@ beforeEach(() => {
   // Next hydrates the document; the fiber walk that finds Instances with no Adapter looks for a container there.
   const key = Object.keys(container).find((name) => name.startsWith("__reactContainer$")) as string;
   doc.__reactContainer$test = (container as unknown as Record<string, unknown>)[key];
-  (window as { __loupe?: LoupeDebug }).__loupe = createDebug();
 });
 
 afterEach(() => {
@@ -61,7 +60,6 @@ afterEach(() => {
   container.remove();
   delete doc.__reactContainer$test;
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
-  delete (window as { __loupe?: LoupeDebug }).__loupe;
 });
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));

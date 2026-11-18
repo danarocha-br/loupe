@@ -16,8 +16,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE, uniqueId } from "../call-site.js";
 import { createAdapter } from "./adapter.js";
-import { createDebug, type LoupeDebug } from "./debug.js";
+import { debugOf, type LoupeDebug } from "./debug.js";
 import { setView } from "./registry.js";
+import { resetLoupe } from "./slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -45,11 +46,11 @@ let root: Root;
 let loupe: LoupeDebug;
 
 beforeEach(() => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
+  loupe = debugOf();
 });
 
 afterEach(() => {
@@ -463,9 +464,9 @@ describe("createAdapter", () => {
         loupe.set(anchor(2), "variant", "destructive");
       });
       act(() => root.unmount());
-      delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+      resetLoupe();
       root = createRoot(container);
-      loupe = createDebug();
+      loupe = debugOf();
       render(dialog(true));
       expect(loupe.records()).toEqual([]);
       expect(buttons()[0]?.dataset.variant).toBe("default");

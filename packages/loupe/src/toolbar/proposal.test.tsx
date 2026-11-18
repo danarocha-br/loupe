@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
+import { resetLoupe } from "../runtime/slot.js";
 import { memoryRequest, memorySource } from "./flags.fixture.js";
 import { setFlagSource } from "./flags-store.js";
 import Toolbar from "./index.js";
@@ -83,12 +84,11 @@ const footerButton = (text: string) =>
   [...shadow().querySelectorAll<HTMLButtonElement>(".footer button")].find((button) => button.textContent === text);
 
 beforeEach(async () => {
-  delete (globalThis as { __loupeRegistry?: unknown }).__loupeRegistry;
+  resetLoupe();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
-  (window as { __loupe?: LoupeDebug }).__loupe = loupe;
+  loupe = debugOf();
   startTracking();
   act(() => root.render(<Harness />));
   await settle();
@@ -99,7 +99,6 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
-  delete (window as { __loupe?: LoupeDebug }).__loupe;
   vi.restoreAllMocks();
 });
 

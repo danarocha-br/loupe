@@ -1,9 +1,8 @@
-// What the Toolbar reads the page through: `__loupe`, and a version that moves
-// whenever the registry or the page changes. What the panel shows is
-// `panelView()`'s to decide (PER-214).
+// The version the Toolbar redraws on: it moves whenever the registry or the page
+// changes. What the panel shows is `panelView()`'s to decide (PER-214), read
+// through `debugOf()`.
 
-import { useEffect, useMemo, useState } from "react";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { useEffect, useState } from "react";
 import { onRegistryChange } from "../runtime/registry.js";
 
 /** A version that moves whenever the registry or the page's DOM changes, at most once a frame. */
@@ -33,11 +32,4 @@ export function usePageVersion(host: Element | null): number {
     };
   }, [host]);
   return version;
-}
-
-export function useDebug(): LoupeDebug {
-  return useMemo(() => {
-    const host = window as typeof window & { __loupe?: LoupeDebug };
-    return host.__loupe ?? createDebug();
-  }, []);
 }

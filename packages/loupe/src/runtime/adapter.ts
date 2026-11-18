@@ -11,13 +11,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { ANCHOR_ATTRIBUTE, instanceId, parseHint, SOURCE_ATTRIBUTE, unanchoredId } from "../call-site.js";
+import { ANCHOR_ATTRIBUTE, instanceId, SOURCE_ATTRIBUTE, unanchoredId } from "../call-site.js";
 import type { PropMeta } from "../meta/types.js";
 import { splitAuthored, writesOf } from "./authored.js";
 import { currentFiber, keyPathOf } from "./fiber.js";
 import {
+  committed,
   disableOverrides,
-  emitChange,
   identityOf,
   type MountedInstance,
   register,
@@ -126,13 +126,8 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
       latest.current = props;
       const instance = mounted.current?.instance;
       if (instance) {
-        instance.fiber = fiber;
-        instance.hint = hintOf(props);
-        instance.renders++;
-        observeCallSite(instance);
+        committed(instance, fiber, hintOf(props));
         reportHeldStates(instance, overrides);
-        // The Toolbar's Current values are live.
-        emitChange();
       }
     });
 
@@ -150,10 +145,8 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
         attempts: holds.attempts,
         notify: force,
         fiber,
-        renders: 1,
       });
       mounted.current = { baseId, instance };
-      observeCallSite(instance);
       // Before paint: an Override kept across a remount shows on the first frame.
       // A group or page Override set before this mount reaches it the same way.
       if (registry().store.applies(identityOf(instance))) force();
@@ -177,11 +170,6 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
   Adapter.displayName = `Loupe(${name})`;
   Object.defineProperty(Adapter, ADAPTER, { value: name });
   return Adapter as unknown as C;
-}
-
-/** The hop guard. Runs before paint, so a suspended Override is never shown. */
-function observeCallSite(instance: MountedInstance): void {
-  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: parseHint(instance.hint)?.total ?? null });
 }
 
 function hintOf(props: Props): string | null {

@@ -7,21 +7,24 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { debugOf } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
 import { Highlight } from "./highlight.js";
 import { CaptureIcon, CursorIcon, LayersIcon, PanelIcon } from "./icons.js";
 import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
-import { useDebug, usePageVersion } from "./page.js";
+import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
 import { panelView, type SeenComponents } from "./panel-view/index.js";
 import { usePicker } from "./picker.js";
 import { useCapture } from "./snapshots-card.js";
+import { startToolbar } from "./start.js";
 import { CSS, HOST_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
 
 export type Theme = "light" | "dark";
 
 export default function Toolbar() {
+  useEffect(startToolbar, []);
   const root = useShadowRoot();
   if (!root) return null;
   return createPortal(<ToolbarBody host={root.host as HTMLElement} />, root);
@@ -147,7 +150,7 @@ function ToolbarOpen({
   theme: Theme;
   onTheme(): void;
 }) {
-  const debug = useDebug();
+  const debug = useMemo(debugOf, []);
   const version = usePageVersion(host);
   const layer = useLayerStatus(version);
   // "Appears on interaction" remembers components across page versions: `panelView()`
