@@ -14,7 +14,7 @@ import { proposalMarkdown } from "../proposal/markdown.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
 import { createDebug, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
-import { previewedFlags } from "./flags.js";
+import { previewedFlags } from "./flags-store.js";
 import { readProjectContext } from "./project-server.js";
 import { captureScreen, exportableSnapshots, exposeSnapshots } from "./snapshots.js";
 

@@ -1,36 +1,17 @@
 // @vitest-environment jsdom
-import { randomBytes } from "node:crypto";
 import { decryptOverrides as sdkDecryptOverrides } from "flags";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { decryptJwe, encryptOverrides } from "./flags-crypto.js";
+import { FlagsCard } from "./flags.js";
+import { decryptJwe } from "./flags-crypto.js";
+import { type FlagRequest, type FlagsResult, readPreview, writePreview } from "./flags-preview.js";
+import { flagsView, loadFlags, previewedFlags, setFlagSource } from "./flags-store.js";
+import { type MemoryRequest, type MemorySeed, memoryRequest, memorySource } from "./flags.fixture.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// The Server Actions' only Next dependency: a cookie jar and the request's headers.
-const jar = new Map<string, string>();
-/** The options each cookie was last set with. */
-const cookieOptions = new Map<string, unknown>();
-let requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
-// Each request takes real time, as on a slow CI runner: no test may count ticks to wait for a write.
-const slow = () => new Promise((resolve) => setTimeout(resolve, 20));
-vi.mock("next/headers", () => ({
-  cookies: async () => {
-    await slow();
-    return {
-      get: (name: string) => (jar.has(name) ? { name, value: jar.get(name) } : undefined),
-      set: (name: string, value: string, options?: unknown) => {
-        jar.set(name, value);
-        cookieOptions.set(name, options);
-      },
-      delete: (name: string) => void jar.delete(name),
-    };
-  },
-  headers: async () => requestHeaders,
-}));
-
-const secret = randomBytes(32).toString("base64url");
+// Spelled out rather than imported: it is the contract with `flags/next`.
 const COOKIE = "vercel-flag-overrides";
 const DEFINITIONS = {
   definitions: {
@@ -38,33 +19,16 @@ const DEFINITIONS = {
     plan: { description: "Pricing plan", options: [{ value: "starter", label: "Starter" }, { value: "pro", label: "Pro" }] },
   },
 };
+const declared = { endpoint: { body: DEFINITIONS } };
 
-let endpoint: { status: number; body: unknown };
-const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify(endpoint.body), { status: endpoint.status }));
+/** The overrides the cookie holds, as the Flags SDK itself decrypts them. */
+const overridesIn = (request: MemoryRequest) => sdkDecryptOverrides(request.jar.get(COOKIE)?.value as string, request.secret);
 
-beforeEach(() => {
-  jar.clear();
-  cookieOptions.clear();
-  endpoint = { status: 200, body: DEFINITIONS };
-  fetchMock.mockClear();
-  requestHeaders = new Headers({ host: "localhost:3131", cookie: "__session=abc" });
-  vi.stubGlobal("fetch", fetchMock);
-  vi.stubEnv("FLAGS_SECRET", secret);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-});
-
-const overridesInCookie = () => sdkDecryptOverrides(jar.get(COOKIE) as string, secret);
-
-describe("readFlags", () => {
+describe("readPreview", () => {
   it("discovers flags through the endpoint with an access proof and reads the overrides the cookie holds", async () => {
-    const { readFlags } = await import("./flags-server.js");
-    jar.set(COOKIE, await encryptOverrides({ showBetaFeature: true }, secret));
+    const request = memoryRequest({ ...declared, overrides: { showBetaFeature: true } });
 
-    const result = await readFlags();
+    const result = await readPreview(request);
 
     expect(result).toEqual({
       ok: true,
@@ -74,70 +38,102 @@ describe("readFlags", () => {
       ],
       overrides: { showBetaFeature: true },
     });
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://127.0.0.1:3131/.well-known/vercel/flags");
-    const sent = new Headers(init.headers);
+    const [call] = request.calls;
+    expect(call?.url).toBe("http://127.0.0.1:3131/.well-known/vercel/flags");
+    const sent = new Headers(call?.init.headers);
     expect(sent.get("authorization")).toMatch(/^Bearer [\w-]+\.\.[\w-]+\.[\w-]+\.[\w-]+$/);
     expect(sent.get("cookie")).toBe("__session=abc");
   });
 
   it("sends the proof to the loopback port, never to the host the request names", async () => {
-    const { readFlags } = await import("./flags-server.js");
-    requestHeaders = new Headers({ host: "rebound.example:3131", "x-forwarded-proto": "https" });
-    await readFlags();
-    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://127.0.0.1:3131/.well-known/vercel/flags");
+    const request = memoryRequest({ ...declared, headers: { host: "rebound.example:3131", "x-forwarded-proto": "https" } });
+    await readPreview(request);
+    expect(request.calls[0]?.url).toBe("http://127.0.0.1:3131/.well-known/vercel/flags");
   });
 
   it("says why when there is no secret, no endpoint, or the endpoint refuses the proof", async () => {
-    const { readFlags } = await import("./flags-server.js");
-    endpoint = { status: 404, body: null };
-    expect(await readFlags()).toEqual({ ok: false, reason: expect.stringContaining("no flags discovery endpoint") });
-    endpoint = { status: 401, body: null };
-    expect(await readFlags()).toEqual({ ok: false, reason: expect.stringContaining("refused Loupe's access proof") });
-    vi.stubEnv("FLAGS_SECRET", "");
-    expect(await readFlags()).toEqual({ ok: false, reason: expect.stringContaining("FLAGS_SECRET isn't set") });
+    expect(await readPreview(memoryRequest({ endpoint: { status: 404, body: null } }))).toEqual({
+      ok: false,
+      reason: expect.stringContaining("no flags discovery endpoint"),
+    });
+    expect(await readPreview(memoryRequest({ endpoint: { status: 401, body: null } }))).toEqual({
+      ok: false,
+      reason: expect.stringContaining("refused Loupe's access proof"),
+    });
+    // With no secret the request is never asked for, so where there is no Next request
+    // (any other test that renders the Toolbar) the default source just says why.
+    const untouchable: FlagRequest = {
+      ...memoryRequest({ secret: "" }),
+      cookies: () => Promise.reject(new Error("asked for the cookies")),
+      headers: () => Promise.reject(new Error("asked for the headers")),
+    };
+    expect(await readPreview(untouchable)).toEqual({ ok: false, reason: expect.stringContaining("FLAGS_SECRET isn't set") });
+    expect(await writePreview(untouchable, { plan: "pro" }, [])).toEqual({
+      ok: false,
+      reason: expect.stringContaining("FLAGS_SECRET isn't set"),
+    });
   });
 });
 
-describe("writeFlagOverrides", () => {
+describe("writePreview", () => {
   it("keeps other overrides, clears the named ones, and deletes the cookie once nothing is overridden", async () => {
-    const { writeFlagOverrides } = await import("./flags-server.js");
-    jar.set(COOKIE, await encryptOverrides({ fromVercelToolbar: "x" }, secret));
+    const request = memoryRequest({ overrides: { fromVercelToolbar: "x" } });
 
-    expect(await writeFlagOverrides({ plan: "pro" }, [])).toEqual({ ok: true, overrides: { fromVercelToolbar: "x", plan: "pro" } });
-    await expect(overridesInCookie()).resolves.toEqual({ fromVercelToolbar: "x", plan: "pro" });
+    expect(await writePreview(request, { plan: "pro" }, [])).toEqual({ ok: true, overrides: { fromVercelToolbar: "x", plan: "pro" } });
+    await expect(overridesIn(request)).resolves.toEqual({ fromVercelToolbar: "x", plan: "pro" });
 
-    expect(await writeFlagOverrides({}, ["plan"])).toEqual({ ok: true, overrides: { fromVercelToolbar: "x" } });
-    expect(await writeFlagOverrides({}, ["fromVercelToolbar"])).toEqual({ ok: true, overrides: {} });
-    expect(jar.has(COOKIE)).toBe(false);
+    expect(await writePreview(request, {}, ["plan"])).toEqual({ ok: true, overrides: { fromVercelToolbar: "x" } });
+    expect(await writePreview(request, {}, ["fromVercelToolbar"])).toEqual({ ok: true, overrides: {} });
+    expect(request.jar.has(COOKIE)).toBe(false);
 
-    await writeFlagOverrides({ a: true, b: false }, []);
-    expect(await writeFlagOverrides({}, "all")).toEqual({ ok: true, overrides: {} });
-    expect(jar.has(COOKIE)).toBe(false);
+    await writePreview(request, { a: true, b: false }, []);
+    expect(await writePreview(request, {}, "all")).toEqual({ ok: true, overrides: {} });
+    expect(request.jar.has(COOKIE)).toBe(false);
   });
 
   it("lets a preview expire after 8 hours, so it can't outlive the app that set it (PER-182)", async () => {
     // Cookies ignore the port: one left on localhost reaches every other app there, and
     // flags/next throws on it when that app has no FLAGS_SECRET.
-    const { writeFlagOverrides } = await import("./flags-server.js");
+    const request = memoryRequest();
     const before = Math.floor(Date.now() / 1000);
-    await writeFlagOverrides({ plan: "pro" }, []);
+    await writePreview(request, { plan: "pro" }, []);
 
-    expect(cookieOptions.get(COOKIE)).toEqual({ path: "/", sameSite: "lax", maxAge: 8 * 3600 });
+    expect(request.jar.get(COOKIE)?.options).toEqual({ path: "/", sameSite: "lax", maxAge: 8 * 3600 });
     // The token expires with the cookie, so a cookie kept past its Max-Age reads as no preview.
-    const exp = (await decryptJwe(jar.get(COOKIE) as string, secret))?.exp as number;
+    const exp = (await decryptJwe(request.jar.get(COOKIE)?.value as string, request.secret))?.exp as number;
     expect(exp - before).toBeGreaterThanOrEqual(8 * 3600);
     expect(exp - before).toBeLessThanOrEqual(8 * 3600 + 5);
+  });
+});
+
+describe("the flag store", () => {
+  it("drops an answer from a source it has since left, as a page load would", async () => {
+    let answer: (result: FlagsResult) => void = () => {};
+    setFlagSource({ read: () => new Promise((resolve) => (answer = resolve)), write: async () => ({ ok: true, overrides: {} }) });
+    const stale = loadFlags();
+
+    setFlagSource(memorySource(memoryRequest(declared)));
+    await loadFlags();
+    answer({ ok: true, definitions: [], overrides: { plan: "starter" } });
+    await stale;
+
+    const view = flagsView();
+    expect(view.status === "ready" && view.overrides).toEqual({});
   });
 });
 
 describe("the Feature flags card", () => {
   let container: HTMLDivElement;
   let root: Root;
+  let request: MemoryRequest;
+
+  /** A fresh page load, with this cookie and this discovery endpoint. */
+  const pageLoad = (seed: MemorySeed = {}) => {
+    request = memoryRequest({ ...declared, ...seed });
+    setFlagSource(memorySource(request));
+  };
 
   beforeEach(() => {
-    // Each test is a fresh page load: the card's store is module state.
-    vi.resetModules();
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -172,7 +168,7 @@ describe("the Feature flags card", () => {
   const button = (text: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === text) as HTMLButtonElement;
 
   it("previews a flag, records it for the Proposal, and clearing gives the app its value back", async () => {
-    const { FlagsCard, previewedFlags } = await import("./flags.js");
+    pageLoad();
     act(() => root.render(<FlagsCard />));
     await idle();
 
@@ -183,7 +179,7 @@ describe("the Feature flags card", () => {
 
     act(() => pill("showBetaFeature", "On").click());
     await idle();
-    await expect(overridesInCookie()).resolves.toEqual({ showBetaFeature: true });
+    await expect(overridesIn(request)).resolves.toEqual({ showBetaFeature: true });
     expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("PREVIEWING ON");
 
@@ -201,14 +197,13 @@ describe("the Feature flags card", () => {
 
     act(() => button("Clear flag previews").click());
     await idle();
-    expect(jar.has(COOKIE)).toBe(false);
+    expect(request.jar.has(COOKIE)).toBe(false);
     expect(await previewedFlags()).toEqual([]);
     expect(button("Clear flag previews").disabled).toBe(true);
   });
 
   it("reads a preview back after a reload, and lists an override the app doesn't declare", async () => {
-    jar.set(COOKIE, await encryptOverrides({ showBetaFeature: true, retired: 1 }, secret));
-    const { FlagsCard, previewedFlags } = await import("./flags.js");
+    pageLoad({ overrides: { showBetaFeature: true, retired: 1 } });
     act(() => root.render(<FlagsCard />));
     await idle();
 
@@ -218,13 +213,12 @@ describe("the Feature flags card", () => {
   });
 
   it("gives the Proposal the cookie's previews without the card ever mounting", async () => {
-    jar.set(COOKIE, await encryptOverrides({ plan: "pro" }, secret));
-    const { previewedFlags } = await import("./flags.js");
+    pageLoad({ overrides: { plan: "pro" } });
     expect(await previewedFlags()).toEqual([{ key: "plan", value: "pro", label: "Pro", description: "Pricing plan" }]);
   });
 
   it("says a preview lasts 8 hours in a cookie every app on localhost shares (PER-182)", async () => {
-    const { FlagsCard } = await import("./flags.js");
+    pageLoad();
     act(() => root.render(<FlagsCard />));
     await idle();
     expect(container.querySelector('[aria-label="Feature flags"]')?.textContent).toContain(
@@ -233,8 +227,7 @@ describe("the Feature flags card", () => {
   });
 
   it("explains why previews are unavailable", async () => {
-    vi.stubEnv("FLAGS_SECRET", "");
-    const { FlagsCard } = await import("./flags.js");
+    pageLoad({ secret: "" });
     act(() => root.render(<FlagsCard />));
     await until(() => expect(container.textContent).toContain("FLAGS_SECRET isn't set"));
   });

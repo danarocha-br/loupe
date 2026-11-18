@@ -15,7 +15,6 @@ import { registry } from "../runtime/registry.js";
 vi.mock("./project-server.js", () => ({
   readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
 }));
-vi.mock("./flags.js", () => ({ previewedFlags: async () => [], FlagsCard: () => null }));
 vi.mock("./notices.js", () => ({
   useLayerStatus: () => null,
   staleComponents: () => new Set(),
