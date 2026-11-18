@@ -18,8 +18,9 @@
 
 import { flushSync } from "react-dom";
 import { type ImagePair, type SnapshotInput, setOnKey, toJson } from "../proposal/build.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { currentRoute, emitChange, identityOf, type MountedInstance, registry, setView } from "../runtime/registry.js";
+import { type PerPageOptions, perPage } from "../runtime/slot.js";
 import { type InstanceIdentity, type OverrideRecord, reachOf } from "../runtime/store.js";
 import { CAPTURE_ATTRIBUTE, screenshotRasterizer } from "./snapshots-raster.js";
 
@@ -80,35 +81,32 @@ export type Rasterizer = {
 
 type Store = { list: Snapshot[]; next: number; queue: Promise<unknown> };
 
-const GLOBAL_KEY = "__loupeSnapshots";
-
-type Host = typeof globalThis & { [GLOBAL_KEY]?: Store };
-
 /** What a page load starts with: no Snapshots, numbering from 1. */
 function emptyStore(): Store {
   return { list: [], next: 1, queue: Promise.resolve() };
 }
 
+/**
+ * `resetLoupe()` starts the list over as a page load does, but keeps the capture
+ * queue. A capture already queued finishes into the list it was queued with, and
+ * the page changes for one capture at a time.
+ */
+const SNAPSHOTS: PerPageOptions<Store> = { restart: (old) => ({ ...emptyStore(), queue: old.queue }) };
+
 let current: Rasterizer = screenshotRasterizer;
 
 /**
- * Draws the page with `next` from now on, starting over as a page load does: no
- * Snapshots, numbering from 1. Tests draw fixed pixels this way; the page never
- * calls it. A capture already queued still runs first, with the Rasterizer and
- * into the list it was queued with: the page changes for one capture at a time,
- * and the new list starts empty.
+ * Draws the page with `next` from now on. Tests draw fixed pixels this way, and
+ * the page never calls it. A capture already queued still runs with the
+ * Rasterizer it was queued with.
  */
 export function setRasterizer(next: Rasterizer): void {
   current = next;
-  const host = globalThis as Host;
-  host[GLOBAL_KEY] = { ...emptyStore(), queue: host[GLOBAL_KEY]?.queue ?? Promise.resolve() };
 }
 
-/** One list per page, kept on `globalThis` across a Fast Refresh; a reload clears it. */
+/** One list per page, kept in the page's slot across a Fast Refresh. A reload clears it. */
 function store(): Store {
-  const host = globalThis as Host;
-  host[GLOBAL_KEY] ??= emptyStore();
-  return host[GLOBAL_KEY];
+  return perPage("snapshots", emptyStore, SNAPSHOTS);
 }
 
 /** Every Snapshot this page load, oldest first, each as it reads now. */
@@ -431,10 +429,6 @@ function boxOf(rasterizer: Rasterizer, debug: LoupeDebug, id: string): Rect | nu
   return rects.length === 0 ? null : union(rects);
 }
 
-function debugOf(): LoupeDebug {
-  return (window as typeof window & { __loupe?: LoupeDebug }).__loupe ?? createDebug();
-}
-
 /**
  * Covers the page with a still of it, above everything but the Toolbar's panel,
  * while the Before view renders underneath. Returns what takes it away.
@@ -480,30 +474,3 @@ function settle(): Promise<void> {
     setTimeout(finish, 150);
   });
 }
-
-/** Adds `capture`, `retake`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
-function exposeSnapshots(): void {
-  const debug = debugOf() as LoupeDebug & {
-    capture?: (options?: unknown) => Promise<Snapshot>;
-    retake?: (id: number) => Promise<Snapshot>;
-    snapshots?: () => readonly ListedSnapshot[];
-    removeSnapshot?: (id: number) => void;
-  };
-  // It once took `{ replace }` and `{ auto }`: a call that still passes them says so
-  // rather than quietly taking a new Snapshot.
-  debug.capture ??= (options?: unknown) =>
-    options === undefined
-      ? captureScreen()
-      : Promise.reject(
-          new Error(
-            "[loupe] __loupe.capture() takes no options. Retake a Snapshot with __loupe.retake(id); " +
-              "__loupe.proposal({ capture: true }) takes the export's own.",
-          ),
-        );
-  debug.retake ??= retakeSnapshot;
-  debug.snapshots ??= snapshots;
-  debug.removeSnapshot ??= removeSnapshot;
-}
-
-// With the Toolbar, like `__loupe.proposal()`.
-if (typeof window !== "undefined") exposeSnapshots();

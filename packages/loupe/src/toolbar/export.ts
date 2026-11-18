@@ -10,7 +10,7 @@
 import { changeInWords } from "../proposal/build.js";
 import { proposalReport, REPORT_WARN_BYTES, reportFileName } from "../proposal/report.js";
 import type { Proposal } from "../proposal/types.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { perPage } from "../runtime/slot.js";
 import { megabytes } from "./format.js";
 import { collectProposalKeyed, suggestedTitle } from "./proposal.js";
 import { captureForExport, exportCaptureBytes, snapshots } from "./snapshots.js";
@@ -18,13 +18,9 @@ import { captureForExport, exportCaptureBytes, snapshots } from "./snapshots.js"
 /** What the designer typed; `title` stays null until they edit it, so it follows the suggestion. */
 export type ExportForm = { title: string | null; designer: string; notes: Record<string, string> };
 
-const GLOBAL_KEY = "__loupeExportForm";
-
-/** One form per page load, kept on `globalThis` across a Fast Refresh. */
+/** One form per page load, kept in the page's slot across a Fast Refresh. */
 export function exportForm(): ExportForm {
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: ExportForm };
-  host[GLOBAL_KEY] ??= { title: null, designer: "", notes: {} };
-  return host[GLOBAL_KEY];
+  return perPage("exportForm", () => ({ title: null, designer: "", notes: {} }));
 }
 
 export type ExportEntry = { id: string; key: string; label: string };
@@ -112,17 +108,3 @@ export async function exportProposal(options: ExportOptions): Promise<ExportResu
   download(result.html, result.fileName, "text/html");
   return result;
 }
-
-/** Adds `report` and `exportProposal` to `window.__loupe`, the acceptance surface. */
-export function exposeExport(): void {
-  if (typeof window === "undefined") return;
-  const debug = ((window as typeof window & { __loupe?: LoupeDebug }).__loupe ?? createDebug()) as LoupeDebug & {
-    report?: (options: ExportOptions) => Promise<ExportResult>;
-    exportProposal?: (options: ExportOptions) => Promise<ExportResult>;
-  };
-  debug.report ??= buildExport;
-  debug.exportProposal ??= exportProposal;
-}
-
-// With the Toolbar, like `__loupe.proposal()`.
-if (typeof window !== "undefined") exposeExport();

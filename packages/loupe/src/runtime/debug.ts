@@ -124,7 +124,7 @@ const SERVER_REASON =
 /** Why an anchored client Instance found by the fiber walk can't be overridden (PER-100 §1). */
 export const UNADAPTED_REASON = "No Adapter renders this Instance, so Overrides can't reach it.";
 
-export function createDebug(): LoupeDebug {
+function createDebug(): LoupeDebug {
   const reg = registry();
 
   /** The Instances on the page as it is now. */

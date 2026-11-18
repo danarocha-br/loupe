@@ -5,15 +5,17 @@
 //
 // Nothing here writes to the store or the repo: exporting clears nothing.
 // Once the Toolbar loads, `__loupe.proposal(options?)` returns the JSON and
-// `__loupe.proposalMarkdown(options?)` the Copy as Markdown text. Snapshots that
-// aren't Outdated ride along (PER-138); `{ capture: true }` takes the export's own first.
+// `__loupe.proposalMarkdown(options?)` the Copy as Markdown text (`start.ts`).
+// Snapshots that aren't Outdated ride along (PER-138); `{ capture: true }` takes
+// the export's own first.
 
 import { parseInstanceId } from "../call-site.js";
 import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
 import { proposalMarkdown } from "../proposal/markdown.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { debugOf } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
+import { type PerPageOptions, perPage } from "../runtime/slot.js";
 import { previewedFlags } from "./flags-store.js";
 import { readProjectContext } from "./project-server.js";
 import { captureForExport, exportableSnapshots } from "./snapshots.js";
@@ -33,8 +35,6 @@ export type ProposalOptions = {
 };
 
 type Tracker = {
-  /** The registry it watches: a new one (only ever in tests) starts a new tracker. */
-  registry: object;
   sightings: Map<string, Sighting>;
   /** `setOnKey(target)` → the route it was first set on. */
   setOn: Record<string, string>;
@@ -42,17 +42,21 @@ type Tracker = {
   stop: () => void;
 };
 
-const GLOBAL_KEY = "__loupeProposalTracker";
 const REFRESH_MS = 100;
 
-/** Starts remembering what the page shows, once per page; kept on `globalThis` across a Fast Refresh. */
+const TRACKER: PerPageOptions<Tracker> = { stop: (tracker) => tracker.stop() };
+
+/**
+ * Starts remembering what the page shows, once per page. The tracker is kept in the
+ * page's slot across a Fast Refresh, and `resetLoupe()` stops it.
+ */
 export function startTracking(): Tracker {
-  const host = globalThis as typeof globalThis & { [GLOBAL_KEY]?: Tracker };
+  return perPage("tracker", makeTracker, TRACKER);
+}
+
+function makeTracker(): Tracker {
   const reg = registry();
-  const existing = host[GLOBAL_KEY];
-  if (existing?.registry === reg) return existing;
-  existing?.stop();
-  const tracker: Tracker = { registry: reg, sightings: new Map(), setOn: {}, routes: {}, stop: () => {} };
+  const tracker: Tracker = { sightings: new Map(), setOn: {}, routes: {}, stop: () => {} };
   let timer: ReturnType<typeof setTimeout> | null = null;
   // Registry listeners run inside a commit: read after it, and at most every
   // REFRESH_MS, so a page that rerenders often doesn't pay for a walk each commit.
@@ -78,7 +82,6 @@ export function startTracking(): Tracker {
     if (timer !== null) clearTimeout(timer);
   };
   refresh(tracker);
-  host[GLOBAL_KEY] = tracker;
   return tracker;
 }
 
@@ -135,10 +138,6 @@ function routeContext(): RouteContext {
 }
 
 const UNKNOWN_PROJECT: ProposalProject = { repo: null, commit: null, dirty: null, playgroundVersion: null };
-
-function debugOf(): LoupeDebug {
-  return (window as typeof window & { __loupe?: LoupeDebug }).__loupe ?? createDebug();
-}
 
 /** "Button variant in MemberRowMenu", from the first change. */
 export function suggestedTitle(proposal: Proposal): string {
@@ -229,22 +228,4 @@ export async function copyProposalMarkdown(options: ProposalOptions = {}): Promi
     throw new Error(`${reason} The Markdown is in the console.`);
   }
   return text;
-}
-
-/** Adds `proposal` and `proposalMarkdown` to `window.__loupe`, the acceptance surface. */
-export function exposeProposal(): void {
-  if (typeof window === "undefined") return;
-  const debug = debugOf() as LoupeDebug & {
-    proposal?: (options?: ProposalOptions) => Promise<Proposal>;
-    proposalMarkdown?: (options?: ProposalOptions) => Promise<string>;
-  };
-  debug.proposal ??= collectProposal;
-  debug.proposalMarkdown ??= (options) => collectProposal(options).then(proposalMarkdown);
-}
-
-// From the moment the Toolbar loads, not from the first export: a record set on
-// another route, or an Instance that has since unmounted, is only known if seen.
-if (typeof window !== "undefined") {
-  startTracking();
-  exposeProposal();
 }

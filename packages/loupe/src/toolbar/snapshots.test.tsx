@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId, instanceId } from "../call-site.js";
 import { createAdapter } from "../runtime/adapter.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { disableOverrides, registry } from "../runtime/registry.js";
 import type { FixedPixelsOptions } from "./snapshots.fixture.js";
@@ -34,6 +34,7 @@ const { fixedPixels } = await import("./snapshots.fixture.js");
 type Snapshot = Awaited<ReturnType<typeof captureScreen>>;
 const { collectProposal } = await import("./proposal.js");
 const { SnapshotsCard } = await import("./snapshots-card.js");
+const { startToolbar } = await import("./start.js");
 
 type Box = [top: number, left: number, width: number, height: number];
 type ButtonProps = { variant?: string; box: Box };
@@ -76,22 +77,19 @@ function draw(): string {
   return String(rasterized.length);
 }
 
-/**
- * Starts over as a page load does, with no Snapshots, drawing fixed pixels with
- * `layout` and `draw` unless the test says otherwise.
- */
-function startOver(options: FixedPixelsOptions = {}) {
+/** Draws fixed pixels with `layout` and `draw`, unless the test says otherwise. */
+function drawFixed(options: FixedPixelsOptions = {}) {
   setRasterizer(fixedPixels({ layout, draw, ...options }));
 }
 
 beforeEach(() => {
   resetLoupe();
-  startOver();
+  drawFixed();
   rasterized.length = 0;
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
+  loupe = debugOf();
 });
 
 afterEach(() => {
@@ -195,7 +193,7 @@ describe("Capture screen", () => {
   });
 
   it("counts the images that didn't load on the viewport pair, the more of the two, and none on crops", async () => {
-    startOver({ failed: [1, 3] });
+    drawFixed({ failed: [1, 3] });
     setUp();
     const snapshot = await run(captureScreen);
     expect(snapshot.viewport.failedImages).toBe(3);
@@ -203,7 +201,7 @@ describe("Capture screen", () => {
   });
 
   it("leaves the page as it was, and the list, when a drawing fails", async () => {
-    startOver({
+    drawFixed({
       draw: () => {
         const image = draw();
         if (image === "4") throw new Error("The canvas is tainted.");
@@ -322,12 +320,12 @@ describe("Capture screen", () => {
     expect(rasterized.map((seen) => seen.covered)).toEqual([false, true, false, true]);
   });
 
-  it("starting over mid-capture leaves the new list empty, and the page still changes for one capture at a time", async () => {
+  it("resetLoupe() mid-capture leaves the new list empty, and the page still changes for one capture at a time", async () => {
     setUp();
     let first: Snapshot | undefined;
     await act(async () => {
       const queued = captureScreen();
-      startOver();
+      resetLoupe();
       const [taken] = await Promise.all([queued, captureScreen()]);
       first = taken;
     });
@@ -348,7 +346,7 @@ describe("Capture screen", () => {
 describe("crops", () => {
   it("cover where an Instance is in both views", async () => {
     // Ghost buttons draw 200px wider: "before" reaches further right than "after".
-    startOver({
+    drawFixed({
       layout: (node) => {
         const box = layout(node);
         return box && node.getAttribute("data-variant") === "ghost" ? { ...box, right: box.right + 200 } : box;
@@ -417,7 +415,7 @@ describe("in the Proposal and the Toolbar", () => {
 
   it("drops an export's own Snapshot that repeats a manual one, and the last export's own with it", async () => {
     let image = "a";
-    startOver({
+    drawFixed({
       draw: () => {
         draw();
         return image;
@@ -440,7 +438,7 @@ describe("in the Proposal and the Toolbar", () => {
   });
 
   it("keeps an export's own Snapshot whose crops a manual one of the same screen doesn't have", async () => {
-    startOver({
+    drawFixed({
       draw: () => {
         draw();
         return "same";
@@ -485,20 +483,13 @@ describe("in the Proposal and the Toolbar", () => {
 });
 
 describe("on window.__loupe", () => {
-  it("adds capture, retake, snapshots and removeSnapshot, and capture() turns down the options it once took", async () => {
-    const surface: Record<string, unknown> = {};
-    (window as { __loupe?: unknown }).__loupe = surface;
-    // A fresh copy of the module adds itself to the page's `__loupe` as it loads.
-    vi.resetModules();
-    try {
-      await import("./snapshots.js");
-      expect(Object.keys(surface).sort()).toEqual(["capture", "removeSnapshot", "retake", "snapshots"]);
-      const capture = surface.capture as (options?: unknown) => Promise<unknown>;
-      await expect(capture({ replace: 1 })).rejects.toThrow("Retake a Snapshot with __loupe.retake(id)");
-      await expect(capture({ auto: true })).rejects.toThrow("__loupe.proposal({ capture: true })");
-      expect(rasterized).toEqual([]);
-    } finally {
-      delete (window as { __loupe?: unknown }).__loupe;
-    }
+  it("startToolbar() adds capture, retake, snapshots and removeSnapshot, and capture() turns down the options it once took", async () => {
+    startToolbar();
+    const surface = loupe as LoupeDebug & Record<string, unknown>;
+    for (const name of ["capture", "retake", "snapshots", "removeSnapshot"]) expect(typeof surface[name]).toBe("function");
+    const capture = surface.capture as (options?: unknown) => Promise<unknown>;
+    await expect(capture({ replace: 1 })).rejects.toThrow("Retake a Snapshot with __loupe.retake(id)");
+    await expect(capture({ auto: true })).rejects.toThrow("__loupe.proposal({ capture: true })");
+    expect(rasterized).toEqual([]);
   });
 });

@@ -8,7 +8,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { devMount } from "../mount.js";
-import { createDebug, type LoupeDebug } from "../runtime/debug.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { disableOverrides, onRegistryChange } from "../runtime/registry.js";
 import Toolbar from "./index.js";
@@ -28,15 +28,13 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  loupe = createDebug();
-  (window as { __loupe?: LoupeDebug }).__loupe = loupe;
+  loupe = debugOf();
 });
 
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
-  delete (window as { __loupe?: LoupeDebug }).__loupe;
   vi.restoreAllMocks();
 });
 
@@ -195,6 +193,19 @@ describe("the Toolbar", () => {
     const ring = shadow().querySelector<HTMLElement>(".ring");
     expect(ring?.style.top).toBe("8px");
     expect(ring?.textContent).toBe("Button");
+  });
+
+  it("adds its methods to __loupe as it mounts, and again after resetLoupe()", async () => {
+    const methods = ["proposal", "proposalMarkdown", "report", "exportProposal", "capture", "retake", "snapshots", "removeSnapshot"];
+    const onLoupe = () => methods.filter((name) => typeof (debugOf() as unknown as Record<string, unknown>)[name] === "function");
+    await mount();
+    expect(onLoupe()).toEqual(methods);
+    act(() => root.unmount());
+    resetLoupe();
+    expect(onLoupe()).toEqual([]);
+    root = createRoot(container);
+    await mount();
+    expect(onLoupe()).toEqual(methods);
   });
 });
 
