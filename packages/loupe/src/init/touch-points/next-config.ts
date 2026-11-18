@@ -23,6 +23,7 @@ const NEXT_IMPORT = `import { withLoupe } from "${PRODUCT_LAYER.name}/next";`;
 export function nextConfig(file: string): TouchPoint {
   const tp: TouchPoint = {
     id: "next-config",
+    role: "imports-layer",
     file,
     applyByHand: [
       `In ${file}, import withLoupe:`,

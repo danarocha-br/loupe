@@ -10,6 +10,7 @@ export function packageJson(file: string, wanted: Record<string, string>): Touch
   const names = Object.keys(wanted).sort();
   const tp: TouchPoint = {
     id: "package-json",
+    role: "adds-dependencies",
     file,
     applyByHand: [
       `In ${file}, add to "devDependencies", keeping its alphabetical order:`,

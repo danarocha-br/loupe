@@ -314,6 +314,19 @@ describe("what stays", () => {
     expect(moved.code).toBe(1);
     expect(moved.text).toContain("isn't one loupe init wrote");
     expect(snapshot(root)).toEqual(elsewhere);
+
+    // A touch point this Loupe doesn't know, in a file that is there: removing the rest would drop its record.
+    writeFileSync(path.join(root, LEDGER), recorded);
+    git(root, "mv", "config/biome.jsonc", "biome.jsonc");
+    editLedger(root, (l) => {
+      l.touchPoints.push({ id: "tsconfig", file: "apps/web/tsconfig.json", mode: "auto", sha256: "0" });
+    });
+    commit(root);
+    const unknown = snapshot(root);
+    const later = await cli(root, ["remove"]);
+    expect(later.code).toBe(1);
+    expect(later.text).toContain("isn't one loupe init wrote");
+    expect(snapshot(root)).toEqual(unknown);
   });
 
   it("says so when there is no ledger", async () => {

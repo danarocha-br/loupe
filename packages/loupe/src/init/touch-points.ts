@@ -25,11 +25,21 @@ export type Applied = Change | { unexpected: string };
 export type Reverted = Change | { manual: string };
 
 /**
+ * What a touch point's edit is to the Product layer, which is what the commands go by instead of its id:
+ * - `imports-layer`: the app imports the layer through it. `remove` reverts these first, and while one stays,
+ *   it stops before the layer so the app still builds.
+ * - `excludes-layer`: it keeps tools off the layer's files, so `remove` keeps it while the layer has files.
+ * - `adds-dependencies`: it adds the layer and Loupe to the app's dependencies, so a change to it needs an install.
+ */
+export type Role = "imports-layer" | "excludes-layer" | "adds-dependencies";
+
+/**
  * One file `init` edits. Its methods only read and return text: the commands read and write the
  * file and record it in the ledger. Reverting what `apply` wrote gives back the original bytes.
  */
 export type TouchPoint = {
   id: TouchPointId;
+  role: Role;
   /** Repo-relative, POSIX. */
   file: string;
   /** Loupe's edit in `text`, in the form the ledger hashes; undefined when there is none. */
@@ -52,8 +62,8 @@ export const NPM_PACKAGE = "@danarocha/loupe";
 
 export type TouchPointContext = {
   root: string;
-  /** The app's directory, relative to the root. */
-  app: string;
+  /** The app's directory, relative to the root; without it, only the touch points at the root are listed. */
+  app?: string;
   version: string;
   /** How the app's package.json names workspace packages ("workspace:*"). */
   workspaceProtocol: string;

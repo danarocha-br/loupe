@@ -22,6 +22,7 @@ const MOUNT_BLOCK = `{process.env.NODE_ENV === "development" && <LoupeMount />}`
 export function rootLayout(file: string): TouchPoint {
   const tp: TouchPoint = {
     id: "root-layout",
+    role: "imports-layer",
     file,
     applyByHand: [
       `In ${file}, import the mount:`,

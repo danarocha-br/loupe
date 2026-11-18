@@ -228,6 +228,11 @@ describe("biome.jsonc", () => {
     ]);
   });
 
+  it("is the only one listed before the app is known, as it sits at the root", () => {
+    expect(touchPoints({ root: withBiome(), version: "0", workspaceProtocol: "" }).map((t) => t.file)).toEqual(["biome.jsonc"]);
+    expect(touchPoints({ root: "/nowhere", version: "0", workspaceProtocol: "" })).toEqual([]);
+  });
+
   it("appends the exclusion with its comments intact", () => {
     const out = applied(biome().apply(biomeJsonc));
     expect(out).toBe(`{

@@ -207,7 +207,8 @@ class Run {
   problems = 0;
   manual = 0;
   wrote = false;
-  packageJsonChanged = false;
+  /** The app's dependencies changed: the Product layer needs linking. */
+  dependenciesChanged = false;
   /** The Product layer's own package.json was written: its dependencies and Loupe peer need an install. */
   layerPackageJsonChanged = false;
 
@@ -352,7 +353,7 @@ class Run {
     const found = tp.find(applied.text);
     this.setTouchPoint({ id: tp.id, file: tp.file, mode: "auto", sha256: found ? sha256(found.canonical) : null });
     this.write(tp.file, applied.text);
-    if (tp.id === "package-json") this.packageJsonChanged = true;
+    if (tp.role === "adds-dependencies") this.dependenciesChanged = true;
     line("+", verb ? `${verb}: ${applied.summary}` : applied.summary);
   }
 
@@ -391,7 +392,7 @@ class Run {
       // runs, the layer keeps resolving the old Loupe and `pnpm install --frozen-lockfile` fails. A rerun after
       // a blocked upgrade writes nothing more, so this can't wait for a write to happen.
       io.out(`Next: run pnpm install so ${PRODUCT_LAYER.name} resolves Loupe ${upgrade.to}, then commit pnpm-lock.yaml. Loupe never writes the lockfile.`);
-    } else if (this.packageJsonChanged || this.layerPackageJsonChanged) {
+    } else if (this.dependenciesChanged || this.layerPackageJsonChanged) {
       io.out(`Next: run pnpm install to link ${PRODUCT_LAYER.name}. Loupe never writes the lockfile.`);
     }
     if (this.manual > 0) {
@@ -409,10 +410,9 @@ class Run {
 
 /** The files whose uncommitted changes stop `init`: what it may write, and the lockfile. */
 function protectedPaths(root: string, app: string | undefined, version: string): string[] {
-  const points = touchPoints({ root, app: app ?? "", version, workspaceProtocol: "" });
-  // Without the app, only the root Biome config is known yet.
-  const known = app === undefined ? points.filter((t) => t.id === "biome-config") : points;
-  return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...known.map((t) => t.file)];
+  // Without the app, only the touch points at the root are known yet.
+  const points = touchPoints({ root, app, version, workspaceProtocol: "" });
+  return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...points.map((t) => t.file)];
 }
 
 /** The files with a manual step the ledger still waits on: a dirty one is likely that step, just made. */
