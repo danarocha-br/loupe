@@ -19,6 +19,7 @@ import {
   LEDGER_PATH,
   type Ledger,
   LedgerError,
+  pendingFiles,
   readLedger,
   saveLedger,
   type TouchPointEntry,
@@ -413,11 +414,6 @@ function protectedPaths(root: string, app: string | undefined, version: string):
   // Without the app, only the touch points at the root are known yet.
   const points = touchPoints({ root, app, version, workspaceProtocol: "" });
   return [LOCKFILE, `${PRODUCT_LAYER.path}/`, ...points.map((t) => t.file)];
-}
-
-/** The files with a manual step the ledger still waits on: a dirty one is likely that step, just made. */
-function pendingFiles(ledger: Ledger): string[] {
-  return (ledger.touchPoints ?? []).filter((t) => t.mode === "manual" && !t.sha256).map((t) => t.file);
 }
 
 function dependency(json: PackageJson, name: string): string | undefined {

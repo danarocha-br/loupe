@@ -12,6 +12,7 @@ import {
   LEDGER_PATH,
   type Ledger,
   LedgerError,
+  pendingFiles,
   readLedger,
   recordAccepted,
   saveLedger,
@@ -154,6 +155,20 @@ describe("judgeTouchPoint", () => {
     // Hand-edited after Loupe 0.0.4 recorded it: the other dependency still counts.
     const edited = repo({ [PKG]: packageJson({ ...OURS, "@repo/loupe": "workspace:^" }) });
     expect(judgeTouchPoint(edited, AT_004, auto(oldHash(OURS)), packageJsonPoint(edited)).kind).toBe("drift");
+  });
+});
+
+describe("pendingFiles", () => {
+  it("lists only the manual steps not adopted yet", () => {
+    const ledger: Ledger = {
+      touchPoints: [
+        { id: "next-config", file: `${APP}/next.config.ts`, mode: "manual", sha256: null },
+        { id: "root-layout", file: `${APP}/app/layout.tsx`, mode: "manual", sha256: "adopted" },
+        { id: "package-json", file: PKG, mode: "auto", sha256: null },
+      ],
+    };
+    expect(pendingFiles(ledger)).toEqual([`${APP}/next.config.ts`]);
+    expect(pendingFiles({})).toEqual([]);
   });
 });
 

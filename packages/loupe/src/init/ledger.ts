@@ -189,6 +189,15 @@ export function claimOf(verdict: TouchPointVerdict): Claim | undefined {
 }
 
 /**
+ * The files of the manual steps the ledger still waits on: entries recorded `manual` with no hash yet. Narrower
+ * than the `pending` verdict, which any entry without a hash gets: an `auto` one is an edit its touch point
+ * couldn't find again, not a step left to a person.
+ */
+export function pendingFiles(ledger: Ledger): string[] {
+  return (ledger.touchPoints ?? []).filter((t) => t.mode === "manual" && !t.sha256).map((t) => t.file);
+}
+
+/**
  * - `intact` / `drift`: `by` says whose record it was checked against: the ledger (`init`) or the file's own header (`generate`).
  * - `missing`: the file isn't there (for a recorded file, it is gone).
  * - `not-loupes`: neither the ledger nor a header claims it.
