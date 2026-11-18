@@ -322,10 +322,16 @@ describe("Capture screen", () => {
 
   it("resetLoupe() mid-capture leaves the new list empty, and the page still changes for one capture at a time", async () => {
     setUp();
+    // Queued now, it starts at the first await: after the page below has loaded.
+    const queued = captureScreen();
+    // A page load: the old page unmounts, Loupe starts over, and the new page renders with its own Overrides.
+    act(() => root.unmount());
+    resetLoupe();
+    root = createRoot(container);
+    loupe = debugOf();
+    setUp();
     let first: Snapshot | undefined;
     await act(async () => {
-      const queued = captureScreen();
-      resetLoupe();
       const [taken] = await Promise.all([queued, captureScreen()]);
       first = taken;
     });
@@ -333,6 +339,10 @@ describe("Capture screen", () => {
     expect(first?.id).toBe(1);
     expect(ids()).toEqual([[1, false]]);
     expect(rasterized.map((seen) => seen.covered)).toEqual([false, true, false, true]);
+    // Both took the page that is there: its Overrides, crops and Before view.
+    expect(first?.crops.length).toBeGreaterThan(0);
+    expect(snapshots()[0]?.crops.length).toBeGreaterThan(0);
+    expect(rasterized.map((seen) => seen.variants[0])).toEqual(["outline", "ghost", "outline", "ghost"]);
   });
 
   it("refuses a hidden tab's empty viewport rather than capturing nothing", async () => {

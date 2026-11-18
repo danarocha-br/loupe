@@ -52,6 +52,10 @@ export function perPage<T>(key: string, make: () => T, options?: PerPageOptions<
  * Values go newest first, so one made from another stops before the one it was
  * made from. A value with `restart` is replaced in place. Every other value is
  * dropped, then stopped.
+ *
+ * A page load unmounts the page first, and so should a test: an Adapter still
+ * mounted was registered with the registry this drops, and the new one has
+ * nothing of it, neither its Instance nor its Overrides.
  */
 export function resetLoupe(): void {
   const parts = slot();
