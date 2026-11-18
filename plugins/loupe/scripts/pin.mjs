@@ -4,7 +4,7 @@
 // `packages/loupe/src/names.ts` and `packages/loupe/package.json`.
 
 export const LOUPE_PACKAGE = "@danarocha/loupe";
-export const LOUPE_VERSION = "0.0.5";
+export const LOUPE_VERSION = "0.0.6";
 
 /** Where `loupe init` writes the Product layer and its ledger, relative to the repo root. */
 export const PRODUCT_LAYER = "packages/loupe";
