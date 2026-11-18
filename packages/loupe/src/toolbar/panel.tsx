@@ -8,7 +8,6 @@ import { type ReactNode, useEffect, useState } from "react";
 import { callSiteLabels, parseHint } from "../call-site.js";
 import type { InstanceRow, LoupeDebug, RecordRow } from "../runtime/debug.js";
 import type { Inspection } from "../runtime/inspect.js";
-import { NO_META_NOTE, overridesOffNote, SERVER_NOTE, SPREADS_NOTE, UNADAPTED_NOTE } from "../runtime/inspect.js";
 import type { LastSeen } from "../runtime/registry.js";
 import type { Scope, ScopeTarget, Suspension } from "../runtime/store.js";
 import type { PageSnapshot } from "./page.js";
@@ -19,6 +18,7 @@ import { fallbacks, labelsOf, PAGE_LABEL, scopeChips, type ScopeView, scopeView 
 import { FlagsCard } from "./flags.js";
 import { ExportButton } from "./export-dialog.js";
 import { BackIcon, CheckIcon, ChevronIcon, CopyIcon, InfoIcon, ResetIcon, SunIcon } from "./icons.js";
+import { NOTES, overridesOffBanner } from "./notes.js";
 import { copyProposalMarkdown } from "./proposal.js";
 import { SnapshotsCard } from "./snapshots-card.js";
 import {
@@ -105,10 +105,6 @@ export function Panel(props: PanelProps) {
 
 /** The React self-check failed (PER-184: said here once, not again on the Instance). */
 function OverridesOff({ reason }: { reason: string }) {
-  // The title says "Overrides are off"; the body is the rest of the note, whatever its wording.
-  const note = overridesOffNote(reason);
-  const rest = note.replace(/^Overrides are off,\s*/, "");
-  const sentence = rest === note ? note : rest.charAt(0).toUpperCase() + rest.slice(1);
   return (
     <div className="card notice-card banner" role="status">
       <div className="head">
@@ -117,7 +113,7 @@ function OverridesOff({ reason }: { reason: string }) {
           Overrides are off
         </div>
       </div>
-      <p className="body">{sentence}</p>
+      <p className="body">{overridesOffBanner(reason)}</p>
     </div>
   );
 }
@@ -347,14 +343,6 @@ function instanceLabel(id: string, hint: string | null): string {
   return `${where}${callSiteLabels(id).key}`;
 }
 
-/** An Instance's card-level note, under a title that names its kind. */
-const NOTE_TITLE: Record<string, string> = {
-  [UNADAPTED_NOTE]: "Inspect only · No Adapter",
-  [SERVER_NOTE]: "On the server",
-  [SPREADS_NOTE]: "Props spread here",
-  [NO_META_NOTE]: "No prop metadata",
-};
-
 function Inspector(props: BodyProps & { id: string }) {
   const { debug, id, onSelect, page, scope, onScope, view, notices } = props;
   const inspection = safeInspect(debug, id);
@@ -434,8 +422,8 @@ function Inspector(props: BodyProps & { id: string }) {
   // Overrides off: the panel's banner already says it (PER-184).
   const note =
     inspection.note === null ||
-    (inspection.note === UNADAPTED_NOTE && notGenerated) ||
-    (!page.status.overrides && inspection.note === overridesOffNote(page.status.reason))
+    (inspection.note === "unadapted" && notGenerated) ||
+    (inspection.note === "overrides-off" && !page.status.overrides)
       ? null
       : inspection.note;
   return (
@@ -488,8 +476,8 @@ function Inspector(props: BodyProps & { id: string }) {
         <div className="card note-card" role="note">
           <InfoIcon />
           <div className="text">
-            <h3>{NOTE_TITLE[note] ?? "Note"}</h3>
-            <p className="body">{note}</p>
+            <h3>{NOTES[note].title}</h3>
+            <p className="body">{NOTES[note].text(debug.status)}</p>
           </div>
         </div>
       )}

@@ -58,9 +58,21 @@ export type Inspection = {
   /** What a library set on the Instance: never a row, never in Coverage (PER-96). */
   injected: Props;
   authorship: Authorship | "server";
-  /** One card-level line, when the whole Instance is inspect-only or its rows need a caveat. */
-  note: string | null;
+  /** Which card-level note applies, when the whole Instance is inspect-only or its rows need a caveat. The Toolbar words it. */
+  note: NoteKind | null;
 };
+
+/**
+ * Why an Instance gets a card-level note (PER-214). The runtime only says which
+ * one applies; the Toolbar owns the title and the sentence.
+ *
+ * - `server`: rendered on the server, so it can't be previewed.
+ * - `overrides-off`: the React self-check failed, so everything is inspect-only.
+ * - `unadapted`: no Adapter renders it, so no Override reaches it.
+ * - `spreads`: its call site spreads props, so library props can't be told from the app's.
+ * - `no-meta`: no prop metadata for its component yet.
+ */
+export type NoteKind = "server" | "overrides-off" | "unadapted" | "spreads" | "no-meta";
 
 export type InspectInput = {
   id: string;
@@ -77,22 +89,10 @@ export type InspectInput = {
   writes: CallSiteWrites | null;
   meta: Readonly<Record<string, PropMeta>> | null;
   stateProps: readonly string[];
-  /** False while the React self-check fails: everything is inspect-only. */
+  /** False while the React self-check fails: everything is inspect-only. The reason is `Status.reason` (`__loupe.status`). */
   overridesOn: boolean;
-  overridesOffReason?: string;
   sources?: Record<string, Source>;
 };
-
-export const SERVER_NOTE = "Rendered on the server: it can't be previewed in the MVP.";
-export const SPREADS_NOTE = "This call site spreads props, so library props can't be separated from the app's here.";
-export const UNADAPTED_NOTE =
-  "No Adapter renders this Instance, so it is inspect-only: `loupe generate` writes Adapters only for components with a prop that can be Editable, and imports inside the design system are never swapped for one.";
-export const NO_META_NOTE =
-  "No prop metadata for this component: run `loupe generate` to see which props are editable.";
-
-export function overridesOffNote(reason: string | undefined): string {
-  return `Overrides are off, everything is inspect-only: this React build isn't supported${reason ? ` (${reason})` : ""}.`;
-}
 
 /**
  * The reason for a prop the component doesn't declare, from what the call site
@@ -181,12 +181,12 @@ export function inspect(input: InspectInput): Inspection {
   const ordered = [...rows.filter((row) => row.editable), ...rows.filter((row) => !row.editable)];
   const editable = ordered.filter((row) => row.editable).length;
 
-  let note: string | null = null;
-  if (server) note = SERVER_NOTE;
-  else if (!input.overridesOn) note = overridesOffNote(input.overridesOffReason);
-  else if (input.adapted === false) note = UNADAPTED_NOTE;
-  else if (input.authorship === "spreads") note = SPREADS_NOTE;
-  else if (meta === null) note = NO_META_NOTE;
+  let note: NoteKind | null = null;
+  if (server) note = "server";
+  else if (!input.overridesOn) note = "overrides-off";
+  else if (input.adapted === false) note = "unadapted";
+  else if (input.authorship === "spreads") note = "spreads";
+  else if (meta === null) note = "no-meta";
 
   return {
     id: input.id,

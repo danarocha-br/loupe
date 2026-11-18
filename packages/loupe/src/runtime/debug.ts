@@ -212,7 +212,7 @@ export function createDebug(): LoupeDebug {
         meta: instance.meta,
         stateProps: instance.stateProps,
         overridesOn: status.overrides,
-        ...(status.overrides ? { sources: describe(instance).sources } : { overridesOffReason: status.reason }),
+        ...(status.overrides ? { sources: describe(instance).sources } : {}),
       });
     }
     const found = foundInstance(id);
@@ -233,7 +233,6 @@ export function createDebug(): LoupeDebug {
         meta: loadedMeta(found.anchor),
         stateProps: [],
         overridesOn: status.overrides,
-        ...(status.overrides ? {} : { overridesOffReason: status.reason }),
       });
     }
     return inspect({

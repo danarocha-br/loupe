@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { callSiteHint, callSiteId, instanceId } from "../call-site.js";
 import type { PropMeta } from "../meta/types.js";
 import type { CallSiteWrites } from "../writes.js";
-import { type InspectInput, inspect, NO_META_NOTE, reasonOfValue, SERVER_NOTE, SPREADS_NOTE } from "./inspect.js";
+import { type InspectInput, inspect, reasonOfValue } from "./inspect.js";
 
 const options = (values: (string | boolean)[], extra: Partial<PropMeta> = {}): PropMeta =>
   ({ editable: true, from: "repo", kind: "options", status: "verified", options: values, ...extra }) as PropMeta;
@@ -87,22 +87,22 @@ describe("inspect", () => {
     );
   });
 
-  it("makes everything inspect-only while Overrides are off, and says why once", () => {
-    const result = inspect(base({ overridesOn: false, overridesOffReason: "React reported no fiber." }));
+  it("makes everything inspect-only while Overrides are off, with one note", () => {
+    const result = inspect(base({ overridesOn: false }));
     expect(result.coverage.editable).toBe(0);
     expect(result.rows.filter((row) => row.reason === "OVERRIDES OFF").map((row) => row.name)).toEqual([
       "children",
       "size",
       "variant",
     ]);
-    expect(result.note).toContain("React reported no fiber.");
+    expect(result.note).toBe("overrides-off");
   });
 
   it("gives a server-rendered Instance one card-level line and no Editable prop", () => {
     const result = inspect(
       base({ rendered: "server", meta: null, authorship: "server", injected: {}, current: { plan: "pro", onPick: () => {} } }),
     );
-    expect(result.note).toBe(SERVER_NOTE);
+    expect(result.note).toBe("server");
     expect(result.coverage).toEqual({ editable: 0, inspectOnly: 2 });
     // No per-row guess: "pro" may be one of a closed set we can't see from here.
     expect(result.rows.map((row) => row.reason)).toEqual([undefined, undefined]);
@@ -135,7 +135,7 @@ describe("inspect", () => {
     const result = inspect(
       base({ rendered: "server", authorship: "server", injected: {}, current: { variant: "ghost", onClick: () => {} } }),
     );
-    expect(result.note).toBe(SERVER_NOTE);
+    expect(result.note).toBe("server");
     expect(result.coverage.editable).toBe(0);
     expect(result.rows.map((row) => [row.name, row.reason ?? null])).toEqual([
       ["children", "ON THE SERVER"],
@@ -150,10 +150,10 @@ describe("inspect", () => {
 
   it("flags a spreading call site and an Adapter with no metadata", () => {
     expect(inspect(base({ authorship: "spreads", writes: { attributes: [], spreads: true, children: "text" } })).note).toBe(
-      SPREADS_NOTE,
+      "spreads",
     );
     const bare = inspect(base({ meta: null }));
-    expect(bare.note).toBe(NO_META_NOTE);
+    expect(bare.note).toBe("no-meta");
     expect(bare.rows.every((row) => !row.editable && row.reason === "UNVERIFIED")).toBe(true);
   });
 

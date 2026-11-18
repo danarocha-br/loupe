@@ -9,7 +9,6 @@ import { snapshot } from "../toolbar/page.js";
 import { scopeView } from "../toolbar/scopes.js";
 import { createAdapter } from "./adapter.js";
 import { createDebug, type LoupeDebug, UNADAPTED_REASON } from "./debug.js";
-import { UNADAPTED_NOTE } from "./inspect.js";
 import { loadedMeta, metaRequestOf, rememberMeta } from "./instance-meta.js";
 import { onRegistryChange } from "./registry.js";
 
@@ -159,7 +158,7 @@ describe("anchored client Instances without an Adapter", () => {
       component: "NewCard",
       rendered: "client",
       callSite: { path: "app/page.tsx", line: 10, column: 5, ordinal: 1, total: 1 },
-      note: UNADAPTED_NOTE,
+      note: "unadapted",
       coverage: { editable: 0, inspectOnly: 1 },
     });
     expect(inspection.rows).toMatchObject([{ name: "title", value: "Hi", editable: false }]);
@@ -188,7 +187,7 @@ describe("anchored client Instances without an Adapter", () => {
       ["tone", false, "NO ADAPTER"],
     ]);
     expect(inspection.rows[1]?.default).toEqual({ source: "destructure", value: "a" });
-    expect(inspection).toMatchObject({ note: UNADAPTED_NOTE, coverage: { editable: 0, inspectOnly: 2 } });
+    expect(inspection).toMatchObject({ note: "unadapted", coverage: { editable: 0, inspectOnly: 2 } });
     expect(loupe.list()).toMatchObject([{ component: "NewCard", adapted: false, editable: false, reason: UNADAPTED_REASON }]);
     expect(() => loupe.set(at("NewCard"), "tone", "b")).toThrow(/no Adapter/);
   });
