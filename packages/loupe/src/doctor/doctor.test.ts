@@ -17,7 +17,6 @@ import {
 } from "../compat/repo.fixture.js";
 import { version } from "../version.js";
 import type { BuildRunner } from "./build.js";
-import { runDoctor } from "./command.js";
 
 const doctor = (root: string, ...argv: string[]) => cli(root, ["doctor", ...argv]);
 
@@ -282,14 +281,7 @@ describe("loupe doctor --build", () => {
       return { code, describe: "fake" };
     };
 
-  async function withBuild(root: string, build: BuildRunner) {
-    const out: string[] = [];
-    const code = await runDoctor(
-      { build: true },
-      { out: (l) => out.push(l), err: (l) => out.push(l), cwd: root, nodeVersion: "22.22.2", build },
-    );
-    return { code, text: out.join("\n") };
-  }
+  const withBuild = (root: string, build: BuildRunner) => cli(root, ["doctor", "--build"], { build });
 
   it("passes a build with no trace of Loupe, ignoring .next/dev, .next/cache and source maps", async () => {
     const root = await installed();

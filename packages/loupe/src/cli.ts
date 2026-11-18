@@ -1,4 +1,5 @@
 import { checkCompatibility } from "./compat/check.js";
+import type { BuildRunner } from "./doctor/build.js";
 import { doctorUsage, parseDoctorArgs, runDoctor } from "./doctor/command.js";
 import { generateUsage, parseGenerateArgs, runGenerate } from "./generate/command.js";
 import { initUsage, parseInitArgs, runInit } from "./init/command.js";
@@ -16,6 +17,8 @@ export type Io = {
   nodeVersion?: string;
   /** Runs `pnpm install` for `loupe remove`; the real one by default. */
   install?: (root: string) => number;
+  /** Runs `next build` for `loupe doctor --build`; the real one by default. */
+  build?: BuildRunner;
 };
 
 const usage = `Usage: loupe <command>
@@ -145,6 +148,7 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
       err: io.err,
       cwd: io.cwd ?? process.cwd(),
       nodeVersion: io.nodeVersion ?? process.versions.node,
+      build: io.build,
     });
   }
 
