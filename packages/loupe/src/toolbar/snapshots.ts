@@ -94,11 +94,14 @@ let current: Rasterizer = screenshotRasterizer;
 /**
  * Draws the page with `next` from now on, starting over as a page load does: no
  * Snapshots, numbering from 1. Tests draw fixed pixels this way; the page never
- * calls it.
+ * calls it. A capture already queued still runs first, with the Rasterizer and
+ * into the list it was queued with: the page changes for one capture at a time,
+ * and the new list starts empty.
  */
 export function setRasterizer(next: Rasterizer): void {
   current = next;
-  (globalThis as Host)[GLOBAL_KEY] = emptyStore();
+  const host = globalThis as Host;
+  host[GLOBAL_KEY] = { ...emptyStore(), queue: host[GLOBAL_KEY]?.queue ?? Promise.resolve() };
 }
 
 /** One list per page, kept on `globalThis` across a Fast Refresh; a reload clears it. */
@@ -119,7 +122,7 @@ export function snapshots(): readonly ListedSnapshot[] {
 
 /** Takes a Snapshot of the screen in view. Captures run one at a time. */
 export function captureScreen(): Promise<Snapshot> {
-  return enqueue(() => capture({}));
+  return enqueue((session) => capture(session, {}));
 }
 
 /**
@@ -127,15 +130,11 @@ export function captureScreen(): Promise<Snapshot> {
  * another page: it would be replaced with a picture of the wrong page.
  */
 export function retakeSnapshot(id: number): Promise<Snapshot> {
-  return enqueue(() => capture({ retake: id }));
+  return enqueue((session) => capture(session, { retake: id }));
 }
 
 export function removeSnapshot(id: number): void {
-  const state = store();
-  const rest = state.list.filter((snapshot) => snapshot.id !== id);
-  if (rest.length === state.list.length) return;
-  state.list = rest;
-  emitChange();
+  drop(store(), id);
 }
 
 /**
@@ -147,9 +146,9 @@ export function removeSnapshot(id: number): void {
  */
 export async function captureForExport(): Promise<{ failed: string | null }> {
   try {
-    await enqueue(async () => {
-      const taken = await capture({ auto: true });
-      if (repeatsManual(taken)) removeSnapshot(taken.id);
+    await enqueue(async (session) => {
+      const taken = await capture(session, { auto: true });
+      if (repeatsManual(session.state, taken)) drop(session.state, taken.id);
       return taken;
     });
     return { failed: null };
@@ -161,7 +160,7 @@ export async function captureForExport(): Promise<{ failed: string | null }> {
 
 /** The Snapshots an export carries, oldest first: every one that isn't Outdated. */
 export function exportableSnapshots(): SnapshotInput[] {
-  return kept().map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
+  return kept(store()).map(({ route, size, dpr, viewport, crops }) => ({ route, size, dpr, viewport, crops }));
 }
 
 /**
@@ -171,7 +170,7 @@ export function exportableSnapshots(): SnapshotInput[] {
  * one or replaces the last. The export dialog warns past 25 MB (PER-139).
  */
 export function exportCaptureBytes(): number {
-  const list = kept();
+  const list = kept(store());
   const route = currentRoute();
   return list.some((snapshot) => snapshot.route === route) ? 0 : (list.at(-1)?.bytes ?? 0);
 }
@@ -189,8 +188,15 @@ function isOutdated(snapshot: Snapshot): boolean {
 }
 
 /** The Snapshots that aren't Outdated. */
-function kept(): Snapshot[] {
-  return store().list.filter((snapshot) => !isOutdated(snapshot));
+function kept(state: Store): Snapshot[] {
+  return state.list.filter((snapshot) => !isOutdated(snapshot));
+}
+
+function drop(state: Store, id: number): void {
+  const rest = state.list.filter((snapshot) => snapshot.id !== id);
+  if (rest.length === state.list.length) return;
+  state.list = rest;
+  emitChange();
 }
 
 /** Retake works only on the page a Snapshot shows. */
@@ -198,22 +204,36 @@ function takenElsewhere(snapshot: Snapshot): boolean {
   return snapshot.route !== currentRoute();
 }
 
-/** Whether an export's own Snapshot shows what a manual one of its route already does. */
-function repeatsManual(taken: Snapshot): boolean {
-  return kept().some(
+/**
+ * Whether an export's own Snapshot shows nothing a manual one of its route doesn't:
+ * the same screen, and every crop it adds, for the same change. A crop for a change
+ * since set differently, say per Instance rather than as a group, is new: the
+ * Proposal only places a crop with the change it was taken for.
+ */
+function repeatsManual(state: Store, taken: Snapshot): boolean {
+  return kept(state).some(
     (other) =>
       !other.auto &&
       other.route === taken.route &&
-      other.viewport.before === taken.viewport.before &&
-      other.viewport.after === taken.viewport.after,
+      samePair(other.viewport, taken.viewport) &&
+      taken.crops.every((crop) =>
+        other.crops.some((had) => had.change === crop.change && had.keyPath === crop.keyPath && samePair(had, crop)),
+      ),
   );
 }
 
+function samePair(a: { before: string; after: string }, b: { before: string; after: string }): boolean {
+  return a.before === b.before && a.after === b.after;
+}
+
+/** What a capture works with: the list and the Rasterizer as they were when it was queued. */
+type Session = { state: Store; rasterizer: Rasterizer };
+
 /** Runs `job` once every capture before it has finished. */
-function enqueue(job: () => Promise<Snapshot>): Promise<Snapshot> {
-  const state = store();
-  const run = state.queue.then(job);
-  state.queue = run.catch(() => {});
+function enqueue(job: (session: Session) => Promise<Snapshot>): Promise<Snapshot> {
+  const session: Session = { state: store(), rasterizer: current };
+  const run = session.state.queue.then(() => job(session));
+  session.state.queue = run.catch(() => {});
   return run;
 }
 
@@ -229,7 +249,7 @@ type Covered = { id: string; keyPath: string; after: Rect; before: Rect | null }
 /** A change on screen: one record, and the Instances it reaches that are in view. */
 type ChangeOnScreen = { key: string; covered: Covered[] };
 
-async function capture(options: CaptureOptions): Promise<Snapshot> {
+async function capture({ state, rasterizer }: Session, options: CaptureOptions): Promise<Snapshot> {
   if (typeof window === "undefined") throw new Error("[loupe] Capture screen runs in the browser.");
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -238,12 +258,10 @@ async function capture(options: CaptureOptions): Promise<Snapshot> {
   }
   const reg = registry();
   const debug = debugOf();
-  const rasterizer = current;
   const dpr = window.devicePixelRatio || 1;
   const frame: Frame = { width, height, dpr };
   const route = currentRoute();
   const url = location.href;
-  const state = store();
   const replaced = options.retake === undefined ? undefined : state.list.find((s) => s.id === options.retake);
   if (options.retake !== undefined && !replaced) {
     throw new Error(`[loupe] There is no Snapshot ${options.retake} to retake.`);
@@ -466,12 +484,22 @@ function settle(): Promise<void> {
 /** Adds `capture`, `retake`, `snapshots` and `removeSnapshot` to `window.__loupe`, the acceptance surface. */
 function exposeSnapshots(): void {
   const debug = debugOf() as LoupeDebug & {
-    capture?: () => Promise<Snapshot>;
+    capture?: (options?: unknown) => Promise<Snapshot>;
     retake?: (id: number) => Promise<Snapshot>;
     snapshots?: () => readonly ListedSnapshot[];
     removeSnapshot?: (id: number) => void;
   };
-  debug.capture ??= captureScreen;
+  // It once took `{ replace }` and `{ auto }`: a call that still passes them says so
+  // rather than quietly taking a new Snapshot.
+  debug.capture ??= (options?: unknown) =>
+    options === undefined
+      ? captureScreen()
+      : Promise.reject(
+          new Error(
+            "[loupe] __loupe.capture() takes no options. Retake a Snapshot with __loupe.retake(id); " +
+              "__loupe.proposal({ capture: true }) takes the export's own.",
+          ),
+        );
   debug.retake ??= retakeSnapshot;
   debug.snapshots ??= snapshots;
   debug.removeSnapshot ??= removeSnapshot;

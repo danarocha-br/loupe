@@ -30,6 +30,7 @@ const {
   snapshots,
 } = await import("./snapshots.js");
 const { fixedPixels } = await import("./snapshots.fixture.js");
+type Snapshot = Awaited<ReturnType<typeof captureScreen>>;
 const { collectProposal } = await import("./proposal.js");
 const { SnapshotsCard } = await import("./snapshots-card.js");
 
@@ -320,6 +321,21 @@ describe("Capture screen", () => {
     expect(rasterized.map((seen) => seen.covered)).toEqual([false, true, false, true]);
   });
 
+  it("starting over mid-capture leaves the new list empty, and the page still changes for one capture at a time", async () => {
+    setUp();
+    let first: Snapshot | undefined;
+    await act(async () => {
+      const queued = captureScreen();
+      startOver();
+      const [taken] = await Promise.all([queued, captureScreen()]);
+      first = taken;
+    });
+    // The first went into the list it was queued on, and finished before the second began.
+    expect(first?.id).toBe(1);
+    expect(ids()).toEqual([[1, false]]);
+    expect(rasterized.map((seen) => seen.covered)).toEqual([false, true, false, true]);
+  });
+
   it("refuses a hidden tab's empty viewport rather than capturing nothing", async () => {
     setUp();
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(0);
@@ -422,6 +438,31 @@ describe("in the Proposal and the Toolbar", () => {
     expect(proposal.routes[0]?.screenshots.map((shot) => shot.kind)).toEqual(["viewport", "crop"]);
   });
 
+  it("keeps an export's own Snapshot whose crops a manual one of the same screen doesn't have", async () => {
+    startOver({
+      draw: () => {
+        draw();
+        return "same";
+      },
+    });
+    setUp();
+    await run(captureScreen);
+    // The same value, now set per Instance rather than as a group: the screen is
+    // the same and the manual Snapshot isn't Outdated, but its crop is the group's.
+    act(() => {
+      loupe.reset(row(1), "variant", "group");
+      for (const n of [1, 2, 3]) loupe.set(row(n), "variant", "outline");
+    });
+    expect(snapshots()[0]?.outdated).toBe(false);
+
+    const proposal = await run(() => collectProposal({ title: "t", capture: true }));
+    expect(ids()).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+    expect(proposal.routes[0]?.changes.map((change) => change.screenshots.length)).toEqual([1, 1, 1]);
+  });
+
   it("lists each Snapshot, marked Outdated once an Override it showed changes", async () => {
     setUp();
     await run(captureScreen);
@@ -439,5 +480,24 @@ describe("in the Proposal and the Toolbar", () => {
     expect(snapshots()).toEqual([]);
     expect(card.card.textContent).toBe("");
     card.remove();
+  });
+});
+
+describe("on window.__loupe", () => {
+  it("adds capture, retake, snapshots and removeSnapshot, and capture() turns down the options it once took", async () => {
+    const surface: Record<string, unknown> = {};
+    (window as { __loupe?: unknown }).__loupe = surface;
+    // A fresh copy of the module adds itself to the page's `__loupe` as it loads.
+    vi.resetModules();
+    try {
+      await import("./snapshots.js");
+      expect(Object.keys(surface).sort()).toEqual(["capture", "removeSnapshot", "retake", "snapshots"]);
+      const capture = surface.capture as (options?: unknown) => Promise<unknown>;
+      await expect(capture({ replace: 1 })).rejects.toThrow("Retake a Snapshot with __loupe.retake(id)");
+      await expect(capture({ auto: true })).rejects.toThrow("__loupe.proposal({ capture: true })");
+      expect(rasterized).toEqual([]);
+    } finally {
+      delete (window as { __loupe?: unknown }).__loupe;
+    }
   });
 });
