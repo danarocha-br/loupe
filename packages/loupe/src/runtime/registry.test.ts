@@ -3,7 +3,7 @@
 // again finds it, and after a `resetLoupe()` nothing of the old one listens.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { callSiteId, instanceId } from "../call-site.js";
-import { type MountedInstance, registry } from "./registry.js";
+import { committed, type MountedInstance, register, registry } from "./registry.js";
 import { resetLoupe } from "./slot.js";
 
 const ANCHOR = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Button", ordinal: 1 });
@@ -73,5 +73,17 @@ describe("watching the route", () => {
     history.pushState(null, "", "/billing");
     await navigated();
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe("a mounted Instance", () => {
+  it("keeps the route it mounted on, and committed() writes its fiber, hint and render count", () => {
+    const entry = { anchor: ANCHOR, hint: null, component: "Button", keyPath: "", stateProps: [], meta: null, fiber: null };
+    history.replaceState(null, "", "/members");
+    const instance = register(ID, entry as unknown as Parameters<typeof register>[1]);
+    expect(instance).toMatchObject({ id: ID, route: "/members", renders: 1 });
+    history.pushState(null, "", "/billing");
+    committed(instance, null, "app/page.tsx:12:5 1/1");
+    expect(instance).toMatchObject({ route: "/members", renders: 2, hint: "app/page.tsx:12:5 1/1" });
   });
 });

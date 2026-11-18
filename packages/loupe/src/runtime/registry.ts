@@ -25,8 +25,8 @@ export type MountedInstance = {
   id: string;
   /** The call-site id the loader wrote (`data-ds-anchor`). */
   anchor: string;
-  /** `path:line:col n/total`, display only (`data-ds-source`). */
-  hint: string | null;
+  /** `path:line:col n/total`, display only (`data-ds-source`), as of the latest commit. */
+  readonly hint: string | null;
   component: string;
   keyPath: string;
   /**
@@ -44,10 +44,19 @@ export type MountedInstance = {
   attempts: Map<string, unknown>;
   /** Rerender this Instance. */
   notify(): void;
-  /** The fiber of the latest render, to map a picked DOM node back. */
-  fiber: Fiber | null;
-  renders: number;
+  /** The fiber of the latest commit, to map a picked DOM node back. */
+  readonly fiber: Fiber | null;
+  /** How many times it has committed. */
+  readonly renders: number;
+  /**
+   * The pathname it mounted on. At unmount, `location` may already be the next
+   * page's: a client navigation changes it before the old page's cleanups run.
+   */
+  readonly route: string;
 };
+
+/** What only the registry writes: `register` and `committed` keep these fields. */
+type Writable = { -readonly [K in keyof MountedInstance]: MountedInstance[K] };
 
 /** An Instance as it last rendered before it unmounted: what the Toolbar shows for a record it holds. */
 export type LastSeen = {
@@ -213,29 +222,42 @@ function recordedIds(store: OverrideStore): Set<string> {
 }
 
 /**
- * The route each Instance mounted on. Read at unmount, `location` may already
- * be the next page's: a client navigation changes it before the old page's cleanups run.
- */
-const mountedOn = new WeakMap<MountedInstance, string>();
-
-/**
  * Registers a mounted Instance under `baseId`, or `baseId~2`, `~3`… when another
  * mounted Instance already holds it (the same call site, rendered twice with no
- * key to tell them apart). Returns the id it got.
+ * key to tell them apart). Returns the id it got, then runs the hop guard.
  * `~n` is mount order, so a record naming any id of a duplicated base is suspended.
  */
-export function register(baseId: string, entry: Omit<MountedInstance, "id">): MountedInstance {
+export function register(baseId: string, entry: Omit<MountedInstance, "id" | "renders" | "route">): MountedInstance {
   const { instances, departed, store } = registry();
   const id = uniqueId(baseId, instances);
-  const instance: MountedInstance = { ...entry, id };
+  const instance: MountedInstance = { ...entry, id, renders: 1, route: currentRoute() };
   instances.set(id, instance);
-  mountedOn.set(instance, currentRoute());
   departed.delete(id);
   // Also when this one took the free base id while a `~n` is still mounted.
   const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
   if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
   emitChange();
+  observe(instance);
   return instance;
+}
+
+/**
+ * What a committed render writes to a mounted Instance: the fiber and hint it
+ * rendered with, and one more render. Then the hop guard runs, and the Toolbar
+ * redraws, since its Current values are live.
+ */
+export function committed(instance: MountedInstance, fiber: Fiber | null, hint: string | null): void {
+  const writable = instance as Writable;
+  writable.fiber = fiber;
+  writable.hint = hint;
+  writable.renders++;
+  observe(instance);
+  emitChange();
+}
+
+/** The hop guard. Runs before paint, so a suspended Override is never shown. */
+function observe(instance: MountedInstance): void {
+  registry().store.observe({ id: instance.id, anchor: instance.anchor, total: parseHint(instance.hint)?.total ?? null });
 }
 
 export function unregister(instance: MountedInstance): void {
@@ -248,7 +270,7 @@ export function unregister(instance: MountedInstance): void {
       component: instance.component,
       anchor: instance.anchor,
       hint: instance.hint,
-      route: mountedOn.get(instance) ?? currentRoute(),
+      route: instance.route,
       current: instance.live().current,
     });
   }
