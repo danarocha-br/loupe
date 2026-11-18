@@ -164,7 +164,8 @@ fails, it puts the dependencies back so the next run retries.
 
 ## Upgrading
 
-An upgrade is a rerun of `init` with the newer version installed:
+An upgrade is a rerun of `init` with the newer version installed. The Installer
+plugin's `/loupe:upgrade` does these steps for a designer; by hand:
 
 1. In the app's `package.json`, set `@danarocha/loupe` to the new version,
    exact as `init` wrote it, and run `pnpm install`.
@@ -172,6 +173,8 @@ An upgrade is a rerun of `init` with the newer version installed:
    has uncommitted changes; during an upgrade it says "commit the version bump,
    then rerun".
 3. Run `pnpm exec loupe init` in the app's folder.
+4. Run `pnpm install` again, as `init` ends by saying, and commit the lockfile
+   with what `init` wrote.
 
 `init` then reconciles item by item, as on any rerun, recording each item in the
 ledger before writing it. It rewrites its own unedited files in

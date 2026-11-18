@@ -49,9 +49,9 @@ describe("the Installer plugin", () => {
     assert.equal(entry.hooks[0].command, 'node "${CLAUDE_PLUGIN_ROOT}/scripts/guard.mjs"');
   });
 
-  it("ships the install, remove and doctor skills, each running the CLI through the pinned runner", () => {
+  it("ships the install, upgrade, remove and doctor skills, each running the CLI through the pinned runner", () => {
     const skills = readdirSync(path.join(plugin, "skills")).sort();
-    assert.deepEqual(skills, ["doctor", "install", "remove"]);
+    assert.deepEqual(skills, ["doctor", "install", "remove", "upgrade"]);
     for (const skill of skills) {
       const text = readFileSync(path.join(plugin, "skills", skill, "SKILL.md"), "utf8");
       const front = text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "";

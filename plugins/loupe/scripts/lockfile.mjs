@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { LEDGER, LOUPE_PACKAGE, PRODUCT_LAYER, PRODUCT_LAYER_PACKAGE } from "./pin.mjs";
 import { findRoot } from "./loupe.mjs";
 
-const LOCKFILE = "pnpm-lock.yaml";
+export const LOCKFILE = "pnpm-lock.yaml";
 const OWN = new Set([LOUPE_PACKAGE, PRODUCT_LAYER_PACKAGE]);
 const LAYER_IMPORTER = PRODUCT_LAYER;
 
