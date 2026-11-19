@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command } from "./command.js";
 import type { LayerStatus } from "../layer-status.js";
-import { formatNotice } from "../format-notice.js";
+import { formatNotice, missingLayerAdvice } from "../format-notice.js";
 import { readProductLayerStatus } from "./layer-server.js";
 import { warnOnce } from "./warn-once.js";
 
@@ -100,9 +100,7 @@ export function LayerNotices({ status }: { status: LayerStatus | null }) {
         </div>
         <p className="body">
           adapt-list.json is gone, so files that reload lose their Adapters and their Instances drop out of this panel. A
-          branch switch can remove it. Restore it with git, or write it again with the command below, which names the
-          design system and the app. Then restart the dev server: files that reloaded without it stay without Adapters
-          until you do.
+          branch switch can remove it. {missingLayerAdvice(status.command, "the command below")}
         </p>
         <Command text={status.command} />
       </div>

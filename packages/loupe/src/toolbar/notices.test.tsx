@@ -3,6 +3,7 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
+import { missingLayerAdvice } from "../format-notice.js";
 import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
@@ -163,8 +164,9 @@ describe("a missing Product layer (PER-227)", () => {
     expect(notice?.getAttribute("role")).toBe("alert");
     expect(notice?.textContent).toContain("Product layer missing");
     expect(notice?.textContent).toContain("adapt-list.json is gone");
-    expect(notice?.textContent).toContain("Restore it with git, or write it again with the command below");
-    expect(notice?.textContent).toContain("restart the dev server");
+    // The words are `missingLayerAdvice`'s, tested on its own; here, that the card carries them and shows the command.
+    expect(notice?.textContent).toContain(missingLayerAdvice(WRITE_AGAIN, "the command below"));
+    expect(notice?.textContent).toContain("Restore it with git");
     expect(notice?.textContent).toContain(WRITE_AGAIN);
     // Nothing else can be said about a layer that isn't there.
     expect(shadow().querySelector("[data-testid=stale-notice], [data-testid=format-notice]")).toBeNull();

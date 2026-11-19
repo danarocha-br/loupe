@@ -1,10 +1,30 @@
-// The words of the format-version notice (PER-85), shared by `withLoupe`'s
-// terminal line and the Toolbar's notice and `console.error`. Pure, so the
-// browser can import it. Each ends where the `generate` command follows.
+// The words of the Product layer's notices that the terminal and the Toolbar both
+// say: the format-version notice (PER-85), shared by `withLoupe`'s terminal line and
+// the Toolbar's notice and `console.error`, and what to do once `adapt-list.json` is
+// gone (PER-227), shared by the dev server's terminal line and the Toolbar's card.
+// Pure, so the browser can import it. A format notice ends where the `generate`
+// command follows.
 
+import { SPECIFIER_FLAG } from "./generate/first-run.js";
 import { NPM_PACKAGE } from "./names.js";
 
 export type FormatNotice = { layer: number | null; runtime: number; newer: boolean };
+
+/**
+ * What to do about a missing `adapt-list.json`. `command` is the one that writes it
+ * again; `reference` is how the surface points at it, "the command below" where a
+ * card shows it. Regenerating is for a Product layer that is otherwise intact: it
+ * can't bring back the package a deleted layer folder held, git can.
+ */
+export function missingLayerAdvice(command: string, reference: string = command): string {
+  // `generate` reads the specifier from the layer's package.json, so only a layer without one is asked for it.
+  const specifier = command.includes(SPECIFIER_FLAG) ? " and <name> with the path the app imports the Product layer by" : "";
+  return (
+    `Restore it with git. If the rest of the Product layer is intact, write it again with ${reference}, ` +
+    `replacing each <dir> with a path from the app folder (. is the app itself)${specifier}. ` +
+    "Then restart the dev server: files that reloaded without it stay without Adapters until you do."
+  );
+}
 
 export function formatNotice(format: FormatNotice): string {
   const versions = `formatVersion ${format.layer ?? "unknown"}, and this Loupe reads ${format.runtime}`;

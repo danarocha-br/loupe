@@ -10,6 +10,7 @@ import path from "node:path";
 import { parse } from "@babel/parser";
 import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "./adapt-list.js";
 import type { FormatNotice } from "./format-notice.js";
+import { ROOT_FLAGS, SPECIFIER_FLAG } from "./generate/first-run.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./generate/header.js";
 import { compare, DESIGN_SYSTEM_INCLUDE, hashFile, sourceFiles, statStamp } from "./meta/sources.js";
 import { PRODUCT_LAYER } from "./names.js";
@@ -26,8 +27,8 @@ export type StaleModule = {
 export type LayerStatus = {
   /**
    * The command that rewrites the Product layer, run from the repo root. While `missing`,
-   * the one that writes it again: `generate` reads its roots from the file that is gone,
-   * so that run has to name them.
+   * the one that writes it again: `generate` reads its roots (and, for a layer with no
+   * package name, its specifier) from the file that is gone, so that run names them.
    */
   command: string;
   /**
@@ -66,8 +67,25 @@ export function generateCommand({ root, adaptList, app }: LayerPaths): string {
   return `${appRel === "" ? "pnpm" : `pnpm -C ${appRel}`} exec loupe generate${out}`;
 }
 
-/** What `generate` asks for the first time, and again once `adapt-list.json` no longer holds the roots. */
-const NAME_THE_ROOTS = " --design-system <dir> --app <dir>";
+/**
+ * The command that writes `adapt-list.json` again, which names what `generate` can no
+ * longer read from it: the roots, and the layer's import specifier unless its
+ * package.json holds one (an in-app layer like the fixture's has no such file).
+ */
+function writeAgainCommand(paths: LayerPaths): string {
+  const named = hasPackageName(path.dirname(paths.adaptList));
+  return `${generateCommand(paths)} ${ROOT_FLAGS}${named ? "" : ` ${SPECIFIER_FLAG}`}`;
+}
+
+/** The rule `generate` follows: the specifier is the layer's package.json `name`, unless the run is told one. */
+function hasPackageName(layer: string): boolean {
+  try {
+    const name = (JSON.parse(readFileSync(path.join(layer, "package.json"), "utf8")) as { name?: unknown }).name;
+    return typeof name === "string" && name !== "";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Only a file that isn't there is a status of its own; any other failure to read it
@@ -80,7 +98,7 @@ export function readLayerStatus(paths: LayerPaths): LayerStatus {
     text = readFileSync(paths.adaptList, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return { command: `${command}${NAME_THE_ROOTS}`, missing: true, format: null, stale: [], notGenerated: null };
+      return { command: writeAgainCommand(paths), missing: true, format: null, stale: [], notGenerated: null };
     }
     throw error;
   }

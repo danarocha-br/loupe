@@ -222,10 +222,13 @@ The `loupe` command is installed in the app, not at the repo root, so a plain
 also ask Claude to run it. It rewrites only what changed. Commit what it writes.
 
 If the panel says **Product layer missing**, `adapt-list.json` is gone, as after a
-branch switch to a branch without it. Restore the file with git, or write it again:
-run `generate` and name the folders it can no longer read from that file, by adding
-`--design-system <dir> --app <dir>` to the command in the panel. Then restart the
-dev server: files that reloaded without the file stay without Adapters until you do.
+branch switch to a branch without it. Restore it with git. If the rest of the Product
+layer is intact, you can write it again instead: run the command in the panel,
+replacing each `<dir>` with a path from the app folder (`pnpm -C` runs it from there,
+so `.` is the app itself). When the command also has `--specifier <name>`, the layer
+has no package name for `generate` to read, so replace `<name>` with the path the
+app imports it by, such as `@/loupe`. Then restart the dev server: files that
+reloaded without the file stay without Adapters until you do.
 
 ## What the install changes
 

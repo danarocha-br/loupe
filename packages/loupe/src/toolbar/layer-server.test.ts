@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const layer = vi.hoisted(() => ({ read: (): unknown => null }));
 vi.mock("../layer-status.js", () => ({ readLayerStatus: () => layer.read() }));
 
+import { missingLayerAdvice } from "../format-notice.js";
 import type { LayerStatus } from "../layer-status.js";
 import { readProductLayerStatus } from "./layer-server.js";
 
@@ -71,13 +72,11 @@ describe("readProductLayerStatus", () => {
     // A branch switch removes the file; every focus asks again.
     layer.read = () => status(true);
     for (let focus = 0; focus < 3; focus += 1) expect(await readProductLayerStatus()).toEqual(status(true));
+    // The terminal and the Toolbar's card say the same advice (`missingLayerAdvice`, tested on its own).
     expect(warn.mock.calls).toEqual([
-      [
-        "[loupe] loupe-layer-status: /repo/packages/loupe/adapt-list.json is missing. Restore it with git, or write it again with " +
-          "pnpm -C apps/web exec loupe generate --design-system <dir> --app <dir>. " +
-          "Then restart the dev server: files that reloaded without it stay without Adapters until you do.",
-      ],
+      [`[loupe] loupe-layer-status: /repo/packages/loupe/adapt-list.json is missing. ${missingLayerAdvice(status(true).command)}`],
     ]);
+    expect(String(warn.mock.calls[0]?.[0])).toContain("Restore it with git");
 
     // Back after `generate`: the status is normal again, with nothing more said.
     layer.read = () => status(false);

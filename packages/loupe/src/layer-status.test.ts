@@ -158,9 +158,10 @@ describe("readLayerStatus", () => {
 });
 
 describe("readLayerStatus when adapt-list.json is gone (PER-227)", () => {
-  // `generate` reads the roots from the file that is gone, so the command that writes it again names them.
+  // `generate` reads the roots from the file that is gone, so the command that writes it again names them,
+  // and the specifier too when the layer has no package.json to read it from (this repo's has none).
   const MISSING = {
-    command: "pnpm -C apps/app exec loupe generate --design-system <dir> --app <dir>",
+    command: "pnpm -C apps/app exec loupe generate --design-system <dir> --app <dir> --specifier <name>",
     missing: true,
     format: null,
     stale: [],
@@ -204,8 +205,26 @@ describe("readLayerStatus when adapt-list.json is gone (PER-227)", () => {
     const { paths } = repo("apps/app/loupe");
     rmSync(paths.adaptList);
     expect(readLayerStatus(paths).command).toBe(
-      "pnpm -C apps/app exec loupe generate --out loupe --design-system <dir> --app <dir>",
+      "pnpm -C apps/app exec loupe generate --out loupe --design-system <dir> --app <dir> --specifier <name>",
     );
+  });
+
+  // `generate` takes the specifier from the layer's package.json `name`, so only a layer without one is asked for it.
+  it("asks for the specifier only when the layer's package.json has no name to read", () => {
+    const { write, paths } = repo();
+    rmSync(paths.adaptList);
+    const command = () => readLayerStatus(paths).command;
+    const bare = "pnpm -C apps/app exec loupe generate --design-system <dir> --app <dir>";
+
+    write("packages/loupe/package.json", `{ "name": "@repo/loupe" }\n`);
+    expect(command()).toBe(bare);
+
+    write("packages/loupe/package.json", `{ "private": true }\n`);
+    expect(command()).toBe(`${bare} --specifier <name>`);
+    write("packages/loupe/package.json", `{ "name": "" }\n`);
+    expect(command()).toBe(`${bare} --specifier <name>`);
+    write("packages/loupe/package.json", `{ not json`);
+    expect(command()).toBe(`${bare} --specifier <name>`);
   });
 
   it("still throws when the read fails for another reason, for the caller to report", () => {

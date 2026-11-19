@@ -7,6 +7,7 @@
 // Only the Toolbar imports this module, and the Toolbar reaches the page through
 // `<LoupeMount />`'s development-only import, so a production build holds neither.
 
+import { missingLayerAdvice } from "../format-notice.js";
 import { type LayerStatus, readLayerStatus } from "../layer-status.js";
 import { warnOnce } from "./warn-once.js";
 
@@ -26,12 +27,7 @@ export async function readProductLayerStatus(): Promise<LayerStatus | null> {
   if (!root || !adaptList || !app) return null;
   try {
     const status = readLayerStatus({ root, adaptList, app });
-    if (status.missing) {
-      warnOnce(
-        `[loupe] ${MARKER}: ${adaptList} is missing. Restore it with git, or write it again with ${status.command}. ` +
-          "Then restart the dev server: files that reloaded without it stay without Adapters until you do.",
-      );
-    }
+    if (status.missing) warnOnce(`[loupe] ${MARKER}: ${adaptList} is missing. ${missingLayerAdvice(status.command)}`);
     return status;
   } catch (error) {
     warnOnce(`[loupe] ${MARKER}: ${error instanceof Error ? error.message : String(error)}`);
