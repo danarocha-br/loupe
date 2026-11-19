@@ -6,16 +6,22 @@ const COMMAND = "pnpm -C apps/app exec loupe generate --design-system <dir> --ap
 describe("missingLayerAdvice (PER-227)", () => {
   it("puts git first, keeps regenerating for an intact Product layer, and asks for no restart", () => {
     const advice = missingLayerAdvice(COMMAND);
-    expect(advice.startsWith("Restore it with git. If the rest of the Product layer is intact, write it again with ")).toBe(true);
+    expect(advice.startsWith("Restore it with git. If the rest of the Product layer is intact, write it again ")).toBe(true);
     // The loader depends on adapt-list.json even while it is gone, so Instances return when the file does.
     expect(advice).not.toMatch(/restart/i);
     expect(advice.endsWith("(. is the app itself).")).toBe(true);
   });
 
   it("points at the command by itself, or by the reference a card gives it", () => {
-    expect(missingLayerAdvice(COMMAND)).toContain(`write it again with ${COMMAND}, replacing`);
-    expect(missingLayerAdvice(COMMAND, "the command below")).toContain("write it again with the command below, replacing");
+    expect(missingLayerAdvice(COMMAND)).toContain(`with ${COMMAND}, replacing`);
+    expect(missingLayerAdvice(COMMAND, "the command below")).toContain("with the command below, replacing");
     expect(missingLayerAdvice(COMMAND, "the command below")).not.toContain("pnpm");
+  });
+
+  it("says where to run it: the repo root, which `pnpm -C` leaves for the app (PR #58)", () => {
+    // Pasted into the terminal `next dev` runs in, often the app folder, `pnpm -C apps/app` finds no folder.
+    expect(missingLayerAdvice(COMMAND)).toContain(`write it again from the repo root with ${COMMAND}, replacing`);
+    expect(missingLayerAdvice(COMMAND, "the command below")).toContain("write it again from the repo root with the command below, replacing");
   });
 
   it("says what to put in <dir>: a path from the app folder, not from the repo root", () => {

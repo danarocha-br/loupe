@@ -75,8 +75,9 @@ describe("withLoupe", () => {
       (error: unknown) => error as Error,
     );
     // This layer has no package.json, so the command asks for the specifier too.
+    expect(failure?.message).toContain(`withLoupe: ${missing} is missing. Restore it with git. `);
     expect(failure?.message).toMatch(
-      /^withLoupe: \S+\/gone\/adapt-list\.json is missing\. Restore it with git\. .* exec loupe generate --out \S+ --design-system <dir> --app <dir> --specifier <name>, replacing /,
+      / exec loupe generate --out .+? --design-system <dir> --app <dir> --specifier <name>, replacing /,
     );
     // The command the Toolbar's card and `loupe doctor` name, in the dev server's terminal words.
     const command = writeAgainCommand({ root: dir, adaptList: missing, app: process.cwd() });

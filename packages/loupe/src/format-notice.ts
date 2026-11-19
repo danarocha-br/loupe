@@ -13,15 +13,16 @@ export type FormatNotice = { layer: number | null; runtime: number; newer: boole
 
 /**
  * What to do about a missing `adapt-list.json`. `command` is the one that writes it
- * again; `reference` is how the surface points at it, "the command below" where a
- * card shows it. Regenerating is for a Product layer that is otherwise intact: it
+ * again, run from the repo root: a terminal that printed it may be in the app folder,
+ * where `pnpm -C <app>` finds nothing. `reference` is how the surface points at it,
+ * "the command below" where a card shows it. Regenerating is for a Product layer that is otherwise intact: it
  * can't bring back the package a deleted layer folder held, git can.
  */
 export function missingLayerAdvice(command: string, reference: string = command): string {
   // `generate` reads the specifier from the layer's package.json, so only a layer without one is asked for it.
   const specifier = command.includes(SPECIFIER_FLAG) ? " and <name> with the path the app imports the Product layer by" : "";
   return (
-    `Restore it with git. If the rest of the Product layer is intact, write it again with ${reference}, ` +
+    `Restore it with git. If the rest of the Product layer is intact, write it again from the repo root with ${reference}, ` +
     `replacing each <dir> with a path from the app folder (. is the app itself)${specifier}.`
   );
 }
