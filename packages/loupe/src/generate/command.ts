@@ -21,8 +21,9 @@ export type GenerateOptions = {
   /** Import specifier of the Product layer; its package.json `name` when omitted. */
   specifier?: string;
   /**
-   * Repo root; when omitted, the workspace root `init` and `doctor` use (PER-233), else
-   * the nearest directory holding `.git`. `withLoupe`'s loader reads every path from it.
+   * Repo root; when omitted, the nearest pnpm workspace, the one `withLoupe`'s loader reads
+   * every path from (PER-233), else the nearest package.json `workspaces`, else the nearest
+   * directory holding `.git`.
    */
   root?: string;
   check: boolean;
@@ -49,8 +50,8 @@ Options:
   --design-system <dir>   design-system package root (default: from adapt-list.json)
   --app <dir>             app root (default: from adapt-list.json)
   --specifier <name>      import specifier of the Product layer (default: its package.json name)
-  --root <dir>            repo root (default: the workspace root, else the nearest
-                          directory holding .git)
+  --root <dir>            repo root (default: the nearest pnpm workspace, else the nearest
+                          package.json workspaces, else the nearest directory holding .git)
   --check                 write nothing; exit 1 when output would change or a file was edited
   --verbose               list every component and what it became`;
 
@@ -278,17 +279,22 @@ function packageName(dir: string): string | undefined {
 }
 
 /**
- * The root `init` wrote the Product layer against, so a run from the app folder agrees
- * with the loader even when the workspace sits inside a larger git checkout.
+ * The root `withLoupe`'s loader reads the Product layer against, so a run from the app
+ * folder agrees with it even when the workspace sits inside a larger git checkout, or the
+ * app's own package.json declares `workspaces` (PER-233). The pnpm workspace comes first,
+ * as in the loader; `findWorkspace` alone would stop at such an app.
  */
 function findRepoRoot(from: string): string {
-  const workspace = findWorkspace(path.resolve(from));
-  if (workspace !== undefined) return workspace;
-  let dir = path.resolve(from);
-  for (;;) {
-    if (existsSync(path.join(dir, ".git"))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) throw new Error(`No git repository above ${from}; pass --root <dir>`);
-    dir = parent;
+  const start = path.resolve(from);
+  const root = nearestHolding(start, "pnpm-workspace.yaml") ?? findWorkspace(start) ?? nearestHolding(start, ".git");
+  if (root === undefined) throw new Error(`No git repository above ${from}; pass --root <dir>`);
+  return root;
+}
+
+/** The nearest directory up from `from` that holds `name`, if there is one. */
+function nearestHolding(from: string, name: string): string | undefined {
+  for (let dir = from; ; dir = path.dirname(dir)) {
+    if (existsSync(path.join(dir, name))) return dir;
+    if (path.dirname(dir) === dir) return undefined;
   }
 }

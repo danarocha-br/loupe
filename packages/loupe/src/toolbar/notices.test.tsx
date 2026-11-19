@@ -9,7 +9,7 @@ import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
-import { HOST_ATTRIBUTE } from "./styles.js";
+import { CSS, HOST_ATTRIBUTE } from "./styles.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -259,6 +259,20 @@ describe("components that are new since the last generate", () => {
     expect(shadow().querySelector("[data-testid=not-generated]")?.textContent).toBe(
       `Not generated yet Run ${COMMAND} from the repo root to read its props.`,
     );
+  });
+
+  it("shows a quoted path's run of spaces as the shell reads it, in the card and the Inspector", async () => {
+    const command = "pnpm -C 'apps/Web  App' exec loupe generate";
+    const shown = (where: string) => shadow().querySelector(`[data-testid=${where}] .mono.verbatim`)?.textContent;
+    // jsdom applies no shadow-root stylesheet, so this reads the rule and the class apart.
+    expect(CSS).toContain(".verbatim { white-space: pre-wrap; }");
+    server.status = { ...FRESH, command, notGenerated: ["NewCard"] };
+    await mountWithNew();
+    expect(shown("not-generated-notice")).toBe(command);
+    const row = [...shadow().querySelectorAll("summary")].find((summary) => summary.textContent?.startsWith("NewCard"));
+    act(() => (row?.parentElement?.querySelector("button[data-instance]") as HTMLButtonElement).click());
+    await settle();
+    expect(shown("not-generated")).toBe(command);
   });
 
   it("never flags an adapted component: its Adapter is generate's output", async () => {

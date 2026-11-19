@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { parseAdaptList } from "../adapt-list.js";
 import { run } from "../cli.js";
+import { findWorkspace } from "../compat/repo.js";
 import { generateCommand, writeAgainCommand } from "../layer-status.js";
 import { extract } from "../meta/command.js";
 import { collectSources } from "../meta/sources.js";
@@ -465,7 +466,24 @@ describe("the root of a workspace inside a larger git checkout", () => {
     expect(existsSync(path.join(top, "packages"))).toBe(false);
   });
 
-  it("still takes the nearest .git when no folder above declares a workspace", () => {
+  it("takes the pnpm workspace past an app whose own package.json declares workspaces", () => {
+    const { root, top, app } = nestedRepo();
+    const manifest = path.join(app, "package.json");
+    writeFileSync(manifest, JSON.stringify({ ...JSON.parse(readFileSync(manifest, "utf8")), workspaces: ["components/*"] }));
+    const adaptList = path.join(root, "packages/loupe/adapt-list.json");
+    const command = writeAgainCommand({ root, adaptList, app });
+    const written = runPrinted(command, root, { "--design-system": "../design-system", "--app": ".", "--specifier": "@repo/loupe" });
+    expect(written.ok).toBe(true);
+    expect(parseAdaptList(readFileSync(adaptList, "utf8"), adaptList)).toMatchObject({
+      designSystem: ["fixture/design-system"],
+      app: ["fixture/app"],
+    });
+    expect(existsSync(path.join(app, "packages"))).toBe(false);
+    expect(existsSync(path.join(top, "packages"))).toBe(false);
+  });
+
+  // It can only reach the fallback where no workspace sits above the temp folder.
+  it.skipIf(findWorkspace(tmpdir()) !== undefined)("still takes the nearest .git when no folder above declares a workspace", () => {
     const root = fixtureRepo();
     rmSync(path.join(root, "pnpm-workspace.yaml"));
     const app = path.join(root, "fixture/app");
