@@ -42,10 +42,15 @@ function isDir(path: string): boolean {
 
 /** The nearest directory up from `cwd` that declares a workspace, else `cwd`. */
 export function findRoot(cwd: string): string {
+  return findWorkspace(cwd) ?? cwd;
+}
+
+/** The nearest directory up from `cwd` that declares a workspace, if there is one. */
+export function findWorkspace(cwd: string): string | undefined {
   for (let dir = cwd; ; dir = dirname(dir)) {
     if (existsSync(join(dir, "pnpm-workspace.yaml"))) return dir;
     if (readJson<PackageJson>(join(dir, "package.json"))?.workspaces) return dir;
-    if (dirname(dir) === dir) return cwd;
+    if (dirname(dir) === dir) return undefined;
   }
 }
 

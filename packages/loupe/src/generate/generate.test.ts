@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -16,12 +18,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
+import { parseAdaptList } from "../adapt-list.js";
 import { run } from "../cli.js";
+import { generateCommand, writeAgainCommand } from "../layer-status.js";
 import { extract } from "../meta/command.js";
 import { collectSources } from "../meta/sources.js";
 import type { ComponentExport, ModuleMeta } from "../meta/types.js";
 import { diff } from "./apply.js";
-import { runGenerate } from "./command.js";
+import { parseGenerateArgs, runGenerate } from "./command.js";
 import { readHeader, stampJson, stampModule } from "./header.js";
 import { adapterModule, coverageOf, plan } from "./plan.js";
 
@@ -34,14 +38,18 @@ afterAll(() => {
 });
 
 /**
- * A copy of the fixture repo at a fresh path: sources copied, `node_modules`
- * linked back to the workspace's. The stand-in Product layer is dropped, so
- * `fixture/app/loupe` starts empty.
+ * A copy of the fixture repo at a fresh path, a pnpm workspace as an install is: sources
+ * copied, `node_modules` linked back to the workspace's. The stand-in Product layer is
+ * dropped, so `fixture/app/loupe` starts empty. `inside` puts the workspace in a folder
+ * below the git checkout's root.
  */
-function fixtureRepo(): string {
-  const root = mkdtempSync(path.join(tmpdir(), "loupe-generate-"));
-  temps.push(root);
-  mkdirSync(path.join(root, ".git"));
+function fixtureRepo(inside = ""): string {
+  const top = mkdtempSync(path.join(tmpdir(), "loupe-generate-"));
+  temps.push(top);
+  mkdirSync(path.join(top, ".git"));
+  const root = path.join(top, inside);
+  mkdirSync(root, { recursive: true });
+  writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages:\n  - fixture/*\n");
   cpSync(path.join(repo, "tsconfig.base.json"), path.join(root, "tsconfig.base.json"));
   for (const pkg of ["fixture/design-system", "fixture/app"]) {
     cpSync(path.join(repo, pkg), path.join(root, pkg), {
@@ -406,5 +414,64 @@ describe("loupe generate on the fixture", () => {
     const out: string[] = [];
     expect(await run(["generate", "--help"], { out: (l) => out.push(l), err: () => {} })).toBe(0);
     expect(out.join("\n")).toContain("Usage: loupe generate");
+  });
+});
+
+// PER-233. `init`, `doctor` and `withLoupe` take the workspace as the repo root, so the
+// Product layer's paths are relative to it; `generate` run with no --root must agree.
+describe("the root of a workspace inside a larger git checkout", () => {
+  /** The fixture as a pnpm workspace in `web/`, below the git checkout's root. */
+  function nestedRepo() {
+    const root = fixtureRepo("web");
+    return { root, top: path.dirname(root), app: path.join(root, "fixture/app") };
+  }
+
+  /**
+   * Runs a command Loupe prints as pnpm runs it: each placeholder filled in from `fill`,
+   * the words read by a shell, then `generate` run from the `-C` folder.
+   */
+  function runPrinted(command: string, root: string, fill: Record<string, string> = {}) {
+    const filled = command.replace(/(--[\w-]+) <\w+>/g, (placeholder, flag: string) => (fill[flag] ? `${flag} ${fill[flag]}` : placeholder));
+    const words = execFileSync("/bin/sh", ["-c", `set -- ${filled}; printf '%s\\n' "$@"`], { encoding: "utf8" }).split("\n").slice(0, -1);
+    expect(words.slice(0, 2)).toEqual(["pnpm", "-C"]);
+    expect(words.slice(3, 6)).toEqual(["exec", "loupe", "generate"]);
+    const options = parseGenerateArgs(words.slice(6));
+    if (typeof options === "string") throw new Error(options);
+    return runGenerate(options, path.join(root, words[2] ?? ""));
+  }
+
+  it("rewrites the layer in place from the app folder, reading the roots back", () => {
+    const { root, app } = nestedRepo();
+    // `init` passes the workspace as the root.
+    expect(runGenerate({ out: OUT, root, ...FIRST_ROOTS, check: false, verbose: false }, root).ok).toBe(true);
+    const command = generateCommand({ root, adaptList: path.join(root, OUT, "adapt-list.json"), app });
+    expect(command).toBe("pnpm -C fixture/app exec loupe generate --out loupe");
+    const rerun = runPrinted(command, root);
+    expect(rerun.ok).toBe(true);
+    expect(rerun.changes).toEqual([]);
+  });
+
+  it("writes a missing default layer again into the workspace, not the outer checkout", () => {
+    const { root, top, app } = nestedRepo();
+    const adaptList = path.join(root, "packages/loupe/adapt-list.json");
+    const command = writeAgainCommand({ root, adaptList, app });
+    expect(command).toBe("pnpm -C fixture/app exec loupe generate --design-system <dir> --app <dir> --specifier <name>");
+    const written = runPrinted(command, root, { "--design-system": "../design-system", "--app": ".", "--specifier": "@repo/loupe" });
+    expect(written.ok).toBe(true);
+    expect(parseAdaptList(readFileSync(adaptList, "utf8"), adaptList)).toMatchObject({
+      designSystem: ["fixture/design-system"],
+      app: ["fixture/app"],
+    });
+    expect(existsSync(path.join(top, "packages"))).toBe(false);
+  });
+
+  it("still takes the nearest .git when no folder above declares a workspace", () => {
+    const root = fixtureRepo();
+    rmSync(path.join(root, "pnpm-workspace.yaml"));
+    const app = path.join(root, "fixture/app");
+    const written = runGenerate({ out: "loupe", designSystem: "../design-system", app: ".", specifier: "@/loupe", check: false, verbose: false }, app);
+    expect(written.ok).toBe(true);
+    const adaptList = path.join(app, "loupe/adapt-list.json");
+    expect(parseAdaptList(readFileSync(adaptList, "utf8"), adaptList)).toMatchObject({ app: ["fixture/app"] });
   });
 });

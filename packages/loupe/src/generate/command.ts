@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseAdaptList } from "../adapt-list.js";
+import { findWorkspace } from "../compat/repo.js";
 import { extract } from "../meta/command.js";
 import { collectSources, compare, DESIGN_SYSTEM_INCLUDE } from "../meta/sources.js";
 import type { ModuleMeta } from "../meta/types.js";
@@ -19,7 +20,10 @@ export type GenerateOptions = {
   app?: string;
   /** Import specifier of the Product layer; its package.json `name` when omitted. */
   specifier?: string;
-  /** Repo root; the nearest directory holding `.git` when omitted. */
+  /**
+   * Repo root; when omitted, the workspace root `init` and `doctor` use (PER-233), else
+   * the nearest directory holding `.git`. `withLoupe`'s loader reads every path from it.
+   */
   root?: string;
   check: boolean;
   verbose: boolean;
@@ -45,7 +49,8 @@ Options:
   --design-system <dir>   design-system package root (default: from adapt-list.json)
   --app <dir>             app root (default: from adapt-list.json)
   --specifier <name>      import specifier of the Product layer (default: its package.json name)
-  --root <dir>            repo root (default: the nearest directory holding .git)
+  --root <dir>            repo root (default: the workspace root, else the nearest
+                          directory holding .git)
   --check                 write nothing; exit 1 when output would change or a file was edited
   --verbose               list every component and what it became`;
 
@@ -272,7 +277,13 @@ function packageName(dir: string): string | undefined {
   return readPackage(dir)?.name;
 }
 
+/**
+ * The root `init` wrote the Product layer against, so a run from the app folder agrees
+ * with the loader even when the workspace sits inside a larger git checkout.
+ */
 function findRepoRoot(from: string): string {
+  const workspace = findWorkspace(path.resolve(from));
+  if (workspace !== undefined) return workspace;
   let dir = path.resolve(from);
   for (;;) {
     if (existsSync(path.join(dir, ".git"))) return dir;

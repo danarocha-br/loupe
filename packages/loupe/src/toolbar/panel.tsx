@@ -442,7 +442,7 @@ function CoverageCard({ coverage }: { coverage: InspectorBody["coverage"] }) {
         <div className="warn" data-testid="not-generated">
           <span className="dot" />
           <span>
-            <StatusView status={notGenerated.tag} /> {TEXT.run} <span className="mono">{notGenerated.command}</span> {TEXT.toReadProps}
+            <StatusView status={notGenerated.tag} /> {TEXT.run} <span className="mono">{notGenerated.command}</span> {TEXT.fromRootToReadProps}
           </span>
         </div>
       )}
