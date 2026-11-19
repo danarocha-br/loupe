@@ -75,6 +75,7 @@ export function NotGeneratedNotice({ names, command }: { names: readonly string[
       <p className="body">
         {names.length} component{one ? "" : "s"} on this page {one ? "is" : "are"} not generated yet, so{" "}
         {one ? "it has" : "they have"} no prop metadata and no Adapter.
+        Run the command below from the repo root.
       </p>
       <ul>
         <li>{names.join(", ")}</li>
@@ -139,6 +140,7 @@ export function LayerNotices({ status }: { status: LayerStatus | null }) {
       </div>
       <p className="body">
         {count} component{count === 1 ? "" : "s"} changed since the last generate. Their props here may be out of date.
+        Run the command below from the repo root.
       </p>
       <ul>
         {status.stale.map((module) => (

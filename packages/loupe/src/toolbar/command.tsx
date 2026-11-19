@@ -16,7 +16,7 @@ export function Command({ text, copy = text, prompt = true }: { text: string; co
     <div className="command">
       <span>
         {prompt && <span aria-hidden="true">$ </span>}
-        <span className="mono">{text}</span>
+        <span className="mono verbatim">{text}</span>
       </span>
       <button
         type="button"

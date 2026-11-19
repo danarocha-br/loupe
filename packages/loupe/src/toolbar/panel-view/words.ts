@@ -105,7 +105,7 @@ export const TEXT = {
   empty: "empty",
   none: "None",
   run: "Run",
-  toReadProps: "to read its props.",
+  fromRootToReadProps: "from the repo root to read its props.",
 } as const;
 
 // ── The page and its list ───────────────────────────────────────────────────

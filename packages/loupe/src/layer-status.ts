@@ -59,12 +59,22 @@ export type LayerPaths = {
 
 const toPosix = (file: string) => file.split(path.sep).join("/");
 
-/** `pnpm -C apps/app exec loupe generate`, with `--out` only when the layer isn't the default `packages/loupe`. */
+/**
+ * `pnpm -C apps/app exec loupe generate`, with `--out` only when the layer isn't the default
+ * `packages/loupe`. No `--root`: run from the app, `generate` finds the workspace root that
+ * `init` wrote the layer against and `loupe doctor` passes here (PER-233). Paths are quoted
+ * for a POSIX shell when they need it, since the doctor's come from a ledger anyone can edit.
+ */
 export function generateCommand({ root, adaptList, app }: LayerPaths): string {
   const layer = path.dirname(adaptList);
   const appRel = toPosix(path.relative(root, app));
-  const out = path.resolve(root, PRODUCT_LAYER.path) === layer ? "" : ` --out ${toPosix(path.relative(app, layer)) || "."}`;
-  return `${appRel === "" ? "pnpm" : `pnpm -C ${appRel}`} exec loupe generate${out}`;
+  const out = path.resolve(root, PRODUCT_LAYER.path) === layer ? "" : ` --out ${quoteForShell(toPosix(path.relative(app, layer)) || ".")}`;
+  return `${appRel === "" ? "pnpm" : `pnpm -C ${quoteForShell(appRel)}`} exec loupe generate${out}`;
+}
+
+/** As it is when the shell reads it back unchanged, else in single quotes, a `'` inside written `'\''`. */
+function quoteForShell(file: string): string {
+  return /^[A-Za-z0-9._/@-]+$/.test(file) ? file : `'${file.replaceAll("'", `'\\''`)}'`;
 }
 
 /**

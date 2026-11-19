@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,7 +6,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ADAPT_LIST_FORMAT_VERSION } from "./adapt-list.js";
 import { stampJson } from "./generate/header.js";
-import { formatOf, generateCommand, readLayerStatus } from "./layer-status.js";
+import { formatOf, generateCommand, readLayerStatus, writeAgainCommand } from "./layer-status.js";
 import { hashFile } from "./meta/sources.js";
 import { stableJson } from "./meta/write.js";
 
@@ -269,6 +270,51 @@ describe("generateCommand", () => {
     expect(generateCommand({ root: "/repo", adaptList: "/repo/packages/loupe/adapt-list.json", app: "/repo" })).toBe(
       "pnpm exec loupe generate",
     );
+  });
+
+  // PER-233. `generate`, run from the app, finds the root itself (generate.test.ts), so no command names one.
+  it("prints the commands for an orbix-shaped repo (apps/app, packages/loupe) and other plain paths as before, with no --root", () => {
+    expect(generateCommand({ root: "/repo", adaptList: "/repo/packages/loupe/adapt-list.json", app: "/repo/apps/app" })).toBe(
+      "pnpm -C apps/app exec loupe generate",
+    );
+    const app = "/repo/apps/@scope/web-app_v2.1";
+    expect(generateCommand({ root: "/repo", adaptList: `${app}/product.layer/adapt-list.json`, app })).toBe(
+      "pnpm -C apps/@scope/web-app_v2.1 exec loupe generate --out product.layer",
+    );
+  });
+
+  it("quotes a path with anything else in it, so it pastes as one argument (PER-233)", () => {
+    expect(generateCommand({ root: "/repo", adaptList: "/repo/packages/loupe/adapt-list.json", app: "/repo/apps/Web App" })).toBe(
+      "pnpm -C 'apps/Web App' exec loupe generate",
+    );
+    expect(generateCommand({ root: "/repo", adaptList: "/repo/packages/product layer/adapt-list.json", app: "/repo/apps/web" })).toBe(
+      "pnpm -C apps/web exec loupe generate --out '../../packages/product layer'",
+    );
+  });
+
+  it("leaves the placeholders of the command that writes the file again bare beside a quoted path", () => {
+    // No package.json at the layer to read a name from, so the specifier is asked for too.
+    expect(writeAgainCommand({ root: "/repo", adaptList: "/repo/packages/loupe/adapt-list.json", app: "/repo/apps/Web App" })).toBe(
+      "pnpm -C 'apps/Web App' exec loupe generate --design-system <dir> --app <dir> --specifier <name>",
+    );
+  });
+
+  // The doctor's paths come from loupe.ledger.json, which anyone with the branch can edit.
+  it("gives a shell each path back as written, running nothing in it", () => {
+    const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "loupe-quote-")));
+    try {
+      for (const name of ["Web App", "it's", "$(touch ran)", "`touch ran`", "a;touch ran", "*", "~", "a\\b", "x'\"$HOME\"'y"]) {
+        const app = path.join(dir, "apps", name);
+        const layer = path.join(dir, "layers", name);
+        const command = generateCommand({ root: dir, adaptList: path.join(layer, "adapt-list.json"), app });
+        // The shell splits and unquotes the arguments; printf prints each on its own line.
+        const argv = execFileSync("/bin/sh", ["-c", `set -- ${command.replace(/^pnpm /, "")}; printf '%s\\n' "$@"`], { cwd: dir, encoding: "utf8" });
+        expect(argv.split("\n").slice(0, -1)).toEqual(["-C", `apps/${name}`, "exec", "loupe", "generate", "--out", `../../layers/${name}`]);
+      }
+      expect(readdirSync(dir)).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

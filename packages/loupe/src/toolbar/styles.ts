@@ -95,6 +95,8 @@ export const CSS = `
   -webkit-font-smoothing: antialiased; font-synthesis: none; overflow-wrap: anywhere;
 }
 .mono { font-family: ${MONO}; font-weight: 400; }
+/* A command as the shell reads it: a run of spaces inside a quoted path stays (PER-233). */
+.verbatim { white-space: pre-wrap; }
 .muted { color: var(--muted); font-weight: 400; }
 .meta { font: 400 10px/12px ${MONO}; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
 .body { font: 400 13px/18px ${SANS}; color: var(--muted); margin: 0; }
