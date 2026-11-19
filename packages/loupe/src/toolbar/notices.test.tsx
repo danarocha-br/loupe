@@ -71,6 +71,9 @@ afterEach(() => {
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
 const panelText = () => shadow().querySelector(".panel")?.textContent ?? "";
+// The missing-layer card, found as a reader finds it: an alert with its title (the format notice is an alert too).
+const missingNotice = () =>
+  [...shadow().querySelectorAll("[role=alert]")].find((alert) => alert.textContent?.includes("Product layer missing")) ?? null;
 const summaryOf = (component: string) =>
   [...shadow().querySelectorAll("summary")].find((summary) => summary.textContent?.startsWith(component))?.textContent ?? "";
 
@@ -150,13 +153,12 @@ describe("the Product layer's notices", () => {
   it("stays quiet when withLoupe isn't active", async () => {
     server.status = null;
     await mount();
-    expect(shadow().querySelector("[data-testid=format-notice], [data-testid=stale-notice], [data-testid=missing-notice]")).toBeNull();
+    expect(shadow().querySelector("[data-testid=format-notice], [data-testid=stale-notice]")).toBeNull();
+    expect(missingNotice()).toBeNull();
   });
 });
 
 describe("a missing Product layer (PER-227)", () => {
-  const missingNotice = () => shadow().querySelector("[data-testid=missing-notice]");
-
   it("says so, and names the command, when the first check already finds it gone", async () => {
     server.status = MISSING;
     await mount();

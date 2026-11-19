@@ -91,7 +91,7 @@ export function LayerNotices({ status }: { status: LayerStatus | null }) {
   // modules stay untouched after it is back, until the dev server restarts.
   if (status.missing) {
     return (
-      <div className="card notice-card" role="alert" data-testid="missing-notice">
+      <div className="card notice-card" role="alert">
         <div className="head">
           <div className="title">
             <span className="dot red" />
