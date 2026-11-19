@@ -145,7 +145,8 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
   }
   if (options.check) {
     for (const change of changes) {
-      lines.push(`${outDir}/${change.file}: ${checkReason(change)}. Run loupe generate.`);
+      // "It", not `loupe generate`: a bare command would drop this run's `--out` and `--root` (PER-234).
+      lines.push(`${outDir}/${change.file}: ${checkReason(change)}. Run it again without --check.`);
     }
     lines.push(
       changes.length === 0
@@ -212,7 +213,7 @@ function refusalLine(outDir: string, { file, why }: Refusal): string {
   const fix = why === "edited"
     ? "edited by hand since loupe generate wrote it. Delete it or git restore it"
     : "not written by loupe generate, and generate needs this path. Move it away";
-  return `${outDir}/${file}: ${fix}, then rerun loupe generate.`;
+  return `${outDir}/${file}: ${fix}, then run it again.`;
 }
 
 function checkReason(change: Change): string {
