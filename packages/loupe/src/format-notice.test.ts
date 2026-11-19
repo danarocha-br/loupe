@@ -4,10 +4,12 @@ import { missingLayerAdvice } from "./format-notice.js";
 const COMMAND = "pnpm -C apps/app exec loupe generate --design-system <dir> --app <dir>";
 
 describe("missingLayerAdvice (PER-227)", () => {
-  it("puts git first, keeps regenerating for an intact Product layer, and ends with the restart", () => {
+  it("puts git first, keeps regenerating for an intact Product layer, and asks for no restart", () => {
     const advice = missingLayerAdvice(COMMAND);
     expect(advice.startsWith("Restore it with git. If the rest of the Product layer is intact, write it again with ")).toBe(true);
-    expect(advice.endsWith("Then restart the dev server: files that reloaded without it stay without Adapters until you do.")).toBe(true);
+    // The loader depends on adapt-list.json even while it is gone, so Instances return when the file does.
+    expect(advice).not.toMatch(/restart/i);
+    expect(advice.endsWith("(. is the app itself).")).toBe(true);
   });
 
   it("points at the command by itself, or by the reference a card gives it", () => {

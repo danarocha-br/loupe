@@ -227,8 +227,8 @@ layer is intact, you can write it again instead: run the command in the panel,
 replacing each `<dir>` with a path from the app folder (`pnpm -C` runs it from there,
 so `.` is the app itself). When the command also has `--specifier <name>`, the layer
 has no package name for `generate` to read, so replace `<name>` with the path the
-app imports it by, such as `@/loupe`. Then restart the dev server: files that
-reloaded without the file stay without Adapters until you do.
+app imports it by, such as `@/loupe`. Once the file is back, the panel's Instances
+return by themselves.
 
 ## What the install changes
 

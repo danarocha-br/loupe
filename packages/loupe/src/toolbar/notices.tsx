@@ -87,8 +87,8 @@ export function NotGeneratedNotice({ names, command }: { names: readonly string[
 export function LayerNotices({ status }: { status: LayerStatus | null }) {
   if (status === null) return null;
   // The loader hands files back untouched while the file is gone, so Instances leave the
-  // panel as their modules reload; this says why. It doesn't track the file, so those
-  // modules stay untouched after it is back, until the dev server restarts.
+  // panel as their modules reload; this says why. It still depends on the file then, so
+  // they come back by themselves once it does.
   if (status.missing) {
     return (
       <div className="card notice-card" role="alert">

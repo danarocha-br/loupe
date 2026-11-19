@@ -21,8 +21,7 @@ export function missingLayerAdvice(command: string, reference: string = command)
   const specifier = command.includes(SPECIFIER_FLAG) ? " and <name> with the path the app imports the Product layer by" : "";
   return (
     `Restore it with git. If the rest of the Product layer is intact, write it again with ${reference}, ` +
-    `replacing each <dir> with a path from the app folder (. is the app itself)${specifier}. ` +
-    "Then restart the dev server: files that reloaded without it stay without Adapters until you do."
+    `replacing each <dir> with a path from the app folder (. is the app itself)${specifier}.`
   );
 }
 
