@@ -3,6 +3,8 @@ import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { missingLayerAdvice } from "./format-notice.js";
+import { writeAgainCommand } from "./layer-status.js";
 import { PHASE_DEVELOPMENT_SERVER, withLoupe } from "./next.cjs";
 
 const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "loupe-next-")));
@@ -64,6 +66,33 @@ describe("withLoupe", () => {
     await expect(
       withLoupe(config, { adaptList: broken, root: dir })(PHASE_DEVELOPMENT_SERVER),
     ).rejects.toThrow(/designSystem must be an array/);
+  });
+
+  it("fails at startup on a missing adapt-list.json, naming the command that writes it again (PER-231)", async () => {
+    const missing = path.join(dir, "gone", "adapt-list.json");
+    const failure = await withLoupe(config, { adaptList: missing, root: dir })(PHASE_DEVELOPMENT_SERVER).then(
+      () => null,
+      (error: unknown) => error as Error,
+    );
+    // This layer has no package.json, so the command asks for the specifier too.
+    expect(failure?.message).toContain(`withLoupe: ${missing} is missing. Restore it with git. `);
+    expect(failure?.message).toMatch(
+      / exec loupe generate --out .+? --design-system <dir> --app <dir> --specifier <name>, replacing /,
+    );
+    // The command the Toolbar's card and `loupe doctor` name, in the dev server's terminal words.
+    const command = writeAgainCommand({ root: dir, adaptList: missing, app: process.cwd() });
+    expect(failure?.message).toBe(`withLoupe: ${missing} is missing. ${missingLayerAdvice(command)}`);
+    expect((failure?.cause as NodeJS.ErrnoException | undefined)?.code).toBe("ENOENT");
+  });
+
+  it("throws any other failure to read adapt-list.json as it is", async () => {
+    // A directory where the file should be.
+    const failure = await withLoupe(config, { adaptList: dir, root: dir })(PHASE_DEVELOPMENT_SERVER).then(
+      () => null,
+      (error: unknown) => error as NodeJS.ErrnoException,
+    );
+    expect(failure?.code).toBe("EISDIR");
+    expect(failure?.message).not.toMatch(/^withLoupe:/);
   });
 
   it("hands the Toolbar's Server Action the paths it resolved", async () => {

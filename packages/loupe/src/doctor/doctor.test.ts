@@ -15,6 +15,8 @@ import {
   makeRepo,
   snapshot,
 } from "../compat/repo.fixture.js";
+import { missingLayerAdvice } from "../format-notice.js";
+import { readLayerStatus } from "../layer-status.js";
 import { version } from "../version.js";
 import type { BuildRunner } from "./build.js";
 
@@ -161,11 +163,20 @@ describe("loupe doctor reporting drift", () => {
     expect(code).toBe(1);
   });
 
-  it("says to run generate when adapt-list.json is missing", async () => {
+  it("names the command that writes a missing adapt-list.json again, the same as the Toolbar's card (PER-230)", async () => {
     const root = await installed();
-    rmSync(path.join(root, "packages/loupe/adapt-list.json"));
+    const adaptList = path.join(root, "packages/loupe/adapt-list.json");
+    rmSync(adaptList);
     const { code, text } = await doctor(root);
-    expect(text).toContain("✗ adapt-list.json is missing");
+    const command = "pnpm -C apps/web exec loupe generate --design-system <dir> --app <dir>";
+    // The card reads its command from the layer status, run from the app.
+    expect(readLayerStatus({ root, adaptList, app: path.join(root, "apps/web") }).command).toBe(command);
+    // The words are `missingLayerAdvice`'s, tested on its own; the card's shape puts the command on its own line.
+    expect(text).toContain(
+      ["  ✗ adapt-list.json is missing", `    ${missingLayerAdvice(command, "the command below")}`, `    ${command}`].join("\n"),
+    );
+    // Plain `generate` reads its roots from the file that is gone.
+    expect(text).not.toContain("Run loupe generate.");
     expect(code).toBe(1);
   });
 

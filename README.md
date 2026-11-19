@@ -223,12 +223,14 @@ also ask Claude to run it. It rewrites only what changed. Commit what it writes.
 
 If the panel says **Product layer missing**, `adapt-list.json` is gone, as after a
 branch switch to a branch without it. Restore it with git. If the rest of the Product
-layer is intact, you can write it again instead: run the command in the panel,
-replacing each `<dir>` with a path from the app folder (`pnpm -C` runs it from there,
-so `.` is the app itself). When the command also has `--specifier <name>`, the layer
-has no package name for `generate` to read, so replace `<name>` with the path the
-app imports it by, such as `@/loupe`. Once the file is back, the panel's Instances
-return by themselves.
+layer is intact, you can write it again instead: run the command in the panel from
+the repo root, replacing each `<dir>` with a path from the app folder (`pnpm -C` runs
+it from there, so `.` is the app itself). When the command also has
+`--specifier <name>`, the layer has no package name for `generate` to read, so
+replace `<name>` with the path the app imports it by, such as `@/loupe`. Once the
+file is back, the panel's Instances return by themselves. If the file is already gone
+when `next dev` starts, `next dev` stops with an error that names the same command,
+and `loupe doctor` names it too.
 
 ## What the install changes
 
