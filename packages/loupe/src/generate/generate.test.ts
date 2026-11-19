@@ -319,7 +319,11 @@ describe("loupe generate on the fixture", () => {
       const refused = generate(root, [], check);
       expect(refused.ok).toBe(false);
       expect(refused.refusals).toEqual([{ file: "adapters/ds/ui/button.tsx", why: "edited" }]);
-      expect(refused.lines.join("\n")).toContain("fixture/app/loupe/adapters/ds/ui/button.tsx: edited by hand");
+      // The same run again, not a bare `loupe generate` that would drop its `--out` (PER-234), and without
+      // --check, which would only report the file missing (PER-234 review).
+      expect(refused.lines).toContain(
+        `${OUT}/adapters/ds/ui/button.tsx: edited by hand since loupe generate wrote it. Delete it or git restore it, then run it again${check ? " without --check" : ""}.`,
+      );
       expect(readFileSync(edited, "utf8")).toContain("/* mine */");
       expect(snapshot(root).has("meta/ds/ui/badge.tsx.json")).toBe(false);
     }
@@ -368,6 +372,12 @@ describe("loupe generate on the fixture", () => {
     const refused = generate(other);
     expect(refused.ok).toBe(false);
     expect(refused.refusals).toEqual([{ file: "adapt-list.json", why: "edited" }]);
+    // Not "Delete it": a run without flags reads its roots from this file (PER-234 review).
+    expect(refused.lines[0]).toBe(`${OUT}/adapt-list.json: edited by hand since loupe generate wrote it. Restore it with git, then run it again.`);
+    // A rerun with --check would write nothing.
+    expect(generate(other, [], true).lines[0]).toBe(
+      `${OUT}/adapt-list.json: edited by hand since loupe generate wrote it. Restore it with git, then run it again without --check.`,
+    );
   });
 
   it("reads the roots back from an adapt-list.json in another formatVersion, and rewrites it (PER-133)", () => {
@@ -406,7 +416,10 @@ describe("loupe generate on the fixture", () => {
     const other = fixtureRepo();
     expect(generate(other, FIRST_RUN).ok).toBe(true);
     writeFileSync(path.join(other, OUT, "adapters/ds/ui/button.tsx.loupe-tmp"), "half");
-    expect(generate(other, [], true).ok).toBe(false);
+    const check = generate(other, [], true);
+    expect(check.ok).toBe(false);
+    // The same run again, without --check: a bare `loupe generate` would drop its `--out` (PER-234).
+    expect(check.lines).toContain(`${OUT}/adapters/ds/ui/button.tsx.loupe-tmp: left over from an interrupted run. Run it again without --check.`);
     expect(generate(other).ok).toBe(true);
     expect(snapshot(other).has("adapters/ds/ui/button.tsx.loupe-tmp")).toBe(false);
   });

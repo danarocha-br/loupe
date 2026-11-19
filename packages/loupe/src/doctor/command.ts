@@ -20,7 +20,7 @@ import {
   readLedger,
 } from "../init/ledger.js";
 import { touchPoints } from "../init/touch-points/list.js";
-import { writeAgainCommand } from "../layer-status.js";
+import { generateCommand, type LayerPaths, writeAgainCommand } from "../layer-status.js";
 import { compare } from "../meta/sources.js";
 import { NPM_PACKAGE, PRODUCT_LAYER } from "../names.js";
 import { compareVersions, version as installedVersion } from "../version.js";
@@ -77,22 +77,24 @@ class Report {
   ok(text: string): void {
     this.io.out(`  ✓ ${text}`);
   }
-  warn(text: string, details: string[] = []): void {
+  /** `advice` follows `details` and is never cut short with them: it says what to do about every one. */
+  warn(text: string, details: string[] = [], advice: string[] = []): void {
     this.warnings += 1;
     this.io.out(`  ! ${text}`);
-    this.list(details);
+    this.list(details, advice);
   }
-  fail(text: string, details: string[] = []): void {
+  fail(text: string, details: string[] = [], advice: string[] = []): void {
     this.problems += 1;
     this.io.out(`  ✗ ${text}`);
-    this.list(details);
+    this.list(details, advice);
   }
   note(text: string): void {
     this.io.out(`    ${text}`);
   }
-  private list(details: string[]): void {
+  private list(details: string[], advice: string[]): void {
     for (const d of details.slice(0, 20)) this.note(d);
     if (details.length > 20) this.note(`… and ${details.length - 20} more`);
+    for (const line of advice) this.note(line);
   }
 }
 
@@ -130,8 +132,12 @@ export async function runDoctor(options: DoctorOptions, io: DoctorIo): Promise<n
 
   versions(report, root, ledger, layer.app, version, adaptList);
   touchPointChecks(report, root, ledger, layer.app, version);
-  productLayerChecks(report, root, ledger, layer.path, layer.app);
-  resolution(report, root, layer.path, layer.app);
+  // What the Toolbar's cards are given too, so the doctor's commands match theirs. Plain `generate` reads
+  // its roots from adapt-list.json, so while that is missing every line names the command that writes it again.
+  const paths: LayerPaths = { root, adaptList: path.join(root, layer.path, "adapt-list.json"), app: path.join(root, layer.app) };
+  const command = existsSync(paths.adaptList) ? generateCommand(paths) : writeAgainCommand(paths);
+  productLayerChecks(report, ledger, layer.path, paths, command);
+  resolution(report, root, layer.path, layer.app, command);
 
   if (options.build) await buildCheck(report, root, layer.app, io);
 
@@ -266,7 +272,8 @@ function touchPointChecks(report: Report, root: string, ledger: Ledger, app: str
 }
 
 // 4 and 5. init's files match the ledger; generate's match their headers and their sources.
-function productLayerChecks(report: Report, root: string, ledger: Ledger, layerPath: string, app: string): void {
+function productLayerChecks(report: Report, ledger: Ledger, layerPath: string, paths: LayerPaths, command: string): void {
+  const { root } = paths;
   report.heading(`Product layer ${layerPath}`);
   const files = ledger.files ?? [];
   const drift: string[] = [];
@@ -278,16 +285,14 @@ function productLayerChecks(report: Report, root: string, ledger: Ledger, layerP
   }
   if (files.length === 0) report.fail("The ledger lists none of loupe init's files", ["Run loupe init."]);
   else if (drift.length === 0 && missing.length === 0) report.ok(`${files.length} files from loupe init match the ledger`);
-  if (missing.length > 0) report.fail(`${missing.length} of loupe init's files missing`, [...missing, "Run loupe init."]);
+  if (missing.length > 0) report.fail(`${missing.length} of loupe init's files missing`, missing, ["Run loupe init."]);
   if (drift.length > 0) {
-    report.fail(`${drift.length} of loupe init's files changed by hand (drift)`, [...drift, "Left as they are: git restore them."]);
+    report.fail(`${drift.length} of loupe init's files changed by hand (drift)`, drift, ["Left as they are: git restore them."]);
   }
 
-  const adaptList = path.join(root, layerPath, "adapt-list.json");
-  if (!existsSync(adaptList)) {
-    // Plain `generate` reads its roots from the file that is gone: name the command the Toolbar's card names.
-    const command = writeAgainCommand({ root, adaptList, app: path.join(root, app) });
-    report.fail("adapt-list.json is missing", [missingLayerAdvice(command, "the command below"), command]);
+  if (!existsSync(paths.adaptList)) {
+    // `command` writes the file again here, as the Toolbar's card's does.
+    report.fail("adapt-list.json is missing", [], [missingLayerAdvice(command, "the command below"), command]);
     return;
   }
   let generated: ReturnType<typeof runGenerate>;
@@ -314,32 +319,46 @@ function productLayerChecks(report: Report, root: string, ledger: Ledger, layerP
     report.ok(`${generated.unchanged + stale.length} files from loupe generate, none edited by hand`);
   }
   if (newer.length > 0) {
-    report.fail(`${newer.length} generated file${newer.length === 1 ? "" : "s"} written by a newer Loupe`, [...newer, "Upgrade Loupe."]);
+    report.fail(`${newer.length} generated file${newer.length === 1 ? "" : "s"} written by a newer Loupe`, newer, ["Upgrade Loupe."]);
   }
   if (edited.length > 0) {
-    report.fail(`${edited.length} generated file${edited.length === 1 ? "" : "s"} edited by hand (drift)`, [
-      ...edited,
-      "Left as they are. Delete or git restore them, then run loupe generate.",
-    ]);
+    // generate refuses a hand-edited adapt-list.json alone, and deleting it would lose the roots the command reads.
+    const fix = edited.includes("adapt-list.json")
+      ? "Left as it is. Restore it with git, then run"
+      : "Left as they are. Delete or git restore them, then run";
+    report.fail(`${edited.length} generated file${edited.length === 1 ? "" : "s"} edited by hand (drift)`, edited, commandBelow(fix, command));
   }
   if (foreign.length > 0) {
     // Also what a generated file looks like once a hand edit removed its header.
-    report.fail(`${foreign.length} file${foreign.length === 1 ? "" : "s"} without loupe generate's header where it needs to write (drift)`, [
-      ...foreign,
-      "Left as they are. Move them away or git restore them, then run loupe generate.",
-    ]);
+    report.fail(
+      `${foreign.length} file${foreign.length === 1 ? "" : "s"} without loupe generate's header where it needs to write (drift)`,
+      foreign,
+      commandBelow("Left as they are. Move them away or git restore them, then run", command),
+    );
   }
-  if (absent.length > 0) report.fail(`${absent.length} generated file${absent.length === 1 ? "" : "s"} missing`, [...absent, "Run loupe generate."]);
+  if (absent.length > 0) {
+    report.fail(`${absent.length} generated file${absent.length === 1 ? "" : "s"} missing`, absent, commandBelow("Run", command));
+  }
   if (leftover.length > 0) {
-    report.fail(`${leftover.length} file${leftover.length === 1 ? "" : "s"} left by an interrupted loupe generate`, [...leftover, "Run loupe generate."]);
+    report.fail(`${leftover.length} file${leftover.length === 1 ? "" : "s"} left by an interrupted loupe generate`, leftover, commandBelow("Run", command));
   }
   if (stale.length > 0) {
     // The app still runs on the older Adapters, so this is a warning, not a failure.
-    report.warn(`${stale.length} generated file${stale.length === 1 ? "" : "s"} out of date with the sources`, [
-      ...stale.map((c) => (c.why === "stale" ? `${c.file} (its component is gone)` : c.file)),
-      "Run loupe generate.",
-    ]);
+    report.warn(
+      `${stale.length} generated file${stale.length === 1 ? "" : "s"} out of date with the sources`,
+      stale.map((c) => (c.why === "stale" ? `${c.file} (its component is gone)` : c.file)),
+      commandBelow("Run", command),
+    );
   }
+}
+
+/**
+ * `lead` finished by "the command below from the repo root.", then the command on its own
+ * line: the one the Toolbar's cards print, with `-C <app>` and `--out` where they apply
+ * (PER-234). A bare `loupe generate` isn't on the path there and writes to the default layer.
+ */
+function commandBelow(lead: string, command: string): string[] {
+  return [`${lead} the command below from the repo root.`, command];
 }
 
 /** `from "./x"`, `import "./x"` and `import("./x")`. */
@@ -348,7 +367,7 @@ const EXTENSIONS = ["", ".tsx", ".ts", ".jsx", ".js", "/index.tsx", "/index.ts",
 const isFile = (file: string) => statSync(file, { throwIfNoEntry: false })?.isFile() === true;
 
 // 6 and 7. The app Adapters' relative imports, and the packages each side needs.
-function resolution(report: Report, root: string, layerPath: string, app: string): void {
+function resolution(report: Report, root: string, layerPath: string, app: string, command: string): void {
   report.heading("Resolution");
   const layerAbs = path.join(root, layerPath);
   const appAdapters = path.join(layerAbs, "adapters", "app");
@@ -367,10 +386,11 @@ function resolution(report: Report, root: string, layerPath: string, app: string
     }
   }
   if (broken.length > 0) {
-    report.fail(`${broken.length} relative import${broken.length === 1 ? "" : "s"} of app Adapters don't resolve`, [
-      ...broken,
-      "The component moved: run loupe generate.",
-    ]);
+    report.fail(
+      `${broken.length} relative import${broken.length === 1 ? "" : "s"} of app Adapters don't resolve`,
+      broken,
+      commandBelow("The component moved: run", command),
+    );
   } else report.ok(`${count} relative import${count === 1 ? "" : "s"} of app Adapters resolve`);
 
   const layerJson = readJson<PackageJson & { peerDependencies?: Record<string, string> }>(path.join(layerAbs, "package.json"));

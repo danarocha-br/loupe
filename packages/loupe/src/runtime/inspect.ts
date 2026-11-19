@@ -70,7 +70,7 @@ export type Inspection = {
  * - `overrides-off`: the React self-check failed, so everything is inspect-only.
  * - `unadapted`: no Adapter renders it, so no Override reaches it.
  * - `spreads`: its call site spreads props, so library props can't be told from the app's.
- * - `no-meta`: no prop metadata for its component yet.
+ * - `no-meta`: its Adapter was made by hand without prop metadata, so no prop can be shown Editable.
  */
 export type NoteKind = "server" | "overrides-off" | "unadapted" | "spreads" | "no-meta";
 

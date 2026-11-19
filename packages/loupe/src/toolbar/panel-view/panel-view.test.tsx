@@ -275,6 +275,18 @@ describe("the Inspector", () => {
     ]);
   });
 
+  it("says how to give metadata to an Adapter made without it, with no generate command (PER-234)", () => {
+    render();
+    click("Menu");
+    // The fixture's MenuItem is `createAdapter` with no `{ props }`, as a hand-made Adapter is.
+    const body = inspector(view(menuItem()));
+    expect(body.note).toEqual({
+      kind: "no-meta",
+      title: "No prop metadata",
+      body: "This Adapter was made without prop metadata, so its props are inspect-only. Pass the metadata to `createAdapter` as `{ props }`, as the Product layer's Adapters do.",
+    });
+  });
+
   it("reads Not on the page now once the selected Instance has gone, with what it still holds", () => {
     render();
     click("Menu");

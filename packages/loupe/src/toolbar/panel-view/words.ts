@@ -43,9 +43,12 @@ export const NOTES: Record<NoteKind, { title: string; text(status: Status): stri
     title: "Props spread here",
     text: () => "This call site spreads props, so library props can't be separated from the app's here.",
   },
+  // `generate`'s Adapters always carry their metadata, so only one made by hand gets here,
+  // and a `generate` run leaves it as it is (PER-234).
   "no-meta": {
     title: "No prop metadata",
-    text: () => "No prop metadata for this component: run `loupe generate` to see which props are editable.",
+    text: () =>
+      "This Adapter was made without prop metadata, so its props are inspect-only. Pass the metadata to `createAdapter` as `{ props }`, as the Product layer's Adapters do.",
   },
 };
 

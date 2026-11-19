@@ -28,6 +28,15 @@ async function installed(files: Files = {}): Promise<string> {
   return root;
 }
 
+/** What the Toolbar's cards print for this install's app and layer (PER-234). */
+const COMMAND = "pnpm -C apps/web exec loupe generate";
+/** And while adapt-list.json is missing: the run that writes it again names its roots (PER-230). */
+const WRITE_AGAIN = `${COMMAND} --design-system <dir> --app <dir>`;
+
+/** A doctor line that ends in a `generate` run: `lead`, then the command on its own line. */
+const commandBelow = (lead: string, command = COMMAND) =>
+  [`    ${lead} the command below from the repo root.`, `    ${command}`].join("\n");
+
 const read = (root: string, file: string) => readFileSync(path.join(root, file), "utf8");
 const edit = (root: string, file: string, change: (text: string) => string) =>
   writeFileSync(path.join(root, file), change(read(root, file)));
@@ -136,10 +145,19 @@ describe("loupe doctor reporting drift", () => {
     const { code, text } = await doctor(root);
     expect(text).toContain("✗ 1 generated file edited by hand (drift)");
     expect(text).toContain("    adapters/ds/ui/button.tsx");
+    expect(text).toContain(commandBelow("Left as they are. Delete or git restore them, then run"));
     expect(text).toContain("✗ 1 of loupe init's files changed by hand (drift)");
     expect(text).toContain("    mount.tsx");
     expect(code).toBe(1);
     expect(snapshot(root)).toEqual(before);
+  });
+
+  it("says to restore a hand-edited adapt-list.json, not delete it: the command below reads its roots (PER-234 review)", async () => {
+    const root = await installed();
+    edit(root, "packages/loupe/adapt-list.json", (t) => t.replace(`"apps/web"`, `"apps/nope"`));
+    const { code, text } = await doctor(root);
+    expect(text).toContain(["  ✗ 1 generated file edited by hand (drift)", "    adapt-list.json", commandBelow("Left as it is. Restore it with git, then run")].join("\n"));
+    expect(code).toBe(1);
   });
 
   it("reports a generated file whose header was removed by hand", async () => {
@@ -147,6 +165,7 @@ describe("loupe doctor reporting drift", () => {
     edit(root, "packages/loupe/adapters/ds/ui/button.tsx", (t) => t.split("\n").slice(1).join("\n"));
     const { code, text } = await doctor(root);
     expect(text).toContain("✗ 1 file without loupe generate's header where it needs to write (drift)");
+    expect(text).toContain(commandBelow("Left as they are. Move them away or git restore them, then run"));
     expect(code).toBe(1);
   });
 
@@ -168,12 +187,11 @@ describe("loupe doctor reporting drift", () => {
     const adaptList = path.join(root, "packages/loupe/adapt-list.json");
     rmSync(adaptList);
     const { code, text } = await doctor(root);
-    const command = "pnpm -C apps/web exec loupe generate --design-system <dir> --app <dir>";
     // The card reads its command from the layer status, run from the app.
-    expect(readLayerStatus({ root, adaptList, app: path.join(root, "apps/web") }).command).toBe(command);
+    expect(readLayerStatus({ root, adaptList, app: path.join(root, "apps/web") }).command).toBe(WRITE_AGAIN);
     // The words are `missingLayerAdvice`'s, tested on its own; the card's shape puts the command on its own line.
     expect(text).toContain(
-      ["  ✗ adapt-list.json is missing", `    ${missingLayerAdvice(command, "the command below")}`, `    ${command}`].join("\n"),
+      ["  ✗ adapt-list.json is missing", `    ${missingLayerAdvice(WRITE_AGAIN, "the command below")}`, `    ${WRITE_AGAIN}`].join("\n"),
     );
     // Plain `generate` reads its roots from the file that is gone.
     expect(text).not.toContain("Run loupe generate.");
@@ -184,7 +202,43 @@ describe("loupe doctor reporting drift", () => {
     const root = await installed();
     rmSync(path.join(root, "packages/loupe/adapters/ds/ui/button.tsx"));
     const { code, text } = await doctor(root);
-    expect(text).toContain("✗ 1 generated file missing");
+    expect(text).toContain(["  ✗ 1 generated file missing", "    adapters/ds/ui/button.tsx", commandBelow("Run")].join("\n"));
+    expect(code).toBe(1);
+  });
+
+  it("names the generate command the Toolbar's cards read from the layer status (PER-234)", async () => {
+    const root = await installed();
+    const adaptList = path.join(root, "packages/loupe/adapt-list.json");
+    expect(readLayerStatus({ root, adaptList, app: path.join(root, "apps/web") }).command).toBe(COMMAND);
+  });
+
+  it("names the command after a list cut short, not inside it", async () => {
+    const root = await installed();
+    // One more than the 20 files a list shows.
+    for (let n = 0; n < 21; n += 1) writeFileSync(path.join(root, `packages/loupe/adapters/ds/ui/staged-${n}.tsx.loupe-tmp`), "staged");
+    const { code, text } = await doctor(root);
+    expect(text).toContain(["    … and 1 more", commandBelow("Run")].join("\n"));
+    expect(code).toBe(1);
+  });
+
+  it("names the command that writes adapt-list.json again for a moved component too, while it is missing", async () => {
+    const root = await installed();
+    rmSync(path.join(root, "packages/loupe/adapt-list.json"));
+    const file = path.join(root, "packages/loupe/adapters/app/row.tsx");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, 'export { Row } from "../../../../apps/web/components/row";\n');
+    const { text } = await doctor(root);
+    // Plain `generate` reads its roots from the file that is gone.
+    expect(text).toContain(commandBelow("The component moved: run", WRITE_AGAIN));
+  });
+
+  it("reports a file left by an interrupted generate", async () => {
+    const root = await installed();
+    writeFileSync(path.join(root, "packages/loupe/adapters/ds/ui/button.tsx.loupe-tmp"), "staged");
+    const { code, text } = await doctor(root);
+    expect(text).toContain(
+      ["  ✗ 1 file left by an interrupted loupe generate", "    adapters/ds/ui/button.tsx.loupe-tmp", commandBelow("Run")].join("\n"),
+    );
     expect(code).toBe(1);
   });
 
@@ -194,7 +248,8 @@ describe("loupe doctor reporting drift", () => {
     const before = snapshot(root);
     const { code, text } = await doctor(root);
     expect(text).toMatch(/! \d+ generated files? out of date with the sources/);
-    expect(text).toContain("Run loupe generate.");
+    expect(text).toContain(commandBelow("Run"));
+    expect(text).not.toContain("Run loupe generate.");
     expect(text).toMatch(/Result: healthy, with 1 warning/);
     expect(code).toBe(0);
     expect(snapshot(root)).toEqual(before);
@@ -264,6 +319,7 @@ describe("loupe doctor on a broken install", () => {
     expect(text).toContain("adapters/app/row.tsx imports ../../../../apps/web/styles");
     expect(text).toContain("adapters/app/row.tsx imports ../../../../apps/web/components/row");
     expect(text).toContain("adapters/app/row.tsx imports ../../../../apps/web/app");
+    expect(text).toContain(commandBelow("The component moved: run"));
     expect(code).toBe(1);
   });
 

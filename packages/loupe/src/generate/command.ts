@@ -92,7 +92,7 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
   const listText = existsSync(listFile) ? readFileSync(listFile, "utf8") : undefined;
   if (listText !== undefined && readHeader(listText).kind === "edited") {
     const refusals: Refusal[] = [{ file: "adapt-list.json", why: "edited" }];
-    const lines = [refusalLine(outDir, refusals[0] as Refusal), "Nothing written: 1 file in the way."];
+    const lines = [refusalLine(outDir, refusals[0] as Refusal, options.check), "Nothing written: 1 file in the way."];
     return { ok: false, changes: [], refusals, unchanged: 0, coverage: [], lines };
   }
   const notes: string[] = [];
@@ -139,13 +139,14 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
   lines.push(...summary(coverage));
 
   if (refusals.length > 0) {
-    for (const refusal of refusals) lines.push(refusalLine(outDir, refusal));
+    for (const refusal of refusals) lines.push(refusalLine(outDir, refusal, options.check));
     lines.push(`Nothing written: ${refusals.length} file${refusals.length === 1 ? "" : "s"} in the way.`);
     return { ok: false, changes, refusals, unchanged, coverage, lines };
   }
   if (options.check) {
     for (const change of changes) {
-      lines.push(`${outDir}/${change.file}: ${checkReason(change)}. Run loupe generate.`);
+      // "It", not `loupe generate`: a bare command would drop this run's `--out` and `--root` (PER-234).
+      lines.push(`${outDir}/${change.file}: ${checkReason(change)}. Run it again without --check.`);
     }
     lines.push(
       changes.length === 0
@@ -208,11 +209,15 @@ function coverageList(coverage: readonly CoverageEntry[]): string[] {
   });
 }
 
-function refusalLine(outDir: string, { file, why }: Refusal): string {
-  const fix = why === "edited"
-    ? "edited by hand since loupe generate wrote it. Delete it or git restore it"
-    : "not written by loupe generate, and generate needs this path. Move it away";
-  return `${outDir}/${file}: ${fix}, then rerun loupe generate.`;
+function refusalLine(outDir: string, { file, why }: Refusal, check: boolean): string {
+  // Deleting a hand-edited adapt-list.json would lose the roots a run without flags reads from it.
+  const fix = file === "adapt-list.json"
+    ? "edited by hand since loupe generate wrote it. Restore it with git"
+    : why === "edited"
+      ? "edited by hand since loupe generate wrote it. Delete it or git restore it"
+      : "not written by loupe generate, and generate needs this path. Move it away";
+  // Run again with --check, it would only report the file missing.
+  return `${outDir}/${file}: ${fix}, then run it again${check ? " without --check" : ""}.`;
 }
 
 function checkReason(change: Change): string {
