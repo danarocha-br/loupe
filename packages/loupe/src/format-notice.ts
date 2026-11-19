@@ -1,7 +1,8 @@
 // The words of the Product layer's notices that the terminal and the Toolbar both
 // say: the format-version notice (PER-85), shared by `withLoupe`'s terminal line and
 // the Toolbar's notice and `console.error`, and what to do once `adapt-list.json` is
-// gone (PER-227), shared by the dev server's terminal line and the Toolbar's card.
+// gone (PER-227), shared by the dev server's terminal line, the Toolbar's card,
+// `withLoupe`'s startup error and `loupe doctor` (PER-230, PER-231).
 // Pure, so the browser can import it. A format notice ends where the `generate`
 // command follows.
 

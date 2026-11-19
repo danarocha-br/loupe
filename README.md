@@ -228,7 +228,8 @@ replacing each `<dir>` with a path from the app folder (`pnpm -C` runs it from t
 so `.` is the app itself). When the command also has `--specifier <name>`, the layer
 has no package name for `generate` to read, so replace `<name>` with the path the
 app imports it by, such as `@/loupe`. Once the file is back, the panel's Instances
-return by themselves.
+return by themselves. If the file is already gone when `next dev` starts, `next dev`
+stops with an error that names the same command, and `loupe doctor` names it too.
 
 ## What the install changes
 

@@ -36,15 +36,25 @@ export function withLoupe<C extends Config>(
     // The Toolbar's notices read the Product layer through a Server Action (PER-133).
     const env = { ...base.env, LOUPE_ROOT: root, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() };
 
-    // A Product layer in another format names the command that rewrites it (PER-85).
-    // One the loader can't read fails startup: dropping the rule, or handing every
-    // file back untouched, breaks Turbopack's persistent cache (PER-133).
-    const text = readFileSync(adaptList, "utf8");
-    const { formatOf, generateCommand } = await import("./layer-status.js");
-    const format = formatOf(text);
-    const { formatNotice } = await import("./format-notice.js");
-    const notice = format && `${formatNotice(format)} ${generateCommand({ root, adaptList, app: env.LOUPE_APP })}`;
+    const { formatOf, generateCommand, writeAgainCommand } = await import("./layer-status.js");
+    const { formatNotice, missingLayerAdvice } = await import("./format-notice.js");
     const { parseAdaptList } = await import("./adapt-list.js");
+
+    // A Product layer the loader can't read fails startup (PER-133): dropping the rule,
+    // or handing every file back untouched from the start, broke Turbopack's persistent
+    // cache on orbix-ai. A missing one names the command that writes it again (PER-231),
+    // one in another format the command that rewrites it (PER-85). Whether the loader's
+    // dependency on a missing adapt-list.json (PER-229) makes starting safe is PER-232.
+    let text: string;
+    try {
+      text = readFileSync(adaptList, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const command = writeAgainCommand({ root, adaptList, app: env.LOUPE_APP });
+      throw new Error(`withLoupe: ${adaptList} is missing. ${missingLayerAdvice(command)}`, { cause: error });
+    }
+    const format = formatOf(text);
+    const notice = format && `${formatNotice(format)} ${generateCommand({ root, adaptList, app: env.LOUPE_APP })}`;
     try {
       parseAdaptList(text, adaptList);
     } catch (error) {
