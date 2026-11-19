@@ -71,8 +71,9 @@ export function generateCommand({ root, adaptList, app }: LayerPaths): string {
  * The command that writes `adapt-list.json` again, which names what `generate` can no
  * longer read from it: the roots, and the layer's import specifier unless its
  * package.json holds one (an in-app layer like the fixture's has no such file).
+ * The Toolbar's card, `withLoupe` and `loupe doctor` all name this one.
  */
-function writeAgainCommand(paths: LayerPaths): string {
+export function writeAgainCommand(paths: LayerPaths): string {
   const named = hasPackageName(path.dirname(paths.adaptList));
   return `${generateCommand(paths)} ${ROOT_FLAGS}${named ? "" : ` ${SPECIFIER_FLAG}`}`;
 }

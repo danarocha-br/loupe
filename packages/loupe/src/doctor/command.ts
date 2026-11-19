@@ -7,6 +7,7 @@ import path from "node:path";
 import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "../adapt-list.js";
 import { checkCompatibility } from "../compat/check.js";
 import { findRoot, type PackageJson, readJson } from "../compat/repo.js";
+import { missingLayerAdvice } from "../format-notice.js";
 import { runGenerate } from "../generate/command.js";
 import { GENERATE_FORMAT_VERSION } from "../generate/header.js";
 import {
@@ -19,6 +20,7 @@ import {
   readLedger,
 } from "../init/ledger.js";
 import { touchPoints } from "../init/touch-points/list.js";
+import { writeAgainCommand } from "../layer-status.js";
 import { compare } from "../meta/sources.js";
 import { NPM_PACKAGE, PRODUCT_LAYER } from "../names.js";
 import { compareVersions, version as installedVersion } from "../version.js";
@@ -128,7 +130,7 @@ export async function runDoctor(options: DoctorOptions, io: DoctorIo): Promise<n
 
   versions(report, root, ledger, layer.app, version, adaptList);
   touchPointChecks(report, root, ledger, layer.app, version);
-  productLayerChecks(report, root, ledger, layer.path);
+  productLayerChecks(report, root, ledger, layer.path, layer.app);
   resolution(report, root, layer.path, layer.app);
 
   if (options.build) await buildCheck(report, root, layer.app, io);
@@ -264,7 +266,7 @@ function touchPointChecks(report: Report, root: string, ledger: Ledger, app: str
 }
 
 // 4 and 5. init's files match the ledger; generate's match their headers and their sources.
-function productLayerChecks(report: Report, root: string, ledger: Ledger, layerPath: string): void {
+function productLayerChecks(report: Report, root: string, ledger: Ledger, layerPath: string, app: string): void {
   report.heading(`Product layer ${layerPath}`);
   const files = ledger.files ?? [];
   const drift: string[] = [];
@@ -281,8 +283,11 @@ function productLayerChecks(report: Report, root: string, ledger: Ledger, layerP
     report.fail(`${drift.length} of loupe init's files changed by hand (drift)`, [...drift, "Left as they are: git restore them."]);
   }
 
-  if (!existsSync(path.join(root, layerPath, "adapt-list.json"))) {
-    report.fail("adapt-list.json is missing", ["Run loupe generate."]);
+  const adaptList = path.join(root, layerPath, "adapt-list.json");
+  if (!existsSync(adaptList)) {
+    // Plain `generate` reads its roots from the file that is gone: name the command the Toolbar's card names.
+    const command = writeAgainCommand({ root, adaptList, app: path.join(root, app) });
+    report.fail("adapt-list.json is missing", [missingLayerAdvice(command, "the command below"), command]);
     return;
   }
   let generated: ReturnType<typeof runGenerate>;
