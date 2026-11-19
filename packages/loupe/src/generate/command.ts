@@ -6,6 +6,7 @@ import { collectSources, compare, DESIGN_SYSTEM_INCLUDE } from "../meta/sources.
 import type { ModuleMeta } from "../meta/types.js";
 import { PRODUCT_LAYER } from "../names.js";
 import { apply, type Change, diff, type Refusal } from "./apply.js";
+import { ROOT_FLAGS } from "./first-run.js";
 import { readHeader } from "./header.js";
 import { type CoverageEntry, MissingSpecifierError, plan } from "./plan.js";
 
@@ -93,7 +94,7 @@ export function runGenerate(options: GenerateOptions, cwd: string): GenerateResu
   const dsRoot = rootFlag(options.designSystem, cwd, toRepo) ?? previous?.designSystem;
   const appRoot = rootFlag(options.app, cwd, toRepo) ?? previous?.app;
   if (!dsRoot || !appRoot) {
-    throw new Error("Name the design system and the app the first time: --design-system <dir> --app <dir>");
+    throw new Error(`Name the design system and the app the first time: ${ROOT_FLAGS}`);
   }
   for (const [flag, root] of [["--design-system", dsRoot], ["--app", appRoot]] as const) {
     if (root === "" || root.startsWith("..")) {
