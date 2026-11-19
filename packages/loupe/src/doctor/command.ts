@@ -322,11 +322,11 @@ function productLayerChecks(report: Report, ledger: Ledger, layerPath: string, p
     report.fail(`${newer.length} generated file${newer.length === 1 ? "" : "s"} written by a newer Loupe`, newer, ["Upgrade Loupe."]);
   }
   if (edited.length > 0) {
-    report.fail(
-      `${edited.length} generated file${edited.length === 1 ? "" : "s"} edited by hand (drift)`,
-      edited,
-      commandBelow("Left as they are. Delete or git restore them, then run", command),
-    );
+    // generate refuses a hand-edited adapt-list.json alone, and deleting it would lose the roots the command reads.
+    const fix = edited.includes("adapt-list.json")
+      ? "Left as it is. Restore it with git, then run"
+      : "Left as they are. Delete or git restore them, then run";
+    report.fail(`${edited.length} generated file${edited.length === 1 ? "" : "s"} edited by hand (drift)`, edited, commandBelow(fix, command));
   }
   if (foreign.length > 0) {
     // Also what a generated file looks like once a hand edit removed its header.

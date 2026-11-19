@@ -152,6 +152,14 @@ describe("loupe doctor reporting drift", () => {
     expect(snapshot(root)).toEqual(before);
   });
 
+  it("says to restore a hand-edited adapt-list.json, not delete it: the command below reads its roots (PER-234 review)", async () => {
+    const root = await installed();
+    edit(root, "packages/loupe/adapt-list.json", (t) => t.replace(`"apps/web"`, `"apps/nope"`));
+    const { code, text } = await doctor(root);
+    expect(text).toContain(["  ✗ 1 generated file edited by hand (drift)", "    adapt-list.json", commandBelow("Left as it is. Restore it with git, then run")].join("\n"));
+    expect(code).toBe(1);
+  });
+
   it("reports a generated file whose header was removed by hand", async () => {
     const root = await installed();
     edit(root, "packages/loupe/adapters/ds/ui/button.tsx", (t) => t.split("\n").slice(1).join("\n"));
