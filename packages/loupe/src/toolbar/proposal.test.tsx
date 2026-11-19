@@ -20,7 +20,8 @@ const project = vi.hoisted(() => ({
 const knownProject = project.read;
 vi.mock("./project-server.js", () => ({ readProjectContext: () => project.read() }));
 // The override cookie holds one flag preview, which the app doesn't declare.
-setFlagSource(memorySource(memoryRequest({ overrides: { "new-roles": true } })));
+const cookieWithPreview = () => memorySource(memoryRequest({ overrides: { "new-roles": true } }));
+setFlagSource(cookieWithPreview());
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -143,6 +144,30 @@ describe("the Proposal from the page", () => {
     expect(proposal.routes[0]?.changes).toHaveLength(1);
     expect(await collectProposalMarkdown()).toContain("unknown commit");
   });
+
+  it.each(["refused", "answered badly"] as const)(
+    "still records the flag previews the page last read when the flag call is %s during the export (PER-226)",
+    async (failure) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+      const request = memoryRequest({ overrides: { "new-roles": true } });
+      const source = memorySource(request);
+      let refuse = false;
+      setFlagSource({ ...source, read: () => (refuse ? Promise.reject(new Error("restarting")) : source.read()) });
+      try {
+        // The page has read its previews once, as the card does on mount.
+        await collectProposal();
+        if (failure === "refused") refuse = true;
+        else request.fetch = async () => new Response("boom", { status: 500 });
+
+        const proposal = await collectProposal();
+
+        expect(proposal.routes[0]?.flags).toEqual({ "new-roles": true });
+      } finally {
+        setFlagSource(cookieWithPreview());
+      }
+    },
+  );
 
   it("copies the Markdown summary from the footer", async () => {
     let copied: Promise<string> | null = null;
