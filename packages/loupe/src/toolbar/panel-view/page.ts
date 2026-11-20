@@ -38,7 +38,7 @@ export type Page = {
   records: RecordRow[];
   /** Override values across every record. */
   overrideCount: number;
-  /** Mounted Instances, for the dock and the list's summary. */
+  /** Mounted Instances, for the list's summary. */
   instanceCount: number;
   seen: SeenComponents;
   /** Components `generate` hasn't read yet, and components whose source changed since it did. */

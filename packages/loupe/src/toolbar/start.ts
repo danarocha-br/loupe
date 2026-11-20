@@ -6,10 +6,6 @@
 //   __loupe.proposalMarkdown(options?)  its Copy as Markdown text
 //   __loupe.report(options)             the HTML report, not downloaded (`export.ts`)
 //   __loupe.exportProposal(options)     the report, downloaded as Export does
-//   __loupe.capture()                   Capture screen: a Snapshot of the screen in view (`snapshots.ts`)
-//   __loupe.retake(id)                  takes Snapshot `id` again, in its place
-//   __loupe.snapshots()                 every Snapshot this page load, each as it reads now
-//   __loupe.removeSnapshot(id)          drops a Snapshot
 //
 // Starting again changes nothing: the tracker is one per page, and the methods are
 // the same module functions. `resetLoupe()` takes both away, and the next mount
@@ -19,7 +15,6 @@
 import { debugOf } from "../runtime/debug.js";
 import { buildExport, exportProposal } from "./export.js";
 import { collectProposal, collectProposalMarkdown, startTracking } from "./proposal.js";
-import { captureFromConsole, removeSnapshot, retakeSnapshot, snapshots } from "./snapshots.js";
 
 export function startToolbar(): void {
   // From the moment the Toolbar loads, not from the first export: a record set on
@@ -30,9 +25,5 @@ export function startToolbar(): void {
     proposalMarkdown: collectProposalMarkdown,
     report: buildExport,
     exportProposal,
-    capture: captureFromConsole,
-    retake: retakeSnapshot,
-    snapshots,
-    removeSnapshot,
   });
 }

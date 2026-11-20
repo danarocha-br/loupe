@@ -1,0 +1,1261 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T18:48:54+00:00",
+  "title": "Design System: Loupe Toolbar",
+  "extensions": {
+    "colorMeta": {
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Warm Sheet",
+        "canonical": "#F6F3EF",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262523",
+          "#44423F",
+          "#63615E",
+          "#84827E",
+          "#A7A5A2",
+          "#CBC9C6",
+          "#EFEEEC"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "sunk": {
+        "role": "neutral",
+        "displayName": "Sunk Pill",
+        "canonical": "#F1F3F3",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#242525",
+          "#414242",
+          "#606161",
+          "#818383",
+          "#A4A5A5",
+          "#C8C9C9",
+          "#EEEFEF"
+        ]
+      },
+      "sunk-hover": {
+        "role": "neutral",
+        "displayName": "Sunk Hover",
+        "canonical": "#E5E8E8",
+        "tonalRamp": [
+          "#0A0B0B",
+          "#242525",
+          "#404242",
+          "#5F6262",
+          "#808383",
+          "#A3A5A5",
+          "#C8C9C9",
+          "#EDEFEF"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover Wash",
+        "canonical": "#F8F7F4",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#252524",
+          "#434240",
+          "#62615F",
+          "#838280",
+          "#A6A5A3",
+          "#CAC9C7",
+          "#EFEEED"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0A0A0A",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "on-ink": {
+        "role": "neutral",
+        "displayName": "On Ink",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#5E5E5E",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint",
+        "canonical": "#737373",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "#E4E4E4",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "rule-soft": {
+        "role": "neutral",
+        "displayName": "Rule Soft",
+        "canonical": "#F0F0EE",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252524",
+          "#424241",
+          "#616160",
+          "#828281",
+          "#A5A5A3",
+          "#C9C9C8",
+          "#EEEEED"
+        ]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Rule Strong",
+        "canonical": "#C9C5BE",
+        "tonalRamp": [
+          "#0C0B09",
+          "#272521",
+          "#44423D",
+          "#64615B",
+          "#85827C",
+          "#A8A59F",
+          "#CBC9C4",
+          "#F0EEEB"
+        ]
+      },
+      "edge": {
+        "role": "neutral",
+        "displayName": "Sheet Edge",
+        "canonical": "rgba(27, 34, 32, 0.07)",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3D4442",
+          "#5C6361",
+          "#7C8482",
+          "#A0A7A5",
+          "#C5CBC9",
+          "#EBF0EE"
+        ]
+      },
+      "band": {
+        "role": "neutral",
+        "displayName": "Band",
+        "canonical": "#1B2220",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3D4442",
+          "#5C6361",
+          "#7C8482",
+          "#A0A7A5",
+          "#C5CBC9",
+          "#EBF0EE"
+        ]
+      },
+      "on-band": {
+        "role": "neutral",
+        "displayName": "On Band",
+        "canonical": "#F0F0F0",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "band-muted": {
+        "role": "neutral",
+        "displayName": "Band Muted",
+        "canonical": "#9A9A9A",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "band-hover": {
+        "role": "neutral",
+        "displayName": "Band Hover",
+        "canonical": "rgba(246, 243, 239, 0.1)",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262523",
+          "#44423F",
+          "#63615E",
+          "#84827E",
+          "#A7A5A2",
+          "#CBC9C6",
+          "#EFEEEC"
+        ]
+      },
+      "band-pressed": {
+        "role": "neutral",
+        "displayName": "Band Pressed",
+        "canonical": "rgba(246, 243, 239, 0.16)",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262523",
+          "#44423F",
+          "#63615E",
+          "#84827E",
+          "#A7A5A2",
+          "#CBC9C6",
+          "#EFEEEC"
+        ]
+      },
+      "lilac": {
+        "role": "primary",
+        "displayName": "Chosen Lilac",
+        "canonical": "#CCCDFF",
+        "tonalRamp": [
+          "#0A0918",
+          "#22223A",
+          "#3E3E5E",
+          "#5C5C85",
+          "#7D7DA8",
+          "#A0A1C7",
+          "#C5C6E6",
+          "#EBECFF"
+        ]
+      },
+      "on-lilac": {
+        "role": "primary",
+        "displayName": "On Lilac",
+        "canonical": "#0A0A0A",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "lilac-line": {
+        "role": "primary",
+        "displayName": "Revision Line",
+        "canonical": "#8276CF",
+        "tonalRamp": [
+          "#0B0522",
+          "#251B4B",
+          "#413676",
+          "#5F53A2",
+          "#7F75C8",
+          "#A29AE4",
+          "#C6C1FE",
+          "#ECE9FF"
+        ]
+      },
+      "lilac-ink": {
+        "role": "primary",
+        "displayName": "Revision Ink",
+        "canonical": "#4F43B8",
+        "tonalRamp": [
+          "#09022B",
+          "#201659",
+          "#3A3189",
+          "#564EBB",
+          "#7571E2",
+          "#9798FB",
+          "#BDC0FF",
+          "#E5E9FF"
+        ]
+      },
+      "ok-bg": {
+        "role": "status",
+        "displayName": "Supported Green Wash",
+        "canonical": "#DFF7E4",
+        "tonalRamp": [
+          "#060D08",
+          "#1D2820",
+          "#37473B",
+          "#546758",
+          "#748879",
+          "#99AA9C",
+          "#BFCEC2",
+          "#E7F2E9"
+        ]
+      },
+      "ok-fg": {
+        "role": "status",
+        "displayName": "Supported Green",
+        "canonical": "#14532D",
+        "tonalRamp": [
+          "#001004",
+          "#092D17",
+          "#204D2F",
+          "#386F4A",
+          "#5A916A",
+          "#83B290",
+          "#AED5B7",
+          "#DBF7E1"
+        ]
+      },
+      "switch-off": {
+        "role": "status",
+        "displayName": "Switch Off",
+        "canonical": "#EBE7E0",
+        "tonalRamp": [
+          "#0C0B09",
+          "#272521",
+          "#44423D",
+          "#64615B",
+          "#85827C",
+          "#A8A59F",
+          "#CBC9C4",
+          "#F0EEEB"
+        ]
+      },
+      "switch-on": {
+        "role": "status",
+        "displayName": "Switch Teal",
+        "canonical": "#27917E",
+        "tonalRamp": [
+          "#00110B",
+          "#002E25",
+          "#004F42",
+          "#007261",
+          "#379482",
+          "#6CB5A5",
+          "#9DD7C9",
+          "#D0F9EE"
+        ]
+      },
+      "primary": {
+        "role": "neutral",
+        "displayName": "Primary",
+        "canonical": "#1B2220",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3D4442",
+          "#5C6361",
+          "#7C8482",
+          "#A0A7A5",
+          "#C5CBC9",
+          "#EBF0EE"
+        ]
+      },
+      "on-primary": {
+        "role": "neutral",
+        "displayName": "On Primary",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "#0B0B0B",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#A5A5A5",
+          "#C9C9C9",
+          "#EEEEEE"
+        ]
+      },
+      "pencil": {
+        "role": "neutral",
+        "displayName": "Pencil",
+        "canonical": "#8E959C",
+        "tonalRamp": [
+          "#090B0E",
+          "#222529",
+          "#3E4347",
+          "#5C6268",
+          "#7D838A",
+          "#A0A6AB",
+          "#C5CACE",
+          "#EBEFF2"
+        ]
+      },
+      "alert": {
+        "role": "status",
+        "displayName": "Alert Orange",
+        "canonical": "#C2570C",
+        "tonalRamp": [
+          "#200000",
+          "#490C00",
+          "#732400",
+          "#A03F00",
+          "#C66227",
+          "#E48B5D",
+          "#FFB590",
+          "#FFE1C6"
+        ]
+      },
+      "amber-fg": {
+        "role": "status",
+        "displayName": "Notice Amber",
+        "canonical": "#7A4B00",
+        "tonalRamp": [
+          "#170700",
+          "#381E00",
+          "#5D3905",
+          "#83561C",
+          "#A67840",
+          "#C69C6E",
+          "#E5C29D",
+          "#FFEACE"
+        ]
+      },
+      "amber-bg": {
+        "role": "status",
+        "displayName": "Notice Amber Wash",
+        "canonical": "#FFF3DC",
+        "tonalRamp": [
+          "#0E0B05",
+          "#2A2419",
+          "#494132",
+          "#6A604E",
+          "#8B816E",
+          "#ADA493",
+          "#D0C8BA",
+          "#F3EEE3"
+        ]
+      },
+      "amber-dot": {
+        "role": "status",
+        "displayName": "Notice Amber Dot",
+        "canonical": "#C98A12",
+        "tonalRamp": [
+          "#1A0500",
+          "#3D1B00",
+          "#633600",
+          "#8B5300",
+          "#AF7500",
+          "#CD9B4F",
+          "#EBC186",
+          "#FFE9BF"
+        ]
+      },
+      "sheet-dark": {
+        "role": "neutral",
+        "displayName": "Warm Sheet (dark)",
+        "canonical": "#0E1110",
+        "tonalRamp": [
+          "#0A0B0B",
+          "#232625",
+          "#404342",
+          "#5E6261",
+          "#7F8382",
+          "#A2A6A5",
+          "#C7CAC9",
+          "#EDEFEE"
+        ]
+      },
+      "card-dark": {
+        "role": "neutral",
+        "displayName": "Card White (dark)",
+        "canonical": "#181C1B",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232625",
+          "#3F4342",
+          "#5E6261",
+          "#7F8382",
+          "#A2A6A5",
+          "#C6CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "sunk-dark": {
+        "role": "neutral",
+        "displayName": "Sunk Pill (dark)",
+        "canonical": "#242928",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232625",
+          "#3F4342",
+          "#5D6361",
+          "#7E8483",
+          "#A1A6A5",
+          "#C6CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "sunk-hover-dark": {
+        "role": "neutral",
+        "displayName": "Sunk Hover (dark)",
+        "canonical": "#2E3432",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3E4342",
+          "#5D6361",
+          "#7D8482",
+          "#A1A6A4",
+          "#C5CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "hover-dark": {
+        "role": "neutral",
+        "displayName": "Hover Wash (dark)",
+        "canonical": "#1F2423",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232625",
+          "#3F4342",
+          "#5D6361",
+          "#7E8483",
+          "#A1A6A5",
+          "#C6CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "ink-dark": {
+        "role": "neutral",
+        "displayName": "Ink (dark)",
+        "canonical": "#ECEDEA",
+        "tonalRamp": [
+          "#0B0B0A",
+          "#252524",
+          "#424240",
+          "#61615F",
+          "#828380",
+          "#A4A5A3",
+          "#C9C9C7",
+          "#EEEFED"
+        ]
+      },
+      "on-ink-dark": {
+        "role": "neutral",
+        "displayName": "On Ink (dark)",
+        "canonical": "#0E1110",
+        "tonalRamp": [
+          "#0A0B0B",
+          "#232625",
+          "#404342",
+          "#5E6261",
+          "#7F8382",
+          "#A2A6A5",
+          "#C7CAC9",
+          "#EDEFEE"
+        ]
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Muted (dark)",
+        "canonical": "#A4AAA7",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232624",
+          "#3F4341",
+          "#5D6360",
+          "#7E8481",
+          "#A1A6A4",
+          "#C6CAC8",
+          "#ECEFEE"
+        ]
+      },
+      "faint-dark": {
+        "role": "neutral",
+        "displayName": "Faint (dark)",
+        "canonical": "#8B918E",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232624",
+          "#3F4341",
+          "#5D6360",
+          "#7E8481",
+          "#A1A6A4",
+          "#C6CAC8",
+          "#ECEFEE"
+        ]
+      },
+      "rule-dark": {
+        "role": "neutral",
+        "displayName": "Rule (dark)",
+        "canonical": "#2C3230",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3E4342",
+          "#5D6361",
+          "#7D8482",
+          "#A1A6A4",
+          "#C5CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "rule-soft-dark": {
+        "role": "neutral",
+        "displayName": "Rule Soft (dark)",
+        "canonical": "#232827",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232625",
+          "#3F4342",
+          "#5D6361",
+          "#7E8483",
+          "#A1A6A5",
+          "#C6CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "rule-strong-dark": {
+        "role": "neutral",
+        "displayName": "Rule Strong (dark)",
+        "canonical": "#4A514E",
+        "tonalRamp": [
+          "#090C0B",
+          "#222624",
+          "#3E4341",
+          "#5C6360",
+          "#7D8481",
+          "#A0A7A4",
+          "#C5CAC8",
+          "#ECEFEE"
+        ]
+      },
+      "band-dark": {
+        "role": "neutral",
+        "displayName": "Band (dark)",
+        "canonical": "#29322F",
+        "tonalRamp": [
+          "#090C0B",
+          "#212625",
+          "#3C4441",
+          "#5A6460",
+          "#7B8582",
+          "#9FA7A4",
+          "#C4CBC8",
+          "#EBF0EE"
+        ]
+      },
+      "band-muted-dark": {
+        "role": "neutral",
+        "displayName": "Band Muted (dark)",
+        "canonical": "#A3AAA7",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#222624",
+          "#3E4341",
+          "#5D6360",
+          "#7E8481",
+          "#A1A6A4",
+          "#C6CAC8",
+          "#ECEFEE"
+        ]
+      },
+      "lilac-dark": {
+        "role": "primary",
+        "displayName": "Chosen Lilac (dark)",
+        "canonical": "#3A3884",
+        "tonalRamp": [
+          "#080622",
+          "#1F1E4A",
+          "#393A75",
+          "#5657A1",
+          "#7579C6",
+          "#999EE2",
+          "#BEC4FD",
+          "#E6EBFF"
+        ]
+      },
+      "on-lilac-dark": {
+        "role": "primary",
+        "displayName": "On Lilac (dark)",
+        "canonical": "#F1F0FF",
+        "tonalRamp": [
+          "#0B0B0F",
+          "#25242B",
+          "#41414A",
+          "#61606C",
+          "#82818D",
+          "#A4A4AF",
+          "#C8C8D1",
+          "#EEEEF4"
+        ]
+      },
+      "lilac-line-dark": {
+        "role": "primary",
+        "displayName": "Revision Line (dark)",
+        "canonical": "#A99FF2",
+        "tonalRamp": [
+          "#0B0620",
+          "#251D47",
+          "#413871",
+          "#60559C",
+          "#8076C1",
+          "#A29BDD",
+          "#C7C2F9",
+          "#ECE9FF"
+        ]
+      },
+      "lilac-ink-dark": {
+        "role": "primary",
+        "displayName": "Revision Ink (dark)",
+        "canonical": "#BDB5FF",
+        "tonalRamp": [
+          "#0B071E",
+          "#251E43",
+          "#41396B",
+          "#605795",
+          "#8078B9",
+          "#A39DD6",
+          "#C7C3F3",
+          "#EDEAFF"
+        ]
+      },
+      "ok-bg-dark": {
+        "role": "status",
+        "displayName": "Supported Green Wash (dark)",
+        "canonical": "#143A25",
+        "tonalRamp": [
+          "#030E07",
+          "#152A1E",
+          "#2D4938",
+          "#476B55",
+          "#688C75",
+          "#8EAE99",
+          "#B6D1BF",
+          "#E1F4E7"
+        ]
+      },
+      "ok-fg-dark": {
+        "role": "status",
+        "displayName": "Supported Green (dark)",
+        "canonical": "#93E2AC",
+        "tonalRamp": [
+          "#001103",
+          "#002E14",
+          "#0F4F2B",
+          "#287245",
+          "#4C9465",
+          "#79B58C",
+          "#A6D7B4",
+          "#D6F9DF"
+        ]
+      },
+      "switch-off-dark": {
+        "role": "status",
+        "displayName": "Switch Off (dark)",
+        "canonical": "#353B39",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3E4342",
+          "#5D6361",
+          "#7E8482",
+          "#A1A6A5",
+          "#C6CAC9",
+          "#ECEFEE"
+        ]
+      },
+      "switch-on-dark": {
+        "role": "status",
+        "displayName": "Switch Teal (dark)",
+        "canonical": "#2FA58F",
+        "tonalRamp": [
+          "#00110B",
+          "#002F25",
+          "#005041",
+          "#007361",
+          "#299682",
+          "#64B7A4",
+          "#98D8C9",
+          "#CCFAEE"
+        ]
+      },
+      "primary-dark": {
+        "role": "neutral",
+        "displayName": "Primary (dark)",
+        "canonical": "#F6F3EF",
+        "tonalRamp": [
+          "#0C0B0A",
+          "#262523",
+          "#44423F",
+          "#63615E",
+          "#84827E",
+          "#A7A5A2",
+          "#CBC9C6",
+          "#EFEEEC"
+        ]
+      },
+      "on-primary-dark": {
+        "role": "neutral",
+        "displayName": "On Primary (dark)",
+        "canonical": "#1B2220",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3D4442",
+          "#5C6361",
+          "#7C8482",
+          "#A0A7A5",
+          "#C5CBC9",
+          "#EBF0EE"
+        ]
+      },
+      "pencil-dark": {
+        "role": "neutral",
+        "displayName": "Pencil (dark)",
+        "canonical": "#6B737C",
+        "tonalRamp": [
+          "#090B0E",
+          "#21262A",
+          "#3D4349",
+          "#5B626A",
+          "#7C838C",
+          "#9FA6AE",
+          "#C4CAD0",
+          "#EBEFF4"
+        ]
+      },
+      "alert-dark": {
+        "role": "status",
+        "displayName": "Alert Orange (dark)",
+        "canonical": "#F0904A",
+        "tonalRamp": [
+          "#1E0100",
+          "#451300",
+          "#6E2B00",
+          "#994700",
+          "#BF6924",
+          "#DD915C",
+          "#F9B98F",
+          "#FFE4C5"
+        ]
+      },
+      "amber-fg-dark": {
+        "role": "status",
+        "displayName": "Notice Amber (dark)",
+        "canonical": "#E5B567",
+        "tonalRamp": [
+          "#160700",
+          "#371F00",
+          "#5B3B00",
+          "#815800",
+          "#A47A30",
+          "#C49E63",
+          "#E3C495",
+          "#FFEBC9"
+        ]
+      },
+      "amber-bg-dark": {
+        "role": "status",
+        "displayName": "Notice Amber Wash (dark)",
+        "canonical": "#2A2109",
+        "tonalRamp": [
+          "#0E0B04",
+          "#2A2416",
+          "#49412E",
+          "#6A6049",
+          "#8B8269",
+          "#ADA48F",
+          "#D0C9B7",
+          "#F3EEE1"
+        ]
+      },
+      "amber-dot-dark": {
+        "role": "status",
+        "displayName": "Notice Amber Dot (dark)",
+        "canonical": "#D9963B",
+        "tonalRamp": [
+          "#1A0500",
+          "#3D1B00",
+          "#643500",
+          "#8C5200",
+          "#B07418",
+          "#CF9957",
+          "#EDC08C",
+          "#FFE8C3"
+        ]
+      },
+      "page-line": {
+        "role": "primary",
+        "displayName": "Page Line",
+        "canonical": "#8276CF",
+        "tonalRamp": [
+          "#0B0522",
+          "#251B4B",
+          "#413676",
+          "#5F53A2",
+          "#7F75C8",
+          "#A29AE4",
+          "#C6C1FE",
+          "#ECE9FF"
+        ]
+      },
+      "page-ink": {
+        "role": "primary",
+        "displayName": "Page Ink",
+        "canonical": "#4F43B8",
+        "tonalRamp": [
+          "#09022B",
+          "#201659",
+          "#3A3189",
+          "#564EBB",
+          "#7571E2",
+          "#9798FB",
+          "#BDC0FF",
+          "#E5E9FF"
+        ]
+      },
+      "page-fill": {
+        "role": "primary",
+        "displayName": "Page Fill",
+        "canonical": "rgba(204, 205, 255, 0.34)",
+        "tonalRamp": [
+          "#0A0918",
+          "#22223A",
+          "#3E3E5E",
+          "#5C5C85",
+          "#7D7DA8",
+          "#A0A1C7",
+          "#C5C6E6",
+          "#EBECFF"
+        ]
+      },
+      "page-band": {
+        "role": "neutral",
+        "displayName": "Page Band",
+        "canonical": "#1B2220",
+        "tonalRamp": [
+          "#090C0B",
+          "#222625",
+          "#3D4442",
+          "#5C6361",
+          "#7C8482",
+          "#A0A7A5",
+          "#C5CBC9",
+          "#EBF0EE"
+        ]
+      },
+      "page-hover": {
+        "role": "neutral",
+        "displayName": "Page Hover",
+        "canonical": "#6F7472",
+        "tonalRamp": [
+          "#0A0C0B",
+          "#232625",
+          "#3F4341",
+          "#5E6261",
+          "#7F8482",
+          "#A2A6A4",
+          "#C6CAC9",
+          "#ECEFEE"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The selected Instance's or page's visible name; the Export dialog title at 18px/24px."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "\"Loupe\" in the band only."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "Export dialog count tiles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, prop names, the component name beside Back, the footer's Override count."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "The panel's base text and text fields."
+      },
+      "control": {
+        "displayName": "Control",
+        "purpose": "Buttons, links, the status strip."
+      },
+      "option": {
+        "displayName": "Option",
+        "purpose": "Option cells in a prop's table; the chosen one at 500."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Counts beside card titles, in faint."
+      },
+      "delta": {
+        "displayName": "Delta",
+        "purpose": "The number inside a revision delta."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Call sites, change lines, values set by the code."
+      },
+      "mono-small": {
+        "displayName": "Mono Small",
+        "purpose": "Crumbs, Instance keys."
+      },
+      "annotation": {
+        "displayName": "Annotation",
+        "purpose": "Uppercase mono notes: the page crumb, SAME ON ALL 4, TRUE or FALSE, the status chip."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sheet",
+        "value": "0 1px 2px rgba(27,34,32,0.05), 0 8px 24px rgba(27,34,32,0.07)",
+        "purpose": "The docked sheet, with a 1px edge outline. Dark: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35)."
+      },
+      {
+        "name": "overlay",
+        "value": "0 12px 36px rgba(27,34,32,0.22), 0 2px 6px rgba(27,34,32,0.1)",
+        "purpose": "The sheet overlaying a narrow viewport, and the Show Loupe pill. Dark: 0 12px 36px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.3)."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 64px rgba(27,34,32,0.22)",
+        "purpose": "The Export dialog, over a rgba(27,34,32,0.32) backdrop. Dark: 0 24px 64px rgba(0,0,0,0.6)."
+      },
+      {
+        "name": "delta-lift",
+        "value": "drop-shadow(0 1px 1px rgba(27,34,32,0.18))",
+        "purpose": "The deltas on the page, off any host surface."
+      }
+    ],
+    "motion": [
+      {
+        "name": "delta-in",
+        "value": "180ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "A delta on the page settling in from opacity 0 and scale 0.6. Removed under prefers-reduced-motion."
+      },
+      {
+        "name": "cloud-in",
+        "value": "200ms ease-out",
+        "purpose": "A revision cloud fading up. Removed under prefers-reduced-motion."
+      },
+      {
+        "name": "switch",
+        "value": "180ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "A switch's thumb sliding 18px; its track colour over 160ms ease-out."
+      },
+      {
+        "name": "state",
+        "value": "120ms ease-out",
+        "purpose": "Background and colour changes on buttons, tools and option cells."
+      },
+      {
+        "name": "peek",
+        "value": "opacity 120ms ease-out",
+        "purpose": "The panel fading to 0.08 while Alt is held, to see under the column."
+      },
+      {
+        "name": "undo-window",
+        "value": "8000ms",
+        "purpose": "How long the footer offers Undo after Reset all."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "overlay",
+        "value": "720px",
+        "purpose": "Below two column widths, the sheet overlays instead of reserving a column."
+      },
+      {
+        "name": "wide",
+        "value": "1600px",
+        "purpose": "The column widens from 360px to 400px (the sheet from 344px to 384px)."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Band and Select Tools",
+      "kind": "nav",
+      "refersTo": "header-band",
+      "description": "The header: wordmark and page crumb, and the two select tools in their pill group (Select one in use, Select multiple).",
+      "html": "<div class=\"ds-band-wrap\"><div class=\"ds-band\"><span class=\"ds-word\">Loupe <em>/ Members</em></span><span class=\"ds-tools\"><span class=\"ds-group\"><button class=\"ds-tool ds-mode\" aria-pressed=\"true\"><svg width=\"18\" height=\"18\" viewBox=\"238 238 36 36\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M247.171 248.005l5.315 17.434c0.354 1.16 1.906 1.232 2.341 0.121l2.854-6.582c0.212-0.535 0.675-0.959 1.24-1.09l7.272-1.705c1.17-0.273 1.21-1.928 0.131-2.352l-17.597-7.366c-1.08-0.454-1.866 0.535-1.553 1.544z\"/></svg></button><button class=\"ds-tool\"><svg width=\"18\" height=\"18\" viewBox=\"238 238 36 36\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M246.01 258.375h-1.007c-1.127 0-1.963-0.836-1.963-1.963v-10.776c0-1.127 0.836-2.008 2.008-2.008h12.877c1.127 0 2.027 0.836 2.026 2.008v0.785\"/><path d=\"M254.293 264.224h-2.147c-1.127 0-1.976-0.868-1.976-1.995v-10.398c0-1.127 0.848-1.976 1.976-1.976h11.764c1.127 0 2.02 0.81 2.02 1.938v2.172\"/><path d=\"M256.586 256.839l3.338 10.94c0.222 0.728 1.197 0.773 1.47 0.076l1.792-4.13c0.133-0.336 0.424-0.602 0.779-0.684l4.567-1.07c0.735-0.171 0.76-1.21 0.082-1.476l-11.051-4.622c-0.678-0.285-1.172 0.336-0.975 0.969z\"/></svg></button></span></span></div></div>",
+      "css": ".ds-band-wrap{width:320px;background:#F6F3EF;border-radius:24px 24px 0 0;overflow:hidden}.ds-band{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 9px 0 18px;background:#1B2220;color:#F0F0F0}.ds-word{font:600 14px/20px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;letter-spacing:-0.01em}.ds-word em{font:400 10px/14px ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace;font-style:normal;letter-spacing:0.04em;text-transform:uppercase;color:#9A9A9A;margin-left:6px}.ds-group{display:flex;gap:2px;padding:2px;border-radius:999px;background:rgba(246,243,239,0.05)}.ds-tool{display:inline-grid;place-items:center;width:30px;height:30px;border:0;border-radius:999px;background:none;color:#F0F0F0;cursor:pointer;transition:background-color 120ms ease-out}.ds-tool:hover{background:rgba(246,243,239,0.1)}.ds-tool.ds-mode{background:rgba(246,243,239,0.16)}.ds-tool:focus-visible{outline:2px solid #F0F0F0;outline-offset:2px}"
+    },
+    {
+      "name": "Soft Pill Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Every secondary action (Reset all, Reset this scope, Copy): a sunk pill with no border.",
+      "html": "<button class=\"ds-btn\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 12a8 8 0 1 0 2.6-5.9\"/><path d=\"M4 4v4.5h4.5\"/></svg>Reset all</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border:0;border-radius:999px;background:#F1F3F3;color:#0A0A0A;font:500 12px/16px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;cursor:pointer;transition:background-color 120ms ease-out}.ds-btn:hover{background:#E5E8E8}.ds-btn:focus-visible{outline:2px solid #8276CF;outline-offset:2px}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Export Proposal, the one exit: a 40px dark pill.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 4v11M7 10l5 5 5-5M5 20h14\"/></svg>Export Proposal</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 18px 0 16px;border:0;border-radius:999px;background:#1B2220;color:#FFFFFF;font:600 13px/16px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;cursor:pointer}.ds-btn-primary:hover{filter:brightness(1.3)}.ds-btn-primary:focus-visible{outline:2px solid #8276CF;outline-offset:2px}"
+    },
+    {
+      "name": "Prop Card",
+      "kind": "card",
+      "refersTo": "prop-card",
+      "description": "One prop: its delta and name, the change line, Reset in the corner, and its options as one hairline table with the chosen one lilac and the app's value dotted.",
+      "html": "<div class=\"ds-prop\"><div class=\"ds-head\"><span class=\"ds-delta\"><svg width=\"22\" height=\"20\" viewBox=\"0 0 20 18\" aria-hidden=\"true\"><path d=\"M10 1.6 18.6 16.4H1.4Z\" fill=\"#FFFFFF\" stroke=\"#8276CF\" stroke-width=\"1.25\" stroke-linejoin=\"round\"/></svg><span>1</span></span><b>variant</b><button class=\"ds-reset\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 12a8 8 0 1 0 2.6-5.9\"/><path d=\"M4 4v4.5h4.5\"/></svg>Reset</button></div><div class=\"ds-change\">\"ghost\" → <strong>\"outline\"</strong></div><div class=\"ds-table\"><button>default</button><button class=\"ds-on\">outline</button><button>secondary</button><button class=\"ds-app\">ghost</button><button>destructive</button><button>link</button></div></div>",
+      "css": ".ds-prop{width:320px;display:flex;flex-direction:column;gap:8px;padding:6px 6px 12px 12px;border-radius:18px;background:#FFFFFF;font:400 13px/18px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;color:#0A0A0A}.ds-head{display:flex;align-items:center;gap:6px;min-height:26px}.ds-head b{font:500 14px/18px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;letter-spacing:-0.01em}.ds-reset{margin-left:auto;display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 11px;border:0;border-radius:999px;background:#F1F3F3;font:500 12px/16px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;cursor:pointer}.ds-reset:hover{background:#E5E8E8}.ds-change{margin-top:-6px;font:400 11.5px/16px ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace;color:#5E5E5E}.ds-change strong{color:#4F43B8}.ds-table{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin-right:6px;overflow:hidden;border:1px solid #E4E4E4;border-radius:12px;background:#E4E4E4}.ds-table button{min-height:30px;padding:4px 8px;border:0;background:#FFFFFF;color:#5E5E5E;font:400 12px/16px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;cursor:pointer;transition:background-color 120ms ease-out}.ds-table button:hover{background:#F8F7F4;color:#0A0A0A}.ds-table .ds-on,.ds-table .ds-on:hover{background:#CCCDFF;color:#0A0A0A;font-weight:500}.ds-table .ds-app{text-decoration:underline dotted #737373;text-underline-offset:4px}.ds-delta{position:relative;display:inline-block;width:22px;height:20px}.ds-delta svg{display:block}.ds-delta span{position:absolute;inset:0;display:grid;place-items:end center;padding-bottom:2.5px;font:700 9px/1 system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;color:#4F43B8}"
+    },
+    {
+      "name": "Switches",
+      "kind": "custom",
+      "refersTo": "switch",
+      "description": "True/false props share one card of switch rows: teal when true.",
+      "html": "<div class=\"ds-switches\"><div class=\"ds-sw-row\"><span>loading</span><em>false</em><button role=\"switch\" aria-checked=\"false\" class=\"ds-sw\"><i></i></button></div><div class=\"ds-sw-row\"><span>disabled</span><em>true</em><button role=\"switch\" aria-checked=\"true\" class=\"ds-sw\"><i></i></button></div></div>",
+      "css": ".ds-switches{width:320px;padding:2px 12px 2px 16px;border-radius:18px;background:#FFFFFF}.ds-sw-row{display:flex;align-items:center;gap:8px;min-height:40px;border-top:1px solid #F0F0EE}.ds-sw-row:first-child{border-top:0}.ds-sw-row span{font:500 14px/18px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;color:#0A0A0A}.ds-sw-row em{margin-left:auto;font:400 10px/12px ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace;font-style:normal;letter-spacing:0.04em;text-transform:uppercase;color:#5E5E5E}.ds-sw{position:relative;width:40px;height:22px;border:0;border-radius:999px;background:#EBE7E0;cursor:pointer;transition:background-color 160ms ease-out}.ds-sw i{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 2px rgba(10,10,10,0.22);transition:transform 180ms cubic-bezier(0.2,0.8,0.2,1)}.ds-sw[aria-checked=true]{background:#27917E}.ds-sw[aria-checked=true] i{transform:translateX(18px)}.ds-sw:focus-visible{outline:2px solid #8276CF;outline-offset:2px}"
+    },
+    {
+      "name": "Revision Cloud and Delta",
+      "kind": "custom",
+      "refersTo": "delta",
+      "description": "On the page: a dashed cloud of outward scallops around a changed Instance, its numbered delta on the corner; the selected one filled.",
+      "html": "<div class=\"ds-cloud-demo\"><svg width=\"128\" height=\"64\" viewBox=\"-6 -6 128 64\" aria-hidden=\"true\"><path d=\"M0 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.33 6.33 0 0 1 11.6 0a6.04 6.04 0 0 1 0 10.5a6.04 6.04 0 0 1 0 10.5a6.04 6.04 0 0 1 0 10.5a6.04 6.04 0 0 1 0 10.5a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.33 6.33 0 0 1 -11.6 0a6.04 6.04 0 0 1 0 -10.5a6.04 6.04 0 0 1 0 -10.5a6.04 6.04 0 0 1 0 -10.5a6.04 6.04 0 0 1 0 -10.5Z\" fill=\"rgba(204,205,255,0.34)\" stroke=\"#8276CF\" stroke-width=\"1.4\" stroke-dasharray=\"3.5 2.4\" stroke-linejoin=\"round\"/></svg><span class=\"ds-btn-demo\">Invite</span><svg class=\"ds-mark\" width=\"22\" height=\"20\" viewBox=\"0 0 20 18\" aria-hidden=\"true\"><path d=\"M10 1.6 18.6 16.4H1.4Z\" fill=\"#8276CF\" stroke=\"#8276CF\" stroke-width=\"1.3\" stroke-linejoin=\"round\"/><text x=\"10\" y=\"14.2\" text-anchor=\"middle\" fill=\"#FFFFFF\" font-size=\"8\" font-weight=\"700\" font-family=\"system-ui, sans-serif\">2</text></svg></div>",
+      "css": ".ds-cloud-demo{position:relative;width:128px;height:64px;margin:16px}.ds-cloud-demo>svg:first-child{position:absolute;inset:0;overflow:visible}.ds-btn-demo{position:absolute;left:11px;top:11px;display:grid;place-items:center;width:94px;height:30px;border-radius:8px;background:#0A0A0A;color:#FFFFFF;font:500 13px/16px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif}.ds-mark{position:absolute;left:-4px;top:-10px;filter:drop-shadow(0 1px 1px rgba(27,34,32,0.18))}"
+    },
+    {
+      "name": "Identity and Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip-supported",
+      "description": "The selection's identity: back, component name with its verdict chip, the visible name, the call site.",
+      "html": "<div class=\"ds-identity\"><div class=\"ds-title\"><button class=\"ds-back\" aria-label=\"All components\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M19 12H5M11 6l-6 6 6 6\"/></svg></button><span>Button</span><span class=\"ds-chip\">✓ Supported</span></div><b>Actions for Ana Souza</b><code>member-row-menu.tsx:37</code></div>",
+      "css": ".ds-identity{width:320px;display:flex;flex-direction:column;gap:4px;padding:8px 12px 14px;border-radius:18px;background:#FFFFFF;color:#0A0A0A}.ds-title{display:flex;align-items:center;gap:10px;font:500 14px/18px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;letter-spacing:-0.02em}.ds-back{display:inline-grid;place-items:center;width:28px;height:28px;margin-left:-4px;border:0;border-radius:999px;background:#F6F3EF;color:#0A0A0A;cursor:pointer}.ds-back:hover{background:#E5E8E8}.ds-chip{padding:2px 7px 2px 6px;border-radius:999px;background:#DFF7E4;color:#14532D;font:500 10px/12px ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace;letter-spacing:-0.02em}.ds-identity b{margin-top:8px;font:600 17px/22px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;letter-spacing:-0.015em}.ds-identity code{font:400 12px/16px ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace;color:#5E5E5E}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Label text: one line that grows; focus turns the edge lilac with a soft ring.",
+      "html": "<textarea class=\"ds-field\" rows=\"1\">Bianca Souza</textarea>",
+      "css": ".ds-field{width:300px;min-height:36px;padding:8px 12px;resize:none;border:1px solid #E4E4E4;border-radius:12px;background:#FFFFFF;color:#0A0A0A;font:400 13px/18px system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif;outline:none}.ds-field:focus{border-color:#8276CF;box-shadow:0 0 0 3px rgba(130,118,207,0.28)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Revision Set",
+    "overview": "The Loupe panel is the revision sheet pinned beside a set of drawings. On an architect's drawing a changed area gets a scalloped revision cloud and a small triangle, a delta, carrying the revision's number; the same number lists the change in the revision table. Loupe marks an Override the same way: a dashed cloud around every Instance the change reaches on the page, a numbered delta on the cloud's corner, the same delta on the prop's card in the panel, in the footer and in the change list, and the same number on the change in the exported Proposal.\n\nThe sheet itself is warm and calm. A dark ink band runs across the top, and below it the panel is a column of white cards on a warm ground: the selection, then one card per prop, each prop's options laid out as a small table of hairline cells with the chosen one filled lilac. It works the way a designer already works in Figma: the scope of a change is the select tool in the header (one Instance, or every Instance from its call site), not a control in the middle of the panel, so the cards hold only the props.\n\nIt is a dev tool inside someone else's product, so it stays a guest. It uses system faces only, keeps every style inside its shadow root, and never covers the product: the page reflows to leave a column, and the sheet floats 8px inside it. Light and dark are both first-class, with every colour a token on the shadow host.",
+    "keyCharacteristics": [
+      "A warm sheet with white cards on it; one card per prop.",
+      "An ink band on top: the only dark slab besides the primary button.",
+      "One accent family, lilac: its fill marks what is chosen, its line marks what was revised.",
+      "Revision clouds and numbered deltas tie a change together across page, panel and Proposal.",
+      "Scope chosen with the header's select tools, as in Figma.",
+      "System sans for words, system mono for evidence and small annotations.",
+      "Motion only where something lands: a delta settling in, a cloud fading up, a switch's thumb."
+    ],
+    "rules": [
+      {
+        "name": "The One Violet Family Rule",
+        "body": "Lilac is the only accent. Its fill means chosen; its line means revised. Nothing else is lilac, and no second accent is added for brand, selection or emphasis.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Red Rule",
+        "body": "Nothing in the panel is red. Failures are alert orange, warnings amber, changes lilac.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Is Evidence Rule",
+        "body": "Mono is for what an engineer would paste (values, call sites, commands, flag keys) and for small uppercase annotations. Names a designer reads on screen stay in sans.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every counted or keyed number (Override counts, Instance counts, ×N, delta numbers, option counts, tiles) uses `font-variant-numeric: tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Cards Rule",
+        "body": "Cards never carry a shadow or a border. Tone separates them from the sheet; hairlines separate what is inside them.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** mark every change with its numbered delta, the same number on the page beside its cloud, on its card, in the change list, in the footer and in the Proposal.",
+      "**Do** keep lilac to two jobs: `lilac` fill for what is chosen, `lilac-line` and `lilac-ink` for what was revised.",
+      "**Do** give each prop with options its own card and lay its options out as one hairline table; put true/false props together in one card of switches.",
+      "**Do** choose the scope with the header's select tools, and keep the widen-to-page link in the selection card.",
+      "**Do** separate the sheet from the product with the 8px float, the `edge` outline and the sheet shadow, and separate cards by tone alone.",
+      "**Do** put values, call sites and commands in system mono, and everything a designer reads in system sans.",
+      "**Do** use tabular figures for every count and delta number.",
+      "**Do** declare every panel colour as a token on the shadow host with a dark counterpart; draw clouds, deltas and outlines on the page with the fixed page values.",
+      "**Do** keep motion to the delta's settle, the cloud's fade and the switch's thumb, and drop it under reduced motion."
+    ],
+    "donts": [
+      "**Don't** use red anywhere in the panel; failures are alert orange, warnings amber.",
+      "**Don't** add a second accent colour for brand, selection or emphasis.",
+      "**Don't** put a scope control in the middle of the panel.",
+      "**Don't** give cards a shadow or a border, or nest a card inside a card.",
+      "**Don't** put a status chip on every row; only the exceptions get one.",
+      "**Don't** load a web font into the shadow root or reach for a display face; the system stacks are the type system.",
+      "**Don't** let any panel style reach the host page, or any host style reach the panel.",
+      "**Don't** cover the product: no layout that hides the inspected page while the column fits."
+    ]
+  }
+}

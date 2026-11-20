@@ -101,8 +101,6 @@ export type ProposalChange = {
   /** False: no covered Instance was mounted at export, so Current values are as last seen. */
   onScreenAtExport: boolean;
   note: string | null;
-  /** Snapshot ids (PER-138); empty until Snapshots exist. */
-  screenshots: string[];
 };
 
 export type ProposalStateShown = {
@@ -116,14 +114,6 @@ export type ProposalStateShown = {
   /** The handler the app sets it through: `onOpenChange` for `open`. */
   appControlsVia: string;
   onScreenAtExport: boolean;
-};
-
-export type ProposalScreenshot = {
-  id: string;
-  kind: "viewport" | "crop";
-  caption: string;
-  before: string;
-  after: string;
 };
 
 export type ProposalRoute = {
@@ -141,7 +131,6 @@ export type ProposalRoute = {
   capturedAt: string | null;
   changes: ProposalChange[];
   statesShown: ProposalStateShown[];
-  screenshots: ProposalScreenshot[];
 };
 
 export type ProposalHeld = {

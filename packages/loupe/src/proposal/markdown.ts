@@ -1,12 +1,12 @@
 // Copy as Markdown (PER-99 §9): a short summary of a Proposal to paste into a
-// ticket. One line per change, one per State shown and per held record; no
-// images and no JSON. The exported HTML (PER-139) is the full report.
+// ticket. One line per change, one per State shown and per held record; no JSON.
+// The exported HTML (PER-139) is the full report.
 
 import { formatCurrent } from "../toolbar/format.js";
 import type { Proposal, ProposalCallSite, ProposalChange, ProposalProp, ProposalRoute } from "./types.js";
 import { siteCount } from "./words.js";
 
-export const REPORT_LINE = "Full report with screenshots: attach the exported HTML.";
+export const REPORT_LINE = "Full report: attach the exported HTML.";
 
 function fileOf(path: string): string {
   return path.split("/").at(-1) ?? path;

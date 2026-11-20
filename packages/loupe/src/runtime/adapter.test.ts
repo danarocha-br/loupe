@@ -17,7 +17,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE, uniqueId } from "../call-site.js";
 import { createAdapter } from "./adapter.js";
 import { debugOf, type LoupeDebug } from "./debug.js";
-import { setView } from "./registry.js";
 import { resetLoupe } from "./slot.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -334,30 +333,47 @@ describe("createAdapter", () => {
     });
   });
 
-  it("renders the app's own props in the before view, keeping State-prop Overrides only (PER-138)", () => {
-    type DialogProps = { open?: boolean; onOpenChange?: (open: boolean) => void; tone?: string };
-    const Dialog = createAdapter(
-      "Dialog",
-      ({ open, tone }: DialogProps) => h("div", { "data-open": String(open), "data-tone": tone }),
+  it("mounts a component again when a hold on a State prop the app leaves to it starts and ends", () => {
+    type MenuProps = { open?: boolean; onOpenChange?: (open: boolean) => void };
+    // Like a menu root: it keeps its own open state unless the app controls it.
+    const Menu = createAdapter(
+      "Menu",
+      ({ open }: MenuProps) => {
+        const [own] = React.useState(false);
+        return h("div", { "data-open": String(open ?? own) });
+      },
       { state: ["open"] },
     );
-    const id = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Dialog", ordinal: 1 });
-    render(h(Dialog, { open: false, onOpenChange: () => {}, tone: "calm", [ANCHOR_ATTRIBUTE]: id } as DialogProps));
+    const id = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Menu", ordinal: 1 });
+    render(h(Menu, { [ANCHOR_ATTRIBUTE]: id } as MenuProps));
+    const node = () => container.querySelector("div") as HTMLElement;
+    const before = node();
+    expect(before.dataset.open).toBe("false");
     act(() => {
       loupe.set(id, "open", true);
-      loupe.set(id, "tone", "loud");
     });
-    const shown = () => {
-      const node = container.querySelector("div") as HTMLElement;
-      return [node.dataset.open, node.dataset.tone];
-    };
-    expect(shown()).toEqual(["true", "loud"]);
-    act(() => setView("before"));
-    expect(shown()).toEqual(["true", "calm"]);
-    // The store is untouched: the Toolbar still reads both Overrides.
-    expect(loupe.props(id).overrides).toEqual({ open: true, tone: "loud" });
-    act(() => setView("proposed"));
-    expect(shown()).toEqual(["true", "loud"]);
+    expect(node().dataset.open).toBe("true");
+    expect(node()).not.toBe(before);
+    const held = node();
+    act(() => {
+      loupe.reset(id, "open");
+    });
+    // Uncontrolled again, from its own first render: closed.
+    expect(node().dataset.open).toBe("false");
+    expect(node()).not.toBe(held);
+  });
+
+  it("keeps a component mounted when the app controls the State prop an Override holds", () => {
+    type MenuProps = { open?: boolean; onOpenChange?: (open: boolean) => void };
+    const Menu = createAdapter("Menu", ({ open }: MenuProps) => h("div", { "data-open": String(open) }), { state: ["open"] });
+    const id = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Menu", ordinal: 1 });
+    render(h(Menu, { open: false, onOpenChange: () => {}, [ANCHOR_ATTRIBUTE]: id } as MenuProps));
+    const before = container.querySelector("div");
+    act(() => {
+      loupe.set(id, "open", true);
+    });
+    expect(container.querySelector("div")).toBe(before);
+    expect((before as HTMLElement).dataset.open).toBe("true");
   });
 
   it("names a picked DOM node's Instance", () => {

@@ -11,7 +11,7 @@ import { appValue, formatCurrent } from "../format.js";
 import type { Reads } from "./reads.js";
 import { type Counted, isSuspended, keepingOwn, type ScopeLabels, type ScopeView, valueCounts } from "./scopes.js";
 import type { Control, PropItem, Write } from "./types.js";
-import { countsText, EXPLAIN, heldNotice, keepingText, RESET, RESET_TO, sameOnAll, sourceText, THE_APP, THIS_CALL_SITE, valueText } from "./words.js";
+import { countsText, EXPLAIN, heldNotice, keepingText, NOT_SET, REASON_TITLES, RESET, RESET_TO, sameOnAll, sourceText, THE_APP, THIS_CALL_SITE, valueText } from "./words.js";
 
 /** A mounted, browser-rendered, adapted Instance while Overrides are on: what its rows can edit. */
 export type Editing = {
@@ -20,6 +20,8 @@ export type Editing = {
   labels: ScopeLabels;
   /** Per prop, the scope this Instance falls back to once its own Override is reset. */
   fallback: Record<string, Scope>;
+  /** Per scope, the number of the change it holds for this Instance. */
+  keyAt: Partial<Record<Scope, number | null>>;
 };
 
 /** What every row says the same way at any scope. */
@@ -32,6 +34,7 @@ function common(row: PropRow, overridden: boolean) {
     overridden,
     state: row.state === true,
     reason: row.reason ?? null,
+    reasonTitle: row.reason ? (REASON_TITLES[row.reason] ?? null) : null,
     explanation: row.name === "children" && row.reason ? (EXPLAIN[row.reason] ?? null) : null,
   } satisfies Partial<PropItem>;
 }
@@ -83,6 +86,8 @@ export function instanceProp(row: PropRow, editing: Editing | null): PropItem {
     // source: the first keystroke makes an Override, and a remount would take the field's focus.
     control: row.editable && editing && write ? control(row, value, write, editing.id, null) : null,
     current: fromOverride ? valueText(row) : null,
+    key: editing && source && source !== "app" ? (editing.keyAt[source] ?? null) : null,
+    change: fromOverride ? { from: valueText(row).text, to: formatCurrent(value) } : null,
     held: tried ? heldNotice(held.value, held.appTried) : null,
     reset:
       editing && overridden && write ? { label: RESET_TO[editing.fallback[row.name] ?? "instance"], write, inNotice: tried } : null,
@@ -95,7 +100,7 @@ export function instanceProp(row: PropRow, editing: Editing | null): PropItem {
  * count the Current values of the members still in the scope, and the row notes
  * the members a narrower scope keeps at their own value.
  */
-export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Reads): PropItem {
+export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Reads, key: number | null = null): PropItem {
   const { scope } = view;
   const values = view.record?.values ?? {};
   const overridden = row.name in values;
@@ -128,6 +133,11 @@ export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Read
             control(row, value, write, scope, counts)
           : null,
     current: null,
+    key: overridden ? key : null,
+    // The app's value when every member shares one, else how they differ.
+    change: overridden
+      ? { from: counts.size === 1 ? ([...counts.keys()][0] ?? NOT_SET) : counts.size === 0 ? NOT_SET : "mixed", to: formatCurrent(values[row.name]) }
+      : null,
     held: null,
     reset: overridden && !suspended ? { label: RESET, write, inNotice: false } : null,
     keeping: nearest === undefined ? null : { text: keepingText(keeping.length, inScope), ids: keeping, select: nearest },

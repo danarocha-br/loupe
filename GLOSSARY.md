@@ -67,14 +67,8 @@ _Avoid_: disabled, paused
 **Flag preview**:
 A feature-flag value forced for this browser through the Flags SDK's override cookie.
 
-**Snapshot**:
-A before-and-after capture of the page, or a close-up of one change. It goes out of date once a value it showed changes.
-
-**Before view**:
-The page with every Override off except those on State props, so an open dialog stays open. A Snapshot's "before" image is taken in it.
-
 **Proposal**:
-The record of a designer's Overrides, Flag previews and Snapshots, handed to engineering. The HTML report and the Markdown summary are renderings of it.
+The record of a designer's Overrides and Flag previews, handed to engineering. The HTML report and the Markdown summary are renderings of it.
 _Avoid_: report, export
 
 ## Install

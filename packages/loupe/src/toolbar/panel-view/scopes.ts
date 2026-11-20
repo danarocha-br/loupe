@@ -141,13 +141,19 @@ export function keepingOwn(view: ScopeView, prop: string, reads: Reads): string[
  * Who a group or page change reaches, with a box to leave each one out. A page
  * scope groups them by call site, so one box leaves a whole call site out.
  */
-export function membersView(view: ScopeView, selected: string, rows: readonly InstanceRow[]): MembersView {
+export function membersView(
+  view: ScopeView,
+  selected: string,
+  rows: readonly InstanceRow[],
+  name: (id: string) => string | null = () => null,
+): MembersView {
   const { scope } = view;
   if (scope === "instance") throw new Error("[loupe] This instance has no members to list.");
   const members = view.members.map(
     (member): MemberItem => ({
       id: member.id,
       label: member.id === selected ? THIS_INSTANCE : keyOf(member.id),
+      name: name(member.id),
       out: member.out,
       tag: member.out ? TAGS.leftOut : null,
       toggle: member.out ? "include" : "exclude",

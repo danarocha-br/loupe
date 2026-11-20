@@ -112,19 +112,21 @@ describe("the list", () => {
     expect(buttons?.instances.find((item) => item.id === CONFIRM)).toEqual({
       id: CONFIRM,
       label: "members.tsx:40",
+      name: null,
+      keys: [],
       mounted: false,
       tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
       values: ['variant "default" · Current "ghost" (last seen)'],
     });
     expect(buttons?.notes).toEqual([
-      { kind: "overrides", text: "1 override" },
+      { kind: "overrides", text: "1 Instance changed" },
       { kind: "not-mounted", text: "1 not mounted" },
     ]);
 
     // Mounted again: one ordinary row, no held one beside it.
     click("Abrir");
     expect(group(listOf(view()), "Button")?.instances.filter((item) => item.id === CONFIRM)).toEqual([
-      { id: CONFIRM, label: "members.tsx:40", mounted: true, tags: [], values: [] },
+      { id: CONFIRM, label: "members.tsx:40", name: "Confirmar", keys: [1], mounted: true, tags: [], values: [] },
     ]);
   });
 
@@ -212,7 +214,7 @@ describe("the list", () => {
     });
     click("Menu");
     const shown = view();
-    expect(shown.header).toEqual({ exportEnabled: true });
+    expect(shown.header).toEqual({ exportEnabled: true, route: "/", report: "Home · 2 changes" });
     expect(shown.footer).toMatchObject({ countText: "2 Overrides on this page", hasOverrides: true, copyEnabled: true });
     expect(shown.footer.resetAll).toEqual(
       expect.arrayContaining([
@@ -430,7 +432,7 @@ describe("group and page scopes", () => {
     expect(shown.scope).toBe("group");
     expect(shown.outline.members).toEqual(["ana", "bia", "caio", "dani"].map((name) => ({ id: row(name), out: false })));
     let variant = prop(inspector(shown), "variant");
-    expect(variant).toMatchObject({ counts: "SAME ON ALL 4", source: "from the app", reset: null, control: { key: "group" } });
+    expect(variant).toMatchObject({ counts: "Same on all 4", source: "from the app", reset: null, control: { key: "group" } });
     expect(pressed(variant)).toEqual(['"ghost"']);
 
     act(() => {
@@ -462,11 +464,12 @@ describe("group and page scopes", () => {
     expect(scoped?.members.find((member) => member.id === BIA)).toEqual({
       id: BIA,
       label: "This instance",
+      name: "bia",
       out: true,
       tag: { kind: "left-out", text: "Left out" },
       toggle: "include",
     });
-    expect(scoped?.members.find((member) => member.id === ANA)).toEqual({ id: ANA, label: "#ana", out: false, tag: null, toggle: "exclude" });
+    expect(scoped?.members.find((member) => member.id === ANA)).toEqual({ id: ANA, label: "#ana", name: "ana", out: false, tag: null, toggle: "exclude" });
     expect(pills(prop(inspector(shown), "variant"))).toEqual([
       ['"default"', true, null],
       ['"ghost"', false, 3],
@@ -515,7 +518,7 @@ describe("group and page scopes", () => {
     });
     const variant = prop(inspector(view(BIA, "group")), "variant");
     expect(variant.keeping).toBeNull();
-    expect(variant.counts).toBe("SAME ON ALL 4");
+    expect(variant.counts).toBe("Same on all 4");
   });
 
   it("falls back to This instance while the scoped Instance has gone", () => {
@@ -565,5 +568,68 @@ describe("group and page scopes", () => {
       counts: '"ana" 1 · "bia" 1 · "caio" 1 · "dani" 1 · "Menu" 1',
     });
     expect(prop(body, "variant").control?.kind).toBe("options");
+  });
+});
+
+describe("the plot key and on-screen names (critique 2026-11-19)", () => {
+  it("numbers each change as the Proposal will, and marks every Instance it reaches", () => {
+    render();
+    act(() => {
+      loupe.set(ANA, "variant", "outline");
+      loupe.set(BIA, "variant", "secondary", "group");
+      loupe.exclude(ANA, "group");
+    });
+    const shown = view();
+    // Instance records come first, as in records() and the Proposal: c1, c2.
+    expect(listOf(shown).changes).toEqual([
+      { n: 1, props: "variant", detail: 'variant "ghost" → "outline"', where: "ana", select: ANA, reached: [ANA] },
+      // The group reaches BIA, CAIO and DANI: ANA is left out of it.
+      {
+        n: 2,
+        props: "variant",
+        detail: 'variant "ghost" → "secondary"',
+        where: "bia and 2 more",
+        select: BIA,
+        reached: [BIA, row("caio"), row("dani")],
+      },
+    ]);
+    // ANA is left out of the group, so only its own change marks it.
+    expect(shown.marks.map(({ id, keys }) => ({ id, keys }))).toEqual([
+      { id: ANA, keys: [1] },
+      { id: BIA, keys: [2] },
+      { id: row("caio"), keys: [2] },
+      { id: row("dani"), keys: [2] },
+    ]);
+    expect(prop(inspector(view(ANA)), "variant").key).toBe(1);
+    expect(prop(inspector(view(BIA)), "variant").key).toBe(2);
+    expect(prop(inspector(view(BIA, "group")), "variant").key).toBe(2);
+    // A stamp per Instance of what its changes set: a new value moves it, the same number or not.
+    const before = shown.marks.find((mark) => mark.id === BIA)?.stamp;
+    act(() => {
+      loupe.set(BIA, "variant", "outline", "group");
+    });
+    expect(view().marks.find((mark) => mark.id === BIA)?.stamp).not.toBe(before);
+    expect(view().marks.find((mark) => mark.id === BIA)?.keys).toEqual([2]);
+  });
+
+  it("names an Instance by what it shows on screen", () => {
+    render();
+    const body = listOf(view());
+    expect(group(body, "Button")?.instances.find((item) => item.id === ANA)?.name).toBe("ana");
+    expect(inspector(view(ANA)).name).toBe("ana");
+  });
+
+  it("offers Hold open for a State prop with a true/false choice, and leaves it out of the numbered changes", () => {
+    render();
+    const before = inspector(view(DIALOG));
+    expect(before.hold).toEqual({ prop: "open", held: false, write: { id: DIALOG, prop: "open", scope: "instance" } });
+    act(() => {
+      loupe.set(DIALOG, "open", true);
+    });
+    const shown = view(DIALOG);
+    expect(inspector(shown).hold?.held).toBe(true);
+    // The Proposal shows a held State prop as a state, not a change.
+    expect(listOf(view()).changes).toEqual([]);
+    expect(shown.marks).toEqual([]);
   });
 });

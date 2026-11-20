@@ -31,12 +31,12 @@ describe("resetLoupe", () => {
 
   it("puts what restart returns in a value's place, and stops nothing of it", () => {
     const stop = vi.fn();
-    perPage("test:snapshots", () => ({ list: [1], queue: "capturing" }), {
+    perPage("test:queue", () => ({ list: [1], queue: "running" }), {
       stop,
       restart: (old) => ({ list: [], queue: old.queue }),
     });
     resetLoupe();
-    expect(perPage("test:snapshots", () => ({ list: [9], queue: "idle" }))).toEqual({ list: [], queue: "capturing" });
+    expect(perPage("test:queue", () => ({ list: [9], queue: "idle" }))).toEqual({ list: [], queue: "running" });
     expect(stop).not.toHaveBeenCalled();
   });
 });

@@ -2,17 +2,22 @@
 // verdict and its Instances, the records Suspended for review, and the components
 // seen on this page that aren't mounted now.
 
+import type { ScopeTarget } from "../../runtime/store.js";
+import { formatCurrent } from "../format.js";
+import type { Keys } from "./keys.js";
 import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
-import type { GroupItem, InstanceItem, ListBody, Tag } from "./types.js";
+import type { ChangeItem, GroupItem, InstanceItem, ListBody, Tag } from "./types.js";
 import { componentVerdict } from "./verdict.js";
 import {
   heldValues,
   instanceLabel,
   listSummary,
   notMountedNote,
+  NOT_SET,
   overridesNote,
   pageName,
+  reachText,
   suspendedMeta,
   suspensionReason,
   TAGS,
@@ -21,7 +26,8 @@ import {
   unmountedTag,
 } from "./words.js";
 
-export function listBody(page: Page, reads: Reads): ListBody {
+export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
+  const marked = new Map(keys.marks.map((mark) => [mark.id, mark.keys]));
   const groups = page.groups.map((group): GroupItem => {
     const verdict = componentVerdict(group, reads, page);
     const notes: GroupItem["notes"] = [];
@@ -36,12 +42,22 @@ export function listBody(page: Page, reads: Reads): ListBody {
       const tags: Tag[] = [];
       if (row.rendered === "server") tags.push(TAGS.server);
       if (instanceRecord(page.records, row.id)?.suspended) tags.push(TAGS.suspended);
-      return { id: row.id, label: instanceLabel(row.id, row.hint), mounted: true, tags, values: [] };
+      return {
+        id: row.id,
+        label: instanceLabel(row.id, row.hint),
+        name: reads.name(row.id),
+        keys: marked.get(row.id) ?? [],
+        mounted: true,
+        tags,
+        values: [],
+      };
     });
     const unmounted = group.held.map(
       (entry): InstanceItem => ({
         id: entry.id,
         label: instanceLabel(entry.id, entry.lastSeen?.hint ?? null),
+        name: null,
+        keys: [],
         mounted: false,
         tags: [unmountedTag(entry.record.suspended !== null)],
         // A Suspended record's values are on the "Held for review" card above.
@@ -79,7 +95,49 @@ export function listBody(page: Page, reads: Reads): ListBody {
     suspended,
     suspendedMeta: suspendedMeta(suspended.length),
     summary: listSummary(page.groups.length, page.instanceCount),
+    changes: changeItems(keys, page, reads),
     groups,
     interaction: page.interaction,
   };
+}
+
+/** The plot key's numbered changes as the panel lists them: what each changes, from what to what, and where. */
+export function changeItems(keys: Keys, page: Page, reads: Reads): ChangeItem[] {
+  return keys.changes.map(({ n, record, props }): ChangeItem => {
+    const reached = reachedBy(record.target, record.excluded, page);
+    const [first] = reached;
+    const detail = props
+      .map((prop) => {
+        const from = first ? (reads.appValue(first, prop)?.label ?? NOT_SET) : null;
+        const to = formatCurrent(record.values[prop]);
+        return from === null ? `${prop} → ${to}` : `${prop} ${from} → ${to}`;
+      })
+      .join(", ");
+    const named = first ? reads.name(first) : null;
+    return {
+      n,
+      props: props.join(", "),
+      detail,
+      where: named ? reachText(named, reached.length) : targetLabel(record.target),
+      select: first ?? null,
+      reached,
+    };
+  });
+}
+
+/** The mounted Instances a change reaches now, in page order: its own, or those its scope reaches. */
+function reachedBy(target: ScopeTarget, excluded: readonly string[], page: Page): string[] {
+  return page.rows
+    .filter((candidate) => {
+      if (candidate.rendered !== "client" || excluded.includes(candidate.id)) return false;
+      switch (target.scope) {
+        case "instance":
+          return candidate.id === target.id;
+        case "group":
+          return candidate.anchor === target.anchor;
+        case "page":
+          return candidate.component === target.component && page.route === target.route;
+      }
+    })
+    .map((candidate) => candidate.id);
 }

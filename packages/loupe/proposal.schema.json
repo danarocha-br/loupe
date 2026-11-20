@@ -35,7 +35,7 @@
     "route": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["url", "route", "viewport", "dpr", "theme", "flags", "capturedAt", "changes", "statesShown", "screenshots"],
+      "required": ["url", "route", "viewport", "dpr", "theme", "flags", "capturedAt", "changes", "statesShown"],
       "properties": {
         "url": { "type": ["string", "null"] },
         "route": { "type": "string" },
@@ -50,8 +50,7 @@
         "flags": { "type": "object", "additionalProperties": { "$ref": "#/$defs/json" } },
         "capturedAt": { "type": ["string", "null"], "format": "date-time" },
         "changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
-        "statesShown": { "type": "array", "items": { "$ref": "#/$defs/stateShown" } },
-        "screenshots": { "type": "array", "items": { "$ref": "#/$defs/screenshot" } }
+        "statesShown": { "type": "array", "items": { "$ref": "#/$defs/stateShown" } }
       }
     },
     "callSite": {
@@ -120,8 +119,7 @@
         "overriddenBy",
         "alsoRendersOn",
         "onScreenAtExport",
-        "note",
-        "screenshots"
+        "note"
       ],
       "properties": {
         "id": { "type": "string", "pattern": "^c\\d+$" },
@@ -157,8 +155,7 @@
         "overriddenBy": { "type": "array", "items": { "type": "string", "pattern": "^c\\d+$" } },
         "alsoRendersOn": { "type": "array", "items": { "type": "string" } },
         "onScreenAtExport": { "type": "boolean" },
-        "note": { "type": ["string", "null"] },
-        "screenshots": { "type": "array", "items": { "type": "string" } }
+        "note": { "type": ["string", "null"] }
       }
     },
     "stateShown": {
@@ -174,18 +171,6 @@
         "controlled": { "type": "boolean" },
         "appControlsVia": { "type": "string", "pattern": "^on[A-Z]\\w*Change$" },
         "onScreenAtExport": { "type": "boolean" }
-      }
-    },
-    "screenshot": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "kind", "caption", "before", "after"],
-      "properties": {
-        "id": { "type": "string" },
-        "kind": { "enum": ["viewport", "crop"] },
-        "caption": { "type": "string" },
-        "before": { "type": "string" },
-        "after": { "type": "string" }
       }
     },
     "held": {

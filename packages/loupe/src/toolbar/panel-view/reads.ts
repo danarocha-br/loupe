@@ -6,6 +6,7 @@ import type { InstanceProps, LoupeDebug } from "../../runtime/debug.js";
 import type { Inspection } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import { appValue, formatCurrent } from "../format.js";
+import { screenName } from "./names.js";
 import { NOT_SET } from "./words.js";
 
 /** The app's value for a prop, as a pill counts it: its label, and the value itself unless it is unset. */
@@ -22,6 +23,8 @@ export type Reads = {
   lastSeen(id: string): LastSeen | null;
   /** The adapted Instances around it, nearest first. */
   ancestors(id: string): string[];
+  /** What it is called on screen: its accessible name or visible text; null when it shows none. */
+  name(id: string): string | null;
 };
 
 /**
@@ -41,6 +44,7 @@ export function createReads(debug: LoupeDebug): Reads {
   const inspections = new Map<string, Inspection | null>();
   const props = new Map<string, InstanceProps | null>();
   const values = new Map<string, Map<string, AppValue> | null>();
+  const names = new Map<string, string | null>();
   const reads: Reads = {
     inspect(id) {
       if (!inspections.has(id)) inspections.set(id, orNull(() => debug.inspect(id)));
@@ -71,6 +75,10 @@ export function createReads(debug: LoupeDebug): Reads {
     },
     lastSeen: (id) => debug.lastSeen(id),
     ancestors: (id) => debug.ancestors(id),
+    name(id) {
+      if (!names.has(id)) names.set(id, orNull(() => screenName(debug.nodes(id))));
+      return names.get(id) ?? null;
+    },
   };
   return reads;
 }

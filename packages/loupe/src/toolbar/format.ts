@@ -30,9 +30,10 @@ export function formatCurrent(value: unknown): string {
   return text.length > MAX ? `${text.slice(0, MAX - 1)}…` : text;
 }
 
+/** A default the call site doesn't set: its value when the code says it, else that it is the library's own. */
 export function formatDefault(value: DefaultValue): string {
-  if (value.source === "unknown" || value.value === null) return "DEFAULT";
-  return `DEFAULT ${formatCurrent(value.value)}`;
+  if (value.source === "unknown" || value.value === null) return "library default";
+  return `default ${formatCurrent(value.value)}`;
 }
 
 /**
@@ -49,8 +50,4 @@ export function appValue(row: { set: boolean; value: unknown; default?: DefaultV
 /** "1 change", "3 changes". */
 export function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
-}
-
-export function megabytes(bytes: number): string {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

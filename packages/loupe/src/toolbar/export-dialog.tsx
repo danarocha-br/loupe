@@ -1,41 +1,26 @@
 // The header's Export Proposal and its dialog (PER-99 §8, PER-139), a modal centred
-// on the page (PER-140). The counts and the size warning inform and never block;
-// only an empty title holds Export back.
+// on the page (PER-140). The counts inform and never block; only an empty title
+// holds Export back.
 
 import { type KeyboardEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
-import { REPORT_WARN_BYTES } from "../proposal/report.js";
 import { type ExportPreview, type ExportResult, exportForm, exportProposal, previewExport } from "./export.js";
-import { megabytes, plural } from "./format.js";
+import { plural } from "./format.js";
+import { Key } from "./controls.js";
 import { DownloadIcon } from "./icons.js";
 
-/** "3 changes · 1 without a screenshot · 1 held for review · 0 outdated Snapshots". */
+/** "3 changes · 1 held for review". */
 export function countsLine(preview: ExportPreview): string {
-  return [
-    plural(preview.changes, "change"),
-    `${preview.withoutScreenshot} without a screenshot`,
-    `${preview.held} held for review`,
-    plural(preview.outdatedSnapshots, "outdated Snapshot"),
-  ].join(" · ");
-}
-
-type Done = { label: string; title: string };
-
-/** What the button says after an export: a failed screen capture is said, not only logged. */
-function doneOf(result: ExportResult): Done {
-  if (result.captureFailed === null) return { label: "Exported", title: `Downloaded ${result.fileName}` };
-  return {
-    label: "Exported, no new screen",
-    title: `Downloaded ${result.fileName}, without a screenshot of the screen in view: ${result.captureFailed}`,
-  };
+  return [plural(preview.changes, "change"), `${preview.held} held for review`].join(" · ");
 }
 
 export function ExportButton({ disabled }: { disabled: boolean }) {
   const [open, setOpen] = useState(false);
-  const [done, setDone] = useState<Done | null>(null);
+  /** The file the last export downloaded, while the button says so. */
+  const [done, setDone] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (done === null) return;
-    const timer = setTimeout(() => setDone(null), done.label === "Exported" ? 2500 : 8000);
+    const timer = setTimeout(() => setDone(null), 2500);
     return () => clearTimeout(timer);
   }, [done]);
   // The modal held focus: hand it back once it has gone. While it is still open,
@@ -53,17 +38,17 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
         className="btn primary"
         data-export=""
         disabled={disabled}
-        title={done?.title ?? "Download the HTML report for engineering"}
+        title={done === null ? "Download the HTML report for engineering" : `Downloaded ${done}`}
         onClick={() => setOpen(true)}
       >
         <DownloadIcon />
-        {done?.label ?? "Export Proposal"}
+        {done === null ? "Export Proposal" : "Exported"}
       </button>
       {open && (
         <ExportDialog
           onClose={(result) => {
             setOpen(false);
-            if (result) setDone(doneOf(result));
+            if (result) setDone(result.fileName);
           }}
         />
       )}
@@ -110,7 +95,6 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
   }, []);
 
   const ready = preview !== null && !("failed" in preview);
-  const estimate = ready ? preview.bytes + preview.captureBytes : 0;
   const run = () => {
     if (title.trim() === "" || running.current) return;
     running.current = true;
@@ -192,9 +176,7 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
               <div className="tiles" aria-hidden="true">
                 {[
                   [preview.changes, "Changes"],
-                  [preview.withoutScreenshot, "No screenshot"],
                   [preview.held, "Held"],
-                  [preview.outdatedSnapshots, "Outdated Snapshots"],
                 ].map(([count, label]) => (
                   <div key={label} className="tile">
                     <b>{count}</b>
@@ -205,19 +187,6 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
               <p className="counts sr-only" role="status">
                 {countsLine(preview)}
               </p>
-              <p className="muted">
-                Export captures the screen in view first. Changes without a screenshot read "No screenshot" in the
-                report.
-              </p>
-              {estimate > REPORT_WARN_BYTES && (
-                <div className="warn" role="alert">
-                  <span className="dot" />
-                  <span>
-                    The report will be about {megabytes(estimate)}, over 25 MB: some mail and ticket tools refuse files
-                    that size. Removing Snapshots makes it smaller.
-                  </span>
-                </div>
-              )}
             </>
           )}
         </div>
@@ -229,8 +198,10 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
               </legend>
               {preview.entries.map((entry) => (
                 <label key={entry.key} className="field" data-entry={entry.id}>
-                  <span>
-                    {entry.id} · {entry.label}
+                  <span className="entry">
+                    <Key n={Number(entry.id.slice(1))} />
+                    <span className="sr-only">Change </span>
+                    {entry.label}
                   </span>
                   <textarea
                     rows={2}

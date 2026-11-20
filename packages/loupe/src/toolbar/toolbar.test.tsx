@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The Toolbar's wiring (PER-214): that the panel redraws as the page changes, that
-// selecting, Pick, Hide and the outline work, and that each button makes the
+// selecting, the select tools, Hide and the outline work, and that each button makes the
 // `__loupe` call its data names. What the panel shows is `panel-view.test.tsx`'s,
 // asked of `panelView()` directly.
 
@@ -11,6 +11,7 @@ import { devMount } from "../mount.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { disableOverrides, onRegistryChange } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
+import { LINGER, tagPlace } from "./highlight.js";
 import Toolbar from "./index.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
@@ -74,8 +75,10 @@ const backToList = async () => clickInPanel(panelButton("All components"));
 const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
 const inRow = (prop: string, text: string) =>
   [...row(prop).querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
+/** An option of the row's table; for a true/false prop, its switch, which sets the other value. */
 const pill = (prop: string, option: string) =>
-  row(prop).querySelector<HTMLButtonElement>(`button[data-option='${option}']`) as HTMLButtonElement;
+  (row(prop).querySelector<HTMLButtonElement>(`button[data-option='${option}']`) ??
+    row(prop).querySelector<HTMLButtonElement>(`[role=switch][aria-checked="${option === "true" ? "false" : "true"}"]`)) as HTMLButtonElement;
 const textField = () => row("children").querySelector("textarea") as HTMLTextAreaElement;
 const type = async (field: HTMLTextAreaElement, text: string) => {
   act(() => {
@@ -85,6 +88,11 @@ const type = async (field: HTMLTextAreaElement, text: string) => {
   await settle();
 };
 const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
+/** Ends picking, which a select tool arms, so the page's own clicks go through again. */
+const escape = async () => {
+  act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+  await settle();
+};
 const member = (id: string) => shadow().querySelector<HTMLInputElement>(`input[data-member="${id}"]`) as HTMLInputElement;
 const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>(".ring")].map((ring) => ring.dataset.ring);
 const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
@@ -107,7 +115,7 @@ describe("the Toolbar", () => {
   it("selects from the list, and goes back to it", async () => {
     await mount();
     await select(BIA);
-    expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe(BIA);
+    expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(BIA);
     // What a library set: one collapsed line.
     const injected = [...shadow().querySelectorAll("details")].at(-1) as HTMLDetailsElement;
     expect(injected.querySelector("summary")?.textContent).toBe("1 set by the library");
@@ -120,9 +128,9 @@ describe("the Toolbar", () => {
   it("picks the right one of four repeated row Instances by clicking the page, without the page reacting", async () => {
     const clicked: string[] = [];
     await mount((member) => clicked.push(member));
-    const pick = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Pick") as HTMLButtonElement;
+    const pick = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Select one") as HTMLButtonElement;
     await clickInPanel(pick);
-    expect(pick.getAttribute("aria-pressed")).toBe("true");
+    expect(pick.classList.contains("armed")).toBe(true);
 
     act(() => {
       pageButton("caio").dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
@@ -130,26 +138,26 @@ describe("the Toolbar", () => {
     });
     await settle();
     expect(clicked).toEqual([]);
-    expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe("app/members.tsx › Members › Button[1]#caio");
-    expect(pick.getAttribute("aria-pressed")).toBe("false");
+    expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe("app/members.tsx › Members › Button[1]#caio");
+    expect(pick.classList.contains("armed")).toBe(false);
 
-    // Pick is off again: the page's own clicks go through.
+    // Picking is off again: the page's own clicks go through.
     act(() => pageButton("dani").click());
     expect(clicked).toEqual(["dani"]);
   });
 
-  it("lets Esc and Hide end Pick, after which the page's clicks go through", async () => {
+  it("lets Esc and Hide end picking, after which the page's clicks go through", async () => {
     const clicked: string[] = [];
     await mount((member) => clicked.push(member));
     const button = (text: string) => [...shadow().querySelectorAll("button")].find((b) => b.textContent === text) as HTMLButtonElement;
-    await clickInPanel(button("Pick"));
+    await clickInPanel(button("Select one"));
     act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
     await settle();
-    expect(button("Pick").getAttribute("aria-pressed")).toBe("false");
+    expect(button("Select one").classList.contains("armed")).toBe(false);
     act(() => pageButton("ana").click());
     expect(clicked).toEqual(["ana"]);
 
-    await clickInPanel(button("Pick"));
+    await clickInPanel(button("Select one"));
     await clickInPanel(button("Hide"));
     act(() => pageButton("bia").click());
     expect(clicked).toEqual(["ana", "bia"]);
@@ -181,9 +189,32 @@ describe("the Toolbar", () => {
     expect(() => loupe.reset(item)).toThrow(/No mounted Instance/);
     expect(panelText()).toContain("2 Overrides on this page");
 
+    const before = loupe.records();
     await clickInPanel(panelButton("Reset all"));
     expect(loupe.records()).toEqual([]);
     expect(panelText()).toContain("0 Overrides on this page");
+
+    // It asked nothing, so the footer offers to put them back.
+    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 2 OverridesUndo");
+    await clickInPanel(panelButton("Undo"));
+    expect(loupe.records().map((record) => record.values)).toEqual(before.map((record) => record.values));
+    expect(panelText()).toContain("2 Overrides on this page");
+    expect(shadow().querySelector(".undo")?.textContent).toBe("");
+  });
+
+  it("outlines every Instance a change reaches, a few pixels out, numbered in the panel", async () => {
+    await mount();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+    act(() => {
+      loupe.set(ANA, "variant", "outline");
+    });
+    await settle();
+    const marks = [...shadow().querySelectorAll<HTMLElement>(".mark")];
+    expect(marks.map((mark) => mark.dataset.mark)).toEqual(["1"]);
+    expect([marks[0]?.style.top, marks[0]?.style.left, marks[0]?.style.width, marks[0]?.style.height]).toEqual(["7px", "17px", "86px", "30px"]);
+    // No number on the page: it is on the change's row.
+    expect(marks[0]?.textContent).toBe("");
+    expect(shadow().querySelector(".keylist")?.textContent).toContain("1variant");
   });
 
   it("rings the selected Instance on the page", async () => {
@@ -191,12 +222,49 @@ describe("the Toolbar", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
     await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
     const ring = shadow().querySelector<HTMLElement>(".ring");
-    expect(ring?.style.top).toBe("8px");
-    expect(ring?.textContent).toBe("Button");
+    expect(ring?.style.top).toBe("7px");
+    // Tagged with its component and the size of its box.
+    expect(ring?.textContent).toBe("Button · 80 × 24");
+  });
+
+  it("outlines what a row names when the pointer comes straight from the page", async () => {
+    await mount();
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+    // React skips an enter whose pointer left an element it renders: only `mouseover` sees it.
+    const fromPage = async (element: Element) => {
+      act(() => element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true, relatedTarget: pageButton("ana") })));
+      await settle();
+    };
+    const leave = async (element: Element) => {
+      act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true, relatedTarget: pageButton("ana") })));
+      await settle();
+    };
+    const buttonRow = [...shadow().querySelectorAll("summary")].find((summary) => summary.querySelector(".cname")?.textContent === "Button");
+    await fromPage(buttonRow as HTMLElement);
+    expect(ringKinds()).toEqual(["hover", "hover", "hover", "hover", "hover"]);
+    await leave(buttonRow as HTMLElement);
+    expect(ringKinds()).toEqual([]);
+
+    const instance = instanceButtons().find((button) => button.dataset.instance === BIA) as HTMLButtonElement;
+    await fromPage(instance);
+    expect(ringKinds()).toEqual(["hover"]);
+    await leave(instance);
+
+    // The selection card's Instances, and a page scope's call sites.
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    await escape();
+    await fromPage(member(ANA).closest("li") as HTMLElement);
+    expect(ringKinds()).toEqual(["member"]);
+    await leave(member(ANA).closest("li") as HTMLElement);
+    await clickInPanel(scopeButton("page"));
+    const menuSite = shadow().querySelector(`input[data-site="${MENU}"]`)?.closest("label") as HTMLElement;
+    await fromPage(menuSite);
+    expect(ringKinds()).toEqual(["member"]);
   });
 
   it("adds its methods to __loupe as it mounts, and again after resetLoupe()", async () => {
-    const methods = ["proposal", "proposalMarkdown", "report", "exportProposal", "capture", "retake", "snapshots", "removeSnapshot"];
+    const methods = ["proposal", "proposalMarkdown", "report", "exportProposal"];
     const onLoupe = () => methods.filter((name) => typeof (debugOf() as unknown as Record<string, unknown>)[name] === "function");
     await mount();
     expect(onLoupe()).toEqual(methods);
@@ -218,7 +286,8 @@ describe("controls at This instance", () => {
     expect(pageButton("bia").dataset.variant).toBe("default");
     // Only this Instance: the other rows keep the app's value.
     expect(pageButton("ana").dataset.variant).toBe("ghost");
-    expect(row("variant").querySelector("[data-testid=current]")?.textContent).toBe('Current: "ghost"');
+    // The row reads from the app's value to the Override's.
+    expect(row("variant").querySelector("[data-testid=change]")?.textContent).toBe('"ghost" → "default"');
 
     await clickInPanel(inRow("variant", "Reset"));
     expect(loupe.props(BIA).overrides).toEqual({});
@@ -283,26 +352,29 @@ describe("group and page scopes", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
   });
 
-  it("switches to a group, rings and changes all four, and opens a new selection at This instance", async () => {
+  it("switches to a group with Select multiple, rings and changes all four, and keeps the tool for the next selection", async () => {
     await mount();
     await select(BIA);
     expect(ringKinds()).toEqual(["ring"]);
     await clickInPanel(scopeButton("group"));
     expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
-    expect(ringKinds()).toEqual(["ring", "ring", "ring", "ring"]);
+    // The selected one solid, the others from its call site dashed.
+    expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
 
     await clickInPanel(pill("variant", '"default"'));
     expect(variants()).toEqual(["default", "default", "default", "default"]);
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "group", anchor: members("Button", 1) }]);
     expect(loupe.props(MENU).overrides).toEqual({});
 
-    // Hovering one row of the Instances list rings only that one.
+    // Hovering one row of the Instances list outlines only that one.
     await hover(member(ANA).closest("li") as HTMLElement);
-    expect(ringKinds()).toEqual(["ring"]);
+    expect(ringKinds()).toEqual(["member"]);
 
+    // The select tool is kept: the next selection opens at its call site too.
     await backToList();
     await select(ANA);
-    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    expect(member(BIA).checked).toBe(true);
   });
 
   it("leaves one Instance out with its box, rings it dashed, and resetting the group keeps an Instance Override", async () => {
@@ -318,9 +390,10 @@ describe("group and page scopes", () => {
     await hover(member(BIA).closest("li") as HTMLElement);
     expect(ringKinds()).toEqual(["out"]);
 
-    // Ana gets her own value on top of the group's.
+    // Ana gets her own value on top of the group's, with Select one.
     await backToList();
     await select(ANA);
+    await clickInPanel(scopeButton("instance"));
     await clickInPanel(pill("variant", '"ghost"'));
     expect(inRow("variant", "Reset to group value")).toBeTruthy();
 
@@ -343,11 +416,11 @@ describe("group and page scopes", () => {
     });
     await settle();
     await clickInPanel(row("children").querySelector(".keeping") as HTMLButtonElement);
-    expect(shadow().querySelector("[data-testid=instance-id]")?.textContent).toBe(ANA);
+    expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(ANA);
     expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("opens at This instance again when a scoped Instance comes back after unmounting", async () => {
+  it("keeps Select multiple when a scoped Instance comes back after unmounting", async () => {
     await mount();
     act(() => pageButton("Menu").click());
     await settle();
@@ -355,16 +428,19 @@ describe("group and page scopes", () => {
     await select(item);
     await clickInPanel(scopeButton("group"));
     expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    await escape();
     act(() => pageButton("Menu").click());
     await settle();
     act(() => pageButton("Menu").click());
     await settle();
-    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    expect(shadow().querySelector("[data-testid=members]")).not.toBeNull();
   });
 
-  it("leaves a whole call site out of the page scope in one click", async () => {
+  it("widens Select multiple to the page, and leaves a whole call site out of it in one click", async () => {
     await mount();
     await select(BIA);
+    await clickInPanel(scopeButton("group"));
     await clickInPanel(scopeButton("page"));
     expect(ringKinds()).toHaveLength(5);
     await clickInPanel(shadow().querySelector(`input[data-site="${MENU}"]`) as HTMLInputElement);
@@ -372,6 +448,327 @@ describe("group and page scopes", () => {
     await clickInPanel(pill("variant", '"default"'));
     expect(loupe.props(MENU).overrides).toEqual({});
     expect(variants()).toEqual(["default", "default", "default", "default"]);
+  });
+});
+
+describe("hovering the page while a select tool is armed", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+  });
+
+  /** Moves the pointer onto an element, of the page or of the panel. */
+  const pointTo = async (element: Element) => {
+    act(() => element.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, composed: true })));
+    await settle();
+  };
+  const tag = () => shadow().querySelector<HTMLElement>(".pick-tag");
+  const CAIO = "app/members.tsx › Members › Button[1]#caio";
+
+  it("outlines and tags the Instance under the pointer, in place of the selection, until the pointer leaves the page", async () => {
+    await mount();
+    await select(BIA);
+    expect(ringKinds()).toEqual(["ring"]);
+    await clickInPanel(panelButton("Select one"));
+
+    await pointTo(pageButton("caio"));
+    expect(ringKinds()).toEqual(["pick"]);
+    expect(tag()?.textContent).toBe("Button");
+    expect(tag()?.dataset.tag).toBe(CAIO);
+
+    // Onto another one, then onto the panel: nothing on the page is hovered there.
+    await pointTo(pageButton("Menu"));
+    expect(tag()?.dataset.tag).toBe(MENU);
+    await pointTo(panelButton("Select one"));
+    expect(ringKinds()).toEqual(["ring"]);
+    expect(tag()).toBeNull();
+
+    // Out of the window, and Esc: the selection's outline is back, untagged.
+    await pointTo(pageButton("dani"));
+    act(() => window.dispatchEvent(new MouseEvent("pointerout", { relatedTarget: null })));
+    await settle();
+    expect(tag()).toBeNull();
+    await pointTo(pageButton("dani"));
+    await escape();
+    expect(ringKinds()).toEqual(["ring"]);
+    expect(tag()).toBeNull();
+  });
+
+  it("in Select multiple, outlines every Instance a click would select and counts them on the tag", async () => {
+    await mount();
+    await clickInPanel(panelButton("Select multiple"));
+
+    await pointTo(pageButton("caio"));
+    expect(ringKinds()).toEqual(["pick", "pick", "pick", "pick"]);
+    expect(tag()?.textContent).toBe("Button · 4 from this call site");
+    expect(tag()?.dataset.tag).toBe(CAIO);
+
+    // Along the same call site, the outlines stay and the tag moves.
+    await pointTo(pageButton("ana"));
+    expect(ringKinds()).toEqual(["pick", "pick", "pick", "pick"]);
+    expect(tag()?.dataset.tag).toBe(ANA);
+
+    // The Menu's call site has one.
+    await pointTo(pageButton("Menu"));
+    expect(ringKinds()).toEqual(["pick"]);
+    expect(tag()?.textContent).toBe("Button · 1 from this call site");
+
+    // The click selects what was outlined.
+    act(() => pageButton("caio").click());
+    await settle();
+    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    expect(ringKinds()).toEqual(["member", "member", "ring", "member"]);
+    expect(tag()).toBeNull();
+  });
+
+  it("dashes an Instance left out of the call site's group, as the click will", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    await clickInPanel(pill("variant", '"default"'));
+    await clickInPanel(member(BIA));
+    await backToList();
+    // Re-scoping armed Select multiple, and it stays armed.
+    expect(panelButton("Select multiple").classList.contains("armed")).toBe(true);
+
+    await pointTo(pageButton("ana"));
+    expect(ringKinds()).toEqual(["pick", "out", "pick", "pick"]);
+    expect(tag()?.textContent).toBe("Button · 4 from this call site");
+  });
+
+  it("says Inspect only of an Instance no Override can reach, and previews it alone in Select multiple", async () => {
+    await mount();
+    act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
+    await settle();
+    await clickInPanel(panelButton("Select multiple"));
+
+    await pointTo(pageButton("caio"));
+    expect(ringKinds()).toEqual(["pick"]);
+    expect(tag()?.textContent).toBe("Button · Inspect only");
+    expect(tag()?.querySelector(".detail")?.textContent).toBe(" · Inspect only");
+  });
+});
+
+describe("leaving a selection, and hiding the marks", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+  });
+
+  const selectedId = () => shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id") ?? null;
+  /** A click with the pointer: a keyboard's or a script's has no `detail`. */
+  const press = async (element: Element) => {
+    act(() => element.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true, detail: 1 })));
+    await settle();
+  };
+  const keyEscape = async (target: EventTarget) => {
+    act(() => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true })));
+    await settle();
+  };
+  const hideMarks = () => shadow().querySelector<HTMLButtonElement>("button[data-marks]") as HTMLButtonElement;
+  const changeOutlines = () => shadow().querySelectorAll(".mark").length;
+  const status = () => shadow().querySelector(".status-line")?.textContent ?? "";
+
+  it("goes back to the list on Esc, and the app still gets the key", async () => {
+    await mount();
+    const keys: string[] = [];
+    const listen = (event: KeyboardEvent) => keys.push(event.key);
+    document.addEventListener("keydown", listen);
+    await select(BIA);
+    await keyEscape(document.body);
+    document.removeEventListener("keydown", listen);
+    expect(selectedId()).toBeNull();
+    expect(panelText()).toContain("On this page");
+    expect(ringKinds()).toEqual([]);
+    expect(keys).toEqual(["Escape"]);
+  });
+
+  it("leaves Esc to a select tool first, to the app's open dialog, and to a text field", async () => {
+    await mount();
+    await select(ANA);
+    // Armed, Esc stops picking and keeps the selection; the next Esc deselects.
+    await clickInPanel(panelButton("Select one"));
+    await escape();
+    expect(panelButton("Select one").classList.contains("armed")).toBe(false);
+    expect(selectedId()).toBe(ANA);
+
+    // The app's dialog closes on its own Esc.
+    act(() => pageButton("Abrir").click());
+    await settle();
+    await escape();
+    expect(selectedId()).toBe(ANA);
+    act(() => pageButton("Fechar").click());
+    await settle();
+
+    await keyEscape(textField());
+    expect(selectedId()).toBe(ANA);
+
+    await escape();
+    expect(selectedId()).toBeNull();
+  });
+
+  it("goes back to the list on a click on the page outside the selection, which still reaches the app", async () => {
+    const clicked: string[] = [];
+    await mount((member) => clicked.push(member));
+    await select(BIA);
+    await press(pageButton("ana"));
+    expect(clicked).toEqual(["ana"]);
+    expect(selectedId()).toBeNull();
+  });
+
+  it("keeps the selection on a click on a selected Instance, in the panel, or from the keyboard", async () => {
+    const clicked: string[] = [];
+    await mount((member) => clicked.push(member));
+    await select(BIA);
+    await press(pageButton("bia"));
+    await press(shadow().querySelector(".panel") as HTMLElement);
+    act(() => pageButton("ana").click());
+    await settle();
+    expect(clicked).toEqual(["bia", "ana"]);
+    expect(selectedId()).toBe(BIA);
+
+    // With Select multiple, every Instance from the call site is selected; another one isn't.
+    await clickInPanel(scopeButton("group"));
+    await escape();
+    await press(pageButton("dani"));
+    expect(selectedId()).toBe(BIA);
+    await press(pageButton("Menu"));
+    expect(selectedId()).toBeNull();
+    expect(clicked).toEqual(["bia", "ana", "dani"]);
+  });
+
+  it("hides the selection's outlines and the changes', keeping the selection, the preview and a hovered row", async () => {
+    await mount();
+    act(() => {
+      loupe.set(MENU, "variant", "default");
+    });
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    await escape();
+    expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
+    expect(changeOutlines()).toBe(1);
+
+    await clickInPanel(hideMarks());
+    expect(hideMarks().getAttribute("aria-pressed")).toBe("true");
+    expect(ringKinds()).toEqual([]);
+    expect(changeOutlines()).toBe(0);
+    expect(selectedId()).toBe(BIA);
+    expect(status()).toBe("Outlines are hidden on the page");
+
+    // What follows the pointer still shows: a hovered row of the Instances list, and a pick's preview.
+    await hover(member(ANA).closest("li") as HTMLElement);
+    expect(ringKinds()).toEqual(["member"]);
+    act(() => member(ANA).closest("li")?.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
+    await settle();
+    expect(ringKinds()).toEqual([]);
+    await clickInPanel(panelButton("Select one"));
+    act(() => pageButton("caio").dispatchEvent(new MouseEvent("pointermove", { bubbles: true, composed: true })));
+    await settle();
+    expect(ringKinds()).toEqual(["pick"]);
+    await escape();
+
+    // Select one re-scoped the selection to BIA alone.
+    await clickInPanel(hideMarks());
+    expect(hideMarks().getAttribute("aria-pressed")).toBe("false");
+    expect(ringKinds()).toEqual(["ring"]);
+    expect(changeOutlines()).toBe(1);
+    expect(status()).toBe("");
+  });
+});
+
+describe("a change landing on the page", () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+    LINGER.ms = 120;
+  });
+  afterEach(() => {
+    LINGER.ms = 2000;
+  });
+
+  /** Longer than the shortened linger. */
+  const linger = async () => {
+    for (let i = 0; i < 4; i++) await settle();
+  };
+  const quiet = () => [...shadow().querySelectorAll<HTMLElement>(".ring, .mark")].map((outline) => outline.classList.contains("quiet"));
+  const changeRow = () => shadow().querySelector<HTMLButtonElement>(".keylist button") as HTMLButtonElement;
+  const footerKey = () => shadow().querySelector<HTMLButtonElement>(".footer-keys button") as HTMLButtonElement;
+  const leave = async (element: Element) => {
+    act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
+    await settle();
+  };
+
+  it("outlines what a change reaches as it lands, then fades the outlines, the selection's too", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    await escape();
+    // Nothing has changed yet: the selection stays outlined.
+    await linger();
+    expect(quiet()).toEqual([false, false, false, false]);
+
+    await clickInPanel(pill("variant", '"default"'));
+    expect(quiet()).toEqual([false, false, false, false]);
+    await linger();
+    expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
+    expect(quiet()).toEqual([true, true, true, true]);
+
+    // Pointing at the change in the footer outlines what it reaches again, while pointed.
+    await hover(footerKey());
+    expect(quiet()).toEqual([false, false, false, false]);
+    await leave(footerKey());
+    expect(quiet()).toEqual([true, true, true, true]);
+
+    // Another value lands again, under the same number.
+    await clickInPanel(pill("variant", '"ghost"'));
+    expect(quiet()).toEqual([false, false, false, false]);
+    await linger();
+    expect(quiet()).toEqual([true, true, true, true]);
+  });
+
+  it("with nothing selected, outlines a change's Instances while its row is pointed at, and on selecting one", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(scopeButton("group"));
+    await escape();
+    await clickInPanel(pill("variant", '"default"'));
+    await backToList();
+    await linger();
+    expect(shadow().querySelectorAll(".mark").length).toBe(4);
+    expect(quiet()).toEqual([true, true, true, true]);
+
+    // Its own dashed outline, not a grey hover one; and pointed at straight from the app's page.
+    act(() => changeRow().dispatchEvent(new MouseEvent("mouseover", { bubbles: true, composed: true, relatedTarget: pageButton("ana") })));
+    await settle();
+    expect(quiet()).toEqual([false, false, false, false]);
+    expect(ringKinds()).toEqual([]);
+    await leave(changeRow());
+    expect(quiet()).toEqual([true, true, true, true]);
+
+    // Selecting one it reaches shows the selection a moment, then it steps back.
+    await select(ANA);
+    expect(quiet()).toEqual([false, false, false, false]);
+    await linger();
+    expect(quiet()).toEqual([true, true, true, true]);
+  });
+});
+
+describe("tagPlace", () => {
+  const page = { width: 1000, height: 700 };
+  const size = { width: 120, height: 21 };
+
+  it("sits on the ring's top left", () => {
+    expect(tagPlace({ top: 100, left: 40, width: 200, height: 30 }, size, page)).toEqual({ top: 75, left: 40 });
+  });
+
+  it("goes below the ring when there is no room above", () => {
+    expect(tagPlace({ top: 10, left: 40, width: 200, height: 30 }, size, page)).toEqual({ top: 44, left: 40 });
+  });
+
+  it("goes inside the ring's top when it fills the page", () => {
+    expect(tagPlace({ top: -50, left: 0, width: 1000, height: 900 }, size, page)).toEqual({ top: 6, left: 6 });
+  });
+
+  it("slides back onto the page at either side", () => {
+    expect(tagPlace({ top: 100, left: 950, width: 40, height: 30 }, size, page).left).toBe(874);
+    expect(tagPlace({ top: 100, left: -30, width: 40, height: 30 }, size, page).left).toBe(6);
   });
 });
 

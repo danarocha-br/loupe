@@ -1,11 +1,7 @@
 // The exported report (PER-99 §7, PER-139): one self-contained HTML file an
 // engineer who wasn't in the session can act on. It carries the Proposal JSON in a
-// `<script type="application/json">` block, which a button downloads on its own,
-// and its screenshots as the JSON's own data URLs. Pure: a string from a Proposal.
-//
-// The images are drawn by a small inline script from the embedded JSON, so the
-// file holds each image once rather than once in the JSON and again in the markup.
-// Without scripts the text still reads in full.
+// `<script type="application/json">` block, which a button downloads on its own.
+// Pure: a string from a Proposal. Without scripts the text still reads in full.
 
 import { callSiteLabels } from "../call-site.js";
 import { plural } from "../toolbar/format.js";
@@ -16,15 +12,11 @@ import type {
   ProposalChange,
   ProposalProp,
   ProposalRoute,
-  ProposalScreenshot,
   WrittenAs,
 } from "./types.js";
 import { siteCount } from "./words.js";
 
 export const REPORT_DATA_ID = "loupe-proposal";
-
-/** Above this, the export dialog warns that the file may be too big to attach. It never blocks. */
-export const REPORT_WARN_BYTES = 25 * 1024 * 1024;
 
 export type ReportOptions = {
   /** The report's own file name; the changes file downloads under the same stem as `.json`. */
@@ -149,16 +141,7 @@ function instancesHtml(change: ProposalChange): string {
   return lines.length === 0 ? "" : `<ul class="instances">${lines.join("")}</ul>`;
 }
 
-function pairHtml(shot: ProposalScreenshot): string {
-  const side = (label: "Before" | "After") =>
-    `<figure><figcaption>${label}</figcaption><img data-shot="${escapeHtml(shot.id)}" data-side="${label.toLowerCase()}" alt="${escapeHtml(`${label}: ${shot.caption}`)}"></figure>`;
-  return `<div class="pair" id="${escapeHtml(shot.id)}"><p class="caption">${escapeHtml(shot.id)} · ${escapeHtml(shot.caption)}</p><div class="sides">${side("Before")}${side("After")}</div></div>`;
-}
-
-function changeHtml(change: ProposalChange, route: ProposalRoute): string {
-  const shots = change.screenshots
-    .map((id) => route.screenshots.find((shot) => shot.id === id))
-    .filter((shot): shot is ProposalScreenshot => shot !== undefined);
+function changeHtml(change: ProposalChange): string {
   const facts: string[] = [];
   if (change.needsCondition) facts.push(`<p class="condition"><strong>Needs a condition:</strong> ${escapeHtml(change.needsCondition)}</p>`);
   if (!change.onScreenAtExport) facts.push('<p class="muted">Not on screen at export: Current values are as last seen.</p>');
@@ -178,7 +161,6 @@ ${where}
 ${facts.join("\n")}
 ${instancesHtml(change)}
 ${change.note ? `<blockquote class="note"><strong>Note:</strong> ${escapeHtml(change.note)}</blockquote>` : ""}
-<div class="shots">${shots.length > 0 ? shots.map(pairHtml).join("") : '<p class="muted">No screenshot: not captured on this route.</p>'}</div>
 </article>`;
 }
 
@@ -191,7 +173,7 @@ function changesSection(proposal: Proposal): string {
   const body =
     routes.length === 0
       ? '<p class="muted">No changes proposed.</p>'
-      : routes.map((route) => `<div class="route">${routeHeading(route)}${route.changes.map((change) => changeHtml(change, route)).join("\n")}</div>`).join("\n");
+      : routes.map((route) => `<div class="route">${routeHeading(route)}${route.changes.map(changeHtml).join("\n")}</div>`).join("\n");
   return `<section id="changes"><h2>Proposed changes</h2>${body}</section>`;
 }
 
@@ -201,11 +183,11 @@ function statesSection(proposal: Proposal): string {
       const instance = state.keyPath ? `, Instance ${code(state.keyPath)}` : "";
       const how = state.controlled ? `the app controls it via ${code(state.appControlsVia)}` : "the component owns this state";
       const screen = state.onScreenAtExport ? "" : " Not on screen at export.";
-      return `<li>${code(state.prop)} held at ${code(JSON.stringify(state.forced))} on ${code(`<${state.component}>`)}${instance} on ${code(route.route)}: ${how}. Context for the screenshots, not a change.${screen}<div class="muted">Anchor: ${code(state.anchor)}</div></li>`;
+      return `<li>${code(state.prop)} held at ${code(JSON.stringify(state.forced))} on ${code(`<${state.component}>`)}${instance} on ${code(route.route)}: ${how}. Context, not a change.${screen}<div class="muted">Anchor: ${code(state.anchor)}</div></li>`;
     }),
   );
   const body = items.length === 0 ? '<p class="muted">None.</p>' : `<ul>${items.join("")}</ul>`;
-  return `<section id="states"><h2>States shown</h2><p class="muted">States held open or set to take the screenshots. Don't change the app's code for these.</p>${body}</section>`;
+  return `<section id="states"><h2>States shown</h2><p class="muted">States held open or set so the changes could be seen. Don't change the app's code for these.</p>${body}</section>`;
 }
 
 function heldSection(proposal: Proposal): string {
@@ -242,19 +224,15 @@ function contextHtml(route: ProposalRoute): string {
     );
     parts.push(`<li>States held: ${states.join(", ")}</li>`);
   }
-  if (route.capturedAt) parts.push(`<li>Page last read at ${when(route.capturedAt)}; each screen's caption gives its own viewport</li>`);
+  if (route.capturedAt) parts.push(`<li>Page last read at ${when(route.capturedAt)}</li>`);
   return `<ul class="context">${parts.join("")}</ul>`;
 }
 
-function screensSection(proposal: Proposal): string {
+function pagesSection(proposal: Proposal): string {
   const body = proposal.routes
-    .map((route) => {
-      const viewports = route.screenshots.filter((shot) => shot.kind === "viewport");
-      const shots = viewports.length > 0 ? viewports.map(pairHtml).join("") : '<p class="muted">No screen captured on this route.</p>';
-      return `<div class="route" data-route="${escapeHtml(route.route)}">${routeHeading(route)}${contextHtml(route)}${shots}</div>`;
-    })
+    .map((route) => `<div class="route" data-route="${escapeHtml(route.route)}">${routeHeading(route)}${contextHtml(route)}</div>`)
     .join("\n");
-  return `<section id="screens"><h2>Screens</h2><p class="muted">Each screen as the designer saw it: before is the app as it is, after has the proposed changes.</p>${body}</section>`;
+  return `<section id="pages"><h2>Pages</h2><p class="muted">Each page as the designer last saw it.</p>${body}</section>`;
 }
 
 function headerHtml(proposal: Proposal, jsonName: string): string {
@@ -273,7 +251,7 @@ function headerHtml(proposal: Proposal, jsonName: string): string {
 ${dirty}
 <p>${plural(changes, "change")} · ${plural(states, "State shown", "States shown")} · ${proposal.heldForReview.length} held for review</p>
 <p><button type="button" data-download-json="${escapeHtml(jsonName)}">Download the changes file (${escapeHtml(jsonName)})</button></p>
-<noscript><p class="warning">Screenshots and the download need JavaScript. The changes file is in this page's source, in the script block with id ${REPORT_DATA_ID}.</p></noscript>
+<noscript><p class="warning">The download needs JavaScript. The changes file is in this page's source, in the script block with id ${REPORT_DATA_ID}.</p></noscript>
 </header>`;
 }
 
@@ -297,27 +275,13 @@ th, td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom:
 thead th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: #555; }
 .condition { background: #f3e8fe; border-radius: 8px; padding: 8px 12px; }
 .note { margin: 8px 0; padding: 8px 12px; border-left: 3px solid #a343f5; background: #faf6fe; white-space: pre-wrap; }
-.pair { margin: 12px 0; }
-.caption { margin: 0 0 6px; color: #555; font-size: 13px; }
-.sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-figure { margin: 0; }
-figcaption { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: #555; }
-img { display: block; max-width: 100%; border: 1px solid #e3e6e7; border-radius: 6px; }
 button { font: inherit; cursor: pointer; padding: 6px 12px; border-radius: 6px; border: 1px solid #c9cecf; background: #fff; }
 `;
 
-/** Draws the images from the embedded JSON and downloads the JSON alone. Runs once, inline. */
+/** Downloads the JSON alone, from the embedded block. Runs once, inline. */
 const SCRIPT = `(function () {
   var block = document.getElementById(${JSON.stringify(REPORT_DATA_ID)});
   var proposal = JSON.parse(block.textContent);
-  var shots = {};
-  proposal.routes.forEach(function (route) {
-    route.screenshots.forEach(function (shot) { shots[shot.id] = shot; });
-  });
-  document.querySelectorAll("img[data-shot]").forEach(function (img) {
-    var shot = shots[img.getAttribute("data-shot")];
-    if (shot) img.setAttribute("src", img.getAttribute("data-side") === "before" ? shot.before : shot.after);
-  });
   document.querySelectorAll("[data-download-json]").forEach(function (button) {
     button.addEventListener("click", function () {
       // The block escapes "<" to stay a script block; the file itself is plain JSON.
@@ -351,7 +315,7 @@ ${headerHtml(proposal, jsonName)}
 ${changesSection(proposal)}
 ${statesSection(proposal)}
 ${heldSection(proposal)}
-${screensSection(proposal)}
+${pagesSection(proposal)}
 <section id="apply"><h2>How to apply</h2><p>${escapeHtml(proposal.howToApply)}</p></section>
 </main>
 <script type="application/json" id="${REPORT_DATA_ID}">${scriptSafeJson(proposal)}</script>

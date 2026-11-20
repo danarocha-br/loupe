@@ -1,6 +1,6 @@
-// A value as the Proposal's JSON holds it. The builder and the Toolbar's Snapshots both
-// turn what an Instance showed into JSON the same way. It reads only the Toolbar's
-// formatting of a value and the Proposal's types.
+// A value as the Proposal's JSON holds it: how the builder turns what an Instance
+// showed into JSON. It reads only the Toolbar's formatting of a value and the
+// Proposal's types.
 
 import { formatCurrent } from "../toolbar/format.js";
 import type { JsonValue } from "./types.js";

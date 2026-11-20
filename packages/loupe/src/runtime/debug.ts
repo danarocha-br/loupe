@@ -16,6 +16,7 @@
 //                                          the mounted Instances it names (none: "No Instance mounted")
 //   __loupe.reapply(target)                a "code changed" record applies again (target: a record's `target`)
 //   __loupe.discard(target)                drops a record, mounted or not
+//   __loupe.restore(records)               puts records from `records()` back: undo for a discard
 //   __loupe.lastSeen(id)                   an unmounted Instance as it last rendered, or null
 //   __loupe.pick(element)          the Instance that rendered a DOM node
 //   __loupe.scan()                 server-rendered Instances, from React's `_debugInfo`
@@ -109,6 +110,8 @@ export type LoupeDebug = {
   records(): RecordRow[];
   reapply(target: ScopeTarget): RecordRow[];
   discard(target: ScopeTarget): RecordRow[];
+  /** Puts records `records()` returned back as they were: undo for `discard`. */
+  restore(records: readonly OverrideRecord[]): RecordRow[];
   /** An Instance that unmounted, as it last rendered: null while it is mounted or was never seen. */
   lastSeen(id: string): LastSeen | null;
   pick(element: Element): string | null;
@@ -341,6 +344,12 @@ function createDebug(): LoupeDebug {
     discard(target) {
       assertEditable();
       reg.store.reset(target);
+      return records();
+    },
+
+    restore(saved) {
+      assertEditable();
+      reg.store.restore(saved);
       return records();
     },
 

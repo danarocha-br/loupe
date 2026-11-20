@@ -10,20 +10,13 @@ import { proposalReport, REPORT_DATA_ID, reportFileName } from "./report.js";
 import { HOW_TO_APPLY, type Proposal } from "./types.js";
 
 // A Membros Proposal as an engineer would receive it: one change of each scope,
-// a label text change, a State shown, a held record, a second route and Snapshots.
+// a label text change, a State shown, a held record and a second route.
 
 const ROUTE = "/org/acme/configuracoes/membros";
 const FILE = "apps/app/components/product/member-row-menu.tsx";
 const siteAt = (path: string, enclosing: string, component: string, ordinal = 1) =>
   callSiteId({ path, enclosing, component, ordinal });
 const TRIGGER = siteAt(FILE, "MemberRowMenu", "Button");
-const shot = (id: string, kind: "viewport" | "crop", caption: string) => ({
-  id,
-  kind,
-  caption,
-  before: `data:image/webp;base64,${id}-before`,
-  after: `data:image/webp;base64,${id}-after`,
-});
 
 function sample(): Proposal {
   return {
@@ -72,7 +65,6 @@ function sample(): Proposal {
             alsoRendersOn: ["/org/acme/configuracoes/organizacao"],
             onScreenAtExport: true,
             note: "Rows feel heavy </script><script>window.pwned = true</script>",
-            screenshots: ["s2"],
           },
           {
             id: "c2",
@@ -98,7 +90,6 @@ function sample(): Proposal {
             alsoRendersOn: [],
             onScreenAtExport: false,
             note: null,
-            screenshots: [],
           },
           {
             id: "c3",
@@ -128,7 +119,6 @@ function sample(): Proposal {
             alsoRendersOn: [],
             onScreenAtExport: true,
             note: null,
-            screenshots: [],
           },
         ],
         statesShown: [
@@ -143,10 +133,6 @@ function sample(): Proposal {
             onScreenAtExport: true,
           },
         ],
-        screenshots: [
-          shot("s1", "viewport", `Screen 1: ${ROUTE}`),
-          shot("s2", "crop", "c1: variant, size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"),
-        ],
       },
       {
         url: null,
@@ -158,7 +144,6 @@ function sample(): Proposal {
         capturedAt: null,
         changes: [],
         statesShown: [],
-        screenshots: [],
       },
     ],
     heldForReview: [
@@ -255,7 +240,7 @@ describe("the HTML report", () => {
     (change.callSites[0] as { anchor: string }).anchor = siteAt("x", "<svg onload=window.pwned=1>", "Button");
     const { win, doc } = open(proposalReport(proposal));
     expect(win.pwned).toBeUndefined();
-    expect(doc.querySelectorAll("img:not([data-shot]), b, i, svg")).toHaveLength(0);
+    expect(doc.querySelectorAll("img, b, i, svg")).toHaveLength(0);
     expect(text(doc.querySelector("h1"))).toBe("<img src=x onerror=window.pwned=1>");
     expect(text(doc.querySelector("header"))).toContain("<i>not a date</i>");
   });
@@ -266,7 +251,7 @@ describe("the HTML report", () => {
       "Proposed changes",
       "States shown",
       "Held for review, do not apply",
-      "Screens",
+      "Pages",
       "How to apply",
     ]);
   });
@@ -333,17 +318,6 @@ describe("the HTML report", () => {
     expect(text(doc.querySelector('[data-change="c2"] .instances'))).toBe("Covers 1");
   });
 
-  it("shows a change's crop pair, or says it has none", () => {
-    const { doc } = open(proposalReport(sample()));
-    const images = [...doc.querySelectorAll('[data-change="c1"] img')] as HTMLImageElement[];
-    expect(images.map((image) => image.getAttribute("src"))).toEqual(["data:image/webp;base64,s2-before", "data:image/webp;base64,s2-after"]);
-    expect(images.map((image) => image.alt)).toEqual([
-      "Before: c1: variant, size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1",
-      "After: c1: variant, size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1",
-    ]);
-    expect(text(doc.querySelector('[data-change="c2"] .shots'))).toBe("No screenshot: not captured on this route.");
-  });
-
   it("lists States shown as context, and held records as not to apply", () => {
     const { doc } = open(proposalReport(sample()));
     const states = text(doc.querySelector("#states"));
@@ -355,19 +329,17 @@ describe("the HTML report", () => {
     expect(held).toContain('variant → "ghost"');
   });
 
-  it("identifies each screen by URL, viewport, density, theme, flags and the states held on it", () => {
+  it("identifies each page by URL, viewport, density, theme, flags and the states held on it", () => {
     const { doc } = open(proposalReport(sample()));
-    const screen = doc.querySelector(`[data-route="${ROUTE}"]`);
-    const context = text(screen?.querySelector(".context"));
+    const page = doc.querySelector(`#pages [data-route="${ROUTE}"]`);
+    const context = text(page?.querySelector(".context"));
     expect(context).toContain(`http://localhost:3131${ROUTE}?tab=ativos`);
     expect(context).toContain("1440×900 CSS px at 2x");
     expect(context).toContain("dark theme");
     expect(context).toContain("Flags previewed: new-roles = true");
     expect(context).toContain("States held: open = true on <AlertDialog> (user_2)");
-    const viewport = [...(screen?.querySelectorAll("img") ?? [])] as HTMLImageElement[];
-    expect(viewport.map((image) => image.getAttribute("src"))).toEqual(["data:image/webp;base64,s1-before", "data:image/webp;base64,s1-after"]);
-    const other = text(doc.querySelector('[data-route="/org/acme/configuracoes/organizacao"]'));
-    expect(other).toContain("No screen captured on this route.");
+    const other = text(doc.querySelector('#pages [data-route="/org/acme/configuracoes/organizacao"]'));
+    expect(other).toContain("Flags previewed: none");
   });
 
   it("states the counting rule", () => {

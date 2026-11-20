@@ -183,6 +183,14 @@ export function hostNodesOf(fiber: Fiber | null): Element[] {
   return found.reverse();
 }
 
+/**
+ * The DOM elements a fiber is or renders: a DOM element's fiber is its element,
+ * as React records a Server Component on the first fiber of its output (PER-212).
+ */
+export function ownNodesOf(fiber: Fiber): Element[] {
+  return fiber.tag === HOST_COMPONENT && fiber.stateNode instanceof Element ? [fiber.stateNode] : hostNodesOf(fiber);
+}
+
 /** Calls `visit` for every fiber under `root`, depth first, without recursion. */
 export function walkFibers(root: Fiber, visit: (fiber: Fiber) => void): void {
   const stack: Fiber[] = [root];

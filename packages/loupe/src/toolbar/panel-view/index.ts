@@ -4,14 +4,15 @@
 
 import { createReads } from "./reads.js";
 import { inspectorBody } from "./inspector.js";
-import { listBody } from "./list.js";
+import { changeKeys } from "./keys.js";
+import { changeItems, listBody } from "./list.js";
 import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
 import type { PanelInput, PanelView } from "./types.js";
-import { footerCount, OVERRIDES_OFF_TITLE, overridesOffBanner } from "./words.js";
+import { footerCount, headerReport, OVERRIDES_OFF_TITLE, overridesOffBanner } from "./words.js";
 
 export type * from "./types.js";
-export { TEXT } from "./words.js";
+export { TEXT, THIS_INSTANCE } from "./words.js";
 
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides
@@ -31,6 +32,17 @@ export function panelView(input: PanelInput): PanelView {
       : null;
   const scoped = view && present(view, reads);
   const scope = scoped ? input.scope : "instance";
+  const keys = changeKeys(page.records, page.rows, page.route);
+  const changes = changeItems(keys, page, reads);
+  // State props an Instance Override holds: Overrides, but shown as states, not numbered changes.
+  const stateProps = new Map(page.rows.map((candidate) => [candidate.id, candidate.stateProps]));
+  const held = page.records.reduce(
+    (sum, record) =>
+      record.target.scope === "instance" && !record.suspended
+        ? sum + Object.keys(record.values).filter((prop) => stateProps.get((record.target as { id: string }).id)?.includes(prop)).length
+        : sum,
+    0,
+  );
   return {
     scope,
     seen: page.seen,
@@ -41,7 +53,8 @@ export function panelView(input: PanelInput): PanelView {
       members: scoped?.members ?? null,
     },
     instanceCount: page.instanceCount,
-    header: { exportEnabled: page.records.length > 0 },
+    marks: keys.marks,
+    header: { exportEnabled: page.records.length > 0, route: page.route, report: headerReport(page.route, changes.length, held) },
     banner: page.status.overrides ? null : { title: OVERRIDES_OFF_TITLE, body: overridesOffBanner(page.status.reason) },
     footer: {
       countText: footerCount(page.overrideCount),
@@ -50,7 +63,8 @@ export function panelView(input: PanelInput): PanelView {
       // `discard` takes a record's target, so it also drops a record whose Instance
       // isn't mounted, where `reset(id)` throws (PER-128).
       resetAll: page.overrideCount > 0 && page.status.overrides ? page.records.map((record) => record.target) : [],
+      keys: changes,
     },
-    body: selected === null ? listBody(page, reads) : inspectorBody(selected, row, page, reads, { scope, scoped }),
+    body: selected === null ? listBody(page, reads, keys) : inspectorBody(selected, row, page, reads, { scope, scoped }, keys),
   };
 }

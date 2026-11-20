@@ -25,7 +25,7 @@ function inParentheses(reason: string | undefined): string {
 export const NOTES: Record<NoteKind, { title: string; text(status: Status): string }> = {
   server: {
     title: "On the server",
-    text: () => "Rendered on the server: it can't be previewed in the MVP.",
+    text: () => "Rendered by a Server Component, so Loupe can show its props but can't change them.",
   },
   // The panel's banner says this instead (PER-184), so it reaches a card only while
   // the page and the inspection disagree about the status, for a frame.
@@ -98,13 +98,13 @@ export const unmountedTag = (suspended: boolean): Tag => (suspended ? TAGS.suspe
 
 /** Sentences the panel shows whatever is on the page. */
 export const TEXT = {
-  nothingSelected: "Nothing selected. Pick a component below or click one on the page.",
-  seenNotMounted: "Seen on this page, not mounted now: open its menu or dialog to inspect it.",
+  nothingSelected: "Nothing selected. Choose a component below, or pick a select tool above and click one on the page.",
+  seenNotMounted: "Seen on this page, not mounted now. Select its menu or dialog and press Hold open to inspect it.",
   notOnPage: "Not on the page now",
-  showsWhenMounted: "It shows here again when it mounts, for example when its menu or dialog opens.",
+  showsWhenMounted: "It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open.",
   untick: "Untick one to leave it out: it keeps its own value.",
-  current: "Current:",
-  state: "STATE",
+  current: "App value:",
+  state: "State prop",
   empty: "empty",
   none: "None",
   run: "Run",
@@ -130,7 +130,8 @@ export function listSummary(components: number, instances: number): string {
 }
 
 export const timesText = (count: number) => `×${count}`;
-export const overridesNote = (count: number) => plural(count, "override");
+/** How many of a component's Instances an Override changes: one unit, Instances, beside the footer's Overrides. */
+export const overridesNote = (count: number) => `${plural(count, "Instance")} changed`;
 export const notMountedNote = (count: number) => `${count} not mounted`;
 
 /** The call site's file and line, then the key path that tells repeated Instances apart. */
@@ -182,6 +183,27 @@ function currentLastSeen(lastSeen: LastSeen | null, prop: string): string {
 
 export const suspendedMeta = (count: number) => `${count} · apply to nothing`;
 
+/**
+ * The header's report line: the page, its numbered changes, and the State props
+ * held open, which count as Overrides in the footer but are no numbered change.
+ */
+export function headerReport(route: string, changes: number, held: number): string {
+  const parts = [pageName(route)];
+  if (changes > 0) parts.push(plural(changes, "change"));
+  if (held > 0) parts.push(`${held} held`);
+  return parts.join(" · ");
+}
+
+/** What a numbered change reaches, by name: "Actions for Ana Souza", "Actions for Ana Souza and 3 more". */
+export function reachText(first: string, count: number): string {
+  return count > 1 ? `${first} and ${count - 1} more` : first;
+}
+
+/** The component and where its call site is: "Button · member-row-menu.tsx:37". */
+export function whereText(component: string, site: { path: string; line: number } | null): string {
+  return site ? `${component} · ${site.path.split("/").at(-1)}:${site.line}` : component;
+}
+
 export function footerCount(count: number): string {
   return `${plural(count, "Override")} on this page`;
 }
@@ -204,6 +226,13 @@ export const injectedSummary = (count: number) => `${count} set by the library`;
 export const INSPECT_ONLY_OVERRIDES_OFF = "Overrides off";
 
 export const NO_GROUP = { label: "No call site group", title: "No call site was anchored here, so it has no group." };
+
+// ── The pick tag: what a click on the page would select (2026-11-20) ──────────
+
+/** On the tag of an Instance no Override can reach: the list's status tag. */
+export const PICK_INSPECT_ONLY = INSPECT_ONLY.text;
+/** On the tag in Select multiple: how many Instances a click selects. */
+export const pickCount = (count: number) => `${count} from this call site`;
 
 /** "All in MemberRowMenu", and "· Button 2 of 2" when the enclosing component uses it more than once. */
 export function groupName(enclosing: string | null, component: string, site: { ordinal: number; total: number } | null): string {
@@ -247,7 +276,20 @@ export const EXPLAIN: Partial<Record<string, string>> = {
   CONTENT: "Elements, or nothing, between the tags.",
 };
 
-export const sameOnAll = (count: number) => `SAME ON ALL ${count}`;
+/** What each reason a prop gets no control means, for its tooltip. */
+export const REASON_TITLES: Partial<Record<string, string>> = {
+  FUNCTION: "A function, such as an event handler: there is no value to try.",
+  CONTENT: "Elements, or nothing, between the tags.",
+  "OPEN TEXT": "Any text fits here, so there is no set of options to choose from.",
+  OBJECT: "An object or a list: no single value to choose.",
+  STRUCTURAL: "It changes which element renders, not how it looks.",
+  "LINKED PROPS": "It only works together with another prop.",
+  UNVERIFIED: "Its options couldn't be confirmed from the code.",
+  "FROM CODE": "Written as an expression here, so it changes in code.",
+  MIXED: "Text and code together: no single string to change.",
+};
+
+export const sameOnAll = (count: number) => `Same on all ${count}`;
 export const countsText = (counts: Map<string, number>) => [...counts].map(([key, count]) => `${key} ${count}`).join(" · ");
 
 export function keepingText(keeping: number, inScope: number): string {

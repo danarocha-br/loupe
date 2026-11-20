@@ -6,8 +6,6 @@
 // Nothing here writes to the store or the repo: exporting clears nothing.
 // Once the Toolbar loads, `__loupe.proposal(options?)` returns the JSON and
 // `__loupe.proposalMarkdown(options?)` the Copy as Markdown text (`start.ts`).
-// Snapshots that aren't Outdated ride along (PER-138); `{ capture: true }` takes
-// the export's own first.
 
 import { parseInstanceId } from "../call-site.js";
 import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
@@ -16,20 +14,13 @@ import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js"
 import { debugOf } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
 import { type PerPageOptions, perPage } from "../runtime/slot.js";
+import { pageWidth } from "./dock.js";
 import { previewedFlags } from "./flags-store.js";
 import { readProjectContext } from "./project-server.js";
-import { captureForExport, exportableSnapshots } from "./snapshots.js";
 
 export type ProposalOptions = {
   title?: string;
   designer?: string | null;
-  /**
-   * Take a Snapshot of the screen in view first, as an export does (PER-99 §3).
-   * It replaces the previous export's Snapshot of this route, and is dropped when
-   * it repeats a manual one. A failed capture leaves the Proposal without it
-   * rather than failing.
-   */
-  capture?: boolean;
   /** Per record (`setOnKey`), the designer's note for its entry (PER-139). */
   notes?: Readonly<Record<string, string>>;
 };
@@ -127,7 +118,7 @@ export function pageTheme(root: Element = document.documentElement): "light" | "
 function routeContext(): RouteContext {
   // A hidden tab can report 0×0: no viewport rather than a wrong one.
   const viewport: [number, number] | null =
-    window.innerWidth > 0 && window.innerHeight > 0 ? [window.innerWidth, window.innerHeight] : null;
+    pageWidth() > 0 && window.innerHeight > 0 ? [pageWidth(), window.innerHeight] : null;
   return {
     url: location.href,
     viewport,
@@ -160,7 +151,6 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
 
 /** The Proposal, and per change id the record it reads: what the export dialog keeps notes against. */
 export async function collectProposalKeyed(options: ProposalOptions = {}): Promise<{ proposal: Proposal; keys: Record<string, string> }> {
-  if (options.capture) await captureForExport();
   const tracker = startTracking();
   refresh(tracker);
   const reg = registry();
@@ -200,7 +190,6 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
     routes: tracker.routes,
     currentRoute: route,
     flags: Object.fromEntries(flags.map((flag) => [flag.key, flag.value as JsonValue])),
-    snapshots: exportableSnapshots(),
     notes: options.notes ?? {},
   };
   const { proposal, keys } = buildProposalKeyed(input);

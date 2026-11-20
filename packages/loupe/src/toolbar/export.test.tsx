@@ -24,12 +24,7 @@ vi.mock("./notices.js", () => ({
   NotGeneratedNotice: () => null,
 }));
 
-// What each rasterization draws: the same text means the same pixels.
-let pixels = "screen";
-
 const { default: Toolbar } = await import("./index.js");
-const { captureScreen, setRasterizer, snapshots } = await import("./snapshots.js");
-const { fixedPixels } = await import("./snapshots.fixture.js");
 const { exportForm } = await import("./export.js");
 const { HOST_ATTRIBUTE } = await import("./styles.js");
 
@@ -62,7 +57,7 @@ let loupe: LoupeDebug;
 let downloads: { name: string; blob: Blob }[] = [];
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
-/** Settles until `done` holds: an export's capture and build take longer on a loaded machine. */
+/** Settles until `done` holds: an export's build takes longer on a loaded machine. */
 async function until(done: () => boolean, tries = 100): Promise<void> {
   for (let i = 0; i < tries && !done(); i++) await settle();
   expect(done()).toBe(true);
@@ -103,24 +98,9 @@ async function openDialog(): Promise<void> {
   await until(() => dialog()?.querySelector(".counts") != null);
 }
 
-async function capture() {
-  await act(async () => {
-    await captureScreen();
-  });
-}
-
 beforeEach(async () => {
   resetLoupe();
-  pixels = "screen";
   downloads = [];
-  setRasterizer(
-    fixedPixels({
-      // jsdom lays nothing out: the member buttons are on screen, everything else is nowhere.
-      layout: (node) =>
-        node.tagName === "BUTTON" && node.closest("main") !== null ? { top: 100, left: 100, bottom: 132, right: 180 } : null,
-      draw: () => pixels,
-    }),
-  );
   const blobs = new Map<string, Blob>();
   URL.createObjectURL = (blob: Blob) => {
     const url = `blob:test/${blobs.size}`;
@@ -165,11 +145,9 @@ describe("the export dialog", () => {
     expect(dialog()?.open).toBe(true);
     expect(dialog()?.getAttribute("aria-labelledby")).toBe("loupe-export-title");
     expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Button variant in MemberRow");
-    expect(dialog()?.querySelector(".counts")?.textContent).toBe(
-      "1 change · 1 without a screenshot · 0 held for review · 0 outdated Snapshots",
-    );
+    expect(dialog()?.querySelector(".counts")?.textContent).toBe("1 change · 0 held for review");
     expect([...(dialog()?.querySelectorAll("[data-entry]") ?? [])].map((entry) => entry.querySelector("span")?.textContent)).toEqual([
-      "c1 · variant on 1st of 1 <Button> in MemberRow, every Instance",
+      "1Change variant on 1st of 1 <Button> in MemberRow, every Instance",
     ]);
     expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
   });
@@ -209,19 +187,12 @@ describe("the export dialog", () => {
     expect(proposal).toMatchObject({ title: "Calmer rows", designer: "Dana" });
     const [route] = proposal.routes;
     expect(route?.changes[0]?.note).toBe("Ghost reads as disabled on the dark theme.");
-    // The export's own Snapshot of the screen in view.
-    expect(route?.screenshots.map((shot) => [shot.id, shot.kind])).toEqual([
-      ["s1", "viewport"],
-      ["s2", "crop"],
-    ]);
-    expect(route?.changes[0]?.screenshots).toEqual(["s2"]);
 
     expect(dialog()).toBeNull();
     expect(button("Exported")).toBeDefined();
     // Focus goes back to what opened the dialog.
     expect(shadow().activeElement).toBe(shadow().querySelector("[data-export]"));
     expect(registry().store.records()).toEqual(records);
-    expect(snapshots()).toHaveLength(1);
 
     // The next export starts from what was typed.
     await settle();
@@ -243,62 +214,16 @@ describe("the export dialog", () => {
     });
     expect(dialog()).toBeNull();
     expect(downloads).toEqual([]);
-    expect(snapshots()).toHaveLength(0);
   });
 
-  it("counts outdated Snapshots and warns past 25 MB, without blocking", async () => {
+  it("exports under the suggested title and keeps following it while the designer leaves it alone", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
-    pixels = "x".repeat(7 * 1024 * 1024);
-    await capture();
-    await capture();
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "secondary", "group"));
-    pixels = "y".repeat(7 * 1024 * 1024);
-    await capture();
-    await capture();
-    await settle();
-    await openDialog();
-
-    expect(dialog()?.querySelector(".counts")?.textContent).toBe(
-      "1 change · 0 without a screenshot · 0 held for review · 2 outdated Snapshots",
-    );
-    // Two kept Snapshots, each a viewport pair and a crop pair of 7 MB images; the
-    // export's own Snapshot would replace or repeat one, so it adds nothing.
-    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toMatch(/about 56\.\d MB, over 25 MB/);
-    expect(button("Export", dialog() as HTMLDialogElement)?.disabled).toBe(false);
-  });
-
-  it("exports without its own Snapshot when the capture fails, and says so", async () => {
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    vi.spyOn(window, "innerWidth", "get").mockReturnValue(0);
-    vi.spyOn(console, "warn").mockImplementation(() => {});
     await openDialog();
     act(() => button("Export", dialog() as HTMLDialogElement)?.click());
     await until(() => dialog() === null);
-    expect(downloads).toHaveLength(1);
-    const exported = shadow().querySelector<HTMLButtonElement>("[data-export]");
-    expect(exported?.textContent).toBe("Exported, no new screen");
-    expect(exported?.title).toMatch(/without a screenshot of the screen in view: .*no viewport to capture/);
-  });
-
-  it("drops its own Snapshot when it repeats a manual one of the same screen", async () => {
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    await capture();
-    await openDialog();
-    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
-    await until(() => dialog() === null);
-    expect(snapshots().map((snapshot) => [snapshot.id, snapshot.auto])).toEqual([[1, false]]);
-    expect((await exportedProposal()).routes[0]?.screenshots.filter((shot) => shot.kind === "viewport")).toHaveLength(1);
-
-    // A different screen is kept: the report shows both.
-    pixels = "scrolled";
-    await openDialog();
-    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
-    await until(() => dialog() === null);
-    expect(snapshots().map((snapshot) => snapshot.auto)).toEqual([false, true]);
-    expect((await exportedProposal()).routes[0]?.screenshots.filter((shot) => shot.kind === "viewport")).toHaveLength(2);
+    expect(downloads.map((download) => download.name)).toEqual([expect.stringMatching(/^proposal-button-variant-in-memberrow-\d{8}-\d{4}\.html$/)]);
+    expect((await exportedProposal()).title).toBe("Button variant in MemberRow");
     expect(exportForm().title).toBeNull();
   });
 });
