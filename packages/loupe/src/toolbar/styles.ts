@@ -447,11 +447,11 @@ button:disabled { cursor: default; opacity: 0.45; }
 .row.switch .name { min-width: 0; flex: 0 1 auto; }
 .row.switch > :not(.head-group) { margin-right: 4px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
-.switch-track { position: relative; flex: none; width: 40px; height: 22px; border-radius: 999px; background: var(--switch-off); box-shadow: inset 0 0 0 1px var(--field-edge); transition: background-color 160ms ease-out; }
-.switch-track .thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--control-off); box-shadow: none; transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
-.switch-track[aria-checked="true"] { background: var(--switch-on); box-shadow: none; }
-.switch-track[aria-checked="true"] .thumb { background: var(--thumb); box-shadow: 0 1px 2px rgba(10, 10, 10, 0.22); }
-.switch-track[aria-checked="true"] .thumb { transform: translateX(18px); }
+/* A pill on a beige edge; the thumb is the filled half it sits in, a round hole through it: beige on the left off, teal on the right on. */
+.switch-track { position: relative; flex: none; width: 42px; height: 22px; overflow: hidden; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--switch-off); }
+.switch-track .thumb { position: absolute; inset: 0 auto 0 0; width: 50%; border-radius: 11px 0 0 11px; background: var(--switch-off); transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 180ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 160ms ease-out; }
+.switch-track .thumb::after { content: ""; position: absolute; inset: 0; width: 16px; height: 16px; margin: auto; border-radius: 50%; background: var(--card); }
+.switch-track[aria-checked="true"] .thumb { transform: translateX(100%); border-radius: 0 11px 11px 0; background: var(--switch-on); }
 /* Under reduced motion the thumb and the chevrons still move to their place, without travelling there. */
 @media (prefers-reduced-motion: reduce) {
   .switch-track, .switch-track .thumb, .fold > summary .icon, .inspect summary .icon, .group summary > .icon, .flags .off summary .icon { transition: none; }
@@ -633,10 +633,10 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
   .pills .is-default::after, .legend i { forced-color-adjust: none; box-shadow: inset 0 0 0 1.25px CanvasText; }
-  .switch-track { forced-color-adjust: none; background: Canvas; border: 1px solid ButtonText; }
+  .switch-track { forced-color-adjust: none; background: Canvas; box-shadow: inset 0 0 0 1.5px ButtonText; }
   .switch-track .thumb { forced-color-adjust: none; background: ButtonText; }
-  .switch-track[aria-checked="true"] { background: Highlight; border-color: Highlight; }
-  .switch-track[aria-checked="true"] .thumb { background: HighlightText; }
+  .switch-track .thumb::after { forced-color-adjust: none; background: Canvas; }
+  .switch-track[aria-checked="true"] .thumb { background: Highlight; }
   .members input[type="checkbox"]:checked { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
   .members input[type="checkbox"]:checked::after { border-color: HighlightText; }
   .dot:not(.hollow):not(.ring):not(.none) { forced-color-adjust: none; background: CanvasText; }
