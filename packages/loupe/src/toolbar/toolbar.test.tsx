@@ -187,18 +187,18 @@ describe("the Toolbar", () => {
     act(() => pageButton("Menu").click());
     await settle();
     expect(() => loupe.reset(item)).toThrow(/No mounted Instance/);
-    expect(panelText()).toContain("2 Overrides on this page");
+    expect(panelText()).toContain("2 changes");
 
     const before = loupe.records();
     await clickInPanel(panelButton("Reset all"));
     expect(loupe.records()).toEqual([]);
-    expect(panelText()).toContain("0 Overrides on this page");
+    expect(panelText()).toContain("0 changes");
 
     // It asked nothing, so the footer offers to put them back.
     expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 2 OverridesUndo");
     await clickInPanel(panelButton("Undo"));
     expect(loupe.records().map((record) => record.values)).toEqual(before.map((record) => record.values));
-    expect(panelText()).toContain("2 Overrides on this page");
+    expect(panelText()).toContain("2 changes");
     expect(shadow().querySelector(".undo")?.textContent).toBe("");
   });
 

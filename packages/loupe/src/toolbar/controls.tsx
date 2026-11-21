@@ -45,15 +45,19 @@ export function Key({ n }: { n: number }) {
   );
 }
 
+/** A held State prop's mark: an empty dashed delta, since the Proposal shows it as a state, not a numbered change. */
+export function HeldKey() {
+  return (
+    <span className="key held" title="Held by your Override: shown as a state in the Proposal">
+      <Delta dashed />
+    </span>
+  );
+}
+
 /** Before the name: the change's delta, an empty dashed one for a held State prop, or nothing. */
 function KeySlot({ item }: { item: PropItem }) {
   if (item.key !== null) return <Key n={item.key} />;
-  if (item.dot === "on")
-    return (
-      <span className="key held" title="Held by your Override: shown as a state in the Proposal">
-        <Delta dashed />
-      </span>
-    );
+  if (item.dot === "on") return <HeldKey />;
   return null;
 }
 

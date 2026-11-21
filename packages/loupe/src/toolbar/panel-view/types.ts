@@ -71,6 +71,8 @@ export type PanelView = {
     resetAll: ScopeTarget[];
     /** The plot key's numbered changes, in every state of the panel. */
     keys: ChangeItem[];
+    /** The State props held open: dashed deltas after the numbered ones. */
+    states: StateItem[];
   };
   body: ListBody | InspectorBody | GoneBody;
 };
@@ -103,6 +105,17 @@ export type GroupItem = {
   /** The mounted Instances, outlined while the row is hovered. */
   outlineIds: string[];
   instances: InstanceItem[];
+};
+
+/** A State prop an Instance Override holds: a state shown in the Proposal, marked with a dashed delta, no number. */
+export type StateItem = {
+  /** "open held at true". */
+  detail: string;
+  /** The Instance's name, or its label when it shows none. */
+  where: string;
+  /** The Instance, while it is mounted. */
+  select: string | null;
+  reached: string[];
 };
 
 /** One numbered change: "1 · variant · Actions for Ana Souza". */

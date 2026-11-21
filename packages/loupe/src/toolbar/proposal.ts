@@ -16,6 +16,7 @@ import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js
 import { type PerPageOptions, perPage } from "../runtime/slot.js";
 import { pageWidth } from "./dock.js";
 import { previewedFlags } from "./flags-store.js";
+import { numberChanges } from "./numbers.js";
 import { readProjectContext } from "./project-server.js";
 
 export type ProposalOptions = {
@@ -191,6 +192,8 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
     currentRoute: route,
     flags: Object.fromEntries(flags.map((flag) => [flag.key, flag.value as JsonValue])),
     notes: options.notes ?? {},
+    // The numbers the page shows: c2 is the change marked Δ2.
+    number: numberChanges,
   };
   const { proposal, keys } = buildProposalKeyed(input);
   return { proposal: options.title?.trim() ? proposal : { ...proposal, title: suggestedTitle(proposal) }, keys };

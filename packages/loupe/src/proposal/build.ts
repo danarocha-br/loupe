@@ -77,7 +77,16 @@ export type ProposalInput = {
   flags: Readonly<Record<string, JsonValue>>;
   /** Per record (`setOnKey`), the designer's note: the "why" (PER-139). Blank is none. */
   notes?: Readonly<Record<string, string>>;
+  /**
+   * The number of each change, given its record's key (`setOnKey`) and values, in the
+   * order given: the Toolbar passes the page's numbering (`toolbar/numbers.ts`), so
+   * `c2` is the change the page marks Δ2, gaps and all. Without it, 1, 2, 3 in
+   * record order.
+   */
+  number?: (changes: readonly { key: string; values: Readonly<Record<string, unknown>> }[]) => number[];
 };
+
+const inOrder = (changes: readonly unknown[]): number[] => changes.map((_, index) => index + 1);
 
 const NOT_SET = "not set";
 
@@ -209,7 +218,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
   };
 
   // Entries first, so `overriddenBy` can name them by id.
-  type Draft = { record: OverrideRecord; change: ProposalChange; route: string; covered: Sighting[] };
+  type Draft = { record: OverrideRecord; change: ProposalChange; route: string; covered: Sighting[]; n: number };
   const drafts: Draft[] = [];
   const shown: { route: string; state: ProposalStateShown }[] = [];
 
@@ -276,6 +285,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
       record,
       route,
       covered: included,
+      n: 0,
       change: {
         id: "",
         action: "apply",
@@ -299,9 +309,13 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
     });
   }
 
+  // Each change by the number it was made with, gaps kept, and listed in that order.
+  const numbers = (input.number ?? inOrder)(drafts.map((draft) => ({ key: setOnKey(draft.record.target), values: draft.record.values })));
   drafts.forEach((draft, index) => {
-    draft.change.id = `c${index + 1}`;
+    draft.n = numbers[index] ?? index + 1;
+    draft.change.id = `c${draft.n}`;
   });
+  drafts.sort((a, b) => a.n - b.n);
   for (const draft of drafts) draft.change.overriddenBy = overriddenBy(draft, drafts);
   // Narrowest first, so what a narrower change passes on is settled before a wider one reads it.
   const byChangeId = new Map(drafts.map((draft) => [draft.change.id, draft.change]));

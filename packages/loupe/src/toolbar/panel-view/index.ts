@@ -5,7 +5,7 @@
 import { createReads } from "./reads.js";
 import { inspectorBody } from "./inspector.js";
 import { changeKeys } from "./keys.js";
-import { changeItems, listBody } from "./list.js";
+import { changeItems, listBody, stateItems } from "./list.js";
 import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
 import type { PanelInput, PanelView } from "./types.js";
@@ -35,14 +35,7 @@ export function panelView(input: PanelInput): PanelView {
   const keys = changeKeys(page.records, page.rows, page.route);
   const changes = changeItems(keys, page, reads);
   // State props an Instance Override holds: Overrides, but shown as states, not numbered changes.
-  const stateProps = new Map(page.rows.map((candidate) => [candidate.id, candidate.stateProps]));
-  const held = page.records.reduce(
-    (sum, record) =>
-      record.target.scope === "instance" && !record.suspended
-        ? sum + Object.keys(record.values).filter((prop) => stateProps.get((record.target as { id: string }).id)?.includes(prop)).length
-        : sum,
-    0,
-  );
+  const states = stateItems(page, reads);
   return {
     scope,
     seen: page.seen,
@@ -54,16 +47,17 @@ export function panelView(input: PanelInput): PanelView {
     },
     instanceCount: page.instanceCount,
     marks: keys.marks,
-    header: { route: page.route, report: headerReport(page.route, changes.length, held) },
+    header: { route: page.route, report: headerReport(page.route, changes.length, states.length) },
     banner: page.status.overrides ? null : { title: OVERRIDES_OFF_TITLE, body: overridesOffBanner(page.status.reason) },
     footer: {
-      countText: footerCount(page.overrideCount),
+      countText: footerCount(changes.length, states.length),
       hasOverrides: page.overrideCount > 0,
       copyEnabled: page.records.length > 0,
       // `discard` takes a record's target, so it also drops a record whose Instance
       // isn't mounted, where `reset(id)` throws (PER-128).
       resetAll: page.overrideCount > 0 && page.status.overrides ? page.records.map((record) => record.target) : [],
       keys: changes,
+      states,
     },
     body: selected === null ? listBody(page, reads, keys) : inspectorBody(selected, row, page, reads, { scope, scoped }, keys),
   };

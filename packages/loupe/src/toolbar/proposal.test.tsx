@@ -119,11 +119,11 @@ describe("the Proposal from the page", () => {
     expect(proposal.project.commit).toBe("abcdef1234567");
     expect(route?.flags).toEqual({ "new-roles": true });
     expect(route?.url).toBe(location.href);
-    // Instance records come first, as the store lists them.
-    const [confirm, group] = route?.changes ?? [];
-    expect(group).toMatchObject({ scope: "call-site", props: [{ name: "variant", current: "ghost", proposed: "outline" }] });
+    // Numbered and listed in the order they were made, as the page numbers them.
+    const [group, confirm] = route?.changes ?? [];
+    expect(group).toMatchObject({ id: "c1", scope: "call-site", props: [{ name: "variant", current: "ghost", proposed: "outline" }] });
     expect(group?.instances.map((instance) => instance.keyPath)).toEqual(["ana", "bia"]);
-    expect(confirm).toMatchObject({ scope: "instance", onScreenAtExport: false, props: [{ current: "destructive", proposed: "default" }] });
+    expect(confirm).toMatchObject({ id: "c2", scope: "instance", onScreenAtExport: false, props: [{ current: "destructive", proposed: "default" }] });
   });
 
   it("names its first change when no title is given, and clears nothing", async () => {

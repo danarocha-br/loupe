@@ -446,6 +446,17 @@ describe("buildProposal", () => {
     expectValid(proposal);
   });
 
+  it("names each change by the number the page gave it, gaps kept, and lists them in that order", () => {
+    const group = record({ scope: "group", anchor: TRIGGER }, { size: "sm" });
+    const invite = record({ scope: "instance", id: INVITE }, { variant: "ghost" });
+    // The page numbered the group change 4 and the Instance change 2: one between was reset.
+    const numbers: Record<string, number> = { [setOnKey(group.target)]: 4, [setOnKey(invite.target)]: 2 };
+    const { proposal, keys } = buildProposalKeyed(input([invite, group], { number: (changes) => changes.map(({ key }) => numbers[key] ?? 0) }));
+    expect(changesOf(proposal).map((change) => change.id)).toEqual(["c2", "c4"]);
+    expect(keys).toEqual({ c2: setOnKey(invite.target), c4: setOnKey(group.target) });
+    expectValid(proposal);
+  });
+
   it("reads the store without changing it", () => {
     const records = [record({ scope: "group", anchor: TRIGGER }, { variant: "outline" }, { excluded: [instanceId(TRIGGER, "user_4")] })];
     const before = structuredClone(records);

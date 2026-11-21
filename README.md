@@ -191,7 +191,8 @@ browser remembers your choice.
    marks a revision: a numbered triangle on its card, a dashed outline around
    every instance it reaches on the page, for a moment as it lands and while you
    point at its row, its line in the **Changes** list, and its entry in the
-   Proposal (`c1` is 1). The card keeps
+   Proposal (`c1` is 1). A change keeps its number while you make others, and a
+   change you reset leaves its number unused. The card keeps
    the app's own value, dotted in the table and on the line under the name. Your
    change holds while the app re-renders.
    - Label text can be changed on one instance or a call site, never page-wide.

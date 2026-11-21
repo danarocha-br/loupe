@@ -375,7 +375,7 @@ While the panel is open the page gives it a column on the right by taking a matc
 The sheet is three bands, top to bottom:
 - **The band** (48px): the wordmark and the page crumb on the left; on the right the two select tools in their own soft pill group, then Hide marks, light or dark, and Hide, all 30px round tools.
 - **The middle**, scrolling: cards in one column, 6px apart, 6px from the sheet's edges.
-- **The footer card**, pinned: the Override count with its deltas on the right, and below it Reset all and Copy Proposal at the right edge.
+- **The footer card**, pinned: the count ("2 changes · 1 state shown") with its deltas on the right, a dashed unnumbered delta for each state shown, and below it Reset all and Copy Proposal at the right edge. A change's number is the one it got when it was made: it never moves, and a reset one leaves a gap.
 
 A lilac status strip appears under the band for transient states: a select tool waiting for a click, a dialog under the panel, marks hidden on the page.
 

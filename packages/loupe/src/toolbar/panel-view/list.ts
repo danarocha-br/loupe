@@ -7,7 +7,7 @@ import { formatCurrent } from "../format.js";
 import type { Keys } from "./keys.js";
 import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
-import type { ChangeItem, GroupItem, InstanceItem, ListBody, Tag } from "./types.js";
+import type { ChangeItem, GroupItem, InstanceItem, ListBody, StateItem, Tag } from "./types.js";
 import { componentVerdict } from "./verdict.js";
 import {
   heldValues,
@@ -18,6 +18,7 @@ import {
   overridesNote,
   pageName,
   reachText,
+  stateDetail,
   suspendedMeta,
   suspensionReason,
   TAGS,
@@ -122,6 +123,24 @@ export function changeItems(keys: Keys, page: Page, reads: Reads): ChangeItem[] 
       select: first ?? null,
       reached,
     };
+  });
+}
+
+/** Each State prop an Instance Override holds: what the Proposal lists as a state shown, not a change. */
+export function stateItems(page: Page, reads: Reads): StateItem[] {
+  const stateProps = new Map(page.rows.map((row) => [row.id, row.stateProps]));
+  return page.records.flatMap((record) => {
+    if (record.target.scope !== "instance" || record.suspended) return [];
+    const { id } = record.target;
+    const held = Object.keys(record.values).filter((prop) => stateProps.get(id)?.includes(prop));
+    const mounted = page.rows.some((row) => row.id === id && row.rendered === "client");
+    const where = (mounted ? reads.name(id) : null) ?? targetLabel(record.target);
+    return held.map((prop) => ({
+      detail: stateDetail(prop, formatCurrent(record.values[prop])),
+      where,
+      select: mounted ? id : null,
+      reached: mounted ? [id] : [],
+    }));
   });
 }
 

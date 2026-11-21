@@ -184,13 +184,13 @@ function currentLastSeen(lastSeen: LastSeen | null, prop: string): string {
 export const suspendedMeta = (count: number) => `${count} · apply to nothing`;
 
 /**
- * The header's report line: the page, its numbered changes, and the State props
- * held open, which count as Overrides in the footer but are no numbered change.
+ * The band's report: the page, its numbered changes, and the State props held open,
+ * which the Proposal shows as states, not changes: "Home · 2 changes · 1 state shown".
  */
-export function headerReport(route: string, changes: number, held: number): string {
+export function headerReport(route: string, changes: number, states: number): string {
   const parts = [pageName(route)];
   if (changes > 0) parts.push(plural(changes, "change"));
-  if (held > 0) parts.push(`${held} held`);
+  if (states > 0) parts.push(statesShown(states));
   return parts.join(" · ");
 }
 
@@ -204,8 +204,18 @@ export function whereText(component: string, site: { path: string; line: number 
   return site ? `${component} · ${site.path.split("/").at(-1)}:${site.line}` : component;
 }
 
-export function footerCount(count: number): string {
-  return `${plural(count, "Override")} on this page`;
+function statesShown(count: number): string {
+  return plural(count, "state shown", "states shown");
+}
+
+/** The footer's count: the numbered changes, and the states shown beside them: "2 changes · 1 state shown". */
+export function footerCount(changes: number, states: number): string {
+  return states > 0 ? `${plural(changes, "change")} · ${statesShown(states)}` : plural(changes, "change");
+}
+
+/** What a held State prop shows: "open held at true". */
+export function stateDetail(prop: string, value: string): string {
+  return `${prop} held at ${value}`;
 }
 
 // ── The Inspector ───────────────────────────────────────────────────────────

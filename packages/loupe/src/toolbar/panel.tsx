@@ -18,7 +18,7 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState } from "rea
 import type { LayerStatus } from "../layer-status.js";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
-import { attempt, Key, PropRowView } from "./controls.js";
+import { attempt, HeldKey, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyProposalButton } from "./copy-dialog.js";
 import { FlagsCard } from "./flags.js";
@@ -879,7 +879,9 @@ function Footer({
 }: Pick<Actions, "debug" | "onSelect" | "onHover"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
   const shown = footer.keys.slice(0, FOOTER_KEYS);
-  const more = footer.keys.length - shown.length;
+  // The states shown take what room the numbered changes leave.
+  const states = footer.states.slice(0, FOOTER_KEYS - shown.length);
+  const more = footer.keys.length + footer.states.length - shown.length - states.length;
   return (
     <footer className="footer">
       <div className="tally">
@@ -897,7 +899,7 @@ function Footer({
             </>
           )}
         </span>
-        {!offer && shown.length > 0 && (
+        {!offer && shown.length + states.length > 0 && (
           <ol className="footer-keys" aria-label="Changes">
             {shown.map((change) => (
               <li key={change.n}>
@@ -912,6 +914,23 @@ function Footer({
                   <Key n={change.n} />
                   <span className="sr-only">
                     {change.detail}, {change.where}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {states.map((state) => (
+              <li key={`${state.select ?? state.where} ${state.detail}`}>
+                <button
+                  type="button"
+                  title={`${state.detail} · ${state.where}`}
+                  disabled={state.select === null}
+                  onClick={() => state.select !== null && onSelect(state.select)}
+                  onMouseOver={() => onHover(state.reached)}
+                  onMouseLeave={() => onHover([])}
+                >
+                  <HeldKey />
+                  <span className="sr-only">
+                    State shown: {state.detail}, {state.where}
                   </span>
                 </button>
               </li>

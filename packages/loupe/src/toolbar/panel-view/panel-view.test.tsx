@@ -204,7 +204,7 @@ describe("the list", () => {
     expect(held?.values).toEqual(['variant "default"']);
   });
 
-  it("counts the page's Overrides, held ones included, and names every record Reset all discards", () => {
+  it("counts the page's changes, and names every record Reset all discards", () => {
     render();
     click("Menu");
     const item = menuItem();
@@ -215,7 +215,7 @@ describe("the list", () => {
     click("Menu");
     const shown = view();
     expect(shown.header).toEqual({ route: "/", report: "Home · 2 changes" });
-    expect(shown.footer).toMatchObject({ countText: "2 Overrides on this page", hasOverrides: true, copyEnabled: true });
+    expect(shown.footer).toMatchObject({ countText: "2 changes", hasOverrides: true, copyEnabled: true, states: [] });
     expect(shown.footer.resetAll).toEqual(
       expect.arrayContaining([
         { scope: "instance", id: item },
@@ -580,7 +580,7 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
       loupe.exclude(ANA, "group");
     });
     const shown = view();
-    // Instance records come first, as in records() and the Proposal: c1, c2.
+    // Numbered in the order they were made, as the Proposal will: c1, c2.
     expect(listOf(shown).changes).toEqual([
       { n: 1, props: "variant", detail: 'variant "ghost" → "outline"', where: "ana", select: ANA, reached: [ANA] },
       // The group reaches BIA, CAIO and DANI: ANA is left out of it.
@@ -631,5 +631,47 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
     // The Proposal shows a held State prop as a state, not a change.
     expect(listOf(view()).changes).toEqual([]);
     expect(shown.marks).toEqual([]);
+    // The footer counts it apart, with an unnumbered dashed delta, and so does the band.
+    expect(shown.footer.countText).toBe("0 changes · 1 state shown");
+    expect(shown.footer.states).toEqual([expect.objectContaining({ detail: "open held at true", select: DIALOG, reached: [DIALOG] })]);
+    expect(shown.header.report).toBe("Home · 1 state shown");
+  });
+
+  it("keeps each change's number while others come and go (critique 2026-11-20)", () => {
+    render();
+    // The panel shows before any change, as the Toolbar's does: numbering watches from then.
+    view();
+    // A page-wide change first, then an Instance change: records() lists the Instance first.
+    act(() => {
+      loupe.set(BIA, "variant", "secondary", "page");
+      loupe.set(ANA, "size", "sm");
+    });
+    expect(listOf(view()).changes.map(({ n, props }) => [n, props])).toEqual([
+      [1, "variant"],
+      [2, "size"],
+    ]);
+    // A reset change leaves its number unused: the next one never takes it.
+    act(() => {
+      loupe.reset(BIA, "variant", "page");
+      loupe.set(row("caio"), "variant", "outline");
+    });
+    expect(listOf(view()).changes.map(({ n, props }) => [n, props])).toEqual([
+      [2, "size"],
+      [3, "variant"],
+    ]);
+    // Undo puts changes back as they were, numbers included.
+    const saved = loupe.records();
+    act(() => {
+      for (const record of saved) loupe.discard(record.target);
+    });
+    expect(listOf(view()).changes).toEqual([]);
+    act(() => loupe.restore(saved));
+    expect(listOf(view()).changes.map(({ n }) => n)).toEqual([2, 3]);
+    // Made again with other values, a change is a new one.
+    act(() => {
+      loupe.reset(row("caio"), "variant");
+      loupe.set(row("caio"), "variant", "ghost");
+    });
+    expect(listOf(view()).changes.map(({ n }) => n)).toEqual([2, 4]);
   });
 });
