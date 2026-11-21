@@ -39,7 +39,9 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     ["dark", DARK],
   ])("draws what is found by its outline at 3:1, %s", (_, theme) => {
     expect(contrast(theme["field-edge"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
-    expect(contrast(theme["control-off"] as string, theme["switch-off"] as string)).toBeGreaterThanOrEqual(3);
+    // A switch is its edge and its filled half, with the card showing through the hole: both states at 3:1 on the card.
+    expect(contrast(theme["switch-off"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
+    expect(contrast(theme["switch-on"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
   });
 
   it("names its tokens by role, never by hue, and gives every one a dark value", () => {

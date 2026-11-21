@@ -49,7 +49,7 @@ const LIGHT: Tokens = {
   "revision-text": "#4F43B8",
   "ok-bg": "#DFF7E4",
   "ok-fg": "#14532D",
-  "switch-off": "#EBE7E0",
+  "switch-off": "#938B7F",
   "switch-on": "#27917E",
   primary: "#1B2220",
   "on-primary": "#FFFFFF",
@@ -62,10 +62,8 @@ const LIGHT: Tokens = {
   kbd: "rgba(10, 10, 10, 0.08)",
   "focus-glow": "rgba(130, 118, 207, 0.28)",
   "field-edge": "#8F8A83",
-  "control-off": "#737373",
   "tools-wash": "rgba(246, 243, 239, 0.05)",
   backdrop: "rgba(27, 34, 32, 0.32)",
-  thumb: "#FFFFFF",
   "on-check": "#FFFFFF",
   shadow: "0 1px 2px rgba(27, 34, 32, 0.05), 0 8px 24px rgba(27, 34, 32, 0.07)",
   "overlay-shadow": "0 12px 36px rgba(27, 34, 32, 0.22), 0 2px 6px rgba(27, 34, 32, 0.1)",
@@ -97,7 +95,7 @@ const DARK: Tokens = {
   "revision-text": "#BDB5FF",
   "ok-bg": "#143A25",
   "ok-fg": "#93E2AC",
-  "switch-off": "#353B39",
+  "switch-off": "#6A726F",
   "switch-on": "#2FA58F",
   primary: "#F6F3EF",
   "on-primary": "#1B2220",
@@ -110,10 +108,8 @@ const DARK: Tokens = {
   kbd: "rgba(255, 255, 255, 0.14)",
   "focus-glow": "rgba(169, 159, 242, 0.32)",
   "field-edge": "#646C69",
-  "control-off": "#8B918E",
   "tools-wash": "rgba(246, 243, 239, 0.05)",
   backdrop: "rgba(27, 34, 32, 0.32)",
-  thumb: "#FFFFFF",
   "on-check": "#0E1110",
   shadow: "0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35)",
   "overlay-shadow": "0 12px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3)",
@@ -447,7 +443,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 .row.switch .name { min-width: 0; flex: 0 1 auto; }
 .row.switch > :not(.head-group) { margin-right: 4px; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
-/* A pill on a beige edge; the thumb is the filled half it sits in, a round hole through it: beige on the left off, teal on the right on. */
+/* A pill on a taupe edge; the thumb is the filled half it sits in, a round hole through it: taupe on the left off, teal on the right on. Each at 3:1 on the card. */
 .switch-track { position: relative; flex: none; width: 42px; height: 22px; overflow: hidden; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--switch-off); }
 .switch-track .thumb { position: absolute; inset: 0 auto 0 0; width: 50%; border-radius: 11px 0 0 11px; background: var(--switch-off); transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 180ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 160ms ease-out; }
 .switch-track .thumb::after { content: ""; position: absolute; inset: 0; width: 16px; height: 16px; margin: auto; border-radius: 50%; background: var(--card); }

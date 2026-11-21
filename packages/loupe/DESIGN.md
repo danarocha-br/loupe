@@ -15,7 +15,6 @@ colors:
   rule-soft: "#F0F0EE"
   rule-strong: "#C9C5BE"
   field-edge: "#8F8A83"
-  control-off: "#737373"
   focus-glow: "rgba(130, 118, 207, 0.28)"
   tools-wash: "rgba(246, 243, 239, 0.05)"
   backdrop: "rgba(27, 34, 32, 0.32)"
@@ -31,7 +30,7 @@ colors:
   revision-text: "#4F43B8"
   ok-bg: "#DFF7E4"
   ok-fg: "#14532D"
-  switch-off: "#EBE7E0"
+  switch-off: "#938B7F"
   switch-on: "#27917E"
   primary: "#1B2220"
   on-primary: "#FFFFFF"
@@ -53,7 +52,6 @@ colors:
   rule-soft-dark: "#232827"
   rule-strong-dark: "#4A514E"
   field-edge-dark: "#646C69"
-  control-off-dark: "#8B918E"
   focus-glow-dark: "rgba(169, 159, 242, 0.32)"
   band-dark: "#29322F"
   band-muted-dark: "#A3AAA7"
@@ -63,7 +61,7 @@ colors:
   revision-text-dark: "#BDB5FF"
   ok-bg-dark: "#143A25"
   ok-fg-dark: "#93E2AC"
-  switch-off-dark: "#353B39"
+  switch-off-dark: "#6A726F"
   switch-on-dark: "#2FA58F"
   primary-dark: "#F6F3EF"
   on-primary-dark: "#1B2220"
@@ -254,9 +252,9 @@ components:
     backgroundColor: "{colors.shown}"
     textColor: "{colors.on-shown}"
   switch:
-    backgroundColor: "{colors.switch-off}"
+    backgroundColor: "{colors.card}"
     rounded: "{rounded.pill}"
-    width: "40px"
+    width: "42px"
     height: "22px"
   switch-on:
     backgroundColor: "{colors.switch-on}"
@@ -351,7 +349,7 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 
 ### Status
 - **Supported Green** (`ok-bg`, `ok-fg`): the "Supported" chip beside the component name.
-- **Switch Teal** (`switch-on`), against **Switch Off** (`switch-off`): a true/false prop's switch. Smaller roles: `control-off` (the off thumb, 3:1 on its track), `thumb` (the on thumb), `on-check` (a checkbox's tick: white in light, the dark sheet in dark), `kbd` (a key's wash), `focus-glow` (the soft ring round a focused field), `tools-wash` (the select tools' group on the band) and `backdrop` (behind the Copy dialog). The page's marks name theirs too: `page-hover`, `page-on-ink`, `page-on-band`, `page-on-band-muted` and `page-halo`.
+- **Switch Teal** (`switch-on`), against **Switch Off** (`switch-off`): a true/false prop's switch. Both at 3:1 on the card. Smaller roles: `on-check` (a checkbox's tick: white in light, the dark sheet in dark), `kbd` (a key's wash), `focus-glow` (the soft ring round a focused field), `tools-wash` (the select tools' group on the band) and `backdrop` (behind the Copy dialog). The page's marks name theirs too: `page-hover`, `page-on-ink`, `page-on-band`, `page-on-band-muted` and `page-halo`.
 - **Alert Orange** (`alert`): failures only, as a dot beside the sentence that says what failed.
 - **Notice Amber** (`warn-fg`, `warn-bg`, `warn-dot`): out of date and warnings: stale tags, the warn strip, the flag-previews-off dot.
 
@@ -459,7 +457,7 @@ The panel's core: one card per prop.
 - **Text field:** a white field with a 1px `field-edge` border (3:1 on the card) and 12px corners; focus turns the edge `revision-line` with a 3px `focus-glow` ring; an overridden field keeps the `revision-line` edge.
 
 ### Switches
-True/false props share one card, a row each on `rule-soft` lines, State props (a menu's `open`) first: the name and a 40 × 22px switch: off, a `switch-off` track outlined in `field-edge` with a `control-off` thumb on the left; on, a `switch-on` (teal) track with a white thumb, sliding 18px over 180ms. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name.
+True/false props share one card, a row each on `rule-soft` lines, State props (a menu's `open`) first: the name and a 42 × 22px switch: a `card` pill on a 1.5px `switch-off` edge, whose thumb is the filled half it sits in, rounded on its outer side, with a 16px hole through its middle where the card shows. Off, the half is `switch-off` (taupe) on the left; on, `switch-on` (teal) on the right, sliding across over 180ms with its corners. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name.
 
 ### Identity card
 The selection by what it shows, in rows: the back button, the component name (13px, muted) with its verdict chip and its deltas at the right; the Instance's visible name as the headline, in full however many lines it takes; its call site in Mono Small ("member-row-menu.tsx:37", with "· use 2 of 3" only when its function uses the component more than once); "Inside MemberRowMenu › DropdownMenu" as plain links, outermost first. Then only the exceptions: tags ("On the server", "Source changed", "Not visible now"), the scopes acting on it unless the selection card names one, the not-generated warning, and the actions that can act: Reset this Instance while it holds a change, Hold open at a scope wider than the Instance (at This instance the State prop's own switch holds it). Once the Instance is gone it keeps its component and call site, under a "Not on the page now" chip.
