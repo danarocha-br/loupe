@@ -25,14 +25,14 @@ function inParentheses(reason: string | undefined): string {
 export const NOTES: Record<NoteKind, { title: string; text(status: Status): string }> = {
   server: {
     title: "On the server",
-    text: () => "Rendered by a Server Component, so Loupe can show its props but can't change them.",
+    text: () => "Rendered by a Server Component, so Loupe can show its props but can’t change them.",
   },
   // The panel's banner says this instead (PER-184), so it reaches a card only while
   // the page and the inspection disagree about the status, for a frame.
   "overrides-off": {
     title: "Overrides are off",
     text: (status) =>
-      `Overrides are off, everything is inspect-only: this React build isn't supported${inParentheses(status.overrides ? undefined : status.reason)}.`,
+      `Overrides are off, everything is inspect-only: this React build isn’t supported${inParentheses(status.overrides ? undefined : status.reason)}.`,
   },
   unadapted: {
     title: "Inspect only · No Adapter",
@@ -41,14 +41,14 @@ export const NOTES: Record<NoteKind, { title: string; text(status: Status): stri
   },
   spreads: {
     title: "Props spread here",
-    text: () => "This call site spreads props, so library props can't be separated from the app's here.",
+    text: () => "This call site spreads props, so library props can’t be separated from the app’s here.",
   },
   // `generate`'s Adapters always carry their metadata, so only one made by hand gets here,
   // and a `generate` run leaves it as it is (PER-234).
   "no-meta": {
     title: "No prop metadata",
     text: () =>
-      "This Adapter was made without prop metadata, so its props are inspect-only. Pass the metadata to `createAdapter` as `{ props }`, as the Product layer's Adapters do.",
+      "This Adapter was made without prop metadata, so its props are inspect-only. Pass the metadata to `createAdapter` as `{ props }`, as the Product layer’s Adapters do.",
   },
 };
 
@@ -56,7 +56,7 @@ export const OVERRIDES_OFF_TITLE = "Overrides are off";
 
 /** The Overrides-off banner's sentence, under its title. */
 export function overridesOffBanner(reason: string): string {
-  return `Everything is inspect-only: this React build isn't supported${inParentheses(reason)}.`;
+  return `Everything is inspect-only: this React build isn’t supported${inParentheses(reason)}.`;
 }
 
 // ── Verdicts ────────────────────────────────────────────────────────────────
@@ -91,6 +91,7 @@ export const TAGS = {
   stale: { kind: "stale", text: "Source changed" },
   leftOut: { kind: "left-out", text: "Left out" },
   leftOutUnmounted: { kind: "left-out-unmounted", text: "Left out · not mounted" },
+  notVisible: { kind: "not-visible", text: "Not visible now" },
 } as const satisfies Record<string, Tag>;
 
 /** An Instance's record that isn't mounted: held for review when Suspended, otherwise just not mounted. */
@@ -194,9 +195,15 @@ export function headerReport(route: string, changes: number, states: number): st
   return parts.join(" · ");
 }
 
+/**
+ * An app's own words set inside Loupe's English, between Unicode direction isolates
+ * (the string form of `<bdi>`): an Arabic or Hebrew name can't reorder the words around it.
+ */
+export const isolate = (text: string) => `\u2068${text}\u2069`;
+
 /** What a numbered change reaches, by name: "Actions for Ana Souza", "Actions for Ana Souza and 3 more". */
 export function reachText(first: string, count: number): string {
-  return count > 1 ? `${first} and ${count - 1} more` : first;
+  return count > 1 ? `${isolate(first)} and ${count - 1} more` : first;
 }
 
 /** The component and where its call site is: "Button · member-row-menu.tsx:37". */
@@ -226,7 +233,8 @@ export function coverageText(editable: number, inspectOnly: number): string {
 
 export function callSiteText(site: { path: string; line: number; column: number; ordinal: number; total: number }, anchor: string) {
   return {
-    text: `${site.path.split("/").at(-1)}:${site.line} · use ${site.ordinal} of ${site.total}`,
+    // Which use of the component in its function, only when there is more than one to tell apart.
+    text: `${site.path.split("/").at(-1)}:${site.line}${site.total > 1 ? ` · use ${site.ordinal} of ${site.total}` : ""}`,
     title: `${site.path}:${site.line}:${site.column}\n${anchor}`,
   };
 }
@@ -258,7 +266,8 @@ export function scopeLabel(name: string, scope: Scope, size: number, server: num
 }
 
 export const leftOutChip = (label: string) => `Left out of ${label}`;
-export const previewedText = (included: number, total: number) => `${included} of ${total} previewed`;
+/** How many of a scope's Instances a change here reaches: "Reaches 3 of 4". */
+export const previewedText = (included: number, total: number) => `Reaches ${included} of ${total}`;
 export const siteLabel = (anchor: string) => (anchor ? callSiteLabels(anchor).short : "No call site");
 
 // ── Prop rows ───────────────────────────────────────────────────────────────
@@ -294,7 +303,7 @@ export const REASON_TITLES: Partial<Record<string, string>> = {
   OBJECT: "An object or a list: no single value to choose.",
   STRUCTURAL: "It changes which element renders, not how it looks.",
   "LINKED PROPS": "It only works together with another prop.",
-  UNVERIFIED: "Its options couldn't be confirmed from the code.",
+  UNVERIFIED: "Its options couldn’t be confirmed from the code.",
   "FROM CODE": "Written as an expression here, so it changes in code.",
   MIXED: "Text and code together: no single string to change.",
 };
@@ -316,3 +325,17 @@ export function heldNotice(value: unknown, tried: unknown) {
     after: ".",
   };
 }
+
+// ── The Inspector's own words (the 2026-11-20 layout pass) ──────────────────────
+
+/** The fold of props this Instance shows but can't change here: "Inspect only · 6". */
+export const inspectOnlyTitle = (count: number) => (count === 0 ? "Inspect only" : `Inspect only · ${count}`);
+
+/** An adapted Instance none of whose props is Editable: said once, as a note, instead of a bare tag. */
+export const NO_EDITABLE_NOTE = {
+  title: "No Editable prop",
+  text: "None of its props has a set of values or label text to try, so Loupe can show them but not change them.",
+} as const;
+
+/** The legend under the first table that marks a default: what its marks mean, said once. */
+export const LEGEND = { shown: "Shows now", app: "App’s value", default: "Default" } as const;

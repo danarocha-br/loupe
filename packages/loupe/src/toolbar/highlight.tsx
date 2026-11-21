@@ -50,6 +50,27 @@ const TAG_ROOM = 24;
 /** The pick tag's distance from its ring, and from the edges of the page it stays inside. */
 const TAG_GAP = 4;
 const TAG_EDGE = 6;
+/** The size tag is 11px mono: about this wide a character, plus its padding. */
+const LABEL_CHAR = 6.7;
+const LABEL_PAD = 12;
+
+/** "Button · 32 × 32": the selected Instance's name and rendered size. */
+export function labelText(ring: Box & { label: string | null }): string {
+  return `${ring.label} · ${Math.round(ring.width)} × ${Math.round(ring.height)}`;
+}
+
+/**
+ * The size tag sits on the outline's top right, under it near the window's top, and
+ * from the outline's left where ending at its right would run it off the left edge
+ * (a small Instance at the page's left, or in an RTL layout).
+ */
+export function labelClass(ring: Box & { label: string | null }): string {
+  const classes = ["label"];
+  if (ring.top - RING_GAP < TAG_ROOM) classes.push("below");
+  const right = ring.left + ring.width + RING_GAP + 2;
+  if (right < labelText(ring).length * LABEL_CHAR + LABEL_PAD) classes.push("start");
+  return classes.join(" ");
+}
 
 /**
  * Where the pick tag goes for a ring, as the browser's element picker places
@@ -324,8 +345,8 @@ export function Highlight({
             style={outline(ring)}
           >
             {ring.label && (
-              <span className={ring.top - RING_GAP < TAG_ROOM ? "label below" : "label"}>
-                {ring.label} · {Math.round(ring.width)} × {Math.round(ring.height)}
+              <span className={labelClass(ring)}>
+                {labelText(ring)}
               </span>
             )}
           </div>

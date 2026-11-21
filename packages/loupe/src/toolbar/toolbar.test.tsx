@@ -15,6 +15,7 @@ import { LINGER, tagPlace } from "./highlight.js";
 import Toolbar from "./index.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
+import { dismissUndo } from "./undo.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,6 +34,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // The offer has no timer (undo.ts): one test's must not reach the next.
+  act(() => dismissUndo());
   act(() => root.unmount());
   container.remove();
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
@@ -106,6 +109,9 @@ describe("the Toolbar", () => {
     act(() => pageButton("Menu").click());
     await settle();
     expect(panelText()).toContain("MenuItem ×1");
+    // A component's name is never cut short: it may break only where its words meet, "Menu·Item".
+    const menuItem = [...shadow().querySelectorAll(".group summary .cname")].find((name) => name.textContent === "MenuItem");
+    expect(menuItem?.querySelectorAll("wbr")).toHaveLength(1);
 
     act(() => pageButton("Menu").click());
     await settle();
@@ -158,7 +164,7 @@ describe("the Toolbar", () => {
     expect(clicked).toEqual(["ana"]);
 
     await clickInPanel(button("Select one"));
-    await clickInPanel(button("Hide"));
+    await clickInPanel(button("Hide panel"));
     act(() => pageButton("bia").click());
     expect(clicked).toEqual(["ana", "bia"]);
     expect(shadow().querySelector(".panel")).toBeNull();
@@ -278,6 +284,23 @@ describe("the Toolbar", () => {
 });
 
 describe("controls at This instance", () => {
+  it("moves through a table of options with the arrow keys, one Tab stop for the table (critique 2026-11-20)", async () => {
+    await mount();
+    await select(BIA);
+    const radios = () => [...row("variant").querySelectorAll<HTMLButtonElement>("[role=radio]")];
+    expect(row("variant").querySelector("[role=radiogroup]")).not.toBeNull();
+    // One stop: the chosen option, the app's ghost.
+    expect(radios().filter((radio) => radio.tabIndex === 0).map((radio) => radio.dataset.option)).toEqual(['"ghost"']);
+    const at = radios().findIndex((radio) => radio.dataset.option === '"ghost"');
+    const next = radios()[(at + 1) % radios().length] as HTMLButtonElement;
+    act(() => {
+      radios()[at]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, composed: true }));
+    });
+    await settle();
+    expect(next.getAttribute("aria-checked")).toBe("true");
+    expect(loupe.props(BIA).overrides).toEqual({ variant: JSON.parse(next.dataset.option as string) });
+  });
+
   it("overrides an option on one Instance and resets it", async () => {
     await mount();
     await select(BIA);
@@ -309,7 +332,30 @@ describe("controls at This instance", () => {
     await clickInPanel(resetInstance);
     expect(loupe.records()).toEqual([]);
     expect(pageButton("bia")).toBeTruthy();
-    expect(resetInstance.disabled).toBe(true);
+    // With nothing left to reset, the button goes rather than sitting disabled (critique 2026-11-20).
+    expect(panelButton("Reset this Instance")).toBeUndefined();
+
+    // It asked nothing, so the footer offers to put both back (review 2026-11-20).
+    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 2 OverridesUndo");
+    await clickInPanel(panelButton("Undo"));
+    expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca", variant: "default" });
+    expect(shadow().querySelector(".undo")?.textContent).toBe("");
+  });
+
+  it("keeps the undo offer until the Overrides change some other way", async () => {
+    await mount();
+    await select(BIA);
+    await clickInPanel(pill("variant", '"default"'));
+    await clickInPanel(panelButton("Reset all"));
+    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 1 OverrideUndo");
+    // Redraws that change no Override leave it (it has no timer either: undo.test.ts).
+    await settle();
+    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 1 OverrideUndo");
+    // A new change ends it: putting the old records back would undo this one too.
+    await type(textField(), "Bianca");
+    await settle();
+    expect(shadow().querySelector(".undo")?.textContent).toBe("");
+    expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca" });
   });
 
   it("offers Reset this Instance for a selected Instance that isn't mounted, through discard", async () => {
@@ -402,6 +448,7 @@ describe("group and page scopes", () => {
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "instance", id: ANA }]);
     expect(variants()).toEqual(["ghost", "ghost", "ghost", "ghost"]);
     expect(loupe.props(ANA).overrides).toEqual({ variant: "ghost" });
+    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 1 OverrideUndo");
   });
 
   it("selects the Instances a narrower scope keeps, from the row's note", async () => {
@@ -715,6 +762,12 @@ describe("a change landing on the page", () => {
     expect(quiet()).toEqual([false, false, false, false]);
     await leave(footerKey());
     expect(quiet()).toEqual([true, true, true, true]);
+    act(() => footerKey().focus());
+    await settle();
+    expect(quiet()).toEqual([false, false, false, false]);
+    act(() => footerKey().blur());
+    await settle();
+    expect(quiet()).toEqual([true, true, true, true]);
 
     // Another value lands again, under the same number.
     await clickInPanel(pill("variant", '"ghost"'));
@@ -740,6 +793,14 @@ describe("a change landing on the page", () => {
     expect(quiet()).toEqual([false, false, false, false]);
     expect(ringKinds()).toEqual([]);
     await leave(changeRow());
+    expect(quiet()).toEqual([true, true, true, true]);
+
+    // Focus on the row outlines the same, so a keyboard sees what the change reaches (review 2026-11-20).
+    act(() => changeRow().focus());
+    await settle();
+    expect(quiet()).toEqual([false, false, false, false]);
+    act(() => changeRow().blur());
+    await settle();
     expect(quiet()).toEqual([true, true, true, true]);
 
     // Selecting one it reaches shows the selection a moment, then it steps back.
@@ -838,9 +899,87 @@ describe("held for review", () => {
     await settle();
     const review = shadow().querySelector("[data-testid=held-for-review]") as HTMLElement;
     expect(review.textContent).toContain("Code changed here");
+    const held = loupe.records();
     await clickInPanel([...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement);
     expect(loupe.records()).toEqual([]);
     expect(shadow().querySelector("[data-testid=held-for-review]")).toBeNull();
+
+    // Discard asks nothing either: the footer offers the held record back, still held.
+    expect(shadow().querySelector(".undo")?.textContent).toBe("Discarded 1 held OverrideUndo");
+    await clickInPanel(panelButton("Undo"));
+    expect(loupe.records().map(({ target, values, suspended }) => ({ target, values, suspended: suspended !== null }))).toEqual(
+      held.map(({ target, values }) => ({ target, values, suspended: true })),
+    );
+  });
+});
+
+describe("keyboard focus (review 2026-11-20)", () => {
+  const focusIn = (element: HTMLElement) => act(() => element.focus());
+
+  it("follows a selection made in the panel to the new view's heading, and back to the list's", async () => {
+    await mount();
+    const bia = instanceButtons().find((button) => button.dataset.instance === BIA) as HTMLButtonElement;
+    focusIn(bia);
+    await clickInPanel(bia);
+    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    const back = panelButton("All components");
+    focusIn(back);
+    await clickInPanel(back);
+    expect(panelText()).toContain("Nothing selected");
+    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+  });
+
+  it("leaves focus alone when nothing in the panel had it, as after a pick on the page", async () => {
+    await mount();
+    await select(BIA);
+    expect(shadow().activeElement).toBeNull();
+  });
+
+  it("moves focus to Undo after Reset all, and back to Reset all once Undo is taken", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+    });
+    await settle();
+    focusIn(panelButton("Reset all"));
+    await clickInPanel(panelButton("Reset all"));
+    expect(shadow().activeElement?.textContent).toBe("Undo");
+    await clickInPanel(panelButton("Undo"));
+    await settle();
+    expect(loupe.props(ANA).overrides).toEqual({ variant: "default" });
+    expect(shadow().activeElement).toBe(panelButton("Reset all"));
+  });
+
+  it("speaks English whatever the app's language, and reads the app's own names in the app's", async () => {
+    document.documentElement.lang = "pt-BR";
+    try {
+      await mount();
+      expect(document.querySelector(`[${HOST_ATTRIBUTE}]`)?.getAttribute("lang")).toBe("en");
+      await select(BIA);
+      expect(shadow().querySelector("h2.name")?.getAttribute("lang")).toBe("pt-BR");
+    } finally {
+      document.documentElement.removeAttribute("lang");
+    }
+  });
+
+  it("hands focus between Hide and the tab that shows the panel again", async () => {
+    await mount();
+    focusIn(panelButton("Hide panel"));
+    await clickInPanel(panelButton("Hide panel"));
+    const tab = shadow().querySelector<HTMLButtonElement>(".show-tab") as HTMLButtonElement;
+    expect(tab.getAttribute("aria-label")).toBe("Show Loupe");
+    expect(shadow().activeElement).toBe(tab);
+    await clickInPanel(tab);
+    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+  });
+
+  it("keeps its live regions in place while they are empty, so what lands in them is announced", async () => {
+    await mount();
+    expect(shadow().querySelector(".status-region")?.getAttribute("role")).toBe("status");
+    expect(shadow().querySelector(".status-region")?.textContent).toBe("");
+    expect(shadow().querySelector(".footer .undo")?.getAttribute("role")).toBe("status");
+    await clickInPanel(panelButton("Select one"));
+    expect(shadow().querySelector(".status-region")?.textContent).toContain("Click an Instance on the page");
   });
 });
 

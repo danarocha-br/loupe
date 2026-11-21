@@ -9,11 +9,11 @@
 // The row comes decided from `panelView()` (PER-214); this file draws it, makes the
 // write its data names, and keeps the Text field's unsent text while it has focus.
 
-import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, Fragment, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
 import { Delta, LockIcon, ResetIcon } from "./icons.js";
-import { type Control, type PropItem, TEXT, type ValueText } from "./panel-view/index.js";
+import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
 
 /**
@@ -30,7 +30,7 @@ export function attempt(write: () => void): void {
 
 /** The app's value: written, the metadata's default, or a muted `not set`. Never recased: values are exact. */
 function ValueView({ value }: { value: ValueText }) {
-  if (value.kind === "default") return <span className="default" title="The component's default: the call site doesn't set it">{value.text}</span>;
+  if (value.kind === "default") return <span className="default" title="The component’s default: the call site doesn’t set it">{value.text}</span>;
   if (value.kind === "unset") return <span className="muted">{value.text}</span>;
   return <>{value.text}</>;
 }
@@ -38,10 +38,29 @@ function ValueView({ value }: { value: ValueText }) {
 /** One change's revision delta, with the number the page's cloud and the Proposal's change id show. */
 export function Key({ n }: { n: number }) {
   return (
-    <span className="key" title={`Change ${n} in the Proposal`}>
+    // Read as "Change 1", not a bare "1": the number means nothing without what it numbers.
+    <span className="key" role="img" aria-label={`Change ${n}`} title={`Change ${n} in the Proposal`}>
       <Delta />
       <span className="n">{n}</span>
     </span>
+  );
+}
+
+/**
+ * A prop's or a component's name, free to break only where its words meet:
+ * `focusable·When·Disabled`, `AlertDialog·Content`, never mid-word.
+ */
+export function Breakable({ text }: { text: string }) {
+  const parts = text.split(/(?<=[a-z0-9])(?=[A-Z])/);
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && <wbr />}
+          {part}
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -104,7 +123,14 @@ export function PropRowView({
       type="button"
       className={toggle ? "btn small reset round" : "btn small reset"}
       title={toggle ? reset.label : undefined}
-      onClick={() => attempt(() => debug.reset(reset.write.id, reset.write.prop, reset.write.scope))}
+      onClick={(event) => {
+        // Reset goes once there is nothing to reset: focus moves to the row's own control, not out of the panel.
+        const control = event.currentTarget
+          .closest(".row")
+          ?.querySelector<HTMLElement>('[role="radio"][tabindex="0"], [role="switch"], textarea');
+        attempt(() => debug.reset(reset.write.id, reset.write.prop, reset.write.scope));
+        control?.focus();
+      }}
     >
       <ResetIcon />
       {toggle ? <span className="sr-only">{reset.label}</span> : reset.label}
@@ -115,59 +141,67 @@ export function PropRowView({
   const mixed = toggle !== null && toggle.options.filter((option) => (option.count ?? 0) > 0).length > 1;
   // The table shows the chosen option and the field shows the text: the line keeps the value only for a row without either.
   const shown = item.control === null || item.control.kind === "refused";
+  // Where a value comes from matters once it comes from a wider scope than the one in view:
+  // at This instance, a group or page Override's; at a scope, the card is that scope already.
+  const wider = item.source !== null && item.counts === null && item.source !== sourceText(THIS_INSTANCE);
   const classes = ["row", item.overridden && "overridden", toggle && "switch"].filter(Boolean).join(" ");
   return (
     <div className={classes} data-prop={item.name}>
-      <div className="line">
-        {item.dot && <KeySlot item={item} />}
-        <span className="name">
-          {item.label}
-          {item.codeName && <span className="mono"> {item.codeName}</span>}
-        </span>
-        {/* Label text left empty sits beside the name at This instance, and after the counts at a scope. */}
-        {item.empty && item.counts === null && <EmptyTag />}
-        {item.state && <span className="tag">{TEXT.state}</span>}
-        {!item.change && shown && item.value && (
-          <span className="value">
-            <ValueView value={item.value} />
+      <div className="head-group">
+        <div className="line">
+          {item.dot && <KeySlot item={item} />}
+          {/* The label and its code name together in the tooltip; the name itself wraps between its words. */}
+          <span className="name" title={item.codeName ? `${item.label} (${item.codeName})` : item.label}>
+            <span>
+              <Breakable text={item.label} />
+            </span>
+            {item.codeName && <span className="mono"> {item.codeName}</span>}
           </span>
-        )}
-        {item.counts !== null && (!toggle || mixed) && (
-          <span className="value counts" data-testid="counts">
-            {item.counts}
-          </span>
-        )}
-        {item.empty && item.counts !== null && <EmptyTag />}
-        {item.reason && (
-          <span className="tag reason" title={item.reasonTitle ?? undefined}>
-            {item.reason}
-          </span>
-        )}
-        {reset && !reset.inNotice && !toggle && resetButton}
-        {toggle && (
-          <span className="toggle">
-            {!mixed && <span className="state-text">{toggle.on ? "true" : "false"}</span>}
-            {reset && !reset.inNotice && resetButton}
-            <SwitchView control={toggle} label={item.label} debug={debug} />
-          </span>
+          {/* Label text left empty sits beside the name at This instance, and after the counts at a scope. */}
+          {item.empty && item.counts === null && <EmptyTag />}
+          {item.state && <span className="tag">{TEXT.state}</span>}
+          {!item.change && shown && item.value && (
+            <span className="value">
+              <ValueView value={item.value} />
+            </span>
+          )}
+          {item.counts !== null && (!toggle || mixed) && (
+            <span className="value counts" data-testid="counts">
+              {item.counts}
+            </span>
+          )}
+          {item.empty && item.counts !== null && <EmptyTag />}
+          {item.reason && (
+            <span className="tag reason" title={item.reasonTitle ?? undefined}>
+              {item.reason}
+            </span>
+          )}
+          {reset && !reset.inNotice && !toggle && resetButton}
+          {/* The switch shows true or false itself; no word repeats it. */}
+          {toggle && (
+            <span className="toggle">
+              {reset && !reset.inNotice && resetButton}
+              <SwitchView control={toggle} label={item.label} debug={debug} />
+            </span>
+          )}
+        </div>
+        {item.change && (
+          <div className="change" data-testid="change">
+            <span className="from">{item.change.from}</span>
+            <span className="arrow">
+              {" → "}
+            </span>
+            <span className="to">{item.change.to}</span>
+            {wider && (
+              <span className="from-scope" data-testid="source">
+                {" · "}
+                {item.source}
+              </span>
+            )}
+          </div>
         )}
       </div>
-      {item.change && (
-        <div className="change" data-testid="change">
-          <span className="from">{item.change.from}</span>
-          <span className="arrow" aria-label="to">
-            {" → "}
-          </span>
-          <span className="to">{item.change.to}</span>
-        </div>
-      )}
       {item.explanation && <div className="explain">{item.explanation}</div>}
-      {/* Where a value comes from matters once it isn't the app's own: under an Override. */}
-      {item.source && item.change && (
-        <div className="source muted" data-testid="source">
-          {item.source}
-        </div>
-      )}
       {item.control && !toggle && (
         <ControlView
           key={item.control.kind === "refused" ? "refused" : item.control.key}
@@ -194,9 +228,11 @@ export function PropRowView({
           type="button"
           className="keeping"
           onClick={() => onSelect(keeping.select, "one")}
-          // Over, not Enter, as every row of the panel (`Actions` in panel.tsx).
+          // Over, not Enter, as every row of the panel (`Actions` in panel.tsx); focus outlines the same.
           onMouseOver={() => onHover(keeping.ids)}
           onMouseLeave={() => onHover([])}
+          onFocus={() => onHover(keeping.ids)}
+          onBlur={() => onHover([])}
         >
           {keeping.text}
         </button>
@@ -223,10 +259,27 @@ function SwitchView({ control, label, debug }: { control: Options & { on: boolea
   );
 }
 
+/** Arrow keys move through a table of options and choose as they go, as a radio group does; Home and End jump. */
+const STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
+function moveIn(event: KeyboardEvent<HTMLDivElement>) {
+  const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+  const at = buttons.indexOf((event.target as HTMLElement).closest("button") as HTMLButtonElement);
+  if (at === -1 || buttons.length === 0) return;
+  const step = STEPS[event.key];
+  const next =
+    event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : step === undefined ? null : (at + step + buttons.length) % buttons.length;
+  if (next === null) return;
+  event.preventDefault();
+  const target = buttons[next];
+  target?.focus();
+  target?.click();
+}
+
 /**
- * A closed set of options as one table, the chosen one in lilac and the app's own
- * value dotted under an Override, each with its count at a scope; a field for label
- * text (PER-113); or why neither.
+ * A closed set of options as one table: the value that shows now in lilac, the app's
+ * own value ringed and tagged under an Override, the design system's default with a
+ * dot, each with its count at a scope; a field for label text (PER-113); or why neither.
  */
 function ControlView({ control, label, app, debug }: { control: Control; label: string; app: string | null; debug: LoupeDebug }) {
   if (control.kind === "refused") {
@@ -244,23 +297,40 @@ function ControlView({ control, label, app, debug }: { control: Control; label: 
     // Four or fewer fit one line; more run three across, the last one spanning what its line leaves.
     const columns = count <= 4 ? count : 3;
     const lastSpan = count % columns === 0 ? 1 : columns - (count % columns) + 1;
+    // One stop for the whole table: the chosen option, or the first while none is.
+    const pressed = control.options.findIndex((option) => option.pressed);
+    const stop = pressed === -1 ? 0 : pressed;
     return (
-      <div className="pills" role="group" aria-label={label} style={{ "--cols": columns } as CSSProperties}>
-        {control.options.map((option, index) => (
-          <button
-            key={`${typeof option.value}:${option.value}`}
-            type="button"
-            style={index === count - 1 && lastSpan > 1 ? { gridColumn: `span ${lastSpan}` } : undefined}
-            aria-pressed={option.pressed}
-            className={option.label === app && !option.pressed ? "app" : undefined}
-            title={option.label === app && !option.pressed ? `${option.label}: the app's value` : undefined}
-            data-option={option.label}
-            onClick={() => set(option.value)}
-          >
-            <span className="opt">{bare(option.label)}</span>
-            {option.count !== null && <span className="count">{option.count}</span>}
-          </button>
-        ))}
+      <div className="pills" role="radiogroup" aria-label={label} style={{ "--cols": columns } as CSSProperties} onKeyDown={moveIn}>
+        {control.options.map((option, index) => {
+          const isApp = option.label === app && !option.pressed;
+          const marks = [isApp && "app", option.isDefault && "is-default"].filter(Boolean).join(" ");
+          const notes = [isApp && "the app’s value", option.isDefault && "the design system’s default"].filter(Boolean).join("; ");
+          return (
+            <button
+              key={`${typeof option.value}:${option.value}`}
+              type="button"
+              role="radio"
+              aria-checked={option.pressed}
+              tabIndex={index === stop ? 0 : -1}
+              style={index === count - 1 && lastSpan > 1 ? { gridColumn: `span ${lastSpan}` } : undefined}
+              className={marks || undefined}
+              // The exact value and its marks for a pointer; the cell wraps the value in full.
+              title={notes ? `${option.label}: ${notes}` : option.label}
+              data-option={option.label}
+              onClick={() => set(option.value)}
+            >
+              <span className="opt">{bare(option.label)}</span>
+              {isApp && (
+                <span className="app-tag" aria-hidden="true">
+                  app
+                </span>
+              )}
+              {option.count !== null && <span className="count">{option.count}</span>}
+              {notes && <span className="sr-only">, {notes}</span>}
+            </button>
+          );
+        })}
       </div>
     );
   }

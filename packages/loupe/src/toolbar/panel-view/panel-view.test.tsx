@@ -261,7 +261,7 @@ describe("the Inspector", () => {
     const shown = view(BIA);
     expect(shown.banner).toEqual({
       title: "Overrides are off",
-      body: "Everything is inspect-only: this React build isn't supported (React reported no fiber while an Adapter rendered.).",
+      body: "Everything is inspect-only: this React build isn’t supported (React reported no fiber while an Adapter rendered.).",
     });
     expect(shown.footer.resetAll).toEqual([]);
     const body = inspector(shown);
@@ -285,7 +285,7 @@ describe("the Inspector", () => {
     expect(body.note).toEqual({
       kind: "no-meta",
       title: "No prop metadata",
-      body: "This Adapter was made without prop metadata, so its props are inspect-only. Pass the metadata to `createAdapter` as `{ props }`, as the Product layer's Adapters do.",
+      body: "This Adapter was made without prop metadata, so its props are inspect-only. Pass the metadata to `createAdapter` as `{ props }`, as the Product layer’s Adapters do.",
     });
   });
 
@@ -295,16 +295,18 @@ describe("the Inspector", () => {
     const item = menuItem();
     expect(view(item).body.kind).toBe("inspector");
     click("Menu");
-    expect(gone(view(item))).toEqual({ kind: "gone", id: item, held: null, canReset: false });
+    // What it was stays: the component its id names, though Loupe never kept how it rendered.
+    expect(gone(view(item))).toEqual({ kind: "gone", id: item, component: "MenuItem", where: null, held: null, canReset: false });
 
     click("Abrir");
     act(() => {
       loupe.set(CONFIRM, "variant", "default");
     });
     click("Fechar");
-    expect(gone(view(CONFIRM))).toEqual({
+    expect(gone(view(CONFIRM))).toMatchObject({
       kind: "gone",
       id: CONFIRM,
+      component: "Button",
       held: { tag: { kind: "not-mounted", text: "No Instance mounted" }, values: ['variant "default" · Current "ghost" (last seen)'] },
       canReset: true,
     });
@@ -426,7 +428,7 @@ describe("group and page scopes", () => {
     ]);
   });
 
-  it("reaches every Instance of a call site at group scope, and keeps counting the app's values", () => {
+  it("reaches every Instance of a call site at group scope, and counts what each one shows (critique 2026-11-20)", () => {
     render();
     let shown = view(BIA, "group");
     expect(shown.scope).toBe("group");
@@ -441,11 +443,13 @@ describe("group and page scopes", () => {
     shown = view(BIA, "group");
     variant = prop(inspector(shown), "variant");
     expect(variant).toMatchObject({ source: `from ${GROUP}`, reset: { label: "Reset", write: { id: BIA, prop: "variant", scope: "group" } } });
-    // The pills keep counting the app's own values after the Override is set.
+    // The pills count what each member shows now: all four show the group's value.
     expect(pills(variant)).toEqual([
-      ['"default"', true, null],
-      ['"ghost"', false, 4],
+      ['"default"', true, 4],
+      ['"ghost"', false, null],
     ]);
+    // The change still reads from the app's own value.
+    expect(variant.change).toEqual({ from: '"ghost"', to: '"default"' });
     expect(inspector(shown).members?.reset).toEqual({ target: { scope: "group", anchor: members("Button", 1) }, enabled: true });
     expect(inspector(view(ANA)).chips).toEqual([GROUP]);
   });
@@ -459,7 +463,7 @@ describe("group and page scopes", () => {
     let shown = view(BIA, "group");
     expect(shown.outline.members?.filter((member) => member.out)).toEqual([{ id: BIA, out: true }]);
     const scoped = inspector(shown).members;
-    expect(scoped?.countText).toBe("3 of 4 previewed");
+    expect(scoped?.countText).toBe("Reaches 3 of 4");
     expect(scoped?.sites).toBeNull();
     expect(scoped?.members.find((member) => member.id === BIA)).toEqual({
       id: BIA,
@@ -470,9 +474,10 @@ describe("group and page scopes", () => {
       toggle: "include",
     });
     expect(scoped?.members.find((member) => member.id === ANA)).toEqual({ id: ANA, label: "#ana", name: "ana", out: false, tag: null, toggle: "exclude" });
+    // The three still in the scope show its value; Bia, left out, isn't counted.
     expect(pills(prop(inspector(shown), "variant"))).toEqual([
-      ['"default"', true, null],
-      ['"ghost"', false, 3],
+      ['"default"', true, 3],
+      ['"ghost"', false, null],
     ]);
 
     // Ana gets her own value on top of the group's.
@@ -498,9 +503,10 @@ describe("group and page scopes", () => {
     });
     const shown = view(BIA, "group");
     expect(shown.outline.members?.map((entry) => entry.id)).toEqual([row("ana"), row("bia"), row("dani")]);
+    // Ana keeps her own ghost on top of the group's default.
     expect(pills(prop(inspector(shown), "variant"))).toEqual([
-      ['"default"', true, null],
-      ['"ghost"', false, 3],
+      ['"default"', true, 2],
+      ['"ghost"', false, 1],
     ]);
     vi.restoreAllMocks();
 
@@ -518,7 +524,9 @@ describe("group and page scopes", () => {
     });
     const variant = prop(inspector(view(BIA, "group")), "variant");
     expect(variant.keeping).toBeNull();
-    expect(variant.counts).toBe("Same on all 4");
+    // The table says what shows: Ana's own value too, so it never claims all four agree (critique 2026-11-20).
+    expect(variant.counts).toBe('"default" 1 · "ghost" 3');
+    expect(pressed(variant)).toEqual([]);
   });
 
   it("falls back to This instance while the scoped Instance has gone", () => {
@@ -588,7 +596,8 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
         n: 2,
         props: "variant",
         detail: 'variant "ghost" → "secondary"',
-        where: "bia and 2 more",
+        // The name sits between direction isolates: an RTL name can't reorder "and 2 more".
+        where: "\u2068bia\u2069 and 2 more",
         select: BIA,
         reached: [BIA, row("caio"), row("dani")],
       },
@@ -635,6 +644,16 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
     expect(shown.footer.countText).toBe("0 changes · 1 state shown");
     expect(shown.footer.states).toEqual([expect.objectContaining({ detail: "open held at true", select: DIALOG, reached: [DIALOG] })]);
     expect(shown.header.report).toBe("Home · 1 state shown");
+  });
+
+  it("says a dialog that renders nothing until it is held open is not visible now (critique 2026-11-20)", () => {
+    render();
+    const notVisible = { kind: "not-visible", text: "Not visible now" };
+    expect(inspector(view(DIALOG)).tags).toContainEqual(notVisible);
+    act(() => {
+      loupe.set(DIALOG, "open", true);
+    });
+    expect(inspector(view(DIALOG)).tags).not.toContainEqual(notVisible);
   });
 
   it("keeps each change's number while others come and go (critique 2026-11-20)", () => {

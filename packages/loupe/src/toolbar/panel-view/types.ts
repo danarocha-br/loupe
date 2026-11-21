@@ -41,7 +41,7 @@ export type Verdict =
 
 /** A tag a view styles by kind and shows by its text. */
 export type Tag = {
-  kind: "server" | "suspended" | "not-mounted" | "stale" | "left-out" | "left-out-unmounted";
+  kind: "server" | "suspended" | "not-mounted" | "stale" | "left-out" | "left-out-unmounted" | "not-visible";
   text: string;
 };
 
@@ -152,6 +152,10 @@ export type InstanceItem = {
 export type GoneBody = {
   kind: "gone";
   id: string;
+  /** What it was, from how it last rendered; null when Loupe never saw it render. */
+  component: string | null;
+  /** Its call site's file and line: "member-row-menu.tsx:52". */
+  where: string | null;
   held: { tag: Tag; values: string[] } | null;
   /** Whether it still holds an Override that "Reset this Instance" can drop. */
   canReset: boolean;
@@ -178,7 +182,8 @@ export type InspectorBody = {
   /** Null while nothing here can be edited: on the server, with no Adapter, or with Overrides off. */
   editing: { resetInstanceEnabled: boolean; scopes: ScopeOption[] | null } | null;
   members: MembersView | null;
-  note: { kind: NoteKind; title: string; body: string } | null;
+  /** Why nothing here can change, said once; `no-editable` is the Toolbar's own, for an adapted Instance with no Editable prop. */
+  note: { kind: NoteKind | "no-editable"; title: string; body: string } | null;
   coverage: {
     editable: number;
     inspectOnly: number;
@@ -209,7 +214,8 @@ export type MembersView = {
   members: MemberItem[];
   /** At page scope, the members by call site, each with one box for the whole site. */
   sites: SiteItem[] | null;
-  server: { id: string; tag: Tag }[];
+  /** `label`: what it is called on screen, else its call site's file and line. */
+  server: { id: string; label: string; tag: Tag }[];
   outUnmounted: { id: string; tag: Tag }[];
   reset: { target: ScopeTarget; enabled: boolean };
 };
@@ -276,7 +282,13 @@ export type PropItem = {
 
 export type Control =
   /** `key` resets the control when it changes: another Instance, or another scope. */
-  | { kind: "options"; key: string; write: Write; options: { value: OptionValue; label: string; pressed: boolean; count: number | null }[] }
+  | {
+      kind: "options";
+      key: string;
+      write: Write;
+      /** `isDefault`: the design system's default, which the metadata knows; shown with a dot. */
+      options: { value: OptionValue; label: string; pressed: boolean; count: number | null; isDefault: boolean }[];
+    }
   | { kind: "text"; key: string; write: Write; value: string }
   /** A prop this scope can't change: `refusal` says which rule, `text` says it. */
   | { kind: "refused"; refusal: "state-only" | "per-call-site"; text: string };

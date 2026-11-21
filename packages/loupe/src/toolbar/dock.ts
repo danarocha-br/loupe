@@ -30,9 +30,12 @@ export function pageWidth(): number {
 
 export type Column = { width: number; docked: boolean };
 
-/** The panel's width for a viewport, and whether the page makes room for it. */
+/**
+ * The panel's width for a viewport, and whether the page makes room for it. Never
+ * wider than the viewport: at 320px (WCAG 1.4.10) it overlays the whole width.
+ */
 export function columnFor(viewport: number): Column {
-  const width = viewport >= WIDE ? WIDE_WIDTH : WIDTH;
+  const width = Math.min(viewport >= WIDE ? WIDE_WIDTH : WIDTH, viewport);
   return { width, docked: viewport >= width * ROOM };
 }
 
