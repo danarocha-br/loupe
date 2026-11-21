@@ -604,25 +604,17 @@ fieldset.site .list { padding-left: 26px; }
   .row .text, .dialog .field input, .dialog .field textarea { font-size: max(16px, ${size(16)}); line-height: 1.375; }
 }
 
-/* The page map (Find · A): every component a tinted block where it sits, one hue each, the list's dots in the same hue. */
+/* On this page: the page map over its rows. Every component a tinted block where it sits, one hue each; each row is its legend, its dot in the same hue. */
 ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
-.page-map { gap: 12px; }
-.map-sheet { position: relative; width: 100%; border-radius: 12px; background: var(--sheet); background-image: radial-gradient(var(--rule) 1px, transparent 1px); background-size: 12px 12px; box-shadow: inset 0 0 0 1px var(--edge); overflow: hidden; }
+.map-sheet { position: relative; margin: 6px 14px 10px; border-radius: 12px; background: var(--sheet); background-image: radial-gradient(var(--rule) 1px, transparent 1px); background-size: 12px 12px; box-shadow: inset 0 0 0 1px var(--edge); overflow: hidden; }
 .map-sheet .blk { position: absolute; min-width: 5px; min-height: 5px; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--hue) 18%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 75%, transparent); transition: opacity 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
 .map-sheet[data-lit] .blk { opacity: 0.22; }
 .map-sheet[data-lit] .blk.lit { opacity: 1; background: color-mix(in srgb, var(--hue) 50%, transparent); box-shadow: inset 0 0 0 2px var(--hue), 0 0 0 3px color-mix(in srgb, var(--hue) 22%, transparent); }
-.map-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.map-legend button { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 9px; border-radius: 999px; background: var(--sunk); font-weight: 500; font-size: ${size(12)}; transition: background-color 120ms ease-out; }
-.map-legend button.lit { background: color-mix(in srgb, var(--hue) 24%, var(--card)); }
-.map-legend .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--hue); }
-.map-legend .unseen .swatch { background: none; box-shadow: inset 0 0 0 1.5px var(--hue); }
-.map-legend .unseen { color: var(--muted); }
-.map-legend .n { font: 400 ${size(11)}/1 ${MONO}; color: var(--muted); }
+.group.lit > details > summary { background: var(--hover); }
 .cname .hue-dot { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 3px; background: var(--hue); vertical-align: 0; }
 
 /* The list's start (Find · C, guided start): what to change, and the two select tools at full size */
 .hero { gap: 10px; padding: 16px 14px 14px; background: var(--band); color: var(--on-band); }
-.hero .eyebrow { font: 500 ${size(11)}/1.27 ${MONO}; letter-spacing: 0.06em; text-transform: uppercase; color: var(--band-muted); }
 .hero .hero-title { font-size: ${size(22)}; line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; color: var(--on-band); text-wrap: balance; }
 .hero .hero-title:focus { outline: none; }
 .hero .body { color: var(--band-muted); }

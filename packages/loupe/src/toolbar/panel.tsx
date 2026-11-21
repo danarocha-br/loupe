@@ -39,6 +39,7 @@ import {
 import { layerAnnouncement, LayerNotices, NotGeneratedNotice } from "./notices.js";
 import {
   type GoneBody,
+  type GroupItem,
   type InspectorBody,
   type ListBody,
   type MembersView,
@@ -360,12 +361,15 @@ function ComponentList({
   mode,
   picking,
 }: Actions & Heading & Pick<PanelProps, "onTool" | "mode" | "picking"> & { body: ListBody; notices: ReactNode }) {
+  // One component pointed at, on the map or on its row: both light it, and the page outlines it.
+  const [lit, setLit] = useState<string | null>(null);
+  const point = (group: GroupItem | null) => {
+    setLit(group?.component ?? null);
+    onHover(group ? group.outlineIds : []);
+  };
   return (
     <>
       <div className="section hero">
-        <span className="eyebrow">
-          {body.page.name} · {body.summary}
-        </span>
         {/* `name` with the other views' headings: focus finds each view's by `h2.name`. */}
         <h2 className="name hero-title" tabIndex={-1} ref={heading}>
           {TEXT.startTitle}
@@ -388,7 +392,6 @@ function ComponentList({
           ))}
         </div>
       </div>
-      <PageMap debug={debug} groups={body.groups} onHover={onHover} onSelect={onSelect} />
       {notices}
       {body.notGenerated && <NotGeneratedNotice names={body.notGenerated.names} command={body.notGenerated.command} />}
       {body.changes.length > 0 && (
@@ -419,20 +422,21 @@ function ComponentList({
         </div>
       )}
       <HeldForReviewCard debug={debug} items={body.suspended} meta={body.suspendedMeta} />
-      <div className="section list-card">
+      <div className="section list-card on-page">
         <div className="head">
           <h3>On this page</h3>
           <span className="meta">{body.summary}</span>
         </div>
+        <PageMap debug={debug} groups={body.groups} lit={lit} onPoint={point} onSelect={onSelect} />
         <ul className="list" aria-label="Components on this page">
           {body.groups.map((group, index) => (
-            <li key={group.component} className={`group ${hueOf(index)}`}>
+            <li key={group.component} className={`group ${hueOf(index)}${lit === group.component ? " lit" : ""}`}>
               <details>
                 <summary
-                  onMouseOver={() => onHover(group.outlineIds)}
-                  onMouseLeave={() => onHover([])}
-                  onFocus={() => onHover(group.outlineIds)}
-                  onBlur={() => onHover([])}
+                  onMouseOver={() => point(group)}
+                  onMouseLeave={() => point(null)}
+                  onFocus={() => point(group)}
+                  onBlur={() => point(null)}
                 >
                   {/* The whole name, wrapping where its words meet: a long one is never cut short (layout review). */}
                   <span className="cname">

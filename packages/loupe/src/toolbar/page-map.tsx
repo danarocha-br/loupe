@@ -44,81 +44,57 @@ function bestNode(debug: LoupeDebug, ids: readonly string[]): { node: Element; b
   return best;
 }
 
-type Props = { debug: LoupeDebug; groups: GroupItem[]; onHover(ids: string[]): void; onSelect(id: string | null): void };
+type Props = {
+  debug: LoupeDebug;
+  groups: GroupItem[];
+  /** The component pointed at, here or on its row: its blocks light, the rest fade. */
+  lit: string | null;
+  onPoint(group: GroupItem | null): void;
+  onSelect(id: string | null): void;
+};
 
 /** Seven hues, one per component, in the order the list shows them (styles.ts `MAP_HUES`). */
 const HUES = 7;
 export const hueOf = (index: number) => `hue-${index % HUES}`;
 
-/** Every component on the page as a tinted block where it sits: point to find, click to inspect. */
-export function PageMap({ debug, groups, onHover, onSelect }: Props) {
+/**
+ * Every component on screen as a tinted block where it sits, over the rows of "On this
+ * page": the rows are its legend. Point to find, click to inspect. Nothing is drawn
+ * while nothing has a box (an Instance that isn't mounted, or a page with no layout).
+ */
+export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
   useRemeasure();
-  const [lit, setLit] = useState<string | null>(null);
-  const placed = groups.map((group, index) => ({
-    group,
-    hue: hueOf(index),
-    blocks: group.instances
-      .filter((item) => item.mounted)
-      .map((item) => ({ id: item.id, box: bestNode(debug, [item.id])?.box ?? null }))
-      .filter((b): b is { id: string; box: Box } => b.box !== null),
-  }));
-  const all = placed.flatMap((p) => p.blocks.map((b) => b.box));
-  if (all.length === 0) return null;
-  const minLeft = Math.max(0, Math.min(...all.map((b) => b.left)));
-  const minTop = Math.max(0, Math.min(...all.map((b) => b.top)));
-  const W = Math.max(...all.map((b) => b.left + b.width)) + minLeft;
-  const H = Math.max(...all.map((b) => b.top + b.height)) + minTop;
-  const blocks = placed
-    .flatMap((p) => p.blocks.map((b) => ({ ...b, group: p.group, hue: p.hue })))
-    .sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
-  const point = (group: GroupItem | null) => {
-    setLit(group?.component ?? null);
-    onHover(group ? group.outlineIds : []);
-  };
+  const blocks = groups
+    .flatMap((group, index) =>
+      group.instances
+        .filter((item) => item.mounted)
+        .map((item) => ({ id: item.id, group, hue: hueOf(index), box: bestNode(debug, [item.id])?.box ?? null })),
+    )
+    .filter((b): b is typeof b & { box: Box } => b.box !== null);
+  if (blocks.length === 0) return null;
+  const boxes = blocks.map((b) => b.box);
+  const minLeft = Math.max(0, Math.min(...boxes.map((b) => b.left)));
+  const minTop = Math.max(0, Math.min(...boxes.map((b) => b.top)));
+  const W = Math.max(...boxes.map((b) => b.left + b.width)) + minLeft;
+  const H = Math.max(...boxes.map((b) => b.top + b.height)) + minTop;
+  // The largest first, so a small block inside a large one stays on top to be pointed at.
+  blocks.sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
   return (
-    <div className="section page-map" onMouseLeave={() => point(null)}>
-      <div className="head">
-        <h3>Page map</h3>
-        <span className="meta">Point to find · click to inspect</span>
-      </div>
-      <div className="map-sheet" style={{ aspectRatio: `${W} / ${H}` }} data-lit={lit ? "" : undefined}>
-        {blocks.map((b) => (
-          <button
-            key={`${b.group.component}:${b.id}`}
-            type="button"
-            className={`blk ${b.hue}${lit === b.group.component ? " lit" : ""}`}
-            style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
-            title={`${b.group.component} ${b.group.count}`}
-            aria-label={`Inspect this ${b.group.component}`}
-            onMouseOver={() => point(b.group)}
-            onFocus={() => point(b.group)}
-            onBlur={() => point(null)}
-            onClick={() => onSelect(b.id)}
-          />
-        ))}
-      </div>
-      <ul className="map-legend" aria-label="Components by colour">
-        {placed.map((p) => (
-          <li key={p.group.component}>
-            <button
-              type="button"
-              className={`${p.hue}${lit === p.group.component ? " lit" : ""}${p.blocks.length === 0 ? " unseen" : ""}`}
-              title={p.blocks.length === 0 ? "Not on screen until someone opens it" : undefined}
-              onMouseOver={() => point(p.group)}
-              onFocus={() => point(p.group)}
-              onBlur={() => point(null)}
-              onClick={() => {
-                const first = p.group.instances.find((item) => item.mounted);
-                if (first) onSelect(first.id);
-              }}
-            >
-              <i className="swatch" />
-              {p.group.component}
-              <span className="n">{p.group.count}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+    <div className="map-sheet" style={{ aspectRatio: `${W} / ${H}` }} data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
+      {blocks.map((b) => (
+        <button
+          key={`${b.group.component}:${b.id}`}
+          type="button"
+          className={`blk ${b.hue}${lit === b.group.component ? " lit" : ""}`}
+          style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
+          title={`${b.group.component} ${b.group.count}`}
+          aria-label={`Inspect this ${b.group.component}`}
+          onMouseOver={() => onPoint(b.group)}
+          onFocus={() => onPoint(b.group)}
+          onBlur={() => onPoint(null)}
+          onClick={() => onSelect(b.id)}
+        />
+      ))}
     </div>
   );
 }

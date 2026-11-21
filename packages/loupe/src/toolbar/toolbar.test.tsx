@@ -1008,34 +1008,47 @@ describe("LoupeMount", () => {
   });
 });
 
-describe("the page map (Find · A)", () => {
+describe("On this page: the page map over its rows", () => {
   beforeEach(() => {
     // jsdom lays nothing out: every Instance a box, so the map has something to draw.
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
   });
 
-  const legend = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-legend button")];
+  const section = () => shadow().querySelector(".on-page") as HTMLElement;
   const blocks = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-sheet .blk")];
+  const buttonBlocks = () => blocks().filter((block) => block.getAttribute("aria-label") === "Inspect this Button");
+  const groupRow = (component: string) =>
+    [...shadow().querySelectorAll<HTMLElement>("li.group")].find((item) => item.querySelector(".cname")?.textContent === component) as HTMLElement;
 
-  it("draws each mounted Instance where it sits, in its component's hue, with the list's dots in the same hue", async () => {
+  it("is one section: its counts in the head, the map, then the rows as the map's legend", async () => {
     await mount();
-    const button = legend().find((item) => item.textContent?.startsWith("Button")) as HTMLButtonElement;
-    expect(button.className).toMatch(/^hue-\d/);
-    expect(blocks().filter((block) => block.getAttribute("aria-label") === "Inspect this Button")).toHaveLength(5);
-    const hue = button.className.split(" ")[0] as string;
-    const group = [...shadow().querySelectorAll<HTMLElement>("li.group")].find((item) => item.querySelector(".cname")?.textContent === "Button");
-    expect(group?.classList.contains(hue)).toBe(true);
+    expect(shadow().querySelectorAll(".map-sheet")).toHaveLength(1);
+    expect(section().querySelector(".map-sheet")).not.toBeNull();
+    expect(section().querySelector(".head")?.textContent).toMatch(/^On this page\d+ components · \d+ Instances$/);
+    expect(shadow().querySelector(".map-legend")).toBeNull();
+    expect(buttonBlocks()).toHaveLength(5);
+    const hue = buttonBlocks()[0]?.classList[1] as string;
+    expect(hue).toMatch(/^hue-\d$/);
+    expect(groupRow("Button").classList.contains(hue)).toBe(true);
   });
 
-  it("lights one component's blocks and outlines them on the page while pointed at, and inspects a block on click", async () => {
+  it("lights a component's blocks and its row from either one, and outlines it on the page", async () => {
     await mount();
-    const block = blocks().find((item) => item.getAttribute("aria-label") === "Inspect this Button") as HTMLButtonElement;
-    await hover(block);
+    await hover(buttonBlocks()[0] as HTMLButtonElement);
     expect(shadow().querySelector(".map-sheet")?.hasAttribute("data-lit")).toBe(true);
     expect(blocks().filter((item) => item.classList.contains("lit"))).toHaveLength(5);
+    expect(groupRow("Button").classList.contains("lit")).toBe(true);
     expect(ringKinds().length).toBeGreaterThan(0);
-    await clickInPanel(block);
+
+    await hover(groupRow("Dialog").querySelector("summary") as HTMLElement);
+    expect(groupRow("Button").classList.contains("lit")).toBe(false);
+    expect(buttonBlocks().some((item) => item.classList.contains("lit"))).toBe(false);
+  });
+
+  it("inspects the Instance a block stands for", async () => {
+    await mount();
+    await clickInPanel(buttonBlocks()[0] as HTMLButtonElement);
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).not.toBeNull();
-    expect(shadow().querySelector(".page-map")).toBeNull();
+    expect(shadow().querySelector(".map-sheet")).toBeNull();
   });
 });
