@@ -596,7 +596,8 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
         n: 2,
         props: "variant",
         detail: 'variant "ghost" → "secondary"',
-        where: "bia and 2 more",
+        // The name sits between direction isolates: an RTL name can't reorder "and 2 more".
+        where: "\u2068bia\u2069 and 2 more",
         select: BIA,
         reached: [BIA, row("caio"), row("dani")],
       },

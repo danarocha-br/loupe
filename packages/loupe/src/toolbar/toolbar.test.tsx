@@ -109,6 +109,9 @@ describe("the Toolbar", () => {
     act(() => pageButton("Menu").click());
     await settle();
     expect(panelText()).toContain("MenuItem ×1");
+    // A component's name is never cut short: it may break only where its words meet, "Menu·Item".
+    const menuItem = [...shadow().querySelectorAll(".group summary .cname")].find((name) => name.textContent === "MenuItem");
+    expect(menuItem?.querySelectorAll("wbr")).toHaveLength(1);
 
     act(() => pageButton("Menu").click());
     await settle();
@@ -945,6 +948,18 @@ describe("keyboard focus (review 2026-11-20)", () => {
     await settle();
     expect(loupe.props(ANA).overrides).toEqual({ variant: "default" });
     expect(shadow().activeElement).toBe(panelButton("Reset all"));
+  });
+
+  it("speaks English whatever the app's language, and reads the app's own names in the app's", async () => {
+    document.documentElement.lang = "pt-BR";
+    try {
+      await mount();
+      expect(document.querySelector(`[${HOST_ATTRIBUTE}]`)?.getAttribute("lang")).toBe("en");
+      await select(BIA);
+      expect(shadow().querySelector("h2.name")?.getAttribute("lang")).toBe("pt-BR");
+    } finally {
+      document.documentElement.removeAttribute("lang");
+    }
   });
 
   it("hands focus between Hide and the tab that shows the panel again", async () => {

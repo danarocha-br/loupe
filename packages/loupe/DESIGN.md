@@ -10,31 +10,36 @@ colors:
   ink: "#0A0A0A"
   on-ink: "#FFFFFF"
   muted: "#5E5E5E"
-  faint: "#737373"
+  faint: "#6E6E6E"
   rule: "#E4E4E4"
   rule-soft: "#F0F0EE"
   rule-strong: "#C9C5BE"
+  field-edge: "#8F8A83"
+  control-off: "#737373"
+  focus-glow: "rgba(130, 118, 207, 0.28)"
+  tools-wash: "rgba(246, 243, 239, 0.05)"
+  backdrop: "rgba(27, 34, 32, 0.32)"
   edge: "rgba(27, 34, 32, 0.07)"
   band: "#1B2220"
   on-band: "#F0F0F0"
   band-muted: "#9A9A9A"
   band-hover: "rgba(246, 243, 239, 0.1)"
   band-pressed: "rgba(246, 243, 239, 0.16)"
-  lilac: "#CCCDFF"
-  on-lilac: "#0A0A0A"
-  lilac-line: "#8276CF"
-  lilac-ink: "#4F43B8"
+  shown: "#CCCDFF"
+  on-shown: "#0A0A0A"
+  revision-line: "#8276CF"
+  revision-text: "#4F43B8"
   ok-bg: "#DFF7E4"
   ok-fg: "#14532D"
   switch-off: "#EBE7E0"
   switch-on: "#27917E"
   primary: "#1B2220"
   on-primary: "#FFFFFF"
-  pencil: "#8E959C"
+  held: "#8E959C"
   alert: "#C2570C"
-  amber-fg: "#7A4B00"
-  amber-bg: "#FFF3DC"
-  amber-dot: "#C98A12"
+  warn-fg: "#7A4B00"
+  warn-bg: "#FFF3DC"
+  warn-dot: "#C98A12"
   sheet-dark: "#0E1110"
   card-dark: "#181C1B"
   sunk-dark: "#242928"
@@ -47,28 +52,35 @@ colors:
   rule-dark: "#2C3230"
   rule-soft-dark: "#232827"
   rule-strong-dark: "#4A514E"
+  field-edge-dark: "#646C69"
+  control-off-dark: "#8B918E"
+  focus-glow-dark: "rgba(169, 159, 242, 0.32)"
   band-dark: "#29322F"
   band-muted-dark: "#A3AAA7"
-  lilac-dark: "#3A3884"
-  on-lilac-dark: "#F1F0FF"
-  lilac-line-dark: "#A99FF2"
-  lilac-ink-dark: "#BDB5FF"
+  shown-dark: "#3A3884"
+  on-shown-dark: "#F1F0FF"
+  revision-line-dark: "#A99FF2"
+  revision-text-dark: "#BDB5FF"
   ok-bg-dark: "#143A25"
   ok-fg-dark: "#93E2AC"
   switch-off-dark: "#353B39"
   switch-on-dark: "#2FA58F"
   primary-dark: "#F6F3EF"
   on-primary-dark: "#1B2220"
-  pencil-dark: "#6B737C"
+  held-dark: "#6B737C"
   alert-dark: "#F0904A"
-  amber-fg-dark: "#E5B567"
-  amber-bg-dark: "#2A2109"
-  amber-dot-dark: "#D9963B"
+  warn-fg-dark: "#E5B567"
+  warn-bg-dark: "#2A2109"
+  warn-dot-dark: "#D9963B"
   page-line: "#8276CF"
   page-ink: "#4F43B8"
   page-fill: "rgba(204, 205, 255, 0.34)"
   page-band: "#1B2220"
   page-hover: "#6F7472"
+  page-on-ink: "#FFFFFF"
+  page-on-band: "#F0F0F0"
+  page-on-band-muted: "rgba(240, 240, 240, 0.62)"
+  page-halo: "rgba(255, 255, 255, 0.85)"
 typography:
   field-touch:
     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
@@ -181,7 +193,7 @@ components:
     backgroundColor: "{colors.band}"
     textColor: "{colors.on-band}"
     typography: "{typography.wordmark}"
-    padding: "0 9px 0 18px"
+    padding: "0 9px 0 20px"
     height: "48px"
   card:
     backgroundColor: "{colors.card}"
@@ -239,8 +251,8 @@ components:
     backgroundColor: "{colors.hover}"
     textColor: "{colors.ink}"
   option-cell-selected:
-    backgroundColor: "{colors.lilac}"
-    textColor: "{colors.on-lilac}"
+    backgroundColor: "{colors.shown}"
+    textColor: "{colors.on-shown}"
   switch:
     backgroundColor: "{colors.switch-off}"
     rounded: "{rounded.pill}"
@@ -250,7 +262,7 @@ components:
     backgroundColor: "{colors.switch-on}"
   delta:
     backgroundColor: "{colors.card}"
-    textColor: "{colors.lilac-ink}"
+    textColor: "{colors.revision-text}"
     typography: "{typography.delta}"
     width: "22px"
     height: "20px"
@@ -269,8 +281,8 @@ components:
     rounded: "{rounded.pill}"
     padding: "1px 8px"
   tag-stale:
-    backgroundColor: "{colors.amber-bg}"
-    textColor: "{colors.amber-fg}"
+    backgroundColor: "{colors.warn-bg}"
+    textColor: "{colors.warn-fg}"
   text-field:
     backgroundColor: "{colors.card}"
     textColor: "{colors.ink}"
@@ -278,14 +290,14 @@ components:
     rounded: "{rounded.table}"
     padding: "8px 12px"
   status-line:
-    backgroundColor: "{colors.lilac}"
-    textColor: "{colors.on-lilac}"
+    backgroundColor: "{colors.shown}"
+    textColor: "{colors.on-shown}"
     typography: "{typography.control}"
     rounded: "{rounded.status}"
     padding: "8px 12px"
   warn:
-    backgroundColor: "{colors.amber-bg}"
-    textColor: "{colors.amber-fg}"
+    backgroundColor: "{colors.warn-bg}"
+    textColor: "{colors.warn-fg}"
     rounded: "{rounded.table}"
     padding: "10px 12px"
   copy-dialog:
@@ -321,9 +333,9 @@ It is a dev tool inside someone else's product, so it stays a guest. It uses sys
 A warm off-white sheet, white cards, near-black ink, and one lilac family that carries both choice and revision.
 
 ### Primary
-- **Chosen Lilac** (`lilac`, dark `lilac-dark`): the fill of the chosen option in a prop's table, the instruction strip while a select tool waits for a click, and the held button state. Text on it uses `on-lilac`.
-- **Revision Line** (`lilac-line`, dark `lilac-line-dark`): the delta's stroke, the Override dot, ticked checkboxes, focus outlines and the text field's focus edge.
-- **Revision Ink** (`lilac-ink`, dark `lilac-ink-dark`): lilac text that has to be read: the number inside a delta, the new value in a change line, the "changed" count in the component list, the widen link and the "keep" link. Also the 1px edge of the option cell that shows now and its focus outline, which `lilac-line` can't carry on lilac (4.86:1 against 2.53:1).
+- **Chosen Lilac** (`shown`, dark `shown-dark`): the fill of the chosen option in a prop's table, the instruction strip while a select tool waits for a click, and the held button state. Text on it uses `on-shown`.
+- **Revision Line** (`revision-line`, dark `revision-line-dark`): the delta's stroke, the Override dot, ticked checkboxes, focus outlines and the text field's focus edge.
+- **Revision Ink** (`revision-text`, dark `revision-text-dark`): lilac text that has to be read: the number inside a delta, the new value in a change line, the "changed" count in the component list, the widen link and the "keep" link. Also the 1px edge of the option cell that shows now and its focus outline, which `revision-line` can't carry on lilac (4.86:1 against 2.53:1).
 
 ### Neutral
 - **Warm Sheet** (`sheet` / `sheet-dark`): the panel's ground, the back button, the selection strip, notices and the command line.
@@ -331,17 +343,17 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 - **Sunk** (`sunk` / `sunk-dark`) and **Sunk Hover** (`sunk-hover`): soft pill buttons, tags, status chips and crumbs, and their hover.
 - **Hover Wash** (`hover` / `hover-dark`): hover on rows and option cells inside a card, and an open group in the component list.
 - **Ink** (`ink` / `ink-dark`): all primary text. `on-ink` is its counter-colour.
-- **Muted** (`muted`) and **Faint** (`faint`): option labels at rest, secondary lines, values; faint for counts, arrows, annotations and left-out Instances. Faint is also the edge of anything that has to be found at 3:1: an off switch's outline and thumb, and a checkbox's border.
-- **Rule** (`rule`): the option table's hairlines and field borders. **Rule Soft** (`rule-soft`): row separators inside a card. **Rule Strong** (`rule-strong`): the scrollbar, the ring on an option cell holding the app's value, and the underline of the "Inside" links. **Edge** (`edge`): the sheet's 1px outline against the product.
+- **Muted** (`muted`) and **Faint** (`faint`): option labels at rest, secondary lines, values; faint for counts, arrows, annotations and left-out Instances. Faint passes 4.5:1 on every surface it sits on: cards, the hover wash, the sheet and sunk pills.
+- **Rule** (`rule`): the option table's hairlines. **Field Edge** (`field-edge`): the 3:1 edge of anything found by its outline: text fields, an off switch and an unticked checkbox. **Rule Soft** (`rule-soft`): row separators inside a card. **Rule Strong** (`rule-strong`): the scrollbar, the ring on an option cell holding the app's value, and the underline of the "Inside" links. **Edge** (`edge`): the sheet's 1px outline against the product.
 - **Band** (`band` / `band-dark`): the header. **On Band** (`on-band`) for the wordmark and tools, **Band Muted** (`band-muted`) for the page crumb. **Band Hover** and **Band Pressed** are translucent washes of the sheet colour for the tools.
 - **Primary** (`primary` / `primary-dark`): Copy Proposal only. Ink in light, the warm sheet colour in dark.
-- **Pencil** (`pencil`): held for review (Suspended): the hollow ring and the held tag. Applies to nothing on the page.
+- **Pencil** (`held`): held for review (Suspended): the hollow ring and the held tag. Applies to nothing on the page.
 
 ### Status
 - **Supported Green** (`ok-bg`, `ok-fg`): the "Supported" chip beside the component name.
-- **Switch Teal** (`switch-on`), against **Switch Off** (`switch-off`): a true/false prop's switch. Smaller roles: `kbd` (a key's wash), `thumb` (the on thumb) and `on-check` (a checkbox's tick: white in light, the dark sheet in dark).
+- **Switch Teal** (`switch-on`), against **Switch Off** (`switch-off`): a true/false prop's switch. Smaller roles: `control-off` (the off thumb, 3:1 on its track), `thumb` (the on thumb), `on-check` (a checkbox's tick: white in light, the dark sheet in dark), `kbd` (a key's wash), `focus-glow` (the soft ring round a focused field), `tools-wash` (the select tools' group on the band) and `backdrop` (behind the Copy dialog). The page's marks name theirs too: `page-hover`, `page-on-ink`, `page-on-band`, `page-on-band-muted` and `page-halo`.
 - **Alert Orange** (`alert`): failures only, as a dot beside the sentence that says what failed.
-- **Notice Amber** (`amber-fg`, `amber-bg`, `amber-dot`): out of date and warnings: stale tags, the warn strip, the flag-previews-off dot.
+- **Notice Amber** (`warn-fg`, `warn-bg`, `warn-dot`): out of date and warnings: stale tags, the warn strip, the flag-previews-off dot.
 
 ### On the page
 - **Page Ink** (`page-ink`), **Page Line** (`page-line`) and **Page Fill** (`page-fill`): the outlines over the host product. They are fixed light values in both panel themes, because they sit on the app, not on the panel. The selected Instance's outline is solid `page-ink` and its tag is `page-ink` with white figures (7.4:1); the other Instances a selection or a change reaches are dashed `page-line`; left-out and hovered Instances are dashed **Page Hover** (`page-hover`). The pick tag is a **Page Band** (`page-band`) pill.
@@ -363,18 +375,22 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 - **Headline** (600, 17px/22px, -0.015em): the selected Instance's visible name and the page name; the Copy Proposal dialog's title steps up to 18px/24px.
 - **Wordmark** (600, 14px/20px, -0.01em): "Loupe" in the band.
 - **Title** (500, 14px/18px, -0.01em): card titles, prop names, the component name beside the back button, and the footer's Override count.
-- **Body** (400, 13px/18px): the panel's base text and text fields. Explanatory paragraphs run 13px/19px in muted.
+- **Body** (400, 13px/18px): the panel's base text and text fields. Explanatory paragraphs run 13px/19px in muted, and any 12px sentence that can wrap runs 12px/17px: nothing that wraps to three lines sits under a 1.4 line height.
 - **Control** (500, 12px/16px): buttons, links, the status strip.
 - **Option** (400, 12px/16px): option cells; the chosen one at 500.
 - **Label** (500, 11px/14px) and **Meta** (400, 11px/14px, tabular, faint): field labels and the counts beside card titles.
 - **Delta** (700, 9px/1, tabular): the number inside a delta.
 - **Mono** (400, 12px/16px) and **Mono Small** (400, 11px/16px): call sites, change lines, values in the Inspect only rows, and a table's counts at a scope ("Same on all 4", `"outline" 1 · "ghost" 3`), never recased since they quote values.
-- **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page crumb in the band, the "app" tag in an option cell (500, 9px/12px), and the status chip (500, 10px/12px).
+- **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page crumb in the band, the "app" tag in an option cell (500, 10px/14px), and the status chip (500, 10px/12px). The 9px step is the delta's alone.
 
 ### Named Rules
 **The Mono Is Evidence Rule.** Mono is for what an engineer would paste (values, call sites, commands, flag keys) and for small uppercase annotations. Names a designer reads on screen stay in sans.
 
-**The Tabular Figures Rule.** Every counted or keyed number (Override counts, Instance counts, ×N, delta numbers, option counts, tiles) uses `font-variant-numeric: tabular-nums`.
+**The Tabular Figures Rule.** Every counted or keyed number (Override counts, Instance counts, ×N, delta numbers, option counts, tiles, "4 Instances changed", the footer's "+3") uses `font-variant-numeric: tabular-nums`.
+
+**The Reader's Size Rule.** Every size here is in px at the browser's default 16px text, and follows the reader's own default: the host registers `--loupe-px` as a length worth its `medium` over 16, and each font size is a multiple of it (`size()` in styles.ts). `rem` can't do it inside the shadow root, where it reads the app's root size. Where the browser can't register a property, the sizes stay as written.
+
+**The Rendering Rule.** Smoothing is set once, on the host, for WebKit and Firefox; the browser may synthesise a weight a system face lacks. Paragraphs wrap with `text-wrap: pretty`, headings with `balance`. The host says `lang="en"`; an Instance's own name carries the app's `lang`, and a name set inside an English sentence sits between direction isolates (U+2068 … U+2069), the string form of `<bdi>`.
 
 ## Layout
 
@@ -386,6 +402,8 @@ The sheet is three bands, top to bottom:
 - **The footer card**, pinned: the count ("2 changes · 1 state shown") with its deltas on the right, a dashed unnumbered delta for each state shown, and below it Reset all and Copy Proposal at the right edge. A change's number is the one it got when it was made: it never moves, and a reset one leaves a gap.
 
 A lilac status strip appears under the band for transient states: a select tool waiting for a click, a dialog under the panel, marks hidden on the page.
+
+One leading edge runs down the panel, 20px in from the sheet: the wordmark, the status strip's text, every card's text and the footer's count all start on it.
 
 Inside the middle, a selection reads top to bottom: the identity card, then its note when one applies, then under Select multiple the selection card, then one card per prop with options or a text field, then one card of switches for the true/false props (State props first), then "Inspect only · N" folded to one line. Cards keep their height and the middle scrolls: a card never shrinks to fit. Every card's text starts 14px from its left edge, 12px from its top; a prop card pads 10px top and right so its Reset pill sits in the corner, and its table and fields stop 14px from the right edge. Rows inside a card are 38–42px on `rule-soft` lines. Spacing steps are 1, 2, 4, 6, 8, 10, 12, 14 and 18px.
 
@@ -426,22 +444,22 @@ The scope of a change, chosen the way Figma selects.
 Soft pills, with the dark primary kept for the one exit.
 - **Shape:** full pill, 30px tall (26px small), `sunk` fill, no border, 12px/500.
 - **Primary:** Copy Proposal only: `primary` fill, `on-primary` text, 40px tall, 13px/600. Hover brightens in light (1.3) and dims in dark (0.92).
-- **Hover / Focus:** hover fills `sunk-hover`; focus is a 2px `lilac-line` outline at 2px offset on every focusable element. Disabled drops to 45% opacity.
+- **Hover / Focus:** hover fills `sunk-hover`; focus is a 2px `revision-line` outline at 2px offset on every focusable element. Disabled drops to 45% opacity.
 - **Back:** a 28px round button on the warm sheet colour, the arrow only.
 - **Reset:** a small pill in the top-right corner of a prop's card; on a switch row, round and icon-only.
-- **Link:** 500 12px `lilac-ink`, underlined at a 3px offset; for Widen, Narrow and "keep" actions.
+- **Link:** 500 12px `revision-text`, underlined at a 3px offset; for Widen, Narrow and "keep" actions.
 
 ### Prop cards (option tables)
 The panel's core: one card per prop.
 - **Head:** the delta (when overridden), the prop's name in the title style, then on the right its counts at a scope (Mono Small) and its Reset pill.
-- **Change line:** 2px under the head, `"ghost" → "outline"` in 11px mono, the new value in `lilac-ink` at 600, then "· from All on page" only when the value comes from a wider scope than the one in view.
-- **Table:** cells 30px tall on 1px `rule` hairlines inside a 12px-cornered table; four or fewer options run on one line, more run three across with the last spanning its line. Three marks, so a designer never has to guess: the cell that shows now is `lilac`; the app's own value, once overridden, gets a 1px inset `rule-strong` ring and an "app" tag; the design system's default, when the metadata knows it, a hollow 5px dot in its top-right corner. A one-line legend under the first table that carries a default says what they mean. At a scope each cell counts the Instances showing it now, a narrower Override's value included, so "Same on all 4" is only ever true.
-- **Keyboard:** a table is one radio group and one Tab stop; the arrow keys move through it and choose as they go, Home and End jump. The cell that shows now carries a 1px `lilac-ink` edge, and its focus outline is `lilac-ink` too.
+- **Change line:** 2px under the head, `"ghost" → "outline"` in 11px mono, the new value in `revision-text` at 600, then "· from All on page" only when the value comes from a wider scope than the one in view.
+- **Table:** cells 30px tall on 1px `rule` hairlines inside a 12px-cornered table; four or fewer options run on one line, more run three across with the last spanning its line. Three marks, so a designer never has to guess: the cell that shows now is `shown`; the app's own value, once overridden, gets a 1px inset `rule-strong` ring and an "app" tag; the design system's default, when the metadata knows it, a hollow 5px dot in its top-right corner. A one-line legend under the first table that carries a default says what they mean. At a scope each cell counts the Instances showing it now, a narrower Override's value included, so "Same on all 4" is only ever true.
+- **Keyboard:** a table is one radio group and one Tab stop; the arrow keys move through it and choose as they go, Home and End jump. The cell that shows now carries a 1px `revision-text` edge, and its focus outline is `revision-text` too.
 - **Long values** wrap inside their cell; nothing in a table is cut short.
-- **Text field:** a white field with a 1px `rule` border and 12px corners; focus turns the edge `lilac-line` with a 3px soft lilac ring; an overridden field keeps the `lilac-line` edge.
+- **Text field:** a white field with a 1px `field-edge` border (3:1 on the card) and 12px corners; focus turns the edge `revision-line` with a 3px `focus-glow` ring; an overridden field keeps the `revision-line` edge.
 
 ### Switches
-True/false props share one card, a row each on `rule-soft` lines, State props (a menu's `open`) first: the name and a 40 × 22px switch: off, an outlined `switch-off` track with a `faint` thumb on the left; on, a `switch-on` (teal) track with a white thumb, sliding 18px over 180ms. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name.
+True/false props share one card, a row each on `rule-soft` lines, State props (a menu's `open`) first: the name and a 40 × 22px switch: off, a `switch-off` track outlined in `field-edge` with a `control-off` thumb on the left; on, a `switch-on` (teal) track with a white thumb, sliding 18px over 180ms. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name.
 
 ### Identity card
 The selection by what it shows, in rows: the back button, the component name (13px, muted) with its verdict chip and its deltas at the right; the Instance's visible name as the headline, in full however many lines it takes; its call site in Mono Small ("member-row-menu.tsx:37", with "· use 2 of 3" only when its function uses the component more than once); "Inside MemberRowMenu › DropdownMenu" as plain links, outermost first. Then only the exceptions: tags ("On the server", "Source changed", "Not visible now"), the scopes acting on it unless the selection card names one, the not-generated warning, and the actions that can act: Reset this Instance while it holds a change, Hold open at a scope wider than the Instance (at This instance the State prop's own switch holds it). Once the Instance is gone it keeps its component and call site, under a "Not on the page now" chip.
@@ -465,14 +483,14 @@ To judge the page with nothing on it, before any change has landed too. The eye 
 With nothing selected: a "Changes" card (each change by its delta, the change in mono, where it applies), then "On this page", a card of 42px rows on `rule-soft` lines: the component name at 500, `×N` in tabular mono, a status chip only where something is exceptional, and a chevron that turns 90° when the group opens onto its Instances.
 
 ### Notices and status
-- **Status strip:** `lilac` fill, 14px corners, 12px text, `kbd` keys on a faint wash.
+- **Status strip:** `shown` fill, 14px corners, 12px text, `kbd` keys on a faint wash.
 - **Warn strip:** amber wash, amber text and dot, 12px corners.
 - **Notice:** the warm sheet colour inside a card, 12px corners, code in mono 600.
 - **Tags and chips:** `sunk` pills, 11px muted (chips in 10px mono); stale ones amber; held ones a pencil ring.
-- **Dots:** 8px (6px small): `lilac-line` for Overrides, alert orange for failures, amber for warnings, a pencil ring for held, `rule` for none.
+- **Dots:** 8px (6px small): `revision-line` for Overrides, alert orange for failures, amber for warnings, a pencil ring for held, `rule` for none.
 
 ### Copy Proposal dialog
-A 440px sheet with 24px corners and 6px inset, its sections white cards with 18px corners, over the dialog shadow. The title in the headline style, count tiles in the figure style, fields with 12px corners, actions right-aligned. Copy is never disabled for a missing title: pressed without one, the field turns alert orange and says "Give the Proposal a title" under it, and takes focus. A count that fails says to close and reopen, with its reason for an engineer.
+A 440px sheet with 24px corners and 6px inset, its sections white cards with 18px corners, over the dialog shadow. The title in the headline style, count tiles in the figure style, fields with 12px corners, actions right-aligned. Only the sections scroll: Cancel and Copy stay in view at any height or zoom, and the dialog's height leaves room for a phone browser's toolbar (`100dvh`). Copy is never disabled for a missing title: pressed without one, the field turns alert orange and says "Give the Proposal a title" under it, and takes focus. A count that fails says to close and reopen, with its reason for an engineer.
 
 ### Undo
 Reset all, Reset this Instance, Reset this scope and Discard act immediately; the footer then offers "Reset N Overrides · Undo" ("Discarded N held Overrides · Undo") on its own line. The offer has no timer: it stays until it is taken, a newer offer replaces it, or the Overrides change some other way. One offer at a time.
@@ -493,7 +511,7 @@ Reset all, Reset this Instance, Reset this scope and Discard act immediately; th
 
 ### Do:
 - **Do** mark every change with its numbered delta, the same number on its card, in the change list, in the footer and in the Proposal; keep numbers off the page.
-- **Do** keep lilac to two jobs: `lilac` fill for what is chosen, `lilac-line` and `lilac-ink` for what was revised.
+- **Do** keep lilac to two jobs: `shown` fill for what is chosen, `revision-line` and `revision-text` for what was revised.
 - **Do** give each prop with options its own card and lay its options out as one hairline table; put true/false props together in one card of switches.
 - **Do** choose the scope with the header's select tools, and keep the widen-to-page link in the selection card.
 - **Do** separate the sheet from the product with the 8px float, the `edge` outline and the sheet shadow, and separate cards by tone alone.
@@ -501,7 +519,8 @@ Reset all, Reset this Instance, Reset this scope and Discard act immediately; th
 - **Do** use tabular figures for every count and delta number.
 - **Do** declare every panel colour as a token on the shadow host with a dark counterpart; draw outlines and tags on the page with the fixed page values.
 - **Do** keep motion to the delta's settle, a change's outlines fading in and stepping back, the switch's thumb and a fold's chevron, and drop it under reduced motion.
-- **Do** let a value, a name or a prop wrap rather than cut it short where the panel is the only place it is read in full; keep an ellipsis to list rows, which open the inspector.
+- **Do** let a value, a name or a prop wrap rather than cut it short; component and prop names break only where their words meet (`AlertDialog·Content`). Keep an ellipsis to an Instance's name in a list row, which opens the inspector, and to folds that open on the rest.
+- **Do** give every fold a chevron, and let a link wrap before it loses its end ("Widen to All on page · 7").
 
 ### Don't:
 - **Don't** use red anywhere in the panel; failures are alert orange, warnings amber.

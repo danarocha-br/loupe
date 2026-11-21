@@ -18,7 +18,7 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState } from "rea
 import type { LayerStatus } from "../layer-status.js";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope, ScopeTarget } from "../runtime/store.js";
-import { attempt, HeldKey, Key, PropRowView } from "./controls.js";
+import { attempt, Breakable, HeldKey, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyProposalButton } from "./copy-dialog.js";
 import { FlagsCard } from "./flags.js";
@@ -75,6 +75,12 @@ type PanelProps = {
   theme: "light" | "dark";
   onTheme(): void;
 };
+
+/**
+ * The app's language, for its own words inside Loupe's English (the host says `lang="en"`):
+ * an Instance's visible name is read in the app's voice. Undefined when the app sets none.
+ */
+const appLang = () => (typeof document === "undefined" ? undefined : document.documentElement.lang || undefined);
 
 /** The sheet stands this far inside its column on every side, as `.panel` sets it. */
 const PANEL_INSET = 8;
@@ -388,8 +394,9 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
                   onFocus={() => onHover(group.outlineIds)}
                   onBlur={() => onHover([])}
                 >
-                  <span className="cname" title={group.component}>
-                    {group.component}
+                  {/* The whole name, wrapping where its words meet: a long one is never cut short (layout review). */}
+                  <span className="cname">
+                    <Breakable text={group.component} />
                   </span>{" "}
                   <span className="times">{group.count}</span>
                   <span className="sub">
@@ -434,7 +441,7 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
                         <Keys keys={item.keys} />
                         <span className="who">
                           {item.name && (
-                            <span className="screen-name" dir="auto">
+                            <span className="screen-name" dir="auto" lang={appLang()}>
                               {item.name}
                             </span>
                           )}
@@ -651,15 +658,15 @@ function Inspector({
         <div className="title-line">
           <BackButton onSelect={onSelect} />
           {named && (
-            <span className="component" title={body.component}>
-              {body.component}
+            <span className="component">
+              <Breakable text={body.component} />
             </span>
           )}
           {body.verdict.status && <StatusView status={body.verdict.status} check />}
           <Keys keys={body.keys} />
         </div>
         {/* The app's own words, in whatever script it writes: `dir="auto"` lays them out their way. */}
-        <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component} dir="auto">
+        <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component} dir="auto" lang={body.name ? appLang() : undefined}>
           {body.name ?? body.component}
         </h2>
         {/* Where it is written, and which of that call site's Instances it is; the full path and key in the tooltip. */}
@@ -882,7 +889,7 @@ function MembersCard({
         />
         {/* By name only: the key that tells Instances apart is for engineers, in the tooltip. */}
         <span className={member.out ? "who out" : "who"} title={member.id}>
-          <span className="screen-name" dir="auto">
+          <span className="screen-name" dir="auto" lang={member.name ? appLang() : undefined}>
             {member.name ?? member.label}
           </span>
           {member.label === THIS_INSTANCE && member.name && <span className="self">{THIS_INSTANCE}</span>}
@@ -894,7 +901,9 @@ function MembersCard({
   return (
     <div className="section members" data-testid="members">
       <div className="head">
-        <h3 title={current?.title ?? undefined}>{current ? current.label.replace(/ · \d+.*$/, "") : "Instances"}</h3>
+        <h3 title={current?.title ?? undefined}>
+          <Breakable text={current ? current.label.replace(/ · \d+.*$/, "") : "Instances"} />
+        </h3>
         <span className="meta">{members.countText}</span>
       </div>
       {(other || members.reset.enabled) && (

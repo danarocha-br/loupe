@@ -195,9 +195,15 @@ export function headerReport(route: string, changes: number, states: number): st
   return parts.join(" · ");
 }
 
+/**
+ * An app's own words set inside Loupe's English, between Unicode direction isolates
+ * (the string form of `<bdi>`): an Arabic or Hebrew name can't reorder the words around it.
+ */
+export const isolate = (text: string) => `\u2068${text}\u2069`;
+
 /** What a numbered change reaches, by name: "Actions for Ana Souza", "Actions for Ana Souza and 3 more". */
 export function reachText(first: string, count: number): string {
-  return count > 1 ? `${first} and ${count - 1} more` : first;
+  return count > 1 ? `${isolate(first)} and ${count - 1} more` : first;
 }
 
 /** The component and where its call site is: "Button · member-row-menu.tsx:37". */

@@ -8,7 +8,7 @@ import { formatCurrent } from "./format.js";
 import type { FlagDefinition, FlagOption, FlagOverrides, FlagValue } from "./flags-preview.js";
 import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
-import { ClockIcon, ResetIcon } from "./icons.js";
+import { ChevronIcon, ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
 
 /** A flag with no declared options is offered as on and off. */
@@ -77,6 +77,8 @@ export function FlagsCard() {
             <span className="dot amber small" />
             Flag previews are off
             <span className="muted"> · why</span>
+            {/* Every fold in the panel says it opens with a chevron. */}
+            <ChevronIcon />
           </summary>
           <div className="muted">{current.reason}</div>
           {/* The one fix the reader makes in a file: say which and where. */}

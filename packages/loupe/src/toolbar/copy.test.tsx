@@ -136,6 +136,10 @@ describe("the Copy Proposal dialog", () => {
 
     expect(dialog()?.open).toBe(true);
     expect(dialog()?.getAttribute("aria-labelledby")).toBe("loupe-copy-title");
+    // Only the sections scroll: Cancel and Copy stay in view at any height or zoom (layout review 2026-11-20).
+    expect(dialog()?.querySelector(".body .sec")).not.toBeNull();
+    expect(dialog()?.querySelector(".body .actions")).toBeNull();
+    expect(dialog()?.querySelector("form > .actions")).not.toBeNull();
     expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Button variant in MemberRow");
     expect(dialog()?.querySelector(".counts")?.textContent).toBe("1 change · 0 held for review");
     expect([...(dialog()?.querySelectorAll("[data-entry]") ?? [])].map((entry) => entry.querySelector("span")?.textContent)).toEqual([

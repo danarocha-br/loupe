@@ -106,18 +106,13 @@ export const ArrowIcon = () => (
 
 /**
  * A revision delta: the triangle a drawing's revision carries its number in, here
- * one change of the Proposal. Without `n` it is the bare triangle, for a number set
- * over it in HTML; `dashed`, empty, for a held state.
+ * one change of the Proposal. The bare triangle: its number is set over it in HTML
+ * (`Key`), at the type scale's delta step; `dashed`, empty, for a held state.
  */
-export function Delta({ n, dashed = false }: { n?: number; dashed?: boolean }) {
+export function Delta({ dashed = false }: { dashed?: boolean }) {
   return (
     <svg className={dashed ? "delta dashed" : "delta"} width="20" height="18" viewBox="0 0 20 18" aria-hidden="true" focusable="false">
       <path d="M10 1.6 18.6 16.4H1.4Z" strokeLinejoin="round" />
-      {n !== undefined && (
-        <text x="10" y="14.2" textAnchor="middle">
-          {n}
-        </text>
-      )}
     </svg>
   );
 }

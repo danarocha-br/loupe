@@ -46,8 +46,11 @@ export function Key({ n }: { n: number }) {
   );
 }
 
-/** A prop's name, free to break only where its words meet: `focusable·When·Disabled`, never mid-word. */
-function Breakable({ text }: { text: string }) {
+/**
+ * A prop's or a component's name, free to break only where its words meet:
+ * `focusable·When·Disabled`, `AlertDialog·Content`, never mid-word.
+ */
+export function Breakable({ text }: { text: string }) {
   const parts = text.split(/(?<=[a-z0-9])(?=[A-Z])/);
   return (
     <>

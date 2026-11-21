@@ -8,6 +8,7 @@ import { copyProposal, type CopyPreview, copyForm, previewCopy } from "./copy.js
 import { plural } from "./format.js";
 import { Key } from "./controls.js";
 import { CopyIcon } from "./icons.js";
+import { isolate } from "./panel-view/index.js";
 
 /**
  * What a failed count says before its reason: what failed, and the way back. The
@@ -49,7 +50,7 @@ export function CopyProposalButton({ disabled }: { disabled: boolean }) {
         className="btn primary"
         data-copy=""
         disabled={disabled}
-        title={done === null ? "Copy the Proposal for your coding agent or an engineer" : `Copied "${done}"`}
+        title={done === null ? "Copy the Proposal for your coding agent or an engineer" : `Copied “${isolate(done)}”`}
         onClick={() => setOpen(true)}
       >
         <CopyIcon size={16} />
@@ -148,117 +149,120 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
           run();
         }}
       >
-        <div className="sec">
-          <div className="head">
-            <h2 id="loupe-copy-title">Copy Proposal</h2>
-            <span className="meta">Markdown and JSON</span>
-          </div>
-          {/* The error sits outside the label, so it describes the field without joining its name. */}
-          <div className="field">
-            <label htmlFor="loupe-copy-title-field">Title</label>
-            <input
-              id="loupe-copy-title-field"
-              ref={titleInput}
-              name="title"
-              required
-              aria-invalid={titleMissing || undefined}
-              aria-describedby={titleMissing ? "loupe-title-missing" : undefined}
-              value={title}
-              onChange={(event) => {
-                setTitle(event.target.value);
-                if (event.target.value.trim() !== "") setTitleMissing(false);
-                copyForm().title = event.target.value;
-              }}
-            />
-            {titleMissing && (
-              <span className="field-error" id="loupe-title-missing">
-                {TITLE_MISSING}
-              </span>
-            )}
-          </div>
-          <label className="field">
-            <span>
-              Designer <span className="muted">(optional)</span>
-            </span>
-            <input
-              name="designer"
-              value={designer}
-              onChange={(event) => {
-                setDesigner(event.target.value);
-                copyForm().designer = event.target.value;
-              }}
-            />
-          </label>
-        </div>
-        <div className="sec">
-          {preview === null && <p className="muted">Counting…</p>}
-          {preview !== null && "failed" in preview && (
-            <div className="warn">
-              <span className="dot" />
-              <span>
-                {PREVIEW_FAILED} <span className="mono verbatim">{preview.failed}</span>
-              </span>
-            </div>
-          )}
-          {ready && (
-            <>
-              {/* The tiles are what the eye reads; the line is what a screen reader hears. */}
-              <div className="tiles" aria-hidden="true">
-                {[
-                  [preview.changes, "Changes"],
-                  [preview.held, "Held"],
-                ].map(([count, label]) => (
-                  <div key={label} className="tile">
-                    <b>{count}</b>
-                    <span className="meta">{label}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-          {/* Both always there, so what lands in them is announced: the counts, and a failure. */}
-          <p className="counts sr-only" role="status">
-            {ready ? countsLine(preview) : ""}
-          </p>
-          <p className="sr-only" role="alert">
-            {error ?? (preview !== null && "failed" in preview ? `${PREVIEW_FAILED} ${preview.failed}` : "")}
-          </p>
-        </div>
-        {ready && preview.entries.length > 0 && (
-          <div className="sec soft">
-            <fieldset className="notes">
-              <legend>
-                Notes <span className="muted">optional, the why</span>
-              </legend>
-              {preview.entries.map((entry) => (
-                <label key={entry.key} className="field" data-entry={entry.id}>
-                  <span className="entry">
-                    {/* The delta reads "Change 2" on its own. */}
-                    <Key n={Number(entry.id.slice(1))} />
-                    {entry.label}
-                  </span>
-                  <textarea
-                    rows={2}
-                    value={notes[entry.key] ?? ""}
-                    onChange={(event) => {
-                      const next = { ...notes, [entry.key]: event.target.value };
-                      setNotes(next);
-                      copyForm().notes = next;
-                    }}
-                  />
-                </label>
-              ))}
-            </fieldset>
-          </div>
-        )}
-        {error !== null && (
+        {/* The sections scroll; the actions below them stay in view (layout review 2026-11-20). */}
+        <div className="body">
           <div className="sec">
-            <div className="warn">
-              <span className="dot" />
-              {error}
+            <div className="head">
+              <h2 id="loupe-copy-title">Copy Proposal</h2>
+              <span className="meta">Markdown and JSON</span>
             </div>
+            {/* The error sits outside the label, so it describes the field without joining its name. */}
+            <div className="field">
+              <label htmlFor="loupe-copy-title-field">Title</label>
+              <input
+                id="loupe-copy-title-field"
+                ref={titleInput}
+                name="title"
+                required
+                aria-invalid={titleMissing || undefined}
+                aria-describedby={titleMissing ? "loupe-title-missing" : undefined}
+                value={title}
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                  if (event.target.value.trim() !== "") setTitleMissing(false);
+                  copyForm().title = event.target.value;
+                }}
+              />
+              {titleMissing && (
+                <span className="field-error" id="loupe-title-missing">
+                  {TITLE_MISSING}
+                </span>
+              )}
+            </div>
+            <label className="field">
+              <span>
+                Designer <span className="muted">(optional)</span>
+              </span>
+              <input
+                name="designer"
+                value={designer}
+                onChange={(event) => {
+                  setDesigner(event.target.value);
+                  copyForm().designer = event.target.value;
+                }}
+              />
+            </label>
           </div>
-        )}
+          <div className="sec">
+            {preview === null && <p className="muted">Counting…</p>}
+            {preview !== null && "failed" in preview && (
+              <div className="warn">
+                <span className="dot" />
+                <span>
+                  {PREVIEW_FAILED} <span className="mono verbatim">{preview.failed}</span>
+                </span>
+              </div>
+            )}
+            {ready && (
+              <>
+                {/* The tiles are what the eye reads; the line is what a screen reader hears. */}
+                <div className="tiles" aria-hidden="true">
+                  {[
+                    [preview.changes, "Changes"],
+                    [preview.held, "Held"],
+                  ].map(([count, label]) => (
+                    <div key={label} className="tile">
+                      <b>{count}</b>
+                      <span className="meta">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {/* Both always there, so what lands in them is announced: the counts, and a failure. */}
+            <p className="counts sr-only" role="status">
+              {ready ? countsLine(preview) : ""}
+            </p>
+            <p className="sr-only" role="alert">
+              {error ?? (preview !== null && "failed" in preview ? `${PREVIEW_FAILED} ${preview.failed}` : "")}
+            </p>
+          </div>
+          {ready && preview.entries.length > 0 && (
+            <div className="sec soft">
+              <fieldset className="notes">
+                <legend>
+                  Notes <span className="muted">optional, the why</span>
+                </legend>
+                {preview.entries.map((entry) => (
+                  <label key={entry.key} className="field" data-entry={entry.id}>
+                    <span className="entry">
+                      {/* The delta reads "Change 2" on its own. */}
+                      <Key n={Number(entry.id.slice(1))} />
+                      {entry.label}
+                    </span>
+                    <textarea
+                      rows={2}
+                      value={notes[entry.key] ?? ""}
+                      onChange={(event) => {
+                        const next = { ...notes, [entry.key]: event.target.value };
+                        setNotes(next);
+                        copyForm().notes = next;
+                      }}
+                    />
+                  </label>
+                ))}
+              </fieldset>
+            </div>
+          )}
+          {error !== null && (
+            <div className="sec">
+              <div className="warn">
+                <span className="dot" />
+                {error}
+              </div>
+            </div>
+          )}
+        </div>
         <div className="actions">
           <button type="button" className="btn" disabled={busy} onClick={() => onClose()}>
             Cancel

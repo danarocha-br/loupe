@@ -342,5 +342,7 @@ describe("the Feature flags card", () => {
     pageLoad({ secret: "" });
     act(() => root.render(<FlagsCard />));
     await until(() => expect(container.textContent).toContain("FLAGS_SECRET isn't set"));
+    // Folded to one line, with the chevron every fold in the panel carries (layout review 2026-11-20).
+    expect(container.querySelector(".off > summary .icon")).not.toBeNull();
   });
 });

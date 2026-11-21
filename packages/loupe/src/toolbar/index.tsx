@@ -23,7 +23,7 @@ import { Panel } from "./panel.js";
 import { panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startToolbar } from "./start.js";
-import { CSS, HOST_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
+import { CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
 
 export type Theme = "light" | "dark";
 
@@ -40,6 +40,9 @@ function useShadowRoot(): ShadowRoot | null {
   useEffect(() => {
     const host = document.createElement("div");
     host.setAttribute(HOST_ATTRIBUTE, "");
+    // Loupe's words are English whatever the app's `lang`: a screen reader reads them in an English voice.
+    host.setAttribute("lang", "en");
+    if (registerTextScale()) host.setAttribute(SCALE_ATTRIBUTE, "");
     const shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
     style.textContent = CSS;
@@ -49,6 +52,27 @@ function useShadowRoot(): ShadowRoot | null {
     return () => host.remove();
   }, []);
   return root;
+}
+
+type PropertyRegistry = { registerProperty?(definition: { name: string; syntax: string; inherits: boolean; initialValue: string }): void };
+
+/**
+ * Registers `--loupe-px` as a length, so `calc(1em / 16)` on the host resolves there,
+ * once, to the reader's default text size over 16, and every font size follows it
+ * (styles.ts `size()`). True once it is registered, by this mount or an earlier one;
+ * false where the browser can't, and the sizes then stay as written.
+ */
+function registerTextScale(): boolean {
+  // `CSS` here is the stylesheet: the browser's CSS namespace is the window's.
+  const registry = (window as unknown as { CSS?: PropertyRegistry }).CSS;
+  if (typeof registry?.registerProperty !== "function") return false;
+  try {
+    registry.registerProperty({ name: "--loupe-px", syntax: "<length>", inherits: true, initialValue: "1px" });
+    return true;
+  } catch (error) {
+    // Registered already: a second mount, or a Fast Refresh.
+    return error instanceof DOMException && error.name === "InvalidModificationError";
+  }
 }
 
 /** Storage can throw (a private window, blocked site data): the OS preference decides then. */

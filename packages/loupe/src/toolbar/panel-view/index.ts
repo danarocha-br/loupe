@@ -12,7 +12,7 @@ import type { PanelInput, PanelView } from "./types.js";
 import { footerCount, headerReport, OVERRIDES_OFF_TITLE, overridesOffBanner } from "./words.js";
 
 export type * from "./types.js";
-export { inspectOnlyTitle, LEGEND, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
+export { inspectOnlyTitle, isolate, LEGEND, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
 
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides
