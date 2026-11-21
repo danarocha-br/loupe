@@ -10,6 +10,8 @@
 // preference or the header's toggle. System faces only: a shadow root can't load a
 // web font.
 
+import { FIND_CSS } from "./find-redesign.js";
+
 export const HOST_ATTRIBUTE = "data-loupe-toolbar";
 
 /** On the host: `light` or `dark`. Loupe's own name, so an app's `[data-theme]` CSS never matches it. */
@@ -212,14 +214,14 @@ button:disabled { cursor: default; opacity: 0.45; }
 
 /* The panel: a sheet in the column the page makes room for (dock.ts) */
 .panel {
-  position: fixed; top: 8px; right: 8px; bottom: 8px; z-index: 2147483647; width: 344px;
-  display: flex; flex-direction: column; overflow: hidden; background: var(--sheet);
-  border-radius: 24px; box-shadow: 0 0 0 1px var(--edge), var(--shadow); transition: opacity 120ms ease-out;
+  position: fixed; top: 8px; right: 0; bottom: 8px; z-index: 2147483647; width: 344px;
+  display: flex; flex-direction: column; overflow: hidden; background: var(--rule-soft);
+  border-radius: 24px 0 0 24px; box-shadow: 0 0 0 1px var(--edge), 0 8px 24px var(--edge); transition: opacity 120ms ease-out;
 }
 .panel.overlay { box-shadow: 0 0 0 1px var(--edge), var(--overlay-shadow); }
 /* Alt held: see through to what runs under the column, such as an app's own dialog. */
 .panel.peek { opacity: 0.08; pointer-events: none; }
-.header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 48px; padding: 0 9px 0 20px; background: var(--band); color: var(--on-band); }
+.header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 44px; padding: 0 9px 0 20px; background: var(--band); color: var(--on-band); }
 .header .brand { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .wordmark { font: 600 ${size(14)}/1.4286 ${SANS}; letter-spacing: -0.01em; color: var(--on-band); }
 .report { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 ${size(10)}/1.4 ${MONO}; letter-spacing: 0.04em; text-transform: uppercase; color: var(--band-muted); font-variant-numeric: tabular-nums; }
@@ -301,9 +303,9 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Rows: back, component, verdict and deltas; the name; where it is written; what it is inside; exceptions; actions. */
 .identity { gap: 0; padding: 10px 14px 14px; }
 .identity > .body { padding-top: 6px; }
-.back { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; margin-left: -4px; border-radius: 999px; background: var(--sheet); color: var(--ink); transition: background-color 120ms ease-out; }
+.back { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; margin-left: -4px; border-radius: 999px; background: var(--rule-soft); color: var(--ink); transition: background-color 120ms ease-out; }
 @media (hover: hover) { .back:hover { background: var(--sunk-hover); } }
-.title-line { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 28px; }
+.title-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 28px; }
 .title-line .component { min-width: 0; overflow-wrap: break-word; font: 500 ${size(13)}/1.3846 ${SANS}; letter-spacing: -0.01em; color: var(--muted); }
 .title-line .keys { margin-left: auto; }
 /* The whole name, however long: the headline is the one place it is read in full. */
@@ -319,6 +321,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 .inside { margin-top: 6px; color: var(--muted); font: 400 ${size(12)}/1.5 ${SANS}; }
 .inside button { min-height: 24px; color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
 @media (hover: hover) { .inside button:hover { text-decoration-color: currentColor; } }
+.inside > span { width: 100%; }
 .inside .sep { padding: 0 4px; color: var(--faint); }
 .identity .warn { margin-top: 10px; }
 
@@ -371,11 +374,11 @@ button:disabled { cursor: default; opacity: 0.45; }
 .keylist .where { grid-area: where; min-width: 0; overflow-wrap: break-word; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
 
 /* A prop's card: a head (delta, name, scope, Reset) with its change under it, then its table of options */
-.prop-card { gap: 8px; padding: 10px 10px 14px 14px; }
+.prop-card { gap: 8px; padding: 0 10px 14px 14px; }
 .row { display: flex; flex-direction: column; gap: 8px; }
 /* The head and the lines that qualify it sit tight; the control sits apart. */
-.row .head-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.row .line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 26px; }
+.row .head-group { height: 26px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.row .line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; height: 26px; flex-shrink: 0; }
 .row .key { margin: 0 -2px 0 -3px; }
 .row .name { flex: none; display: flex; align-items: baseline; gap: 6px; max-width: 100%; font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; }
 .row .name .mono { font-size: ${size(11)}; color: var(--faint); letter-spacing: 0; }
@@ -596,6 +599,23 @@ fieldset.site .list { padding-left: 26px; }
   .row .text, .dialog .field input, .dialog .field textarea { font-size: max(16px, ${size(16)}); line-height: 1.375; }
 }
 
+${FIND_CSS}
+
+/* Guided start hero (from Find · C) */
+.hero { gap: 10px; padding: 16px 14px 14px; background: var(--band); color: var(--on-band); }
+.hero .eyebrow { font: 500 calc(11 * var(--loupe-px))/1.27 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.06em; text-transform: uppercase; color: var(--band-muted); }
+.hero .hero-title { font-size: calc(22 * var(--loupe-px)); line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; color: var(--on-band); text-wrap: balance; }
+.hero .hero-title:focus { outline: none; }
+.hero .body { color: var(--band-muted); }
+.hero-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.big-tool { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; border-radius: 14px; background: var(--band-hover); color: var(--on-band); text-align: left; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); transition: background-color 120ms ease-out; }
+@media (hover: hover) { .big-tool:hover { background: var(--band-pressed); } }
+.big-tool.armed { background: var(--shown); color: var(--on-shown); }
+.big-tool .glyph { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 4px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
+.big-tool.armed .glyph { background: rgba(10, 10, 10, 0.08); }
+.big-tool .t { font-weight: 600; }
+.big-tool .h { font-size: calc(11 * var(--loupe-px)); line-height: 1.36; color: var(--band-muted); }
+.big-tool.armed .h { color: rgba(10, 10, 10, 0.62); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
   .panel, .dialog, .show-tab, .section, .card, .footer { border: 1px solid transparent; }

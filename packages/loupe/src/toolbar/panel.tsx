@@ -22,6 +22,7 @@ import { attempt, Breakable, HeldKey, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyProposalButton } from "./copy-dialog.js";
 import { FlagsCard } from "./flags.js";
+import { hueOf, PageMap } from "./find-redesign.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -340,15 +341,45 @@ function Keys({ keys }: { keys: readonly number[] }) {
 
 type Heading = { heading: RefObject<HTMLHeadingElement | null> };
 
-function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Actions & Heading & { body: ListBody; notices: ReactNode }) {
+function ComponentList({
+  debug,
+  onSelect,
+  onHover,
+  body,
+  notices,
+  heading,
+  onTool,
+  mode,
+  picking,
+}: Actions & Heading & Pick<PanelProps, "onTool" | "mode" | "picking"> & { body: ListBody; notices: ReactNode }) {
   return (
     <>
-      <div className="section identity">
-        <h2 className="name" tabIndex={-1} ref={heading}>
-          {body.page.name}
+      <div className="section hero">
+        <span className="eyebrow">
+          {body.page.name} · {body.summary}
+        </span>
+        <h2 className="hero-title" tabIndex={-1} ref={heading}>
+          What do you want to change?
         </h2>
-        <p className="body">{TEXT.nothingSelected}</p>
+        <p className="body">Pick it right on the page, or start from what this page uses most.</p>
+        <div className="hero-tools" role="group" aria-label="Start selecting">
+          {SELECT_TOOLS.map((tool) => (
+            <button
+              key={tool.mode}
+              type="button"
+              className={picking && mode === tool.mode ? "big-tool armed" : "big-tool"}
+              aria-pressed={picking && mode === tool.mode}
+              onClick={() => onTool(tool.mode)}
+              title={tool.title}
+            >
+              <span className="glyph">{tool.icon}</span>
+              <span className="t">{tool.label}</span>
+              <span className="h">{tool.mode === "one" ? "Click one thing on the page" : "Every Instance from one call site"}</span>
+            </button>
+          ))}
+        </div>
       </div>
+      <PageMap debug={debug} groups={body.groups} onHover={onHover} onSelect={onSelect} />
       {notices}
       {body.notGenerated && <NotGeneratedNotice names={body.notGenerated.names} command={body.notGenerated.command} />}
       {body.changes.length > 0 && (
@@ -385,8 +416,8 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
           <span className="meta">{body.summary}</span>
         </div>
         <ul className="list" aria-label="Components on this page">
-          {body.groups.map((group) => (
-            <li key={group.component} className="group">
+          {body.groups.map((group, index) => (
+            <li key={group.component} className={`group ${hueOf(index)}`}>
               <details>
                 <summary
                   onMouseOver={() => onHover(group.outlineIds)}
@@ -396,6 +427,7 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
                 >
                   {/* The whole name, wrapping where its words meet: a long one is never cut short (layout review). */}
                   <span className="cname">
+                    <i className="hue-dot" />
                     <Breakable text={group.component} />
                   </span>{" "}
                   <span className="times">{group.count}</span>
@@ -656,12 +688,14 @@ function Inspector({
     <>
       <div className="section identity">
         <div className="title-line">
-          <BackButton onSelect={onSelect} />
-          {named && (
-            <span className="component">
-              <Breakable text={body.component} />
-            </span>
-          )}
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
+            <BackButton onSelect={onSelect} />
+            {named && (
+              <span className="component">
+                <Breakable text={body.component} />
+              </span>
+            )}
+          </div>
           {body.verdict.status && <StatusView status={body.verdict.status} check />}
           <Keys keys={body.keys} />
         </div>
