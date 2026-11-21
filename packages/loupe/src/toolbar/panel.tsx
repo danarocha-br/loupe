@@ -22,7 +22,6 @@ import { attempt, Breakable, HeldKey, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyProposalButton } from "./copy-dialog.js";
 import { FlagsCard } from "./flags.js";
-import { hueOf, PageMap } from "./find-redesign.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -53,6 +52,7 @@ import {
   TEXT,
   THIS_INSTANCE,
 } from "./panel-view/index.js";
+import { hueOf, PageMap } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
 import { keepUndoWhile, offerUndo, recordsKey, takeUndo, useUndoOffer } from "./undo.js";
 
@@ -96,12 +96,20 @@ const PANEL_INSET = 8;
 type Actions = Pick<PanelProps, "debug" | "onSelect" | "onScope" | "onHover">;
 
 /** The header's two select tools: what each is called, and the scope it opens a selection at. */
-const SELECT_TOOLS: { mode: SelectMode; scope: Scope; label: string; title: string; icon: ReactNode }[] = [
-  { mode: "one", scope: "instance", label: "Select one", title: "Select one: click an Instance on the page to change it alone (Esc cancels)", icon: <CursorIcon /> },
+const SELECT_TOOLS: { mode: SelectMode; scope: Scope; label: string; hint: string; title: string; icon: ReactNode }[] = [
+  {
+    mode: "one",
+    scope: "instance",
+    label: "Select one",
+    hint: "Click one thing on the page",
+    title: "Select one: click an Instance on the page to change it alone (Esc cancels)",
+    icon: <CursorIcon />,
+  },
   {
     mode: "many",
     scope: "group",
     label: "Select multiple",
+    hint: "Every Instance from one call site",
     title: "Select multiple: click an Instance on the page to change every one from the same call site (Esc cancels)",
     icon: <SelectManyIcon />,
   },
@@ -358,10 +366,11 @@ function ComponentList({
         <span className="eyebrow">
           {body.page.name} · {body.summary}
         </span>
-        <h2 className="hero-title" tabIndex={-1} ref={heading}>
-          What do you want to change?
+        {/* `name` with the other views' headings: focus finds each view's by `h2.name`. */}
+        <h2 className="name hero-title" tabIndex={-1} ref={heading}>
+          {TEXT.startTitle}
         </h2>
-        <p className="body">Pick it right on the page, or start from what this page uses most.</p>
+        <p className="body">{TEXT.startBody}</p>
         <div className="hero-tools" role="group" aria-label="Start selecting">
           {SELECT_TOOLS.map((tool) => (
             <button
@@ -374,7 +383,7 @@ function ComponentList({
             >
               <span className="glyph">{tool.icon}</span>
               <span className="t">{tool.label}</span>
-              <span className="h">{tool.mode === "one" ? "Click one thing on the page" : "Every Instance from one call site"}</span>
+              <span className="h">{tool.hint}</span>
             </button>
           ))}
         </div>
@@ -688,7 +697,7 @@ function Inspector({
     <>
       <div className="section identity">
         <div className="title-line">
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "0.5rem" }}>
+          <div className="lead">
             <BackButton onSelect={onSelect} />
             {named && (
               <span className="component">

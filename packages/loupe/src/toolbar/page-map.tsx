@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { GroupItem } from "./panel-view/types.js";
 
@@ -46,6 +46,7 @@ function bestNode(debug: LoupeDebug, ids: readonly string[]): { node: Element; b
 
 type Props = { debug: LoupeDebug; groups: GroupItem[]; onHover(ids: string[]): void; onSelect(id: string | null): void };
 
+/** Seven hues, one per component, in the order the list shows them (styles.ts `MAP_HUES`). */
 const HUES = 7;
 export const hueOf = (index: number) => `hue-${index % HUES}`;
 
@@ -121,22 +122,3 @@ export function PageMap({ debug, groups, onHover, onSelect }: Props) {
     </div>
   );
 }
-
-export const FIND_CSS = `
-/* Find · A · Page map */
-.hue-0 { --hue: #8276CF; } .hue-1 { --hue: #27917E; } .hue-2 { --hue: #D08A16; } .hue-3 { --hue: #D2577A; }
-.hue-4 { --hue: #3D7FD9; } .hue-5 { --hue: #7A9A2E; } .hue-6 { --hue: #A05ED1; }
-.page-map { gap: 12px; }
-.map-sheet { position: relative; width: 100%; border-radius: 12px; background: var(--sheet); background-image: radial-gradient(var(--rule) 1px, transparent 1px); background-size: 12px 12px; box-shadow: inset 0 0 0 1px var(--edge); overflow: hidden; }
-.map-sheet .blk { position: absolute; min-width: 5px; min-height: 5px; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--hue) 18%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 75%, transparent); transition: opacity 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
-.map-sheet[data-lit] .blk { opacity: 0.22; }
-.map-sheet[data-lit] .blk.lit { opacity: 1; background: color-mix(in srgb, var(--hue) 50%, transparent); box-shadow: inset 0 0 0 2px var(--hue), 0 0 0 3px color-mix(in srgb, var(--hue) 22%, transparent); }
-.map-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.map-legend button { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 9px; border-radius: 999px; background: var(--sunk); font-weight: 500; font-size: calc(12 * var(--loupe-px)); transition: background-color 120ms ease-out; }
-.map-legend button.lit { background: color-mix(in srgb, var(--hue) 24%, var(--card)); }
-.map-legend .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--hue); }
-.map-legend .unseen .swatch { background: none; box-shadow: inset 0 0 0 1.5px var(--hue); }
-.map-legend .unseen { color: var(--muted); }
-.map-legend .n { font: 400 calc(11 * var(--loupe-px))/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
-.cname .hue-dot { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 3px; background: var(--hue); vertical-align: 0; }
-`;

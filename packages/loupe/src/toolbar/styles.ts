@@ -10,8 +10,6 @@
 // preference or the header's toggle. System faces only: a shadow root can't load a
 // web font.
 
-import { FIND_CSS } from "./find-redesign.js";
-
 export const HOST_ATTRIBUTE = "data-loupe-toolbar";
 
 /** On the host: `light` or `dark`. Loupe's own name, so an app's `[data-theme]` CSS never matches it. */
@@ -157,6 +155,12 @@ const PAGE = {
   /** The white keyline that lifts the selection's outline off any page. */
   halo: "rgba(255, 255, 255, 0.85)",
 };
+
+/**
+ * The page map's hues, one per component in the list's order (page-map.tsx): categories,
+ * not roles, so they are named values like the page's marks, the same in either theme.
+ */
+const MAP_HUES = ["#8276CF", "#27917E", "#D08A16", "#D2577A", "#3D7FD9", "#7A9A2E", "#A05ED1"] as const;
 
 export const CSS = `
 /* Left to right in any app: \`all\` leaves direction alone, so an RTL page would half-mirror the panel. App text keeps dir="auto". */
@@ -306,6 +310,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 .back { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; margin-left: -4px; border-radius: 999px; background: var(--rule-soft); color: var(--ink); transition: background-color 120ms ease-out; }
 @media (hover: hover) { .back:hover { background: var(--sunk-hover); } }
 .title-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 28px; }
+.title-line .lead { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .title-line .component { min-width: 0; overflow-wrap: break-word; font: 500 ${size(13)}/1.3846 ${SANS}; letter-spacing: -0.01em; color: var(--muted); }
 .title-line .keys { margin-left: auto; }
 /* The whole name, however long: the headline is the one place it is read in full. */
@@ -599,23 +604,37 @@ fieldset.site .list { padding-left: 26px; }
   .row .text, .dialog .field input, .dialog .field textarea { font-size: max(16px, ${size(16)}); line-height: 1.375; }
 }
 
-${FIND_CSS}
+/* The page map (Find · A): every component a tinted block where it sits, one hue each, the list's dots in the same hue. */
+${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
+.page-map { gap: 12px; }
+.map-sheet { position: relative; width: 100%; border-radius: 12px; background: var(--sheet); background-image: radial-gradient(var(--rule) 1px, transparent 1px); background-size: 12px 12px; box-shadow: inset 0 0 0 1px var(--edge); overflow: hidden; }
+.map-sheet .blk { position: absolute; min-width: 5px; min-height: 5px; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--hue) 18%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 75%, transparent); transition: opacity 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
+.map-sheet[data-lit] .blk { opacity: 0.22; }
+.map-sheet[data-lit] .blk.lit { opacity: 1; background: color-mix(in srgb, var(--hue) 50%, transparent); box-shadow: inset 0 0 0 2px var(--hue), 0 0 0 3px color-mix(in srgb, var(--hue) 22%, transparent); }
+.map-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.map-legend button { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 9px; border-radius: 999px; background: var(--sunk); font-weight: 500; font-size: ${size(12)}; transition: background-color 120ms ease-out; }
+.map-legend button.lit { background: color-mix(in srgb, var(--hue) 24%, var(--card)); }
+.map-legend .swatch { width: 10px; height: 10px; border-radius: 3px; background: var(--hue); }
+.map-legend .unseen .swatch { background: none; box-shadow: inset 0 0 0 1.5px var(--hue); }
+.map-legend .unseen { color: var(--muted); }
+.map-legend .n { font: 400 ${size(11)}/1 ${MONO}; color: var(--muted); }
+.cname .hue-dot { display: inline-block; width: 9px; height: 9px; margin-right: 8px; border-radius: 3px; background: var(--hue); vertical-align: 0; }
 
-/* Guided start hero (from Find · C) */
+/* The list's start (Find · C, guided start): what to change, and the two select tools at full size */
 .hero { gap: 10px; padding: 16px 14px 14px; background: var(--band); color: var(--on-band); }
-.hero .eyebrow { font: 500 calc(11 * var(--loupe-px))/1.27 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.06em; text-transform: uppercase; color: var(--band-muted); }
-.hero .hero-title { font-size: calc(22 * var(--loupe-px)); line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; color: var(--on-band); text-wrap: balance; }
+.hero .eyebrow { font: 500 ${size(11)}/1.27 ${MONO}; letter-spacing: 0.06em; text-transform: uppercase; color: var(--band-muted); }
+.hero .hero-title { font-size: ${size(22)}; line-height: 1.18; font-weight: 600; letter-spacing: -0.02em; color: var(--on-band); text-wrap: balance; }
 .hero .hero-title:focus { outline: none; }
 .hero .body { color: var(--band-muted); }
 .hero-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 .big-tool { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; border-radius: 14px; background: var(--band-hover); color: var(--on-band); text-align: left; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); transition: background-color 120ms ease-out; }
 @media (hover: hover) { .big-tool:hover { background: var(--band-pressed); } }
 .big-tool.armed { background: var(--shown); color: var(--on-shown); }
-.big-tool .glyph { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 4px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
-.big-tool.armed .glyph { background: rgba(10, 10, 10, 0.08); }
+.big-tool .glyph { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 4px; border-radius: 10px; background: color-mix(in srgb, var(--on-band) 10%, transparent); }
+.big-tool.armed .glyph { background: color-mix(in srgb, var(--on-shown) 8%, transparent); }
 .big-tool .t { font-weight: 600; }
-.big-tool .h { font-size: calc(11 * var(--loupe-px)); line-height: 1.36; color: var(--band-muted); }
-.big-tool.armed .h { color: rgba(10, 10, 10, 0.62); }
+.big-tool .h { font-size: ${size(11)}; line-height: 1.36; color: var(--band-muted); }
+.big-tool.armed .h { color: color-mix(in srgb, var(--on-shown) 62%, transparent); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
   .panel, .dialog, .show-tab, .section, .card, .footer { border: 1px solid transparent; }

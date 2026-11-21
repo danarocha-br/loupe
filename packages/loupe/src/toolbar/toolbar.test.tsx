@@ -925,7 +925,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     const back = panelButton("All components");
     focusIn(back);
     await clickInPanel(back);
-    expect(panelText()).toContain("Nothing selected");
+    expect(panelText()).toContain("What do you want to change?");
     expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
   });
 
@@ -1005,5 +1005,37 @@ describe("LoupeMount", () => {
     // The bundler folds the condition; the import has to be inside it to be dropped with it.
     expect(source).toMatch(/process\.env\.NODE_ENV === "development"\s*\?\s*devMount\(lazy\(\(\) => import\("\.\/toolbar\/index\.js"\)\)\)/);
     expect(source.match(/import\(/g)).toHaveLength(1);
+  });
+});
+
+describe("the page map (Find · A)", () => {
+  beforeEach(() => {
+    // jsdom lays nothing out: every Instance a box, so the map has something to draw.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+  });
+
+  const legend = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-legend button")];
+  const blocks = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-sheet .blk")];
+
+  it("draws each mounted Instance where it sits, in its component's hue, with the list's dots in the same hue", async () => {
+    await mount();
+    const button = legend().find((item) => item.textContent?.startsWith("Button")) as HTMLButtonElement;
+    expect(button.className).toMatch(/^hue-\d/);
+    expect(blocks().filter((block) => block.getAttribute("aria-label") === "Inspect this Button")).toHaveLength(5);
+    const hue = button.className.split(" ")[0] as string;
+    const group = [...shadow().querySelectorAll<HTMLElement>("li.group")].find((item) => item.querySelector(".cname")?.textContent === "Button");
+    expect(group?.classList.contains(hue)).toBe(true);
+  });
+
+  it("lights one component's blocks and outlines them on the page while pointed at, and inspects a block on click", async () => {
+    await mount();
+    const block = blocks().find((item) => item.getAttribute("aria-label") === "Inspect this Button") as HTMLButtonElement;
+    await hover(block);
+    expect(shadow().querySelector(".map-sheet")?.hasAttribute("data-lit")).toBe(true);
+    expect(blocks().filter((item) => item.classList.contains("lit"))).toHaveLength(5);
+    expect(ringKinds().length).toBeGreaterThan(0);
+    await clickInPanel(block);
+    expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).not.toBeNull();
+    expect(shadow().querySelector(".page-map")).toBeNull();
   });
 });

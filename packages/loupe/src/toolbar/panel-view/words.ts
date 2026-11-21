@@ -99,7 +99,8 @@ export const unmountedTag = (suspended: boolean): Tag => (suspended ? TAGS.suspe
 
 /** Sentences the panel shows whatever is on the page. */
 export const TEXT = {
-  nothingSelected: "Nothing selected. Choose a component below, or pick a select tool above and click one on the page.",
+  startTitle: "What do you want to change?",
+  startBody: "Pick it right on the page, or start from what this page uses most.",
   seenNotMounted: "Seen on this page, not mounted now. Select its menu or dialog and press Hold open to inspect it.",
   notOnPage: "Not on the page now",
   showsWhenMounted: "It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open.",
