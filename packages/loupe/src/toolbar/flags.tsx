@@ -3,7 +3,7 @@
 // `flags-store.ts`'s (PER-216); the card only renders the store and asks it to
 // preview or clear.
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { formatCurrent } from "./format.js";
 import type { FlagDefinition, FlagOption, FlagOverrides, FlagValue } from "./flags-preview.js";
 import { PREVIEW_HOURS } from "./flags-lifetime.js";
@@ -25,9 +25,32 @@ export function FlagsCard() {
     if (flagsView().status !== "ready") void loadFlags();
   }, []);
 
-  const run = (set: FlagOverrides, clear: string[] | "all") => {
+  // While a preview is written, another click waits its turn. The options stay enabled:
+  // disabling the one that has focus would drop the keyboard out of the card.
+  const busyNow = useRef(false);
+  const card = useRef<HTMLDivElement>(null);
+  const run = (set: FlagOverrides, clear: string[] | "all"): Promise<void> => {
+    if (busyNow.current) return Promise.resolve();
+    busyNow.current = true;
     setBusy(true);
-    void previewFlags(set, clear).finally(() => setBusy(false));
+    return previewFlags(set, clear).finally(() => {
+      busyNow.current = false;
+      setBusy(false);
+    });
+  };
+  /** A Clear that had focus goes (its row stops previewing) or turns off: focus moves to what's left. */
+  const clearing = (from: HTMLElement, done: Promise<void>) => {
+    const root = from.getRootNode() as Document | ShadowRoot;
+    if (root.activeElement !== from) return;
+    const row = from.closest(".flag");
+    void done.then(() => {
+      if (from.isConnected && !(from as HTMLButtonElement).disabled) return;
+      const next =
+        (row?.isConnected ? row.querySelector<HTMLElement>(".pills button") : null) ??
+        card.current?.querySelector<HTMLElement>(".pills button, button:not(:disabled)") ??
+        null;
+      next?.focus();
+    });
   };
 
   const meta =
@@ -37,15 +60,19 @@ export function FlagsCard() {
         ? "Unavailable"
         : null;
   return (
-    <div className="card flags" aria-label="Feature flags">
+    <div className="card flags" ref={card}>
       <div className="head">
         <h3>Feature flags</h3>
         {meta && <span className="meta">{meta}</span>}
       </div>
-      {current.status === "loading" && <div className="muted">Reading the app's flags…</div>}
+      {/* Always there, so an error is announced when its text lands; the card shows it below. */}
+      <p className="sr-only" role="alert">
+        {current.status === "ready" ? (current.error ?? "") : ""}
+      </p>
+      {current.status === "loading" && <div className="muted">Reading the app’s flags…</div>}
       {current.status === "unavailable" && (
         // One line until it's opened: the fix is an engineer's, and the list comes first.
-        <details className="row off" role="status">
+        <details className="row off">
           <summary>
             <span className="dot amber small" />
             Flag previews are off
@@ -65,8 +92,8 @@ export function FlagsCard() {
               definition={definition}
               overrides={current.overrides}
               busy={busy}
-              onPreview={(value) => run({ [definition.key]: value }, [])}
-              onClear={() => run({}, [definition.key])}
+              onPreview={(value) => void run({ [definition.key]: value }, [])}
+              onClear={(from) => clearing(from, run({}, [definition.key]))}
             />
           ))}
           {Object.keys(current.overrides)
@@ -74,16 +101,16 @@ export function FlagsCard() {
             .map((key) => (
               <FlagRow
                 key={key}
-                definition={{ key, description: "Not declared by the app's discovery endpoint." }}
+                definition={{ key, description: "Not declared by the app’s discovery endpoint." }}
                 overrides={current.overrides}
                 busy={busy}
                 undeclared
                 onPreview={() => {}}
-                onClear={() => run({}, [key])}
+                onClear={(from) => clearing(from, run({}, [key]))}
               />
             ))}
           {current.error && (
-            <div className="warn" role="alert">
+            <div className="warn">
               <span className="dot" />
               {current.error}
             </div>
@@ -99,7 +126,7 @@ export function FlagsCard() {
             type="button"
             className="btn clear"
             disabled={busy || Object.keys(current.overrides).length === 0}
-            onClick={() => run({}, "all")}
+            onClick={(event) => clearing(event.currentTarget, run({}, "all"))}
           >
             <ResetIcon />
             Clear flag previews
@@ -123,7 +150,8 @@ function FlagRow({
   busy: boolean;
   undeclared?: boolean;
   onPreview(value: FlagValue): void;
-  onClear(): void;
+  /** Given the Clear button, so focus can move on once it has gone. */
+  onClear(from: HTMLElement): void;
 }) {
   const previewing = Object.hasOwn(overrides, definition.key);
   const value = overrides[definition.key];
@@ -135,7 +163,7 @@ function FlagRow({
         <span className={previewing ? "dot small purple" : "dot small hollow"} />
         <span className="name">{definition.key}</span>
         {previewing && (
-          <button type="button" className="btn small reset" disabled={busy} onClick={onClear}>
+          <button type="button" className="btn small reset" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>
             <ResetIcon />
             Clear
           </button>
@@ -151,7 +179,7 @@ function FlagRow({
                 key={JSON.stringify(option.value)}
                 type="button"
                 aria-pressed={previewing && sameFlagValue(option.value, value)}
-                disabled={busy}
+                aria-busy={busy || undefined}
                 onClick={() => onPreview(option.value)}
               >
                 {option.label ?? formatCurrent(option.value)}

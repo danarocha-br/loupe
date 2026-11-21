@@ -70,6 +70,11 @@ colors:
   page-band: "#1B2220"
   page-hover: "#6F7472"
 typography:
+  field-touch:
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
+    fontSize: "16px"
+    fontWeight: 400
+    lineHeight: "22px"
   headline:
     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
     fontSize: "17px"
@@ -143,8 +148,11 @@ typography:
     lineHeight: "14px"
     letterSpacing: "0.04em"
 rounded:
+  swatch: "3px"
+  page-tag: "4px"
   checkbox: "5px"
   ring: "8px"
+  cell-focus: "10px"
   table: "12px"
   status: "14px"
   card: "18px"
@@ -314,8 +322,8 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 
 ### Primary
 - **Chosen Lilac** (`lilac`, dark `lilac-dark`): the fill of the chosen option in a prop's table, the instruction strip while a select tool waits for a click, and the held button state. Text on it uses `on-lilac`.
-- **Revision Line** (`lilac-line`, dark `lilac-line-dark`): the delta's stroke, the Override dot, the coverage bar's editable segments, ticked checkboxes, focus outlines and the text field's focus edge.
-- **Revision Ink** (`lilac-ink`, dark `lilac-ink-dark`): lilac text that has to be read: the number inside a delta, the new value in a change line, the "changed" count in the component list, the widen link and the "keep" link.
+- **Revision Line** (`lilac-line`, dark `lilac-line-dark`): the delta's stroke, the Override dot, ticked checkboxes, focus outlines and the text field's focus edge.
+- **Revision Ink** (`lilac-ink`, dark `lilac-ink-dark`): lilac text that has to be read: the number inside a delta, the new value in a change line, the "changed" count in the component list, the widen link and the "keep" link. Also the 1px edge of the option cell that shows now and its focus outline, which `lilac-line` can't carry on lilac (4.86:1 against 2.53:1).
 
 ### Neutral
 - **Warm Sheet** (`sheet` / `sheet-dark`): the panel's ground, the back button, the selection strip, notices and the command line.
@@ -323,15 +331,15 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 - **Sunk** (`sunk` / `sunk-dark`) and **Sunk Hover** (`sunk-hover`): soft pill buttons, tags, status chips and crumbs, and their hover.
 - **Hover Wash** (`hover` / `hover-dark`): hover on rows and option cells inside a card, and an open group in the component list.
 - **Ink** (`ink` / `ink-dark`): all primary text. `on-ink` is its counter-colour.
-- **Muted** (`muted`) and **Faint** (`faint`): option labels at rest, secondary lines, values; faint for counts, arrows, annotations and left-out Instances.
-- **Rule** (`rule`): the option table's hairlines and field borders. **Rule Soft** (`rule-soft`): row separators inside a card. **Rule Strong** (`rule-strong`): checkbox borders and the scrollbar. **Edge** (`edge`): the sheet's 1px outline against the product.
+- **Muted** (`muted`) and **Faint** (`faint`): option labels at rest, secondary lines, values; faint for counts, arrows, annotations and left-out Instances. Faint is also the edge of anything that has to be found at 3:1: an off switch's outline and thumb, and a checkbox's border.
+- **Rule** (`rule`): the option table's hairlines and field borders. **Rule Soft** (`rule-soft`): row separators inside a card. **Rule Strong** (`rule-strong`): the scrollbar, the ring on an option cell holding the app's value, and the underline of the "Inside" links. **Edge** (`edge`): the sheet's 1px outline against the product.
 - **Band** (`band` / `band-dark`): the header. **On Band** (`on-band`) for the wordmark and tools, **Band Muted** (`band-muted`) for the page crumb. **Band Hover** and **Band Pressed** are translucent washes of the sheet colour for the tools.
 - **Primary** (`primary` / `primary-dark`): Copy Proposal only. Ink in light, the warm sheet colour in dark.
 - **Pencil** (`pencil`): held for review (Suspended): the hollow ring and the held tag. Applies to nothing on the page.
 
 ### Status
 - **Supported Green** (`ok-bg`, `ok-fg`): the "Supported" chip beside the component name.
-- **Switch Teal** (`switch-on`), against **Switch Off** (`switch-off`): a true/false prop's switch.
+- **Switch Teal** (`switch-on`), against **Switch Off** (`switch-off`): a true/false prop's switch. Smaller roles: `kbd` (a key's wash), `thumb` (the on thumb) and `on-check` (a checkbox's tick: white in light, the dark sheet in dark).
 - **Alert Orange** (`alert`): failures only, as a dot beside the sentence that says what failed.
 - **Notice Amber** (`amber-fg`, `amber-bg`, `amber-dot`): out of date and warnings: stale tags, the warn strip, the flag-previews-off dot.
 
@@ -360,8 +368,8 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 - **Option** (400, 12px/16px): option cells; the chosen one at 500.
 - **Label** (500, 11px/14px) and **Meta** (400, 11px/14px, tabular, faint): field labels and the counts beside card titles.
 - **Delta** (700, 9px/1, tabular): the number inside a delta.
-- **Mono** (400, 12px/16px) and **Mono Small** (400, 11px/16px): call sites, change lines, values set by the code, crumbs.
-- **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page crumb in the band, "SAME ON ALL 4", a switch's TRUE or FALSE, and the status chip (500, 10px/12px).
+- **Mono** (400, 12px/16px) and **Mono Small** (400, 11px/16px): call sites, change lines, values in the Inspect only rows, and a table's counts at a scope ("Same on all 4", `"outline" 1 · "ghost" 3`), never recased since they quote values.
+- **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page crumb in the band, the "app" tag in an option cell (500, 9px/12px), and the status chip (500, 10px/12px).
 
 ### Named Rules
 **The Mono Is Evidence Rule.** Mono is for what an engineer would paste (values, call sites, commands, flag keys) and for small uppercase annotations. Names a designer reads on screen stay in sans.
@@ -370,7 +378,7 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 
 ## Layout
 
-While the panel is open the page gives it a column on the right by taking a matching right margin on the document root (360px, 400px from a 1600px viewport), so the product reflows beside it the way it would beside DevTools. The sheet floats 8px inside that column on every side (344px wide, 384px wide), with 24px corners. Below two column widths of viewport (under 720px) the page keeps the whole viewport and the sheet overlays it.
+While the panel is open the page gives it a column on the right by taking a matching right margin on the document root (360px, 400px from a 1600px viewport), so the product reflows beside it the way it would beside DevTools. The sheet floats 8px inside that column on every side (344px wide, 384px wide), with 24px corners. Below two column widths of viewport (under 720px) the page keeps the whole viewport and the sheet overlays it; under 360px the column narrows to the viewport, so at 320px the sheet is 304px and nothing of it is off-screen.
 
 The sheet is three bands, top to bottom:
 - **The band** (48px): the wordmark and the page crumb on the left; on the right the two select tools in their own soft pill group, then Hide marks, light or dark, and Hide, all 30px round tools.
@@ -379,7 +387,7 @@ The sheet is three bands, top to bottom:
 
 A lilac status strip appears under the band for transient states: a select tool waiting for a click, a dialog under the panel, marks hidden on the page.
 
-Inside the middle, a selection reads top to bottom: the identity card (back, component name and verdict chip, the Instance's visible name, its call site), then under Select multiple the selection card, then one card per prop with options or a text field, then one card of switches for the true/false props, then the props set by the code folded to one line, then Coverage. Cards pad 12px by 14px; a prop card pads 6px top and right so its Reset pill sits in the corner. Rows inside a card are 38–42px on `rule-soft` lines. Spacing steps are 1, 2, 4, 6, 8, 10, 12, 14 and 18px.
+Inside the middle, a selection reads top to bottom: the identity card, then its note when one applies, then under Select multiple the selection card, then one card per prop with options or a text field, then one card of switches for the true/false props (State props first), then "Inspect only · N" folded to one line. Cards keep their height and the middle scrolls: a card never shrinks to fit. Every card's text starts 14px from its left edge, 12px from its top; a prop card pads 10px top and right so its Reset pill sits in the corner, and its table and fields stop 14px from the right edge. Rows inside a card are 38–42px on `rule-soft` lines. Spacing steps are 1, 2, 4, 6, 8, 10, 12, 14 and 18px.
 
 Holding Alt fades the panel to 8% opacity and lets clicks through, so an app dialog under the column can be seen.
 
@@ -412,7 +420,7 @@ The scope of a change, chosen the way Figma selects.
 - **Mode:** the tool in use carries the `band-pressed` wash. It is kept for the next selection until the page reloads.
 - **Armed:** pressing a tool re-scopes the current selection at once and waits for a click on the page; while it waits it is filled with the warm sheet colour and band-coloured icon, and the lilac strip says what a click will select. Pressed again, or Esc, it stops.
 - **Leaving a selection**, as in Figma: Esc, or a pointer click on the page outside every selected Instance (at Select multiple, outside every one it reaches), goes back to the component list. Loupe only listens: the key and the click still reach the app, never stopped or delayed. Esc stays the app's while it has a menu or dialog open, a text field's while one has focus, and a select tool's while one is armed (Esc then stops picking first). A click in the panel, or one from the keyboard, never counts.
-- **Select multiple** opens a selection card: the call site's name, "4 of 4 previewed", a **Widen to All on page · 7** link (or **Narrow to** the call site), **Reset this scope**, and the Instances folded under a disclosure row, open on its own while one is left out.
+- **Select multiple** opens a selection card: the call site's name and "Reaches 4 of 4", a **Widen to All on page · 7** link (or **Narrow to** the call site) with **Reset this scope** on the same line only while the scope holds a change, and the Instances folded under a disclosure row, open on its own while one is left out. Server-rendered Instances are listed by their name, tagged "On the server".
 
 ### Buttons
 Soft pills, with the dark primary kept for the one exit.
@@ -425,25 +433,30 @@ Soft pills, with the dark primary kept for the one exit.
 
 ### Prop cards (option tables)
 The panel's core: one card per prop.
-- **Head:** the delta (when overridden), the prop's name in the title style, then on the right its counts at a scope ("SAME ON ALL 4", annotation style) and its Reset pill.
-- **Change line:** under an Override, `"ghost" → "outline"` in 11.5px mono, the new value in `lilac-ink` at 600, and "from All in MemberRowMenu" when the value comes from a wider scope.
-- **Table:** cells 30px tall on 1px `rule` hairlines inside a 12px-cornered table; four or fewer options run on one line, more run three across with the last spanning its line. The chosen cell is `lilac`; the app's own value, once overridden, is dotted under; at a scope each cell carries a small count of the Instances showing it.
+- **Head:** the delta (when overridden), the prop's name in the title style, then on the right its counts at a scope (Mono Small) and its Reset pill.
+- **Change line:** 2px under the head, `"ghost" → "outline"` in 11px mono, the new value in `lilac-ink` at 600, then "· from All on page" only when the value comes from a wider scope than the one in view.
+- **Table:** cells 30px tall on 1px `rule` hairlines inside a 12px-cornered table; four or fewer options run on one line, more run three across with the last spanning its line. Three marks, so a designer never has to guess: the cell that shows now is `lilac`; the app's own value, once overridden, gets a 1px inset `rule-strong` ring and an "app" tag; the design system's default, when the metadata knows it, a hollow 5px dot in its top-right corner. A one-line legend under the first table that carries a default says what they mean. At a scope each cell counts the Instances showing it now, a narrower Override's value included, so "Same on all 4" is only ever true.
+- **Keyboard:** a table is one radio group and one Tab stop; the arrow keys move through it and choose as they go, Home and End jump. The cell that shows now carries a 1px `lilac-ink` edge, and its focus outline is `lilac-ink` too.
+- **Long values** wrap inside their cell; nothing in a table is cut short.
 - **Text field:** a white field with a 1px `rule` border and 12px corners; focus turns the edge `lilac-line` with a 3px soft lilac ring; an overridden field keeps the `lilac-line` edge.
 
 ### Switches
-True/false props share one card, a row each on `rule-soft` lines: the name, TRUE or FALSE in the annotation style, and a 40 × 22px switch, `switch-off` at rest and `switch-on` (teal) when true, its white thumb sliding 18px over 180ms. At a scope whose Instances differ, the counts replace TRUE or FALSE.
+True/false props share one card, a row each on `rule-soft` lines, State props (a menu's `open`) first: the name and a 40 × 22px switch: off, an outlined `switch-off` track with a `faint` thumb on the left; on, a `switch-on` (teal) track with a white thumb, sliding 18px over 180ms. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name.
 
 ### Identity card
-The selection by what it shows: the back button, the component name with its verdict chip (green "Supported", or neutral "Inspect only"), its deltas at the right; the Instance's visible name as the headline; its call site in mono; then only the exceptions (tags, the scopes acting on it, crumbs to the Instances around it, Hold open and Reset this Instance).
+The selection by what it shows, in rows: the back button, the component name (13px, muted) with its verdict chip and its deltas at the right; the Instance's visible name as the headline, in full however many lines it takes; its call site in Mono Small ("member-row-menu.tsx:37", with "· use 2 of 3" only when its function uses the component more than once); "Inside MemberRowMenu › DropdownMenu" as plain links, outermost first. Then only the exceptions: tags ("On the server", "Source changed", "Not visible now"), the scopes acting on it unless the selection card names one, the not-generated warning, and the actions that can act: Reset this Instance while it holds a change, Hold open at a scope wider than the Instance (at This instance the State prop's own switch holds it). Once the Instance is gone it keeps its component and call site, under a "Not on the page now" chip.
+
+### Inspect only
+The props it shows but can't change here, folded to one line, "Inspect only · 6", naming them while closed and open by itself when nothing else can change. When one reason covers them all it is said once under the line, not tagged on every row; names break only between their words.
 
 ### Revision marks (signature)
 The numbered delta that ties a change together.
 - **In the panel:** a 22 × 20px delta before the prop's name, in the change list, and in the footer as 28px round hit targets that each select what their change reaches (up to 8, then "+N").
 - **On the page:** no number. As a change lands (a new value, under a new number or the same one), every Instance it reaches is outlined, the selected one solid, the others dashed `page-line`; after 2 seconds the outlines fade, the selection's too, and the page shows the change as it will ship. They come back for 2 seconds when an Instance a change reaches is selected, and for as long as the pointer is on the change's row in the change list, its footer delta, or a row naming the Instance. Drawn only where the Instance is actually visible (not under a menu, dialog or the panel).
-- **Motion:** the delta settles in over 180ms from 60% scale on `cubic-bezier(0.16, 1, 0.3, 1)`. A change's outlines fade in over 160ms and step back over 480ms. Reduced motion removes all three.
+- **Motion:** the delta settles in over 180ms from 60% scale on `cubic-bezier(0.16, 1, 0.3, 1)`. A change's outlines fade in over 160ms and step back over 480ms. Reduced motion removes all three. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
 
 ### On-page outline
-After an element picker's outlines (the designer's reference, 2026-11-20). The selected Instance: a 2px solid `page-ink` outline standing 3px off its box, 8px corners and a white halo, and on its top right a `page-ink` tag in 11px mono with its component and size, "Button · 32 × 32" (under the outline near the top of the window). At Select multiple every other Instance reached is a 1.5px dashed `page-line` outline with no tag; left-out ones are dashed grey. It stays until a change lands on the Instance; then it steps back with the change's outlines (Revision marks).
+After an element picker's outlines (the designer's reference, 2026-11-20). The selected Instance: a 2px solid `page-ink` outline standing 3px off its box, 8px corners and a white halo, and on its top right a `page-ink` tag in 11px mono with its component and size, "Button · 32 × 32" (under the outline near the top of the window, and from its top left where ending at its right would run off the window's left edge). At Select multiple every other Instance reached is a 1.5px dashed `page-line` outline with no tag; left-out ones are dashed grey. It stays until a change lands on the Instance; then it steps back with the change's outlines (Revision marks).
 
 ### Hide marks
 To judge the page with nothing on it, before any change has landed too. The eye on the band takes off the page the selection's outlines and tag and a change's outlines, even in the moment they show. The selection, the panel and its deltas stay, so editing goes on. What follows the pointer still shows: a hovered row's outline and, while a select tool is armed, the pick's preview and tag. Pressed, the tool carries the `band-pressed` wash and the struck-through eye, and the lilac strip says "Outlines are hidden on the page". Pressed again, the outlines come back. Kept until the page reloads, never stored.
@@ -459,10 +472,22 @@ With nothing selected: a "Changes" card (each change by its delta, the change in
 - **Dots:** 8px (6px small): `lilac-line` for Overrides, alert orange for failures, amber for warnings, a pencil ring for held, `rule` for none.
 
 ### Copy Proposal dialog
-A 440px sheet with 24px corners and 6px inset, its sections white cards with 18px corners, over the dialog shadow. The title in the headline style, count tiles in the figure style, fields with 12px corners, actions right-aligned.
+A 440px sheet with 24px corners and 6px inset, its sections white cards with 18px corners, over the dialog shadow. The title in the headline style, count tiles in the figure style, fields with 12px corners, actions right-aligned. Copy is never disabled for a missing title: pressed without one, the field turns alert orange and says "Give the Proposal a title" under it, and takes focus. A count that fails says to close and reopen, with its reason for an engineer.
 
 ### Undo
-Reset all acts immediately; the footer then offers "Reset N Overrides · Undo" for 8 seconds on its own line. One offer at a time.
+Reset all, Reset this Instance, Reset this scope and Discard act immediately; the footer then offers "Reset N Overrides · Undo" ("Discarded N held Overrides · Undo") on its own line. The offer has no timer: it stays until it is taken, a newer offer replaces it, or the Overrides change some other way. One offer at a time.
+
+### Access (review 2026-11-20)
+- **Focus follows the work:** a selection made in the panel, Back and the crumbs move focus to the new view's heading; Reset all moves it to its Undo and Undo back to Reset all; a reset or Discard that removes its own button moves it to the heading; Hide and Show swap it between the panel's heading and the "Show Loupe" tab. A pick on the page leaves the app's focus where it is.
+- **Live regions are always mounted:** the status strip's region, the footer's Undo line, and the panel's own status and alert lines that speak the notices. Only their text changes, so a screen reader hears it.
+- **Preview by keyboard:** focus on a change row, a component group, a footer delta or the "keep" link outlines what it reaches, as the pointer does.
+- **Focus rings** sit inside rows that run edge to edge in a card that clips (`outline-offset: -2px`).
+- **Hover** styles apply only where a pointer can hover, so a tap never leaves one stuck.
+- **Left to right** in any app: the host sets `direction: ltr`; the app's own words keep `dir="auto"`.
+- **Narrow windows:** under 360px the column narrows to the viewport, so at 320px nothing is off-screen. The panel and the dialog keep their scrolling to themselves (`overscroll-behavior: contain`).
+- **Touch:** on a coarse pointer, text fields are 16px so iOS Safari doesn't zoom.
+- **Forced colours:** edges come back as transparent borders, and the cell that shows now, the switch and a ticked box are drawn in `Highlight`.
+- **Icons** draw a 1.5px stroke at any size (`vector-effect: non-scaling-stroke`). Line heights are unitless, at the same rendered steps as the type scale. Apostrophes in panel text are typographic (’).
 
 ## Do's and Don'ts
 
@@ -475,7 +500,8 @@ Reset all acts immediately; the footer then offers "Reset N Overrides · Undo" f
 - **Do** put values, call sites and commands in system mono, and everything a designer reads in system sans.
 - **Do** use tabular figures for every count and delta number.
 - **Do** declare every panel colour as a token on the shadow host with a dark counterpart; draw outlines and tags on the page with the fixed page values.
-- **Do** keep motion to the delta's settle, a change's outlines fading in and stepping back, and the switch's thumb, and drop it under reduced motion.
+- **Do** keep motion to the delta's settle, a change's outlines fading in and stepping back, the switch's thumb and a fold's chevron, and drop it under reduced motion.
+- **Do** let a value, a name or a prop wrap rather than cut it short where the panel is the only place it is read in full; keep an ellipsis to list rows, which open the inspector.
 
 ### Don't:
 - **Don't** use red anywhere in the panel; failures are alert orange, warnings amber.

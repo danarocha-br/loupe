@@ -27,7 +27,7 @@ export type PropRow = {
   set: boolean;
   /** The Current value; meaningful only when `set`. */
   value: unknown;
-  /** The default the metadata knows, for an unset row. `unknown`: a library's runtime default. */
+  /** The default the metadata knows, set or not; an unset row shows it as its value. `unknown`: a library's runtime default. */
   default?: DefaultValue;
   editable: boolean;
   /** Why an inspect-only row is; absent on a server-rendered Instance with no metadata, whose note says why. */
@@ -146,7 +146,8 @@ export function inspect(input: InspectInput): Inspection {
     const text = name === "children" && declared?.editable === true && declared.kind === "text";
     const row: PropRow = { name, label: text ? "Text" : name, set, value: current[name], editable: false };
     if (text) row.text = true;
-    if (!set && declared?.default) row.default = declared.default;
+    // Kept on a set row too: the options table marks the design system's default whatever the call site writes.
+    if (declared?.default) row.default = declared.default;
     if (declared?.state || input.stateProps.includes(name)) row.state = true;
     const write = written.get(name);
     if (write) {

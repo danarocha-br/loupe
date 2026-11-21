@@ -23,7 +23,7 @@ import { Panel } from "./panel.js";
 import { panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startToolbar } from "./start.js";
-import { CSS, HOST_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
+import { CSS, HOST_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
 
 export type Theme = "light" | "dark";
 
@@ -82,8 +82,17 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
     return () => query.removeEventListener?.("change", change);
   }, []);
   const theme = chosen ?? system;
-  // Before paint, so a dark system never sees one light frame.
-  useLayoutEffect(() => host.setAttribute(THEME_ATTRIBUTE, theme), [host, theme]);
+  // Before paint, so a dark system never sees one light frame. Transitions are off for
+  // the frame the theme lands in: every colour easing at once would smear the switch.
+  useLayoutEffect(() => {
+    host.setAttribute(SWITCHING_ATTRIBUTE, "");
+    host.setAttribute(THEME_ATTRIBUTE, theme);
+    const panel = host.shadowRoot?.querySelector(".panel");
+    // Reading a style makes the browser apply the new theme now, with transitions still off.
+    if (panel) void getComputedStyle(panel).opacity;
+    const timer = setTimeout(() => host.removeAttribute(SWITCHING_ATTRIBUTE), 1);
+    return () => clearTimeout(timer);
+  }, [host, theme]);
   const toggle = useCallback(() => {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setChosen(next);
@@ -110,6 +119,15 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const [marksHidden, setMarksHidden] = useState(false);
   const [theme, toggleTheme] = useTheme(host);
   const column = useColumn(!hidden);
+  // Hide and Show swap the panel for its tab: focus goes with them when it was on the one
+  // pressed, so a keyboard isn't dropped on the page (review 2026-11-20).
+  const focusSwap = useRef(false);
+  useEffect(() => {
+    if (!focusSwap.current) return;
+    focusSwap.current = false;
+    host.shadowRoot?.querySelector<HTMLElement>(hidden ? ".show-tab" : "h2.name")?.focus();
+  }, [hidden, host]);
+  const focusIsHere = () => (host.shadowRoot?.activeElement ?? null) !== null;
   const select = (id: string | null, next?: SelectMode) => {
     setSelected(id);
     setWidened(false);
@@ -121,7 +139,16 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   };
   if (hidden) {
     return (
-      <button type="button" className="show-tab" onClick={() => setHidden(false)} title="Show the Loupe panel">
+      <button
+        type="button"
+        className="show-tab"
+        aria-label="Show Loupe"
+        onClick={() => {
+          focusSwap.current = focusIsHere();
+          setHidden(false);
+        }}
+        title="Show the Loupe panel"
+      >
         <PanelIcon />
         Loupe
       </button>
@@ -138,7 +165,10 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
       onScope={changeScope}
       marksHidden={marksHidden}
       onMarks={() => setMarksHidden((was) => !was)}
-      onHide={() => setHidden(true)}
+      onHide={() => {
+        focusSwap.current = focusIsHere();
+        setHidden(true);
+      }}
       theme={theme}
       onTheme={toggleTheme}
     />

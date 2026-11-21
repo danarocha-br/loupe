@@ -1,6 +1,7 @@
 // The Inspector (an Instance selected): its identity, verdict, scopes, note,
 // Coverage and rows; or "Not on the page now" once it has gone.
 
+import { callSiteLabels, isUnanchored, parseHint } from "../../call-site.js";
 import type { InstanceRow } from "../../runtime/debug.js";
 import type { PropRow } from "../../runtime/inspect.js";
 import type { Scope } from "../../runtime/store.js";
@@ -19,6 +20,7 @@ import {
   INSPECT_ONLY_OVERRIDES_OFF,
   injectedSummary,
   NO_CALL_SITE,
+  NO_EDITABLE_NOTE,
   NO_GROUP,
   NOT_GENERATED,
   NOTES,
@@ -50,10 +52,15 @@ export function inspectorBody(
   const holds = record !== null && Object.keys(record.values).length > 0;
   const recorded = page.status.overrides && holds;
   if (inspection === null) {
+    const seen = reads.lastSeen(id);
+    const site = seen ? parseHint(seen.hint) : null;
     return {
       kind: "gone",
       id,
-      held: record && holds ? { tag: unmountedTag(record.suspended !== null), values: heldValues(record.values, reads.lastSeen(id)) } : null,
+      // How it last rendered, else what its id names, when the id is a call site's.
+      component: seen?.component ?? (isUnanchored(id) ? null : callSiteLabels(id).component || null),
+      where: site ? `${site.path.split("/").at(-1)}:${site.line}` : null,
+      held: record && holds ? { tag: unmountedTag(record.suspended !== null), values: heldValues(record.values, seen) } : null,
       canReset: recorded,
     };
   }
@@ -80,9 +87,22 @@ export function inspectorBody(
     (inspection.note === "overrides-off" && !page.status.overrides)
       ? null
       : inspection.note;
+  const verdict = instanceVerdict(inspection, adapted, page);
+  // "No Editable prop" is the one Inspect only reason with no runtime note: the Toolbar says it.
+  const note: InspectorBody["note"] = noteKind
+    ? { kind: noteKind, title: NOTES[noteKind].title, body: NOTES[noteKind].text(page.status) }
+    : !verdict.supported && verdict.reason === "no-editable"
+      ? { kind: "no-editable", title: NO_EDITABLE_NOTE.title, body: NO_EDITABLE_NOTE.text }
+      : null;
+  const hold = editing ? holdOf(inspection.rows, editing) : null;
   const tags: Tag[] = [];
   if (inspection.rendered === "server") tags.push(TAGS.server);
   if (page.stale.has(inspection.component)) tags.push(TAGS.stale);
+  // Mounted, not shown: every node it renders is hidden, or a menu or dialog that can be held open renders none.
+  if (inspection.rendered === "client") {
+    const shown = reads.visible(id);
+    if (shown === "hidden" || (shown === "empty" && hold !== null && !hold.held)) tags.push(TAGS.notVisible);
+  }
   const injected = Object.entries(inspection.injected);
   const site = inspection.callSite;
   const { editable, inspectOnly } = inspection.coverage;
@@ -93,14 +113,14 @@ export function inspectorBody(
     name: reads.name(id),
     where: whereText(inspection.component, site),
     keys: keys.marks.find((mark) => mark.id === id)?.keys ?? [],
-    hold: editing ? holdOf(inspection.rows, editing) : null,
-    verdict: instanceVerdict(inspection, adapted, page),
+    hold,
+    verdict,
     tags,
     chips: row ? scopeChips(page.records, row, labels) : [],
     crumbs: reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor })),
     editing: editing ? { resetInstanceEnabled: recorded, scopes: row ? scopeOptions(page, row, scoping.scope) : null } : null,
     members: scoped ? membersView(scoped, id, page.rows, reads.name) : null,
-    note: noteKind ? { kind: noteKind, title: NOTES[noteKind].title, body: NOTES[noteKind].text(page.status) } : null,
+    note,
     coverage: {
       editable,
       inspectOnly,

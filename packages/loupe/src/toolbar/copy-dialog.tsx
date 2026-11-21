@@ -1,12 +1,23 @@
 // The footer's Copy Proposal and its dialog (ADR 0002, after PER-99 §8 and PER-139),
 // a modal centred on the page (PER-140). The counts inform and never block; only an
-// empty title holds Copy back.
+// empty title holds Copy back, and Copy says so under the field rather than sitting
+// disabled with no reason (review 2026-11-20).
 
 import { type KeyboardEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
 import { copyProposal, type CopyPreview, copyForm, previewCopy } from "./copy.js";
 import { plural } from "./format.js";
 import { Key } from "./controls.js";
 import { CopyIcon } from "./icons.js";
+
+/**
+ * What a failed count says before its reason: what failed, and the way back. The
+ * server reads can't fail it (they fall back), so it is the page's own state: a new
+ * count usually goes through, and a repeat is a bug for an engineer.
+ */
+export const PREVIEW_FAILED = "Couldn’t count the changes. Close this and open Copy Proposal again. If it fails again, send an engineer the reason:";
+
+/** Under the title field when Copy is pressed with none. */
+export const TITLE_MISSING = "Give the Proposal a title: it heads the text your coding agent reads.";
 
 /** "3 changes · 1 held for review". */
 export function countsLine(preview: CopyPreview): string {
@@ -67,6 +78,7 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
   // State lags a second Enter in the same frame; the ref doesn't.
   const running = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [titleMissing, setTitleMissing] = useState(false);
   const titleInput = useRef<HTMLInputElement>(null);
   const element = useRef<HTMLDialogElement>(null);
 
@@ -97,7 +109,12 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
 
   const ready = preview !== null && !("failed" in preview);
   const run = () => {
-    if (title.trim() === "" || running.current) return;
+    if (running.current) return;
+    if (title.trim() === "") {
+      setTitleMissing(true);
+      titleInput.current?.focus();
+      return;
+    }
     running.current = true;
     setBusy(true);
     setError(null);
@@ -136,19 +153,29 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
             <h2 id="loupe-copy-title">Copy Proposal</h2>
             <span className="meta">Markdown and JSON</span>
           </div>
-          <label className="field">
-            <span>Title</span>
+          {/* The error sits outside the label, so it describes the field without joining its name. */}
+          <div className="field">
+            <label htmlFor="loupe-copy-title-field">Title</label>
             <input
+              id="loupe-copy-title-field"
               ref={titleInput}
               name="title"
               required
+              aria-invalid={titleMissing || undefined}
+              aria-describedby={titleMissing ? "loupe-title-missing" : undefined}
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
+                if (event.target.value.trim() !== "") setTitleMissing(false);
                 copyForm().title = event.target.value;
               }}
             />
-          </label>
+            {titleMissing && (
+              <span className="field-error" id="loupe-title-missing">
+                {TITLE_MISSING}
+              </span>
+            )}
+          </div>
           <label className="field">
             <span>
               Designer <span className="muted">(optional)</span>
@@ -166,9 +193,11 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
         <div className="sec">
           {preview === null && <p className="muted">Counting…</p>}
           {preview !== null && "failed" in preview && (
-            <div className="warn" role="alert">
+            <div className="warn">
               <span className="dot" />
-              {preview.failed}
+              <span>
+                {PREVIEW_FAILED} <span className="mono verbatim">{preview.failed}</span>
+              </span>
             </div>
           )}
           {ready && (
@@ -185,11 +214,15 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
                   </div>
                 ))}
               </div>
-              <p className="counts sr-only" role="status">
-                {countsLine(preview)}
-              </p>
             </>
           )}
+          {/* Both always there, so what lands in them is announced: the counts, and a failure. */}
+          <p className="counts sr-only" role="status">
+            {ready ? countsLine(preview) : ""}
+          </p>
+          <p className="sr-only" role="alert">
+            {error ?? (preview !== null && "failed" in preview ? `${PREVIEW_FAILED} ${preview.failed}` : "")}
+          </p>
         </div>
         {ready && preview.entries.length > 0 && (
           <div className="sec soft">
@@ -200,8 +233,8 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
               {preview.entries.map((entry) => (
                 <label key={entry.key} className="field" data-entry={entry.id}>
                   <span className="entry">
+                    {/* The delta reads "Change 2" on its own. */}
                     <Key n={Number(entry.id.slice(1))} />
-                    <span className="sr-only">Change </span>
                     {entry.label}
                   </span>
                   <textarea
@@ -220,7 +253,7 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
         )}
         {error !== null && (
           <div className="sec">
-            <div className="warn" role="alert">
+            <div className="warn">
               <span className="dot" />
               {error}
             </div>
@@ -230,7 +263,7 @@ function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
           <button type="button" className="btn" disabled={busy} onClick={() => onClose()}>
             Cancel
           </button>
-          <button type="submit" className="btn primary" disabled={title.trim() === "" || busy}>
+          <button type="submit" className="btn primary" disabled={busy}>
             <CopyIcon size={16} />
             {busy ? "Copying…" : "Copy"}
           </button>

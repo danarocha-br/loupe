@@ -253,14 +253,14 @@ describe("the Feature flags card", () => {
       { timeout: 2000, interval: 10 },
     );
   /**
-   * Waits until the card is loaded and no write is in flight. A write disables every
-   * pill, so a click made before it ends is dropped: that is how a fixed number of
-   * ticks failed on CI.
+   * Waits until the card is loaded and no write is in flight. A write marks every pill
+   * busy (they stay enabled, so focus stays on them), and a click made before it ends is
+   * dropped: that is how a fixed number of ticks failed on CI.
    */
   const idle = () =>
     until(() => {
       const pills = container.querySelectorAll(".pills button");
-      if (pills.length === 0 || container.querySelector(".pills button:disabled")) throw new Error("card busy");
+      if (pills.length === 0 || container.querySelector('.pills button[aria-busy="true"]')) throw new Error("card busy");
     });
   const pill = (flag: string, text: string) =>
     [...container.querySelectorAll(`[data-flag="${flag}"] .pills button`)].find((b) => b.textContent === text) as HTMLButtonElement;
@@ -320,7 +320,7 @@ describe("the Feature flags card", () => {
     pageLoad();
     act(() => root.render(<FlagsCard />));
     await idle();
-    expect(container.querySelector('[aria-label="Feature flags"]')?.textContent).toContain(
+    expect(container.querySelector(".card.flags")?.textContent).toContain(
       "A preview lasts 8 hours, in a cookie every app on localhost shares. Clear it before switching projects.",
     );
   });

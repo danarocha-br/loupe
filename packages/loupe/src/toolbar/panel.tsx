@@ -17,7 +17,7 @@
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import type { LayerStatus } from "../layer-status.js";
 import type { LoupeDebug } from "../runtime/debug.js";
-import type { Scope } from "../runtime/store.js";
+import type { Scope, ScopeTarget } from "../runtime/store.js";
 import { attempt, HeldKey, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyProposalButton } from "./copy-dialog.js";
@@ -36,7 +36,7 @@ import {
   ResetIcon,
   SelectManyIcon,
 } from "./icons.js";
-import { LayerNotices, NotGeneratedNotice } from "./notices.js";
+import { layerAnnouncement, LayerNotices, NotGeneratedNotice } from "./notices.js";
 import {
   type GoneBody,
   type InspectorBody,
@@ -47,11 +47,13 @@ import {
   type ScopeOption,
   type StatusTag,
   type Tag,
+  inspectOnlyTitle,
+  LEGEND,
   TEXT,
   THIS_INSTANCE,
 } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { offerUndo, takeUndo, useUndoOffer } from "./undo.js";
+import { keepUndoWhile, offerUndo, recordsKey, takeUndo, useUndoOffer } from "./undo.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -110,14 +112,24 @@ export function Panel(props: PanelProps) {
       {view.banner && <OverridesOff banner={view.banner} />}
     </>
   );
+  // The notices' cards come and go with the view; what they say is announced from here.
+  const layerSaid = layerAnnouncement(props.layer);
+  const announced = {
+    alert: layerSaid.alert,
+    status: [layerSaid.status, view.banner ? `${view.banner.title}. ${view.banner.body}` : ""].filter(Boolean).join(" "),
+  };
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
+  // Read while rendering, before React swaps the view: once the row that had focus is
+  // gone, nothing after the commit can tell that focus was in the panel (review 2026-11-20).
+  const focusWasHere = useRef(false);
+  const root = middle.current?.getRootNode();
+  focusWasHere.current = root instanceof ShadowRoot && root.activeElement !== null;
   // A new selection, or back to the list, opens at the top. Focus follows it when it
-  // was already in the panel: a pick on the page leaves the app's focus where it is.
+  // was in the panel: a pick on the page leaves the app's focus where it is.
   useEffect(() => {
     if (middle.current) middle.current.scrollTop = 0;
-    const root = middle.current?.getRootNode();
-    if (root instanceof ShadowRoot && root.activeElement !== null) heading.current?.focus();
+    if (focusWasHere.current) heading.current?.focus();
   }, [opened]);
   const status = props.picking ? (
       <>
@@ -170,7 +182,7 @@ export function Panel(props: PanelProps) {
             title={
               props.marksHidden
                 ? "Show marks: outline the selection on the page again"
-                : "Hide marks: take Loupe's outlines off the page, to judge the change as it will ship. The selection stays."
+                : "Hide marks: take Loupe’s outlines off the page, to judge the change as it will ship. The selection stays."
             }
           >
             {props.marksHidden ? <MarksHiddenIcon /> : <MarksIcon />}
@@ -188,15 +200,20 @@ export function Panel(props: PanelProps) {
           </button>
           <button type="button" className="tool" onClick={props.onHide} title="Hide the panel">
             <PanelIcon />
-            <span className="sr-only">Hide</span>
+            <span className="sr-only">Hide panel</span>
           </button>
         </div>
       </header>
-      {status && (
-        <div className="status-line" role="status">
-          {status}
-        </div>
-      )}
+      {/* Each region is always there and only its text changes, so a screen reader hears it. */}
+      <div className="status-region" role="status">
+        {status && <div className="status-line">{status}</div>}
+      </div>
+      <p className="sr-only" role="status" data-testid="announce-status">
+        {announced.status}
+      </p>
+      <p className="sr-only" role="alert" data-testid="announce-alert">
+        {announced.alert}
+      </p>
       <div className="middle" ref={middle}>
         {body.kind === "list" ? (
           <ComponentList {...props} body={body} notices={notices} heading={heading} />
@@ -251,7 +268,7 @@ function useCoveredDialog(column: Column): boolean {
 /** The React self-check failed (PER-184: said here once, not again on the Instance). */
 function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) {
   return (
-    <div className="section notice-card banner" role="status">
+    <div className="section notice-card banner">
       <div className="head">
         <div className="title">
           <span className="dot alert" />
@@ -270,6 +287,7 @@ const TAG_CLASS: Record<Tag["kind"], string> = {
   stale: "tag stale",
   "left-out": "tag",
   "left-out-unmounted": "tag dashed",
+  "not-visible": "tag dashed",
 };
 
 function TagView({ tag }: { tag: Tag }) {
@@ -342,6 +360,8 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
                   onClick={() => change.select !== null && onSelect(change.select)}
                   onMouseOver={() => onHover(change.reached)}
                   onMouseLeave={() => onHover([])}
+                  onFocus={() => onHover(change.reached)}
+                  onBlur={() => onHover([])}
                 >
                   <Key n={change.n} />
                   <span className="what">{change.detail}</span>
@@ -362,7 +382,12 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
           {body.groups.map((group) => (
             <li key={group.component} className="group">
               <details>
-                <summary onMouseOver={() => onHover(group.outlineIds)} onMouseLeave={() => onHover([])}>
+                <summary
+                  onMouseOver={() => onHover(group.outlineIds)}
+                  onMouseLeave={() => onHover([])}
+                  onFocus={() => onHover(group.outlineIds)}
+                  onBlur={() => onHover([])}
+                >
                   <span className="cname" title={group.component}>
                     {group.component}
                   </span>{" "}
@@ -408,7 +433,11 @@ function ComponentList({ debug, onSelect, onHover, body, notices, heading }: Act
                       >
                         <Keys keys={item.keys} />
                         <span className="who">
-                          {item.name && <span className="screen-name">{item.name}</span>}
+                          {item.name && (
+                            <span className="screen-name" dir="auto">
+                              {item.name}
+                            </span>
+                          )}
                           <span className="site">{item.label}</span>
                         </span>
                         {item.tags.map((tag) => (
@@ -466,7 +495,15 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
           <li key={JSON.stringify(item.target)} className="held-item">
             <div className="target">
               <span>{item.label}</span>
-              <button type="button" className="btn small" onClick={() => attempt(() => debug.discard(item.target))}>
+              <button
+                type="button"
+                className="btn small"
+                onClick={(event) => {
+                  const button = event.currentTarget;
+                  dropUndoably(debug, item.target, (count) => `Discarded ${plural(count, "held Override")}`);
+                  focusHeading(button);
+                }}
+              >
                 Discard
               </button>
             </div>
@@ -488,45 +525,84 @@ function BackButton({ onSelect }: Pick<Actions, "onSelect">) {
   );
 }
 
+/**
+ * A button that goes once it has done its job (a Reset with nothing left to reset)
+ * hands focus to the heading, so a keyboard doesn't fall out of the panel.
+ */
+function focusHeading(from: HTMLElement) {
+  const root = from.getRootNode();
+  if (root instanceof ShadowRoot) root.querySelector<HTMLElement>("h2.name")?.focus();
+}
+
+/** "Reset 2 Overrides": what the footer's undo offer says a reset dropped. */
+const resetText = (count: number) => `Reset ${plural(count, "Override")}`;
+
+/**
+ * Drops one record and offers to put it back. Nothing in the panel asks before it
+ * drops a designer's work, so every reset and Discard is undoable, as Reset all is.
+ */
+function dropUndoably(debug: LoupeDebug, target: ScopeTarget, text: (count: number) => string) {
+  const key = JSON.stringify(target);
+  const saved = debug.records().filter((record) => JSON.stringify(record.target) === key);
+  try {
+    debug.discard(target);
+  } catch {
+    // Nothing was dropped (Overrides went off), so there is nothing to offer back.
+    return;
+  }
+  const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
+  offerUndo(text(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
+}
+
 /** `discard` also drops the record of an Instance that isn't mounted, where `reset(id)` throws (PER-128). */
 function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; enabled: boolean }) {
   return (
-    <button type="button" className="btn small" disabled={!enabled} onClick={() => debug.discard({ scope: "instance", id })}>
+    <button
+      type="button"
+      className="btn small"
+      disabled={!enabled}
+      onClick={(event) => {
+        const button = event.currentTarget;
+        dropUndoably(debug, { scope: "instance", id }, resetText);
+        focusHeading(button);
+      }}
+    >
       Reset this Instance
     </button>
   );
 }
 
+/** "Not on the page now": what it was and where it is written, why it may be gone, and what it still holds. */
 function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & { body: GoneBody; notices: ReactNode }) {
   return (
     <>
       <div className="section identity">
         <div className="title-line">
           <BackButton onSelect={onSelect} />
+          {body.component && <span className="status">{TEXT.notOnPage}</span>}
         </div>
-        <h2 className="name" tabIndex={-1} ref={heading}>
-          {TEXT.notOnPage}
+        <h2 className="name" tabIndex={-1} ref={heading} title={body.id}>
+          {body.component ?? TEXT.notOnPage}
         </h2>
-        <div className="id">{body.id}</div>
-      </div>
-      {notices}
-      <div className="section">
-        {body.held && (
-          <>
-            <span>
-              <TagView tag={body.held.tag} />
-            </span>
-            <HeldValues values={body.held.values} />
-          </>
+        {body.where && (
+          <div className="id" title={body.id}>
+            {body.where}
+          </div>
         )}
         <p className="body">{TEXT.showsWhenMounted}</p>
-        <div className="actions">
-          {body.canReset && <ResetInstance debug={debug} id={body.id} enabled />}
-          <button type="button" className="btn small" onClick={() => onSelect(null)}>
-            Back to the list
-          </button>
-        </div>
+        {body.held && (
+          <div className="verdicts">
+            <TagView tag={body.held.tag} />
+          </div>
+        )}
+        {body.held && <HeldValues values={body.held.values} />}
+        {body.canReset && (
+          <div className="actions">
+            <ResetInstance debug={debug} id={body.id} enabled />
+          </div>
+        )}
       </div>
+      {notices}
     </>
   );
 }
@@ -556,10 +632,18 @@ function Inspector({
   heading,
 }: Actions & Heading & Pick<PanelProps, "mode" | "view"> & { body: InspectorBody; notices: ReactNode }) {
   const { hold } = body;
-  const inspectOpen = body.editable.length === 0;
-  const switches = body.editable.filter(isSwitch);
+  // State props first: a menu's `open` is the switch a designer reaches for.
+  const switches = body.editable.filter(isSwitch).sort((a, b) => Number(b.state) - Number(a.state));
   const cards = body.editable.filter((item) => !isSwitch(item));
   const named = body.name !== null;
+  const site = body.coverage.callSite;
+  // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
+  const holdButton = hold && view.scope !== "instance" ? hold : null;
+  const resetInstance = body.editing?.resetInstanceEnabled === true;
+  // The exceptions: a server or stale tag, and the scopes acting on it, unless the members card already names its scope.
+  const chips = body.members ? [] : body.chips;
+  // The marks' legend sits under the first table that carries one.
+  const legendAt = cards.findIndex((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
   const row = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={onSelect} onHover={onHover} />;
   return (
     <>
@@ -574,62 +658,77 @@ function Inspector({
           {body.verdict.status && <StatusView status={body.verdict.status} check />}
           <Keys keys={body.keys} />
         </div>
-        <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component}>
+        {/* The app's own words, in whatever script it writes: `dir="auto"` lays them out their way. */}
+        <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component} dir="auto">
           {body.name ?? body.component}
         </h2>
-        <div className="id" data-testid="instance-id" data-id={body.id} title={body.id}>
-          {named ? siteOf(body.where, body.component) : body.where}
+        {/* Where it is written, and which of that call site's Instances it is; the full path and key in the tooltip. */}
+        <div className="id" data-testid="instance-id" data-id={body.id} title={site ? `${site.title}\n${body.id}` : body.id}>
+          {site ? site.text : siteOf(body.where, body.component)}
         </div>
-        {body.tags.length > 0 && (
-          <div className="verdicts">
-            {body.tags.map((tag) => (
-              <TagView key={tag.kind} tag={tag} />
+        {body.crumbs.length > 0 && (
+          <div className="inside" data-testid="inside">
+            Inside{" "}
+            {[...body.crumbs].reverse().map((crumb, index) => (
+              <span key={crumb.id}>
+                {index > 0 && (
+                  <span className="sep" aria-hidden="true">
+                    ›
+                  </span>
+                )}
+                <button type="button" onClick={() => onSelect(crumb.id)}>
+                  {crumb.label}
+                </button>
+              </span>
             ))}
           </div>
         )}
-        {body.chips.length > 0 && (
-          <div className="chips" data-testid="chips">
-            {body.chips.map((chip) => (
+        {(body.tags.length > 0 || chips.length > 0) && (
+          <div className="verdicts" data-testid="chips">
+            {body.tags.map((tag) => (
+              <TagView key={tag.kind} tag={tag} />
+            ))}
+            {chips.map((chip) => (
               <span key={chip} className="tag">
                 {chip}
               </span>
             ))}
           </div>
         )}
-        {body.crumbs.length > 0 && (
-          <div className="crumbs">
-            Inside
-            {body.crumbs.map((crumb) => (
-              <button key={crumb.id} type="button" onClick={() => onSelect(crumb.id)}>
-                {crumb.label}
-              </button>
-            ))}
+        {body.coverage.notGenerated && (
+          <div className="warn" data-testid="not-generated">
+            <span className="dot" />
+            <span>
+              <StatusView status={body.coverage.notGenerated.tag} /> {TEXT.run}{" "}
+              <span className="mono verbatim">{body.coverage.notGenerated.command}</span> {TEXT.fromRootToReadProps}
+            </span>
           </div>
         )}
-        {(body.editing || hold) && (
+        {(holdButton || resetInstance) && (
           <div className="actions">
-            {hold && (
+            {holdButton && (
               <button
                 type="button"
-                className={hold.held ? "btn small holding" : "btn small"}
-                aria-pressed={hold.held}
-                data-hold={hold.prop}
+                className={holdButton.held ? "btn small holding" : "btn small"}
+                aria-pressed={holdButton.held}
+                data-hold={holdButton.prop}
                 onClick={() =>
                   attempt(() =>
-                    hold.held ? debug.reset(hold.write.id, hold.write.prop, "instance") : debug.set(hold.write.id, hold.write.prop, true, "instance"),
+                    holdButton.held
+                      ? debug.reset(holdButton.write.id, holdButton.write.prop, "instance")
+                      : debug.set(holdButton.write.id, holdButton.write.prop, true, "instance"),
                   )
                 }
               >
-                {hold.held ? `Holding ${hold.prop} · Release` : `Hold ${hold.prop}`}
+                {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
               </button>
             )}
-            {body.editing && <ResetInstance debug={debug} id={body.id} enabled={body.editing.resetInstanceEnabled} />}
+            {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
           </div>
         )}
         {mode === "many" && body.editing?.scopes && view.scope === "instance" && <NoGroup options={body.editing.scopes} onScope={onScope} />}
       </div>
       {notices}
-      {body.members && <MembersCard debug={debug} members={body.members} options={body.editing?.scopes ?? null} onScope={onScope} onHover={onHover} />}
       {body.note && (
         <div className="section note-card" role="note">
           <InfoIcon />
@@ -639,93 +738,90 @@ function Inspector({
           </div>
         </div>
       )}
-      {cards.map((item) => (
+      {body.members && <MembersCard debug={debug} members={body.members} options={body.editing?.scopes ?? null} onScope={onScope} onHover={onHover} />}
+      {cards.map((item, index) => (
         <div key={item.name} className={item.overridden ? "section prop-card overridden" : "section prop-card"}>
           {row(item)}
+          {index === legendAt && <Legend app={cards.some((card) => card.change !== null && card.counts === null)} />}
         </div>
       ))}
       {switches.length > 0 && <div className="section switches">{switches.map(row)}</div>}
-      <div className="section inspect">
-        <details open={inspectOpen}>
-          <summary>
-            <ChevronIcon />
-            <span className="summary-text">
-              {body.inspectOnly.length === 0 ? "Set by the code" : `${body.inspectOnly.length} set by the code`}
-              {!inspectOpen && body.inspectOnly.length > 0 && (
-                <span className="muted"> · {body.inspectOnly.map((item) => item.name).join(", ")}</span>
-              )}
-            </span>
-            {body.inspectOnlyMeta && <span className="meta">{body.inspectOnlyMeta}</span>}
-          </summary>
-          <div className="inspect-rows">
-            {body.inspectOnly.length === 0 ? <div className="muted">{TEXT.none}</div> : body.inspectOnly.map(row)}
-          </div>
-          {body.injected && (
-            <details className="injected">
-              <summary>
-                <ChevronIcon />
-                {body.injected.summary}
-              </summary>
-              {body.injected.rows.map((injected) => (
-                <div className="row" key={injected.name}>
-                  <div className="line">
-                    <span className="name">{injected.name}</span>
-                    <span className="value">{injected.value}</span>
-                  </div>
-                </div>
-              ))}
-            </details>
-          )}
-        </details>
-      </div>
-      <CoverageCard coverage={body.coverage} />
+      <InspectOnly key={body.id} body={body} row={row} />
     </>
   );
 }
 
-/** Editable against inspect-only as a bar, and the call site under it (PER-140). */
-function CoverageCard({ coverage }: { coverage: InspectorBody["coverage"] }) {
-  const { editable, inspectOnly } = coverage;
-  const total = editable + inspectOnly;
-  const notGenerated = coverage.notGenerated;
+/** What a table's marks mean, once, under the first table that carries one. */
+function Legend({ app }: { app: boolean }) {
   return (
-    <div className="section coverage">
-      <div className="head">
-        <h3>Coverage</h3>
-        <span className="meta" data-testid="coverage">
-          {coverage.text}
+    <div className="legend" aria-hidden="true">
+      <span>
+        <i className="shown" />
+        {LEGEND.shown}
+      </span>
+      {app && (
+        <span>
+          <i className="app" />
+          {LEGEND.app}
         </span>
-      </div>
-      {total > 0 && (
-        <div className="bar" aria-hidden="true">
-          {coverage.segmented ? (
-            Array.from({ length: total }, (_, index) => <span key={index} className={index < editable ? "on" : undefined} />)
-          ) : (
-            <>
-              {editable > 0 && <span className="on" style={{ flex: editable }} />}
-              {inspectOnly > 0 && <span style={{ flex: inspectOnly }} />}
-            </>
-          )}
-        </div>
       )}
-      <div className="site">
-        <span className="label">Call site</span>
-        {coverage.callSite ? (
-          <span className="mono" title={coverage.callSite.title}>
-            {coverage.callSite.text}
+      <span>
+        <i className="is-default" />
+        {LEGEND.default}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The props it shows but can't change here, folded to one line (open when nothing
+ * else can change). Closed, the line names them; one cause for them all is said
+ * once, under the line, instead of a tag on every row.
+ */
+function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): ReactNode }) {
+  const [open, setOpen] = useState(body.editable.length === 0);
+  const items = body.inspectOnly;
+  const reasons = new Set(items.map((item) => item.reason));
+  const [only] = reasons.size === 1 ? [...reasons] : [];
+  const shared = only ? items.find((item) => item.reason === only) : undefined;
+  const rows = shared ? items.map((item) => ({ ...item, reason: null })) : items;
+  return (
+    <div className="section inspect">
+      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+        <summary>
+          <ChevronIcon />
+          <span className="summary-text" data-testid="inspect-only">
+            {inspectOnlyTitle(items.length)}
+            {!open && items.length > 0 && <span className="muted"> · {items.map((item) => item.name).join(", ")}</span>}
           </span>
-        ) : (
-          <span className="muted">{coverage.noCallSite}</span>
+          {body.inspectOnlyMeta && <span className="meta">{body.inspectOnlyMeta}</span>}
+        </summary>
+        {shared?.reason && (
+          <p className="why">
+            <span className="tag reason" title={shared.reasonTitle ?? undefined}>
+              {shared.reason}
+            </span>{" "}
+            {shared.reasonTitle}
+          </p>
         )}
-      </div>
-      {notGenerated && (
-        <div className="warn" data-testid="not-generated">
-          <span className="dot" />
-          <span>
-            <StatusView status={notGenerated.tag} /> {TEXT.run} <span className="mono verbatim">{notGenerated.command}</span> {TEXT.fromRootToReadProps}
-          </span>
-        </div>
-      )}
+        <div className="inspect-rows">{rows.length === 0 ? <div className="muted">{TEXT.none}</div> : rows.map(row)}</div>
+        {body.injected && (
+          <details className="injected">
+            <summary>
+              <ChevronIcon />
+              {body.injected.summary}
+            </summary>
+            {body.injected.rows.map((injected) => (
+              <div className="row" key={injected.name}>
+                <div className="line">
+                  <span className="name">{injected.name}</span>
+                  <span className="value">{injected.value}</span>
+                </div>
+              </div>
+            ))}
+          </details>
+        )}
+      </details>
     </div>
   );
 }
@@ -786,7 +882,9 @@ function MembersCard({
         />
         {/* By name only: the key that tells Instances apart is for engineers, in the tooltip. */}
         <span className={member.out ? "who out" : "who"} title={member.id}>
-          <span className="screen-name">{member.name ?? member.label}</span>
+          <span className="screen-name" dir="auto">
+            {member.name ?? member.label}
+          </span>
           {member.label === THIS_INSTANCE && member.name && <span className="self">{THIS_INSTANCE}</span>}
         </span>
         {member.tag && <TagView tag={member.tag} />}
@@ -796,27 +894,33 @@ function MembersCard({
   return (
     <div className="section members" data-testid="members">
       <div className="head">
-        <h3>{current ? current.label.replace(/ · \d+.*$/, "") : "Instances"}</h3>
+        <h3 title={current?.title ?? undefined}>{current ? current.label.replace(/ · \d+.*$/, "") : "Instances"}</h3>
         <span className="meta">{members.countText}</span>
       </div>
-      <div className="selection-actions">
-        {other && <WidenButton option={other} verb={scope === "group" ? "Widen to" : "Narrow to"} onScope={onScope} />}
-        <button
-          type="button"
-          className="btn small"
-          disabled={!members.reset.enabled}
-          onClick={() => attempt(() => debug.discard(members.reset.target))}
-        >
-          <ResetIcon />
-          Reset this scope
-        </button>
-      </div>
+      {(other || members.reset.enabled) && (
+        <div className="selection-actions">
+          {other && <WidenButton option={other} verb={scope === "group" ? "Widen to" : "Narrow to"} onScope={onScope} />}
+          {members.reset.enabled && (
+            <button
+              type="button"
+              className="btn small"
+              onClick={(event) => {
+                const button = event.currentTarget;
+                dropUndoably(debug, members.reset.target, resetText);
+                focusHeading(button);
+              }}
+            >
+              <ResetIcon />
+              Reset this scope
+            </button>
+          )}
+        </div>
+      )}
       {/* The list folds away, as Figma keeps layers out of the properties: open while one is left out. */}
       <details className="fold" open={members.members.some((member) => member.out)}>
         <summary>
           <ChevronIcon />
           {plural(members.members.length, "Instance")}
-          <span className="muted"> · untick one to leave it out</span>
         </summary>
         <div className="muted">{TEXT.untick}</div>
       {members.sites === null ? (
@@ -831,11 +935,13 @@ function MembersCard({
                   data-site={site.anchor}
                   checked={site.allIn}
                   disabled={members.suspended}
+                  onFocus={() => onHover(site.members.map((member) => member.id))}
+                  onBlur={() => onHover([])}
                   onChange={() => {
                     for (const id of site.toggle.ids) toggle(site.toggle.action, id);
                   }}
                 />
-                <span className="mono" title={site.anchor}>
+                <span className="screen-name" title={site.anchor}>
                   {site.label}
                 </span>
                 <span className="muted">· {site.count}</span>
@@ -849,7 +955,10 @@ function MembersCard({
         <ul className="list" aria-label="Server-rendered">
           {members.server.map((server) => (
             <li key={server.id}>
-              <span className="mono">{server.id}</span> <TagView tag={server.tag} />
+              <span className="server-name" title={server.id}>
+                {server.label}
+              </span>
+              <TagView tag={server.tag} />
             </li>
           ))}
         </ul>
@@ -878,6 +987,30 @@ function Footer({
   onHover,
 }: Pick<Actions, "debug" | "onSelect" | "onHover"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
+  // The offer stays until the Overrides move on from what the drop left (undo.ts).
+  useEffect(() => {
+    if (offer !== null) keepUndoWhile(recordsKey(debug));
+  });
+  // Reset all goes disabled once it has acted: focus moves to its Undo, the next thing to do.
+  const undoButton = useRef<HTMLButtonElement>(null);
+  const focusUndo = useRef(false);
+  useEffect(() => {
+    if (!focusUndo.current || offer === null) return;
+    focusUndo.current = false;
+    undoButton.current?.focus();
+  }, [offer]);
+  // Undo goes once it is taken: focus moves back to Reset all, which has something to reset again.
+  const resetAllButton = useRef<HTMLButtonElement>(null);
+  const focusResetAll = useRef(false);
+  useEffect(() => {
+    const button = resetAllButton.current;
+    if (!focusResetAll.current || offer !== null || !button) return;
+    // The view catches up with the restored records a frame later: wait for the button to come back.
+    if (button.disabled && debug.records().length > 0) return;
+    focusResetAll.current = false;
+    if (button.disabled) focusHeading(button);
+    else button.focus();
+  });
   const shown = footer.keys.slice(0, FOOTER_KEYS);
   // The states shown take what room the numbered changes leave.
   const states = footer.states.slice(0, FOOTER_KEYS - shown.length);
@@ -893,7 +1026,15 @@ function Footer({
           {offer && (
             <>
               <span className="what">{offer.text}</span>
-              <button type="button" className="link" onClick={takeUndo}>
+              <button
+                type="button"
+                className="link"
+                ref={undoButton}
+                onClick={() => {
+                  focusResetAll.current = true;
+                  takeUndo();
+                }}
+              >
                 Undo
               </button>
             </>
@@ -910,6 +1051,8 @@ function Footer({
                   onClick={() => change.select !== null && onSelect(change.select)}
                   onMouseOver={() => onHover(change.reached)}
                   onMouseLeave={() => onHover([])}
+                  onFocus={() => onHover(change.reached)}
+                  onBlur={() => onHover([])}
                 >
                   <Key n={change.n} />
                   <span className="sr-only">
@@ -927,6 +1070,8 @@ function Footer({
                   onClick={() => state.select !== null && onSelect(state.select)}
                   onMouseOver={() => onHover(state.reached)}
                   onMouseLeave={() => onHover([])}
+                  onFocus={() => onHover(state.reached)}
+                  onBlur={() => onHover([])}
                 >
                   <HeldKey />
                   <span className="sr-only">
@@ -943,13 +1088,15 @@ function Footer({
         <button
           type="button"
           className="btn"
+          ref={resetAllButton}
           disabled={footer.resetAll.length === 0}
           onClick={() => {
             // Kept so the footer can put them back: Reset all asks nothing, so it is undoable.
             const saved = debug.records();
             const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
             for (const target of footer.resetAll) debug.discard(target);
-            offerUndo(`Reset ${plural(count, "Override")}`, () => attempt(() => debug.restore(saved)));
+            focusUndo.current = true;
+            offerUndo(resetText(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
           }}
         >
           <ResetIcon />

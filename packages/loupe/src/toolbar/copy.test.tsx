@@ -10,6 +10,7 @@ import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
+import { TITLE_MISSING } from "./copy-dialog.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -22,6 +23,7 @@ vi.mock("./notices.js", () => ({
   notGeneratedComponents: () => [],
   LayerNotices: () => null,
   NotGeneratedNotice: () => null,
+  layerAnnouncement: () => ({ alert: "", status: "" }),
 }));
 
 const { default: Toolbar } = await import("./index.js");
@@ -89,8 +91,8 @@ function copiedProposal(): Proposal {
 
 async function openDialog(): Promise<void> {
   act(() => shadow().querySelector<HTMLButtonElement>("[data-copy]")?.click());
-  // Open once the preview has counted.
-  await until(() => dialog()?.querySelector(".counts") != null);
+  // Open once the preview has counted: the counts' live region is there from the start, empty.
+  await until(() => (dialog()?.querySelector(".counts")?.textContent ?? "") !== "");
 }
 
 beforeEach(async () => {
@@ -137,22 +139,34 @@ describe("the Copy Proposal dialog", () => {
     expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Button variant in MemberRow");
     expect(dialog()?.querySelector(".counts")?.textContent).toBe("1 change · 0 held for review");
     expect([...(dialog()?.querySelectorAll("[data-entry]") ?? [])].map((entry) => entry.querySelector("span")?.textContent)).toEqual([
-      "1Change variant on 1st of 1 <Button> in MemberRow, every Instance",
+      "1variant on 1st of 1 <Button> in MemberRow, every Instance",
     ]);
-    expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
+    // The delta names itself "Change 1": no second "Change" in the field's name.
+    expect(dialog()?.querySelector("[data-entry] .key")?.getAttribute("aria-label")).toBe("Change 1");
+    // The alert region is there, empty, until something fails.
+    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe("");
   });
 
-  it("holds Copy back only while the title is empty", async () => {
+  it("holds Copy back while the title is empty, and says so under the field", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
     expect(dialog()?.querySelector("h2")?.textContent).toBe("Copy Proposal");
     const submit = button("Copy", dialog() as HTMLDialogElement);
+    const title = field<HTMLInputElement>('input[name="title"]');
+    type(title, "   ");
+    // Never disabled with no reason given (review 2026-11-20): pressed, it says what is missing.
     expect(submit?.disabled).toBe(false);
-    type(field('input[name="title"]'), "   ");
-    expect(submit?.disabled).toBe(true);
-    type(field('input[name="title"]'), "Calmer rows");
-    expect(submit?.disabled).toBe(false);
+    act(() => submit?.click());
+    await settle();
+    expect(copies).toEqual([]);
+    expect(dialog()?.open).toBe(true);
+    expect(title.getAttribute("aria-invalid")).toBe("true");
+    expect(dialog()?.querySelector(`#${title.getAttribute("aria-describedby")}`)?.textContent).toBe(TITLE_MISSING);
+    expect(shadow().activeElement).toBe(title);
+    type(title, "Calmer rows");
+    expect(title.hasAttribute("aria-invalid")).toBe(false);
+    expect(dialog()?.querySelector(".field-error")).toBeNull();
   });
 
   it("copies one text with the rules, the title, designer and notes, and clears nothing", async () => {
@@ -231,7 +245,7 @@ describe("the Copy Proposal dialog", () => {
     await settle();
     await openDialog();
     act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
-    await until(() => dialog()?.querySelector('[role="alert"]') != null);
+    await until(() => (dialog()?.querySelector('[role="alert"]')?.textContent ?? "") !== "");
     expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe("Write permission denied. The Proposal is in the console.");
     expect(String(info.mock.calls[0]?.[0])).toMatch(/^\[loupe\] Proposal:\n\n# Button variant in MemberRow\n/);
   });

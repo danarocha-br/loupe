@@ -45,16 +45,30 @@ function scopeName(source: Source, labels: ScopeLabels): string {
   return labels[source] ?? THIS_CALL_SITE;
 }
 
+/** The design system's default for an unset prop, when the metadata reads one from the code; never a guess (PER-84). */
+function knownDefault(row: PropRow): { value: unknown } | null {
+  const known = row.default;
+  if (!known || (known.source !== "destructure" && known.source !== "defaultVariants") || known.value == null) return null;
+  return { value: known.value };
+}
+
 /** Pills for a closed set of options, each with its count at a scope; a field for label text (PER-113). */
 function control(row: PropRow, value: unknown, write: Write, key: string, counts: Map<string, Counted> | null): Control {
   if (row.options) {
+    const fallback = knownDefault(row);
     return {
       kind: "options",
       key,
       write,
       options: row.options.map((option) => {
         const label = formatCurrent(option);
-        return { value: option, label, pressed: Object.is(value, option), count: counts?.get(label)?.count ?? null };
+        return {
+          value: option,
+          label,
+          pressed: Object.is(value, option),
+          count: counts?.get(label)?.count ?? null,
+          isDefault: fallback !== null && Object.is(fallback.value, option),
+        };
       }),
     };
   }
@@ -107,7 +121,9 @@ export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Read
   // A Suspended record is shown, never written: "Code changed here, review" is PER-136's.
   const suspended = isSuspended(view);
   const inScope = view.members.filter((member) => !member.out).length;
-  const counts = valueCounts(view, row.name, reads);
+  // The table counts what each member shows now; a change still reads from the app's own values.
+  const counts = valueCounts(view, row.name, reads, "shown");
+  const appCounts = valueCounts(view, row.name, reads, "app");
   const [only] = counts.size === 1 && inScope > 0 ? [...counts.values()] : [];
   const keeping = keepingOwn(view, row.name, reads);
   const [nearest] = keeping;
@@ -136,7 +152,10 @@ export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Read
     key: overridden ? key : null,
     // The app's value when every member shares one, else how they differ.
     change: overridden
-      ? { from: counts.size === 1 ? ([...counts.keys()][0] ?? NOT_SET) : counts.size === 0 ? NOT_SET : "mixed", to: formatCurrent(values[row.name]) }
+      ? {
+          from: appCounts.size === 1 ? ([...appCounts.keys()][0] ?? NOT_SET) : appCounts.size === 0 ? NOT_SET : "mixed",
+          to: formatCurrent(values[row.name]),
+        }
       : null,
     held: null,
     reset: overridden && !suspended ? { label: RESET, write, inNotice: false } : null,

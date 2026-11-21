@@ -6,6 +6,7 @@ import { callSiteLabels, isUnanchored, parseHint } from "../../call-site.js";
 import type { InstanceRow, RecordRow } from "../../runtime/debug.js";
 import { identityOf } from "../../runtime/registry.js";
 import { inScope, PRECEDENCE, reachOf, recordsFor, type Scope, type ScopeTarget, type Source, targetAt } from "../../runtime/store.js";
+import { formatCurrent } from "../format.js";
 import type { AppValue, Reads } from "./reads.js";
 import type { Member, MemberItem, MembersView, SiteItem } from "./types.js";
 import { groupName, keyOf, leftOutChip, PAGE_LABEL, previewedText, scopeLabel, siteLabel, TAGS, THIS_INSTANCE } from "./words.js";
@@ -108,19 +109,31 @@ export function fallbacks(records: readonly RecordRow[], row: InstanceRow): Reco
 export type Counted = AppValue & { count: number };
 
 /**
- * How the Current values of the members still in the scope differ, keyed by the
- * pill's label: `{ '"ghost"': 3, '"secondary"': 1 }`. A member that has gone isn't counted.
+ * How the values of the members still in the scope differ, keyed by the pill's
+ * label: `{ '"ghost"': 3, '"secondary"': 1 }`. A member that has gone isn't counted.
+ * `app` counts the app's own values (what a change reads from); `shown` counts what
+ * each member shows now, a narrower Override's value included (what the table says).
  */
-export function valueCounts(view: ScopeView, prop: string, reads: Reads): Map<string, Counted> {
+export function valueCounts(view: ScopeView, prop: string, reads: Reads, counting: "app" | "shown" = "app"): Map<string, Counted> {
   const counts = new Map<string, Counted>();
   for (const member of view.members) {
     if (member.out) continue;
-    const value = reads.appValue(member.id, prop);
+    const value = counting === "shown" ? shownValue(member.id, prop, reads) : reads.appValue(member.id, prop);
     if (value === null) continue;
     const known = counts.get(value.label);
     counts.set(value.label, known ? { ...known, count: known.count + 1 } : { ...value, count: 1 });
   }
   return counts;
+}
+
+/** What a member shows now for a prop: an Override's value, whatever its scope, else the app's own. */
+function shownValue(id: string, prop: string, reads: Reads): AppValue | null {
+  const live = reads.props(id);
+  if (live && prop in live.overrides && live.sources[prop] !== undefined && live.sources[prop] !== "app") {
+    const value = live.overrides[prop];
+    return { label: formatCurrent(value), value, unset: false };
+  }
+  return reads.appValue(id, prop);
 }
 
 /** Whether `source` is a narrower scope than `scope`, so it wins over it. */
@@ -186,7 +199,7 @@ export function membersView(
     suspended: isSuspended(view),
     members,
     sites,
-    server: view.server.map((server) => ({ id: server.id, tag: TAGS.server })),
+    server: view.server.map((server) => ({ id: server.id, label: name(server.id) ?? siteLabel(server.anchor), tag: TAGS.server })),
     outUnmounted: view.outUnmounted.map((outId) => ({ id: outId, tag: TAGS.leftOutUnmounted })),
     reset: { target: view.target, enabled: view.record !== null },
   };

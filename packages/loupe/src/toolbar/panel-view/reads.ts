@@ -25,6 +25,11 @@ export type Reads = {
   ancestors(id: string): string[];
   /** What it is called on screen: its accessible name or visible text; null when it shows none. */
   name(id: string): string | null;
+  /**
+   * Whether it shows on screen: `hidden` when every node it renders is (`display: none`,
+   * `visibility: hidden`), `empty` when it renders no element, null where the browser can't tell.
+   */
+  visible(id: string): "shown" | "hidden" | "empty" | null;
 };
 
 /**
@@ -78,6 +83,14 @@ export function createReads(debug: LoupeDebug): Reads {
     name(id) {
       if (!names.has(id)) names.set(id, orNull(() => screenName(debug.nodes(id))));
       return names.get(id) ?? null;
+    },
+    visible(id) {
+      const nodes = orNull(() => debug.nodes(id));
+      if (nodes === null) return null;
+      if (nodes.length === 0) return "empty";
+      // jsdom and older browsers have no checkVisibility: they can't tell, so they say nothing.
+      if (nodes.some((node) => typeof node.checkVisibility !== "function")) return null;
+      return nodes.some((node) => node.checkVisibility({ visibilityProperty: true })) ? "shown" : "hidden";
     },
   };
   return reads;

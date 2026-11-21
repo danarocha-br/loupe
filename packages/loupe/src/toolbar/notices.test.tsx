@@ -8,6 +8,7 @@ import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { resetLoupe } from "../runtime/slot.js";
+import { COPY_REFUSED } from "./command.js";
 import Toolbar from "./index.js";
 import { CSS, HOST_ATTRIBUTE } from "./styles.js";
 
@@ -71,9 +72,9 @@ afterEach(() => {
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
 const panelText = () => shadow().querySelector(".panel")?.textContent ?? "";
-// The missing-layer card, found as a reader finds it: an alert with its title (the format notice is an alert too).
-const missingNotice = () =>
-  [...shadow().querySelectorAll("[role=alert]")].find((alert) => alert.textContent?.includes("Product layer missing")) ?? null;
+// The missing-layer card. Its words reach a screen reader through the panel's alert region, which is always there.
+const missingNotice = () => shadow().querySelector("[data-testid=missing-notice]");
+const announced = (kind: "alert" | "status") => shadow().querySelector(`[data-testid=announce-${kind}]`)?.textContent ?? null;
 const summaryOf = (component: string) =>
   [...shadow().querySelectorAll("summary")].find((summary) => summary.textContent?.startsWith(component))?.textContent ?? "";
 
@@ -118,6 +119,25 @@ describe("the Product layer's notices", () => {
     await act(async () => await new Promise((resolve) => setTimeout(resolve, 2100)));
     expect(shadow().querySelector("[data-testid=stale-notice]")).toBeNull();
     expect(summaryOf("Button")).not.toContain("Source changed");
+  });
+
+  it("says how to copy the command by hand when the clipboard refuses it", async () => {
+    server.status = STALE;
+    await mount();
+    const notice = shadow().querySelector("[data-testid=stale-notice]") as HTMLElement;
+    const copy = [...notice.querySelectorAll("button")].find((button) => button.textContent === "Copy") as HTMLButtonElement;
+    // The region is there before anything goes wrong, empty, so the sentence is announced when it lands.
+    expect(notice.querySelector("[role=status].command-refused")?.textContent).toBe("");
+    // jsdom has no clipboard, as an insecure origin has none.
+    await act(async () => {
+      copy.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(copy.textContent).toBe("Copy failed");
+    expect(notice.querySelector(".command-refused")?.textContent).toBe(COPY_REFUSED);
+    // It stays: it says what to do instead, so it doesn't time out like "Copied".
+    await act(async () => await new Promise((resolve) => setTimeout(resolve, 2100)));
+    expect(notice.querySelector(".command-refused")?.textContent).toBe(COPY_REFUSED);
   });
 
   it("shows another formatVersion and logs the command once", async () => {
@@ -167,7 +187,8 @@ describe("a missing Product layer (PER-227)", () => {
     server.status = MISSING;
     await mount();
     const notice = missingNotice();
-    expect(notice?.getAttribute("role")).toBe("alert");
+    // The card comes and goes with the view; the panel's alert region, always there, says it.
+    expect(announced("alert")).toContain("Product layer missing");
     expect(notice?.textContent).toContain("Product layer missing");
     expect(notice?.textContent).toContain("adapt-list.json is gone");
     // The words are `missingLayerAdvice`'s, tested on its own; here, that the card carries them and shows the command.

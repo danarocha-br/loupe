@@ -108,12 +108,12 @@ describe("loading meta/ for an Instance with no Adapter", () => {
     const tone = shadow().querySelector("[data-prop=tone]")?.textContent ?? "";
     expect(tone).toContain("NO ADAPTER");
     expect(tone).toContain("calm");
-    expect(shadow().querySelector("[data-testid=coverage]")?.textContent).toBe("0 editable props · 2 inspect only");
+    expect(shadow().querySelector("[data-testid=inspect-only]")?.textContent).toBe("Inspect only · 2");
   });
 
   it("asks for nothing while the panel is hidden", async () => {
     await mount();
-    await click(panelButton("Hide"));
+    await click(panelButton("Hide panel"));
     expect(shadow().querySelector("button[data-instance]")).toBeNull();
     await settle();
     expect(readInstanceMeta).not.toHaveBeenCalled();
@@ -125,7 +125,9 @@ describe("loading meta/ for an Instance with no Adapter", () => {
     await mount();
     await click(instance(CARD));
     await settle();
-    expect(shadow().querySelector("[data-prop=children]")?.textContent).toContain("UNVERIFIED");
+    // Every row shares the reason, so the fold says it once rather than on each row.
+    expect(shadow().querySelector(".inspect .why")?.textContent).toContain("UNVERIFIED");
+    expect(shadow().querySelector("[data-prop=children]")?.textContent).not.toContain("UNVERIFIED");
     expect(warn.mock.calls).toEqual([["[loupe] Couldn't read meta/ for Card: Error: restarting"]]);
     warn.mockRestore();
   });

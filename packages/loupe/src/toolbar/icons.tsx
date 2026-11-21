@@ -1,6 +1,7 @@
 // The Toolbar's icons, from the 2e sketch (PER-140), with an arrow for Back since the
 // 2026-11-19 critique. Stroked in `currentColor`, so each takes its colour from the
-// button it sits in, in light and dark.
+// button it sits in, in light and dark. Every stroke is 1.5px on screen at any size or
+// viewBox (`vector-effect` in styles.ts, review 2026-11-20): one weight beside the text.
 
 import type { ReactNode } from "react";
 
@@ -13,7 +14,7 @@ function Icon({ size = 16, children }: { size?: number; children: ReactNode }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -46,13 +47,13 @@ export const ResetIcon = ({ size = 14 }: { size?: number }) => (
 
 export const BackIcon = () => (
   <Icon size={14}>
-    <path d="M19 12H5M11 6l-6 6 6 6" strokeWidth="2" />
+    <path d="M19 12H5M11 6l-6 6 6 6" />
   </Icon>
 );
 
 export const CheckIcon = ({ size = 12 }: { size?: number }) => (
   <Icon size={size}>
-    <path d="M5 12.5l4.5 4.5L19 7.5" strokeWidth="2.25" />
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
   </Icon>
 );
 
@@ -64,7 +65,7 @@ export const ChevronIcon = () => (
 
 /** Select one: the arrow, as the Revision Set comp draws it. */
 export const CursorIcon = () => (
-  <svg className="icon" width="18" height="18" viewBox="238 238 36 36" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" focusable="false">
+  <svg className="icon" width="18" height="18" viewBox="238 238 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
     <path d="M247.171 248.005l5.315 17.434c0.354 1.16 1.906 1.232 2.341 0.121l2.854-6.582c0.212-0.535 0.675-0.959 1.24-1.09l7.272-1.705c1.17-0.273 1.21-1.928 0.131-2.352l-17.597-7.366c-1.08-0.454-1.866 0.535-1.553 1.544z" />
   </svg>
 );
@@ -78,7 +79,7 @@ export const SelectManyIcon = () => (
     viewBox="238 238 36 36"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.7"
+    strokeWidth="1.5"
     strokeLinecap="round"
     aria-hidden="true"
     focusable="false"
@@ -92,14 +93,14 @@ export const SelectManyIcon = () => (
 /** Light or dark: a half-filled circle. */
 export const ContrastIcon = () => (
   <svg className="icon" width="16" height="16" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-    <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.25" />
+    <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
     <path d="M7 1.5A5.5 5.5 0 0 1 7 12.5Z" fill="currentColor" />
   </svg>
 );
 
 export const ArrowIcon = () => (
   <Icon size={16}>
-    <path d="M5 12h14M13 6l6 6-6 6" strokeWidth="2" />
+    <path d="M5 12h14M13 6l6 6-6 6" />
   </Icon>
 );
 

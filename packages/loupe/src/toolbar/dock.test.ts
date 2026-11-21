@@ -17,6 +17,11 @@ describe("the panel's column", () => {
     expect(columnFor(700)).toEqual({ width: 360, docked: false });
   });
 
+  it("is never wider than the viewport, so nothing of it is off-screen at 320px", () => {
+    expect(columnFor(360)).toEqual({ width: 360, docked: false });
+    expect(columnFor(320)).toEqual({ width: 320, docked: false });
+  });
+
   it("takes the root's right margin while open and puts the app's own back when it closes", () => {
     document.documentElement.style.setProperty("margin-right", "8px");
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
