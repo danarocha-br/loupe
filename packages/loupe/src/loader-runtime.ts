@@ -6,7 +6,7 @@ import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { type AdaptList, parseAdaptList } from "./adapt-list.js";
 import { createResolver } from "./resolve.js";
-import { transform } from "./transform.js";
+import { type TransformContext, transform } from "./transform.js";
 
 export type LoaderOptions = {
   /** Absolute repo root. */
@@ -26,6 +26,24 @@ function readAdaptList(file: string): AdaptList {
   return list;
 }
 
+/**
+ * What `transform` reads, built the one way the loader builds it. `loupe locate`
+ * (ADR 0002) builds it here too, so its anchors can't disagree with the page's.
+ * `onRead` hears every module whose `'use client'` was read.
+ */
+export function loaderContext(options: LoaderOptions, onRead: (file: string) => void = () => {}): TransformContext {
+  return {
+    root: options.root,
+    adaptList: readAdaptList(options.adaptList),
+    layerDir: path.dirname(options.adaptList),
+    resolve: resolver.resolve,
+    isClientModule: (file) => {
+      onRead(file);
+      return resolver.isClientModule(file);
+    },
+  };
+}
+
 export function runLoader(
   source: string,
   resourcePath: string,
@@ -34,15 +52,6 @@ export function runLoader(
   // Turbopack caches each file's output: it must be told which other files that
   // output read, or editing adapt-list.json or a target's 'use client' leaves it stale.
   const dependencies = new Set([options.adaptList]);
-  const { code, map } = transform(source, resourcePath, {
-    root: options.root,
-    adaptList: readAdaptList(options.adaptList),
-    layerDir: path.dirname(options.adaptList),
-    resolve: resolver.resolve,
-    isClientModule: (file) => {
-      dependencies.add(file);
-      return resolver.isClientModule(file);
-    },
-  });
+  const { code, map } = transform(source, resourcePath, loaderContext(options, (file) => dependencies.add(file)));
   return { code, map, dependencies: [...dependencies] };
 }

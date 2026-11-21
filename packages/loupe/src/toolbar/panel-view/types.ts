@@ -54,17 +54,25 @@ export type PanelView = {
   metaAnchor: string | null;
   /** What the page outline needs: the selection's name, and at a group or page scope the Instances it reaches. */
   outline: { label: string | null; members: Member[] | null };
-  /** Every mounted Instance on the page, for the dock. */
+  /** Every mounted Instance on the page. */
   instanceCount: number;
-  header: { exportEnabled: boolean };
+  /** The plot key: per mounted Instance a numbered change reaches, its numbers. */
+  marks: { id: string; keys: number[]; stamp: string }[];
+  /** The report line names the page and counts its changes. */
+  header: { route: string; report: string };
   /** "Overrides are off" across the panel, while the React self-check fails. */
   banner: { title: string; body: string } | null;
   footer: {
     countText: string;
     hasOverrides: boolean;
+    /** Copy Proposal is on while there is a record. */
     copyEnabled: boolean;
     /** Every record "Reset all" discards; empty while it is off. */
     resetAll: ScopeTarget[];
+    /** The plot key's numbered changes, in every state of the panel. */
+    keys: ChangeItem[];
+    /** The State props held open: dashed deltas after the numbered ones. */
+    states: StateItem[];
   };
   body: ListBody | InspectorBody | GoneBody;
 };
@@ -79,6 +87,8 @@ export type ListBody = {
   suspendedMeta: string;
   /** "9 components · 43 Instances". */
   summary: string;
+  /** Every numbered change, as the Proposal will list it: the page's key. */
+  changes: ChangeItem[];
   groups: GroupItem[];
   /** Components seen on this page with no Instance mounted now. */
   interaction: string[];
@@ -97,10 +107,40 @@ export type GroupItem = {
   instances: InstanceItem[];
 };
 
+/** A State prop an Instance Override holds: a state shown in the Proposal, marked with a dashed delta, no number. */
+export type StateItem = {
+  /** "open held at true". */
+  detail: string;
+  /** The Instance's name, or its label when it shows none. */
+  where: string;
+  /** The Instance, while it is mounted. */
+  select: string | null;
+  reached: string[];
+};
+
+/** One numbered change: "1 · variant · Actions for Ana Souza". */
+export type ChangeItem = {
+  n: number;
+  /** The props it changes: "variant, size". */
+  props: string;
+  /** Each prop from the app's value to the Override's: 'variant "ghost" → "outline"'. */
+  detail: string;
+  /** What it reaches: an Instance's name, or its scope's. */
+  where: string;
+  /** The mounted Instance its row selects: the Instance, or the first one its scope reaches. */
+  select: string | null;
+  /** Every mounted Instance it reaches, outlined on the page while its row is pointed at. */
+  reached: string[];
+};
+
 export type InstanceItem = {
   id: string;
   /** "members.tsx:11#bia". */
   label: string;
+  /** What it is called on screen; null when unmounted or it shows no name. */
+  name: string | null;
+  /** The numbered changes that reach it. */
+  keys: number[];
   /** False for an Instance that holds an Override but isn't mounted: nothing to outline. */
   mounted: boolean;
   tags: Tag[];
@@ -121,6 +161,14 @@ export type InspectorBody = {
   kind: "inspector";
   id: string;
   component: string;
+  /** What it is called on screen; null when it shows no name. */
+  name: string | null;
+  /** The component and its call site's file and line: "Button · member-row-menu.tsx:37". */
+  where: string;
+  /** The numbered changes that reach it. */
+  keys: number[];
+  /** "Hold open": a State prop with a true/false choice, held at true from one button. */
+  hold: { prop: string; held: boolean; write: Write } | null;
   verdict: Verdict;
   tags: Tag[];
   /** The scopes acting on it, and the ones it was left out of. */
@@ -166,7 +214,15 @@ export type MembersView = {
   reset: { target: ScopeTarget; enabled: boolean };
 };
 
-export type MemberItem = { id: string; label: string; out: boolean; tag: Tag | null; toggle: "include" | "exclude" };
+export type MemberItem = {
+  id: string;
+  label: string;
+  /** What it is called on screen. */
+  name: string | null;
+  out: boolean;
+  tag: Tag | null;
+  toggle: "include" | "exclude";
+};
 
 export type SiteItem = {
   anchor: string;
@@ -198,7 +254,13 @@ export type PropItem = {
   /** At a group or page scope, how the members' values differ: "SAME ON ALL 4". */
   counts: string | null;
   reason: string | null;
+  /** What the reason means, for its tooltip. */
+  reasonTitle: string | null;
   explanation: string | null;
+  /** The number of the change whose value this row shows; null when the app's value shows. */
+  key: number | null;
+  /** While an Override's value shows: the app's value and the Override's, read as from → to. */
+  change: { from: string; to: string } | null;
   /** "from All in Members". */
   source: string | null;
   control: Control | null;

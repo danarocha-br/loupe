@@ -1,7 +1,7 @@
 # @danarocha/loupe
 
 A dev-only toolbar for inspecting and overriding the props of real components in
-a running Next.js app, then exporting a Proposal for engineering. This package
+a running Next.js app, then copying a Proposal for a coding agent or an engineer. This package
 holds the Toolbar, the dev loader, the Adapter runtime and the `loupe` CLI,
 which makes every write to the product.
 
@@ -135,6 +135,24 @@ set, and prints a Coverage summary (Adapters, Inspect only, skipped by shape).
 Every generated file carries a header with a hash of its content. If one was
 edited by hand, `generate` and `--check` write nothing, name the file and exit 1.
 There is no `--force`: delete the file (or `git restore` it) and rerun.
+
+## Locating a Proposal's call sites
+
+`locate` reads a Proposal copied from the Toolbar (the whole text, or its JSON
+alone), from a file or piped on standard input, and finds each call site it
+names with the same `transform` the dev loader runs, so its anchors agree with
+the page's. It writes nothing.
+
+```bash
+pnpm exec loupe locate < proposal.md          # each call site's file:line:col, and how each prop is written there
+pnpm exec loupe locate --check < proposal.md  # also exits 1 while an Apply change isn't in the code
+```
+
+It exits 1 when a call site is gone or the number of uses around it changed
+since the Proposal was copied (the same check that suspends an Override), and
+reads only Proposals at `formatVersion` 2. `--out` and `--root` work as for
+`generate`. The copied Proposal names the exact command for its app, so a coding
+agent runs it before and after it edits.
 
 ## Removing Loupe
 

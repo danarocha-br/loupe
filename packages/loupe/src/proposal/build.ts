@@ -5,17 +5,19 @@
 //
 // One entry per record, by the scope it was set at, never flattened per Instance
 // (PER-90). State-prop values go to "States shown", suspended records to "Held for
-// review" (PER-96, PER-97, PER-99).
+// review" (PER-96, PER-97, PER-99). Each change says what the agent does with it,
+// Apply or Ask first, and why (ADR 0002).
 
 import { pageAnchor, parseCallSiteId, parseHint, parseInstanceId } from "../call-site.js";
 import { keyOf, type OverrideRecord, type Props, type ScopeTarget } from "../runtime/store.js";
 import { stateSiblingName } from "../state-prop.js";
-import { formatCurrent } from "../toolbar/format.js";
+import { formatCurrent, plural } from "../toolbar/format.js";
 import type { CallSiteWrites } from "../writes.js";
 import { toJson } from "./json.js";
+import { codeChangedInWords, propInWords } from "./words.js";
 import {
   FORMAT_VERSION,
-  HOW_TO_APPLY,
+  howToApply,
   type JsonValue,
   type Proposal,
   type ProposalCallSite,
@@ -26,9 +28,9 @@ import {
   type ProposalProp,
   type ProposalRoute,
   type ProposalStateShown,
+  SCOPE_RANK,
   type WrittenAs,
 } from "./types.js";
-import { changeInWords } from "./words.js";
 
 /** What the page last showed of one Instance. Kept after it unmounts: "last seen". */
 export type Sighting = {
@@ -73,40 +75,18 @@ export type ProposalInput = {
   currentRoute: string;
   /** Previewed flags; the override cookie is site-wide, so every route group carries them. */
   flags: Readonly<Record<string, JsonValue>>;
-  /** Snapshots to export (PER-138), oldest first; outdated ones already left out. */
-  snapshots?: readonly SnapshotInput[];
   /** Per record (`setOnKey`), the designer's note: the "why" (PER-139). Blank is none. */
   notes?: Readonly<Record<string, string>>;
+  /**
+   * The number of each change, given its record's key (`setOnKey`) and values, in the
+   * order given: the Toolbar passes the page's numbering (`toolbar/numbers.ts`), so
+   * `c2` is the change the page marks Δ2, gaps and all. Without it, 1, 2, 3 in
+   * record order.
+   */
+  number?: (changes: readonly { key: string; values: Readonly<Record<string, unknown>> }[]) => number[];
 };
 
-/** A before/after pair of images, as data URLs. */
-export type ImagePair = {
-  before: string;
-  after: string;
-  /** Images the rasterizer couldn't read (cross-origin, say), drawn as a labelled placeholder. */
-  failedImages: number;
-};
-
-/**
- * One Snapshot as the builder takes it: a viewport pair and a crop pair per change
- * it showed. Ids (`s1`…) and captions are given at export, when changes have ids.
- */
-export type SnapshotInput = {
-  /** The pathname it was captured on. */
-  route: string;
-  /** The viewport it was captured at, in CSS pixels, and its density: the caption states them. */
-  size?: [number, number];
-  dpr?: number;
-  viewport: ImagePair;
-  crops: (ImagePair & {
-    /** The change's record, as `setOnKey` names it. */
-    change: string;
-    /** Set when the crop shows one Instance of a change too tall to crop whole. */
-    keyPath: string | null;
-    /** On the last per-Instance crop: Instances on screen that got no crop of their own. */
-    more: number;
-  })[];
-};
+const inOrder = (changes: readonly unknown[]): number[] => changes.map((_, index) => index + 1);
 
 const NOT_SET = "not set";
 
@@ -146,6 +126,35 @@ function writtenAsOf(writes: CallSiteWrites | null, prop: string): { writtenAs: 
     return { writtenAs: writes.children === "text" ? "literal" : "expression" };
   }
   return { writtenAs: writes.spreads ? "spread" : "unset" };
+}
+
+/**
+ * Why a change needs the designer's decision before it is written (ADR 0002): it
+ * reaches some Instances of a call site only, a prop's value comes from app logic or
+ * spread props, Loupe has no record of how a call site writes it, or a page change
+ * reached server-rendered Instances the designer never saw change. Empty: a literal
+ * edit at each call site, so the change is Apply. A prop some call sites write as a
+ * literal and others don't write at all is still one literal edit each, so it stays
+ * Apply: the ADR asks first only for expressions and spreads. What a narrower change
+ * passes on is added by the builder, which knows the other changes.
+ */
+export function askFirstOf(change: Pick<ProposalChange, "needsCondition" | "props" | "serverRendered">): string[] {
+  const reasons: string[] = [];
+  if (change.needsCondition) reasons.push(change.needsCondition);
+  for (const prop of change.props) {
+    const sites = prop.perCallSite ?? [{ writtenAs: prop.writtenAs, expression: prop.expression }];
+    const expression = sites.find((site) => site.writtenAs === "expression");
+    if (expression) {
+      reasons.push(`${propInWords(prop.name)} is written as an expression${expression.expression ? `: \`${expression.expression}\`` : ""}`);
+    }
+    if (sites.some((site) => site.writtenAs === "spread")) reasons.push(`${propInWords(prop.name)} may come from props the call site spreads`);
+    if (sites.some((site) => site.writtenAs === "unknown")) reasons.push(`Loupe has no record of how the call site writes ${propInWords(prop.name)}`);
+  }
+  const server = change.serverRendered.length;
+  if (server > 0) {
+    reasons.push(`${plural(server, "server-rendered Instance")} on the page couldn't be previewed: ask whether to change ${server === 1 ? "its call site" : "their call sites"} too`);
+  }
+  return reasons;
 }
 
 export function buildProposal(input: ProposalInput): Proposal {
@@ -209,7 +218,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
   };
 
   // Entries first, so `overriddenBy` can name them by id.
-  type Draft = { record: OverrideRecord; change: ProposalChange; route: string; covered: Sighting[] };
+  type Draft = { record: OverrideRecord; change: ProposalChange; route: string; covered: Sighting[]; n: number };
   const drafts: Draft[] = [];
   const shown: { route: string; state: ProposalStateShown }[] = [];
 
@@ -268,15 +277,19 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
       ...writtenAcross(anchors, name),
     }));
 
-    const routes = new Set(client.flatMap((sighting) => sighting.routes));
+    // An edit at a call site reaches every page that draws it, not only the Instances this change covers.
+    const routes = new Set(anchors.flatMap((anchor) => byAnchor(anchor).flatMap((sighting) => sighting.routes)));
     routes.delete(route);
 
     drafts.push({
       record,
       route,
       covered: included,
+      n: 0,
       change: {
         id: "",
+        action: "apply",
+        askFirst: [],
         scope: record.target.scope === "group" ? "call-site" : record.target.scope,
         component,
         origin: null,
@@ -289,18 +302,42 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
             ? server.map((sighting) => ({ id: sighting.id, anchor: sighting.anchor, keyPath: sighting.keyPath }))
             : [],
         overriddenBy: [],
-        alsoRendersOn: record.target.scope === "page" ? [] : [...routes].sort(),
+        alsoRendersOn: [...routes].sort(),
         onScreenAtExport: client.some((sighting) => sighting.mounted),
         note: input.notes?.[setOnKey(record.target)]?.trim() || null,
-        screenshots: [],
       },
     });
   }
 
+  // Each change by the number it was made with, gaps kept, and listed in that order.
+  const numbers = (input.number ?? inOrder)(drafts.map((draft) => ({ key: setOnKey(draft.record.target), values: draft.record.values })));
   drafts.forEach((draft, index) => {
-    draft.change.id = `c${index + 1}`;
+    draft.n = numbers[index] ?? index + 1;
+    draft.change.id = `c${draft.n}`;
   });
+  drafts.sort((a, b) => a.n - b.n);
   for (const draft of drafts) draft.change.overriddenBy = overriddenBy(draft, drafts);
+  // Narrowest first, so what a narrower change passes on is settled before a wider one reads it.
+  const byChangeId = new Map(drafts.map((draft) => [draft.change.id, draft.change]));
+  for (const { change } of [...drafts].sort((a, b) => SCOPE_RANK[a.change.scope] - SCOPE_RANK[b.change.scope])) {
+    change.askFirst = [...askFirstOf(change), ...passedOn(change)];
+    change.action = change.askFirst.length > 0 ? "ask-first" : "apply";
+  }
+
+  /**
+   * A narrower change that waits for the designer and sets one of this change's props
+   * on some of the same Instances: the code at that call site needs the same decision,
+   * so this change waits too, rather than letting `--check` call it done.
+   */
+  function passedOn(change: ProposalChange): string[] {
+    return change.overriddenBy.flatMap((id) => {
+      const other = byChangeId.get(id);
+      if (other?.action !== "ask-first") return [];
+      const shared = change.props.filter((prop) => other.props.some((entry) => entry.name === prop.name));
+      if (shared.length === 0) return [];
+      return [`${other.id} sets ${shared.map((prop) => propInWords(prop.name)).join(", ")} on some of the same Instances and asks first, so this does too`];
+    });
+  }
 
   /** How many Instances the call site rendered: those mounted now, else every one seen. */
   function siblingsOf(anchor: string): Sighting[] {
@@ -328,10 +365,9 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
 
   function overriddenBy(draft: Draft, all: readonly Draft[]): string[] {
     const winners = new Set<string>();
-    const rank = { instance: 0, group: 1, page: 2 } as const;
     for (const other of all) {
       if (other === draft) continue;
-      if (rank[other.record.target.scope] >= rank[draft.record.target.scope]) continue;
+      if (SCOPE_RANK[other.change.scope] >= SCOPE_RANK[draft.change.scope]) continue;
       const shared = Object.keys(other.record.values).some((prop) => prop in draft.record.values);
       if (!shared) continue;
       const reachesOne = other.covered.some((sighting) => draft.covered.some((mine) => mine.id === sighting.id));
@@ -355,11 +391,8 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
         capturedAt: context?.capturedAt ?? null,
         changes: drafts.filter((draft) => draft.route === route).map((draft) => draft.change),
         statesShown: shown.filter((entry) => entry.route === route).map((entry) => entry.state),
-        screenshots: [],
       };
     });
-
-  attachSnapshots(input.snapshots ?? [], drafts, routes);
 
   const heldForReview: ProposalHeld[] = input.records
     .filter((record) => record.suspended)
@@ -379,7 +412,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
         reason: suspended.reason,
         detail:
           suspended.reason === "code-changed"
-            ? `Code changed here, review: this call site had ${suspended.was} use${suspended.was === 1 ? "" : "s"} and now has ${suspended.now}`
+            ? codeChangedInWords(suspended.was, suspended.now)
             : `Matches more than one Instance, review: ${suspended.ids.join(", ")}`,
         props: Object.keys(record.values).map((name) => ({ name, ...proposedOf(record.values[name]) })),
       };
@@ -391,7 +424,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
     createdAt: input.createdAt,
     designer: input.designer?.trim() ? input.designer.trim() : null,
     project: input.project,
-    howToApply: HOW_TO_APPLY,
+    howToApply: howToApply(input.project.install),
     routes,
     heldForReview,
   };
@@ -415,61 +448,6 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
     if (same) return first.expression === undefined ? { writtenAs: first.writtenAs } : { writtenAs: first.writtenAs, expression: first.expression };
     return { writtenAs: "varies", perCallSite: sites };
   }
-}
-
-/**
- * Gives every kept Snapshot's images an id and a caption. A viewport pair goes to
- * the route group it was captured on, or, when that route has no changes, to the
- * group of the first change it cropped. A crop goes to its change's group, and the
- * change lists it. A crop whose change is gone is dropped.
- */
-function attachSnapshots(
-  snapshots: readonly SnapshotInput[],
-  drafts: readonly { record: OverrideRecord; change: ProposalChange; route: string }[],
-  routes: ProposalRoute[],
-): void {
-  const byKey = new Map(drafts.map((draft) => [setOnKey(draft.record.target), draft]));
-  const groupOf = (route: string) => routes.find((group) => group.route === route);
-  let next = 1;
-  snapshots.forEach((snapshot, index) => {
-    const crops = snapshot.crops.flatMap((crop) => {
-      const draft = byKey.get(crop.change);
-      return draft ? [{ crop, draft }] : [];
-    });
-    const home = groupOf(snapshot.route) ?? (crops[0] ? groupOf(crops[0].draft.route) : undefined);
-    if (!home) return;
-    home.screenshots.push({
-      id: `s${next++}`,
-      kind: "viewport",
-      caption: `Screen ${index + 1}: ${snapshot.route}${screenSize(snapshot)}${failedNote(snapshot.viewport.failedImages)}`,
-      before: snapshot.viewport.before,
-      after: snapshot.viewport.after,
-    });
-    for (const { crop, draft } of crops) {
-      const id = `s${next++}`;
-      const instance = crop.keyPath ? `, Instance ${crop.keyPath}` : "";
-      const more = crop.more > 0 ? ` (+${crop.more} more)` : "";
-      groupOf(draft.route)?.screenshots.push({
-        id,
-        kind: "crop",
-        caption: `${draft.change.id}: ${changeInWords(draft.change)}${instance}${more}, screen ${index + 1}${failedNote(crop.failedImages)}`,
-        before: crop.before,
-        after: crop.after,
-      });
-      draft.change.screenshots.push(id);
-    }
-  });
-}
-
-/** ", 1440×900 at 2x": the screen's own viewport, which may differ from the route's last reading. */
-function screenSize(snapshot: SnapshotInput): string {
-  if (!snapshot.size) return "";
-  const [width, height] = snapshot.size;
-  return `, ${width}×${height}${snapshot.dpr ? ` at ${snapshot.dpr}x` : ""}`;
-}
-
-function failedNote(count: number): string {
-  return count === 0 ? "" : ` (${count} image${count === 1 ? "" : "s"} could not be captured, shown as a placeholder)`;
 }
 
 /** The covered Instances' Current value for a prop: one value, or counts when they differ. */

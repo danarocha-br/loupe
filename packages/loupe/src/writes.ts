@@ -2,6 +2,8 @@
 // library injected look the same, and so do `Cancelar` and `{roleActionLabel}`:
 // both are just strings. Only the source can tell them apart, so the loader reads
 // it here and hands the record to the runtime on the element as `data-ds-writes`.
+// `loupe locate` (ADR 0002) reads the same record from the file on disk, with the
+// literal values the page never needs.
 
 /** The JSX attribute carrying a call site's record, as a JSON string. */
 export const WRITES_ATTRIBUTE = "data-ds-writes";
@@ -12,11 +14,16 @@ export const WRITES_ATTRIBUTE = "data-ds-writes";
  */
 export type WrittenAs = "literal" | "expression";
 
+/** A literal's value as JSON holds it: a bare attribute is `true`. */
+export type LiteralValue = string | number | boolean | null;
+
 export type AttributeWrite = {
   name: string;
   writtenAs: WrittenAs;
   /** The expression's source on one line, truncated. Absent for a literal. */
   expression?: string;
+  /** A literal's value, read from source. Never sent to the page: `encodeCallSiteWrites` drops it. */
+  value?: LiteralValue;
 };
 
 /**
@@ -36,6 +43,8 @@ export type CallSiteWrites = {
   /** Whether it spreads props (`{...props}`), so its authored props can't be told apart. */
   spreads: boolean;
   children: ChildrenKind;
+  /** The text React renders when `children` is `text`. Never sent to the page, like `value`. */
+  text?: string;
 };
 
 // A loose view of Babel's AST: the fields this module reads.
@@ -71,19 +80,28 @@ export function readCallSiteWrites(
     written.set(name, describeValue(name, value, source));
   }
 
-  let children = classifyChildren((element.children as Node[] | undefined) ?? []);
+  let content = partsOf((element.children as Node[] | undefined) ?? []);
+  let children = classifyChildren(content);
   // React keeps a `children` attribute only when the element has no children of its own.
   if (childrenAttribute !== undefined) {
     if (children !== "none") written.delete("children");
-    else children = childrenAttribute === null ? "from-code" : classifyChildren([childrenAttribute]);
+    else {
+      content = childrenAttribute === null ? [{ kind: "code", text: "" }] : partsOf([childrenAttribute]);
+      children = classifyChildren(content);
+    }
   }
 
-  return { attributes: [...written.values()], spreads, children };
+  const writes: CallSiteWrites = { attributes: [...written.values()], spreads, children };
+  if (children === "text") writes.text = content.map((part) => part.text).join("");
+  return writes;
 }
 
-/** The value of `WRITES_ATTRIBUTE` for a record. */
+/** The value of `WRITES_ATTRIBUTE` for a record: what the page needs, without the literal values. */
 export function encodeCallSiteWrites(writes: CallSiteWrites): string {
-  return JSON.stringify(writes);
+  const attributes = writes.attributes.map(({ name, writtenAs, expression }) =>
+    expression === undefined ? { name, writtenAs } : { name, writtenAs, expression },
+  );
+  return JSON.stringify({ attributes, spreads: writes.spreads, children: writes.children });
 }
 
 /** Reads `WRITES_ATTRIBUTE` back, or null when it isn't a record this version wrote. */
@@ -121,10 +139,59 @@ function attributeName(name: Node): string {
 }
 
 function describeValue(name: string, value: Node | null, source: string): AttributeWrite {
-  if (value === null || value.type === "StringLiteral") return { name, writtenAs: "literal" };
+  if (value === null) return { name, writtenAs: "literal", value: true };
   const expression = value.type === "JSXExpressionContainer" ? (value.expression as Node) : value;
-  if (isLiteral(unwrap(expression))) return { name, writtenAs: "literal" };
+  const inner = unwrap(expression);
+  if (isLiteral(inner)) {
+    const literal = literalValue(inner);
+    return literal === undefined ? { name, writtenAs: "literal" } : { name, writtenAs: "literal", value: literal };
+  }
   return { name, writtenAs: "expression", expression: shorten(source.slice(expression.start, expression.end)) };
+}
+
+/** What a literal evaluates to; undefined for a BigInt, which JSON can't hold. */
+function literalValue(node: Node): LiteralValue | undefined {
+  switch (node.type) {
+    case "StringLiteral":
+      return node.value as string;
+    case "NumericLiteral":
+      return node.value as number;
+    case "BooleanLiteral":
+      return node.value as boolean;
+    case "NullLiteral":
+      return null;
+    case "TemplateLiteral":
+      return cooked(node) ?? undefined;
+    case "UnaryExpression": {
+      const number = (node.argument as Node).value as number;
+      return node.operator === "-" ? -number : number;
+    }
+    default:
+      return undefined;
+  }
+}
+
+/** A template literal's one string, as JavaScript reads it; null when it holds an invalid escape. */
+function cooked(node: Node): string | null {
+  return (node.quasis as { value: { cooked: string | null } }[])[0]?.value.cooked ?? null;
+}
+
+/** JSX's whitespace rule: lines trimmed where they meet, blank lines dropped, the rest joined by a space. */
+function cleanJsxText(value: string): string {
+  const lines = value.split(/\r\n|\n|\r/);
+  let lastFilled = 0;
+  lines.forEach((line, index) => {
+    if (/[^ \t]/.test(line)) lastFilled = index;
+  });
+  let text = "";
+  lines.forEach((line, index) => {
+    let trimmed = line.replace(/\t/g, " ");
+    if (index > 0) trimmed = trimmed.replace(/^[ ]+/, "");
+    if (index < lines.length - 1) trimmed = trimmed.replace(/[ ]+$/, "");
+    if (trimmed === "") return;
+    text += index === lastFilled ? trimmed : `${trimmed} `;
+  });
+  return text;
 }
 
 // `"ghost" as const` and friends: still the literal, as far as a source edit goes.
@@ -172,46 +239,50 @@ function shorten(text: string): string {
 
 type Piece = "text" | "space" | "code" | "elements";
 
-function classifyChildren(nodes: readonly Node[]): ChildrenKind {
-  const pieces = nodes.flatMap(piece);
-  const kinds = new Set(pieces.filter((kind) => kind !== "space"));
+/** One piece of children as React renders it: its kind, and for text and space, the text. */
+type Part = { kind: Piece; text: string };
+
+function classifyChildren(parts: readonly Part[]): ChildrenKind {
+  const kinds = new Set(parts.map((part) => part.kind).filter((kind) => kind !== "space"));
   // A plain space beside other content is not a label (`<Icon /> <Icon />` is
   // elements, not mixed); a space alone is the whole text.
-  if (kinds.size === 0) return pieces.length > 0 ? "text" : "none";
+  if (kinds.size === 0) return parts.length > 0 ? "text" : "none";
   if (kinds.size > 1) return "mixed";
   const [kind] = kinds;
   return kind === "code" ? "from-code" : kind === "elements" ? "elements" : "text";
 }
 
-function piece(node: Node): Piece[] {
+function partsOf(nodes: readonly Node[]): Part[] {
+  return nodes.flatMap(part);
+}
+
+function part(node: Node): Part[] {
   switch (node.type) {
     case "JSXText":
-      return textPiece(node.value as string, true);
+      return textPart(node.value as string, true);
     case "StringLiteral":
-      return textPiece(node.value as string, false);
-    case "TemplateLiteral": {
-      if ((node.expressions as Node[]).length > 0) return ["code"];
-      const quasis = node.quasis as { value: { cooked: string | null } }[];
-      return textPiece(quasis[0]?.value.cooked ?? "", false);
-    }
+      return textPart(node.value as string, false);
+    case "TemplateLiteral":
+      return (node.expressions as Node[]).length > 0 ? [{ kind: "code", text: "" }] : textPart(cooked(node) ?? "", false);
     case "JSXElement":
     case "JSXFragment":
-      return ["elements"];
+      return [{ kind: "elements", text: "" }];
     case "JSXExpressionContainer": {
       const expression = node.expression as Node;
-      return expression.type === "JSXEmptyExpression" ? [] : piece(unwrap(expression));
+      return expression.type === "JSXEmptyExpression" ? [] : part(unwrap(expression));
     }
     default:
-      return ["code"];
+      return [{ kind: "code", text: "" }];
   }
 }
 
 // Only what React's JSX cleanup trims: a non-breaking space is text.
 const BLANK = /^[ \t\r\n]*$/;
 
-function textPiece(value: string, isJsxText: boolean): Piece[] {
-  if (!BLANK.test(value)) return ["text"];
+function textPart(value: string, isJsxText: boolean): Part[] {
+  const text = isJsxText ? cleanJsxText(value) : value;
+  if (!BLANK.test(value)) return [{ kind: "text", text }];
   // React drops JSXText that is only whitespace across lines.
   if (isJsxText && value.includes("\n")) return [];
-  return ["space"];
+  return [{ kind: "space", text }];
 }

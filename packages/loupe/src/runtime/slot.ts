@@ -1,9 +1,8 @@
 // Loupe's page state (PER-218): one hidden slot on `globalThis` that holds every
 // value Loupe keeps for a page load. That covers the Instance registry, the route
-// watching, the Proposal tracker, the Snapshots, the export form, and the
-// `window.__loupe` the page made. A module that Fast Refresh evaluates again
-// finds the same values here, so Instances, Overrides and Snapshots survive an
-// edit. A reload starts the page over, and `resetLoupe()` does the same for tests.
+// watching, the Proposal tracker, the export form, and the `window.__loupe` the
+// page made. A module that Fast Refresh evaluates again finds the same values
+// here, so Instances and Overrides survive an edit. A reload starts the page over, and `resetLoupe()` does the same for tests.
 //
 // The key is a `Symbol.for`, not a property name. The symbol registry is global,
 // so a module evaluated again finds the same key, and the slot stays out of the

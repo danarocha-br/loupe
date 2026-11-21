@@ -360,13 +360,14 @@ describe("transform: what each call site writes", () => {
     const writes = writesOf(
       '<Button variant="ghost" size={"sm"} tabIndex={-1} aria-hidden={true} asChild title={`Sair`} open={open} render={<Icon />} onClick={() => setOpen(false)} />',
     );
+    // A literal's value comes along for `loupe locate`; a bare attribute is `true`.
     expect(writes.attributes).toEqual([
-      { name: "variant", writtenAs: "literal" },
-      { name: "size", writtenAs: "literal" },
-      { name: "tabIndex", writtenAs: "literal" },
-      { name: "aria-hidden", writtenAs: "literal" },
-      { name: "asChild", writtenAs: "literal" },
-      { name: "title", writtenAs: "literal" },
+      { name: "variant", writtenAs: "literal", value: "ghost" },
+      { name: "size", writtenAs: "literal", value: "sm" },
+      { name: "tabIndex", writtenAs: "literal", value: -1 },
+      { name: "aria-hidden", writtenAs: "literal", value: true },
+      { name: "asChild", writtenAs: "literal", value: true },
+      { name: "title", writtenAs: "literal", value: "Sair" },
       { name: "open", writtenAs: "expression", expression: "open" },
       { name: "render", writtenAs: "expression", expression: "<Icon />" },
       { name: "onClick", writtenAs: "expression", expression: "() => setOpen(false)" },
@@ -376,9 +377,27 @@ describe("transform: what each call site writes", () => {
   it("counts a literal behind a type assertion as a literal", () => {
     const writes = writesOf('<Button variant={"ghost" as const} size={-1 satisfies number} />');
     expect(writes.attributes).toEqual([
-      { name: "variant", writtenAs: "literal" },
-      { name: "size", writtenAs: "literal" },
+      { name: "variant", writtenAs: "literal", value: "ghost" },
+      { name: "size", writtenAs: "literal", value: -1 },
     ]);
+  });
+
+  it("reads null and a BigInt as literals, keeping only the value JSON can hold", () => {
+    const writes = writesOf("<Button tone={null} count={10n} />");
+    expect(writes.attributes).toEqual([
+      { name: "tone", writtenAs: "literal", value: null },
+      { name: "count", writtenAs: "literal" },
+    ]);
+  });
+
+  it("records the text React renders for plain-text children", () => {
+    expect(writesOf("<Button>Cancelar</Button>").text).toBe("Cancelar");
+    expect(writesOf('<Button>{"Remove member"}</Button>').text).toBe("Remove member");
+    expect(writesOf("<Button>\n        Remove\n        member\n      </Button>").text).toBe("Remove member");
+    expect(writesOf("<Button>Fish &amp; chips</Button>").text).toBe("Fish & chips");
+    expect(writesOf('<Button>Hello{" "}world</Button>').text).toBe("Hello world");
+    expect(writesOf('<Button children="Sair" />').text).toBe("Sair");
+    expect(writesOf("<Button>{label}</Button>").text).toBeUndefined();
   });
 
   it("keeps an expression's text short and on one line", () => {
@@ -434,12 +453,24 @@ describe("transform: what each call site writes", () => {
       (node) => (node as { name?: { name?: string } }).name?.name === WRITES_ATTRIBUTE,
     ) as { value: { expression: { value: string } } } | undefined;
     const value = attribute?.value.expression.value;
-    expect(parseCallSiteWrites(value)).toEqual(callSites[0]?.writes);
-    expect(callSites[0]?.writes).toEqual({
+    // The page gets the record without literal values: only `loupe locate` reads those.
+    expect(parseCallSiteWrites(value)).toEqual({
       attributes: [{ name: "variant", writtenAs: "literal" }],
       spreads: true,
       children: "from-code",
     });
+    expect(callSites[0]?.writes).toEqual({
+      attributes: [{ name: "variant", writtenAs: "literal", value: "ghost" }],
+      spreads: true,
+      children: "from-code",
+    });
+  });
+
+  it("says when the source didn't parse, rather than finding no call sites", () => {
+    const broken = run('import { Button } from "@ds/button";\nexport const X = () => <Button size="sm">;\n');
+    expect(broken.callSites).toEqual([]);
+    expect(broken.parseError).toBeTruthy();
+    expect(run('import { Button } from "@ds/button";\nexport const X = () => 1;\n').parseError).toBeUndefined();
   });
 
   it("does not record its own anchor attributes as written when transforming twice", () => {

@@ -17,7 +17,6 @@ import {
   type OverrideStore,
   type Props,
   inScope,
-  type View,
 } from "./store.js";
 
 export type MountedInstance = {
@@ -191,17 +190,6 @@ function startWatchingRoute(): true {
   window.addEventListener(HISTORY_EVENT, check);
   window.addEventListener("popstate", check);
   return true;
-}
-
-/**
- * Switches every Instance between its Overrides and the app's own props (State-prop
- * Overrides kept, so an open dialog stays open). Rerenders are scheduled, not
- * flushed: wrap the call in `flushSync` to commit them at once.
- */
-export function setView(view: View): void {
-  const value = registry();
-  if (!value.store.setView(view)) return;
-  for (const instance of value.instances.values()) instance.notify();
 }
 
 /** Drops to inspect-only for the rest of the page's life. Fails closed. */

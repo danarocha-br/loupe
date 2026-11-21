@@ -269,6 +269,20 @@ describe("with Server Components, as React records them", () => {
     expect(page().at(span)).toBe(panel);
   });
 
+  it("outlines a server-rendered Instance by the element React recorded it on, or what a component fiber renders", () => {
+    const span = document.createElement("span");
+    span.append("member");
+    const em = document.createElement("em");
+    document.body.append(span, em);
+    const card = callSiteId(siteAt("app/shell.tsx", "Shell", "Card"));
+    mount(
+      { node: span, server: [{ name: "Badge", env: "Server", props: badge }] },
+      { server: [{ name: "Card", env: "Server", props: { [ANCHOR_ATTRIBUTE]: card } }], children: [{ node: em }] },
+    );
+    expect(page().nodes(at("Badge"))).toEqual([span]);
+    expect(page().nodes(card)).toEqual([em]);
+  });
+
   it("falls back to the nearest anchor in the DOM for a server-rendered Instance off the fiber path", () => {
     const outside = document.createElement("p");
     outside.setAttribute(ANCHOR_ATTRIBUTE, at("Badge"));

@@ -11,11 +11,12 @@ import { resetLoupe } from "../runtime/slot.js";
 import { memoryRequest, memorySource } from "./flags.fixture.js";
 import { setFlagSource } from "./flags-store.js";
 import Toolbar from "./index.js";
-import { collectProposal, collectProposalMarkdown, pageTheme, startTracking } from "./proposal.js";
+import { copyProposal } from "./copy.js";
+import { collectProposal, collectProposalText, pageTheme, startTracking } from "./proposal.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
 const project = vi.hoisted(() => ({
-  read: async (): Promise<unknown> => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
+  read: async (): Promise<unknown> => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3", install: { app: "apps/app", layer: "packages/loupe" } }),
 }));
 const knownProject = project.read;
 vi.mock("./project-server.js", () => ({ readProjectContext: () => project.read() }));
@@ -118,11 +119,11 @@ describe("the Proposal from the page", () => {
     expect(proposal.project.commit).toBe("abcdef1234567");
     expect(route?.flags).toEqual({ "new-roles": true });
     expect(route?.url).toBe(location.href);
-    // Instance records come first, as the store lists them.
-    const [confirm, group] = route?.changes ?? [];
-    expect(group).toMatchObject({ scope: "call-site", props: [{ name: "variant", current: "ghost", proposed: "outline" }] });
+    // Numbered and listed in the order they were made, as the page numbers them.
+    const [group, confirm] = route?.changes ?? [];
+    expect(group).toMatchObject({ id: "c1", scope: "call-site", props: [{ name: "variant", current: "ghost", proposed: "outline" }] });
     expect(group?.instances.map((instance) => instance.keyPath)).toEqual(["ana", "bia"]);
-    expect(confirm).toMatchObject({ scope: "instance", onScreenAtExport: false, props: [{ current: "destructive", proposed: "default" }] });
+    expect(confirm).toMatchObject({ id: "c2", scope: "instance", onScreenAtExport: false, props: [{ current: "destructive", proposed: "default" }] });
   });
 
   it("names its first change when no title is given, and clears nothing", async () => {
@@ -140,9 +141,13 @@ describe("the Proposal from the page", () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
 
     const proposal = await collectProposal();
-    expect(proposal.project).toEqual({ repo: null, commit: null, dirty: null, playgroundVersion: null });
+    expect(proposal.project).toEqual({ repo: null, commit: null, dirty: null, playgroundVersion: null, install: null });
     expect(proposal.routes[0]?.changes).toHaveLength(1);
-    expect(await collectProposalMarkdown()).toContain("unknown commit");
+    const text = await collectProposalText();
+    expect(text).toContain("unknown commit");
+    // Not knowing where Loupe is installed, the rules still send the agent to `loupe locate`.
+    expect(text).toContain("run `loupe locate` from the app folder Loupe is installed in");
+    expect(text).not.toContain("count the uses");
   });
 
   it.each(["refused", "answered badly"] as const)(
@@ -169,7 +174,7 @@ describe("the Proposal from the page", () => {
     },
   );
 
-  it("copies the Markdown summary from the footer", async () => {
+  it("claims the clipboard during the click, before the Proposal is built", async () => {
     let copied: Promise<string> | null = null;
     class FakeItem {
       constructor(items: Record<string, Promise<Blob>>) {
@@ -185,35 +190,26 @@ describe("the Proposal from the page", () => {
       }
     }
     vi.stubGlobal("ClipboardItem", FakeItem);
-    Object.defineProperty(navigator, "clipboard", { value: { write: vi.fn(async () => {}) }, configurable: true });
-
-    expect(footerButton("Copy as Markdown")?.disabled).toBe(true);
+    const write = vi.fn(async () => {});
+    Object.defineProperty(navigator, "clipboard", { value: { write }, configurable: true });
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    act(() => footerButton("Copy as Markdown")?.click());
-    await settle();
 
-    expect(await copied).toContain("`variant`: \"ghost\" → \"outline\"");
-    expect(footerButton("Copied")).toBeDefined();
+    const done = copyProposal({ title: "Calmer rows" });
+    // Called at once, with a promise for the text: the click's permission is still good.
+    expect(write).toHaveBeenCalledTimes(1);
+    await done;
+    const text = await (copied as Promise<string> | null);
+    expect(text).toContain("# Calmer rows");
+    expect(text).toContain('`variant`: "ghost" → "outline"');
     expect(registry().store.records()).toHaveLength(1);
     vi.unstubAllGlobals();
   });
 
-  it("leaves the Markdown in the console when the browser refuses the clipboard", async () => {
-    vi.stubGlobal("ClipboardItem", class {});
-    Object.defineProperty(navigator, "clipboard", {
-      value: { write: vi.fn(async () => Promise.reject(new Error("Write permission denied."))) },
-      configurable: true,
-    });
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
-    vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("has one copy action in the footer: Copy Proposal", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
-    act(() => footerButton("Copy as Markdown")?.click());
-    await settle();
-    expect(footerButton("Copy failed")?.title).toBe("Write permission denied. The Markdown is in the console.");
-    expect(info.mock.calls[0]?.[0]).toContain("`variant`: \"ghost\" → \"outline\"");
-    vi.unstubAllGlobals();
+    expect(footerButton("Copy Proposal")?.disabled).toBe(false);
+    expect(footerButton("Copy as Markdown")).toBeUndefined();
   });
 
   it("places a record set again after a reset on the route it is set on now", async () => {

@@ -6,8 +6,8 @@ import { callSiteHint, callSiteId, instanceId } from "../call-site.js";
 import type { OverrideRecord } from "../runtime/store.js";
 import type { CallSiteWrites } from "../writes.js";
 import { buildProposal, buildProposalKeyed, type ProposalInput, type Sighting, setOnKey } from "./build.js";
-import { locationInWords, proposalMarkdown, REPORT_LINE } from "./markdown.js";
-import { HOW_TO_APPLY, type Proposal } from "./types.js";
+import { locationInWords, proposalText } from "./text.js";
+import { howToApply, type Proposal } from "./types.js";
 
 // A Membros page, as the Toolbar would have seen it: four member rows, each with a
 // menu trigger Button, a remove dialog, and a role Badge rendered on the server.
@@ -119,11 +119,13 @@ const record = (target: OverrideRecord["target"], values: OverrideRecord["values
   ...extra,
 });
 
+const PROJECT = { repo: "orbix-ai", commit: "0123456789abcdef", dirty: true, playgroundVersion: "0.0.2", install: { app: "apps/app", layer: "packages/loupe" } };
+
 function input(records: OverrideRecord[], overrides: Partial<ProposalInput> = {}): ProposalInput {
   return {
     title: "Quieter member menus",
     createdAt: "2026-11-12T10:00:00.000Z",
-    project: { repo: "orbix-ai", commit: "0123456789abcdef", dirty: true, playgroundVersion: "0.0.2" },
+    project: PROJECT,
     records,
     sightings: membros(),
     setOn: {},
@@ -182,7 +184,12 @@ describe("buildProposal", () => {
     ]);
     expect(change?.instances.map((instance) => instance.keyPath)).toEqual(USERS);
     expect(change?.needsCondition).toBeNull();
-    expect(proposal.howToApply).toBe(HOW_TO_APPLY);
+    // The value comes from app logic: the agent proposes the code and waits.
+    expect(change?.action).toBe("ask-first");
+    expect(change?.askFirst).toEqual(['`variant` is written as an expression: `isSelf ? "secondary" : "ghost"`']);
+    expect(proposal.formatVersion).toBe(2);
+    expect(proposal.howToApply).toBe(howToApply(PROJECT.install));
+    expect(proposal.howToApply).toContain("`pnpm -C apps/app exec loupe locate`");
   });
 
   it("flags a left-out Instance of a call-site change as needing a condition", () => {
@@ -191,6 +198,8 @@ describe("buildProposal", () => {
     );
     const [change] = changesOf(proposal);
     expect(change?.needsCondition).toBe("Left out: 1 (user_4), needs a condition");
+    expect(change?.action).toBe("ask-first");
+    expect(change?.askFirst).toEqual(["Left out: 1 (user_4), needs a condition"]);
     expect(change?.instances.find((instance) => instance.keyPath === "user_4")?.included).toBe(false);
     // The left-out Instance's value doesn't count towards Current.
     expect(change?.props[0]).toMatchObject({ name: "size", current: "icon", writtenAs: "literal" });
@@ -206,8 +215,12 @@ describe("buildProposal", () => {
     const [repeated, single] = changesOf(proposal);
     expect(repeated?.needsCondition).toBe("1 of 4 from this call site (user_3), needs a condition");
     expect(repeated?.props[0]).toMatchObject({ current: "ghost", proposed: "outline" });
+    expect(repeated?.action).toBe("ask-first");
+    expect(repeated?.askFirst[0]).toBe("1 of 4 from this call site (user_3), needs a condition");
     expect(single?.needsCondition).toBeNull();
     expect(single?.props[0]).toMatchObject({ current: "default", proposed: "secondary", writtenAs: "literal" });
+    expect(single?.action).toBe("apply");
+    expect(single?.askFirst).toEqual([]);
   });
 
   it("lists every call site a page change reached, the server-rendered ones apart, and who wins over it", () => {
@@ -226,6 +239,49 @@ describe("buildProposal", () => {
     expect(page?.props[0]?.perCallSite).toHaveLength(3);
     expect(badge?.serverRendered).toEqual([{ id: instanceId(BADGE, "user_1"), anchor: BADGE, keyPath: "user_1" }]);
     expect(badge?.callSites).toEqual([]);
+    // c1 sets `size` on 1 of 4 Instances and asks first: the page change waits for that decision.
+    expect(page?.action).toBe("ask-first");
+    expect(page?.askFirst).toEqual(["c1 sets `size` on some of the same Instances and asks first, so this does too"]);
+    // Server-rendered Instances the designer never saw change: the agent asks.
+    expect(badge?.action).toBe("ask-first");
+    expect(badge?.askFirst).toEqual([
+      "Loupe has no record of how the call site writes `variant`",
+      "1 server-rendered Instance on the page couldn't be previewed: ask whether to change its call site too",
+    ]);
+    expectValid(proposal);
+  });
+
+  it("keeps a page change Apply when its call sites write the prop as a literal or not at all", () => {
+    const proposal = buildProposal(input([record({ scope: "page", route: ROUTE, component: "Button" }, { size: "sm" })]));
+    const [page] = changesOf(proposal);
+    expect(page?.props[0]?.writtenAs).toBe("varies");
+    expect(page?.props[0]?.perCallSite?.map((site) => site.writtenAs).sort()).toEqual(["literal", "unset", "unset"]);
+    expect(page?.action).toBe("apply");
+    expect(page?.askFirst).toEqual([]);
+  });
+
+  it("keeps a page change Apply under a narrower change that is itself Apply", () => {
+    const proposal = buildProposal(
+      input([
+        record({ scope: "instance", id: INVITE }, { size: "lg" }),
+        record({ scope: "page", route: ROUTE, component: "Button" }, { size: "sm" }),
+      ]),
+    );
+    const [instance, page] = changesOf(proposal);
+    expect(instance?.action).toBe("apply");
+    expect(page?.overriddenBy).toEqual([instance?.id]);
+    expect(page?.action).toBe("apply");
+  });
+
+  it("asks first when a prop may come from props the call site spreads", () => {
+    const sightings = membros().map((entry) =>
+      entry.anchor === INVITE ? { ...entry, writes: { attributes: [], spreads: true, children: "none" as const } } : entry,
+    );
+    const proposal = buildProposal(input([record({ scope: "group", anchor: INVITE }, { size: "sm" })], { sightings }));
+    const [change] = changesOf(proposal);
+    expect(change?.props[0]?.writtenAs).toBe("spread");
+    expect(change?.action).toBe("ask-first");
+    expect(change?.askFirst).toEqual(["`size` may come from props the call site spreads"]);
     expectValid(proposal);
   });
 
@@ -234,7 +290,8 @@ describe("buildProposal", () => {
     expect(changesOf(proposal)[0]?.props).toEqual([
       { name: "children", current: "Cancelar", proposed: "Voltar", writtenAs: "literal" },
     ]);
-    expect(proposalMarkdown(proposal)).toContain("Text: 'Cancelar' → 'Voltar'");
+    expect(changesOf(proposal)[0]?.action).toBe("apply");
+    expect(proposalText(proposal)).toContain("Text: 'Cancelar' → 'Voltar'");
   });
 
   it("puts a State prop under States shown, not under changes", () => {
@@ -300,7 +357,7 @@ describe("buildProposal", () => {
     const [change] = changesOf(proposal);
     expect(change?.onScreenAtExport).toBe(false);
     expect(change?.props[0]).toMatchObject({ current: "destructive", proposed: "default" });
-    expect(proposalMarkdown(proposal)).toContain("not on screen at export");
+    expect(proposalText(proposal)).toContain("not on screen when copied");
   });
 
   it("keeps a record that was never seen, as a call site with no total", () => {
@@ -309,6 +366,7 @@ describe("buildProposal", () => {
     const [change] = changesOf(proposal);
     expect(change?.callSites[0]).toMatchObject({ nth: 3, total: null, lineHint: null, component: "DropdownMenuItem" });
     expect(change?.props[0]).toEqual({ name: "variant", proposed: "destructive", writtenAs: "unknown" });
+    expect(change?.action).toBe("ask-first");
     expectValid(proposal);
   });
 
@@ -330,9 +388,35 @@ describe("buildProposal", () => {
     expectValid(proposal);
   });
 
+  it("names the other routes a page change's call sites render on: an edit there reaches them too", () => {
+    const sightings = membros().map((entry) => (entry.anchor === INVITE ? { ...entry, routes: ["/org/acme/configuracoes/convites", ROUTE] } : entry));
+    const proposal = buildProposal(input([record({ scope: "page", route: ROUTE, component: "Button" }, { size: "sm" })], { sightings }));
+    expect(changesOf(proposal)[0]?.alsoRendersOn).toEqual(["/org/acme/configuracoes/convites"]);
+    expectValid(proposal);
+  });
+
+  it("names a route where the call site draws other Instances than the ones the change covers", () => {
+    // Another page draws the same trigger Button for its own rows, never seen on this one.
+    const elsewhere = sighting({
+      id: instanceId(TRIGGER, "user_9"),
+      anchor: TRIGGER,
+      component: "Button",
+      keyPath: "user_9",
+      current: { variant: "ghost", size: "icon" },
+      routes: ["/org/acme/equipes"],
+      mounted: false,
+    });
+    const proposal = buildProposal(
+      input([record({ scope: "page", route: ROUTE, component: "Button" }, { size: "sm" })], { sightings: [...membros(), elsewhere] }),
+    );
+    const [page] = changesOf(proposal);
+    expect(page?.instances.map((instance) => instance.keyPath)).not.toContain("user_9");
+    expect(page?.alsoRendersOn).toEqual(["/org/acme/equipes"]);
+  });
+
   it("carries the context: commit, dirty tree, URL, viewport, theme and flags", () => {
     const proposal = buildProposal(input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" })], { designer: "  " }));
-    expect(proposal.project).toEqual({ repo: "orbix-ai", commit: "0123456789abcdef", dirty: true, playgroundVersion: "0.0.2" });
+    expect(proposal.project).toEqual(PROJECT);
     expect(proposal.designer).toBeNull();
     expect(proposal.routes[0]).toMatchObject({
       url: `http://localhost:3131${ROUTE}?tab=ativos`,
@@ -362,100 +446,22 @@ describe("buildProposal", () => {
     expectValid(proposal);
   });
 
+  it("names each change by the number the page gave it, gaps kept, and lists them in that order", () => {
+    const group = record({ scope: "group", anchor: TRIGGER }, { size: "sm" });
+    const invite = record({ scope: "instance", id: INVITE }, { variant: "ghost" });
+    // The page numbered the group change 4 and the Instance change 2: one between was reset.
+    const numbers: Record<string, number> = { [setOnKey(group.target)]: 4, [setOnKey(invite.target)]: 2 };
+    const { proposal, keys } = buildProposalKeyed(input([invite, group], { number: (changes) => changes.map(({ key }) => numbers[key] ?? 0) }));
+    expect(changesOf(proposal).map((change) => change.id)).toEqual(["c2", "c4"]);
+    expect(keys).toEqual({ c2: setOnKey(invite.target), c4: setOnKey(group.target) });
+    expectValid(proposal);
+  });
+
   it("reads the store without changing it", () => {
     const records = [record({ scope: "group", anchor: TRIGGER }, { variant: "outline" }, { excluded: [instanceId(TRIGGER, "user_4")] })];
     const before = structuredClone(records);
     buildProposal(input(records));
     expect(records).toEqual(before);
-  });
-});
-
-describe("Snapshots in a Proposal (PER-138)", () => {
-  const pair = (name: string, failedImages = 0) => ({
-    before: `data:image/webp;base64,${name}-before`,
-    after: `data:image/webp;base64,${name}-after`,
-    failedImages,
-  });
-  const group = record({ scope: "group", anchor: TRIGGER }, { size: "sm" });
-  const invite = record({ scope: "instance", id: INVITE }, { variant: "ghost" });
-
-  it("gives each image an id, puts the viewport pair on its route and links each crop from its change", () => {
-    const proposal = buildProposal(
-      input([group, invite], {
-        snapshots: [
-          {
-            route: ROUTE,
-            viewport: pair("v1"),
-            crops: [
-              { ...pair("c-trigger"), change: setOnKey(group.target), keyPath: null, more: 0 },
-              { ...pair("c-invite"), change: setOnKey(invite.target), keyPath: null, more: 0 },
-            ],
-          },
-          {
-            route: ROUTE,
-            size: [1280, 800],
-            dpr: 2,
-            viewport: pair("v2", 1),
-            crops: [{ ...pair("c-tall", 1), change: setOnKey(group.target), keyPath: "user_4", more: 2 }],
-          },
-        ],
-      }),
-    );
-    expectValid(proposal);
-    const [route] = proposal.routes;
-    expect(route?.screenshots.map((shot) => [shot.id, shot.kind, shot.caption])).toEqual([
-      ["s1", "viewport", `Screen 1: ${ROUTE}`],
-      ["s2", "crop", "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"],
-      ["s3", "crop", "c2: variant on 1st of 1 <Button> in MembersHeader, screen 1"],
-      ["s4", "viewport", `Screen 2: ${ROUTE}, 1280×800 at 2x (1 image could not be captured, shown as a placeholder)`],
-      [
-        "s5",
-        "crop",
-        "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, Instance user_4 (+2 more), screen 2 (1 image could not be captured, shown as a placeholder)",
-      ],
-    ]);
-    expect(route?.screenshots[1]).toMatchObject({ before: "data:image/webp;base64,c-trigger-before", after: "data:image/webp;base64,c-trigger-after" });
-    expect(changesOf(proposal).map((change) => [change.id, change.screenshots])).toEqual([
-      ["c1", ["s2", "s5"]],
-      ["c2", ["s3"]],
-    ]);
-  });
-
-  it("drops a crop whose change is gone, and leaves an entry with none as without a screenshot", () => {
-    const proposal = buildProposal(
-      input([invite], {
-        snapshots: [
-          {
-            route: ROUTE,
-            viewport: pair("v1"),
-            crops: [{ ...pair("gone"), change: setOnKey(group.target), keyPath: null, more: 0 }],
-          },
-        ],
-      }),
-    );
-    expect(proposal.routes[0]?.screenshots.map((shot) => shot.id)).toEqual(["s1"]);
-    expect(changesOf(proposal)[0]?.screenshots).toEqual([]);
-  });
-
-  it("files a viewport pair from a route with no changes under the first change it cropped", () => {
-    const proposal = buildProposal(
-      input([group], {
-        setOn: { [setOnKey(group.target)]: ROUTE },
-        snapshots: [
-          {
-            route: "/org/acme/configuracoes/organizacao",
-            viewport: pair("elsewhere"),
-            crops: [{ ...pair("c"), change: setOnKey(group.target), keyPath: null, more: 0 }],
-          },
-          { route: "/nowhere", viewport: pair("dropped"), crops: [] },
-        ],
-      }),
-    );
-    expect(proposal.routes.map((route) => route.route)).toEqual([ROUTE]);
-    expect(proposal.routes[0]?.screenshots.map((shot) => [shot.id, shot.caption])).toEqual([
-      ["s1", "Screen 1: /org/acme/configuracoes/organizacao"],
-      ["s2", "c1: size on 1st of 2 <Button> in MemberRowMenu, every Instance, screen 1"],
-    ]);
   });
 });
 
@@ -480,47 +486,19 @@ describe("the published schema", () => {
 
   it("rejects what isn't a Proposal", () => {
     const proposal = buildProposal(input([record({ scope: "group", anchor: TRIGGER }, { size: "sm" })]));
-    expect(validate({ ...proposal, formatVersion: 2 })).toBe(false);
+    expect(validate({ ...proposal, formatVersion: 1 })).toBe(false);
+    expect(validate({ ...proposal, formatVersion: 3 })).toBe(false);
     expect(validate({ ...proposal, title: "" })).toBe(false);
     const [route] = proposal.routes;
     const change = route?.changes[0];
     const broken = { ...proposal, routes: [{ ...route, changes: [{ ...change, props: [{ name: "size", writtenAs: "literal" }] }] }] };
     expect(validate(broken)).toBe(false);
     expect(validate({ ...proposal, extra: true })).toBe(false);
-  });
-});
-
-describe("Copy as Markdown", () => {
-  it("is a short summary fit for a ticket", () => {
-    const proposal = buildProposal(
-      input([
-        record({ scope: "instance", id: instanceId(TRIGGER, "user_3") }, { variant: "outline" }),
-        record({ scope: "instance", id: instanceId(DIALOG, "user_2") }, { open: true }),
-        record({ scope: "group", anchor: INVITE }, { variant: "ghost" }, { suspended: { reason: "code-changed", anchor: INVITE, was: 1, now: 2 } }),
-      ]),
-    );
-    expect(proposalMarkdown(proposal)).toBe(
-      [
-        "## Quieter member menus",
-        "",
-        `http://localhost:3131${ROUTE}?tab=ativos`,
-        "orbix-ai@0123456 (uncommitted changes)",
-        "",
-        `- c1. 1st of 2 \`<Button>\` in \`MemberRowMenu\` (member-row-menu.tsx), Instance user_3: \`variant\`: "ghost" → "outline" (written as an expression: \`isSelf ? "secondary" : "ghost"\`) · **1 of 4 from this call site (user_3), needs a condition**`,
-        "- State shown: `open` held at true on `<AlertDialog>`, Instance user_2 (the app controls it via `onOpenChange`). Context, not a change.",
-        "",
-        `- Held for review, do not apply: \`<Button>\` at ${INVITE} (\`variant\`). Code changed here, review: this call site had 1 use and now has 2.`,
-        "",
-        REPORT_LINE,
-        "",
-      ].join("\n"),
-    );
-  });
-
-  it("names a page change by each call site it reached", () => {
-    const proposal = buildProposal(input([record({ scope: "page", route: ROUTE, component: "Button" }, { size: "sm" })]));
-    const line = proposalMarkdown(proposal).split("\n").find((entry) => entry.startsWith("- c1."));
-    expect(line).toContain("Every `<Button>` on the page (3 call sites:");
+    // An action and its reasons go together.
+    const reasonless = { ...proposal, routes: [{ ...route, changes: [{ ...change, action: "ask-first", askFirst: [] }] }] };
+    expect(validate(reasonless)).toBe(false);
+    const reasoned = { ...proposal, routes: [{ ...route, changes: [{ ...change, action: "apply", askFirst: ["why"] }] }] };
+    expect(validate(reasoned)).toBe(false);
   });
 });
 
@@ -568,8 +546,7 @@ describe("what the page last showed", () => {
     );
     const proposal = buildProposal(input([record({ scope: "group", anchor: CANCEL }, { children: "Voltar" })], { sightings }));
     expect(changesOf(proposal)[0]?.props[0]?.writtenAs).toBe("expression");
-    const markdown = proposalMarkdown(proposal);
-    expect(markdown).toContain("(written as an expression)");
-    expect(markdown).not.toContain("undefined");
+    expect(changesOf(proposal)[0]?.askFirst).toEqual(["Text is written as an expression"]);
+    expect(proposalText(proposal)).not.toContain("undefined");
   });
 });

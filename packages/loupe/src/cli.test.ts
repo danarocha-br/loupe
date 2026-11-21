@@ -25,6 +25,16 @@ describe("loupe CLI", () => {
     const { code, out } = await capture([]);
     expect(code).toBe(0);
     expect(out.join("\n")).toContain("Usage: loupe");
+    expect(out.join("\n")).toContain("locate [--check]");
+  });
+
+  it("prints locate's usage, and refuses an option it doesn't know", async () => {
+    const help = await capture(["locate", "--help"]);
+    expect(help.code).toBe(0);
+    expect(help.out.join("\n")).toContain("Usage: loupe locate [file] [options]");
+    const bad = await capture(["locate", "--json"]);
+    expect(bad.code).toBe(1);
+    expect(bad.err.join("\n")).toContain("Unknown option: --json");
   });
 
   it("refuses an unknown command", async () => {

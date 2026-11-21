@@ -2,8 +2,10 @@
 // Coverage and rows; or "Not on the page now" once it has gone.
 
 import type { InstanceRow } from "../../runtime/debug.js";
+import type { PropRow } from "../../runtime/inspect.js";
 import type { Scope } from "../../runtime/store.js";
 import { formatCurrent } from "../format.js";
+import type { Keys } from "./keys.js";
 import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
 import { type Editing, instanceProp, scopeProp } from "./rows.js";
@@ -22,6 +24,7 @@ import {
   NOTES,
   TAGS,
   unmountedTag,
+  whereText,
 } from "./words.js";
 
 /** The Inspector's choice of scope: the one that applies, and its view at a group or page scope. */
@@ -33,7 +36,14 @@ const SCOPES: readonly Scope[] = ["instance", "group", "page"];
 const MAX_SEGMENTS = 12;
 
 /** `row`: the selected Instance's list row, when it is mounted. */
-export function inspectorBody(id: string, row: InstanceRow | null, page: Page, reads: Reads, scoping: Scoping): InspectorBody | GoneBody {
+export function inspectorBody(
+  id: string,
+  row: InstanceRow | null,
+  page: Page,
+  reads: Reads,
+  scoping: Scoping,
+  keys: Keys,
+): InspectorBody | GoneBody {
   const inspection = reads.inspect(id);
   // An Instance-scope record that holds an Override, mounted or not: what "Reset this Instance" drops.
   const record = instanceRecord(page.records, id);
@@ -50,7 +60,15 @@ export function inspectorBody(id: string, row: InstanceRow | null, page: Page, r
   // Null for a server-rendered Instance, one with no Adapter, or while Overrides are off: no controls then.
   const live = inspection.rendered === "client" && page.status.overrides ? reads.props(id) : null;
   const labels = labelsOf(row);
-  const editing: Editing | null = live ? { id, live, labels, fallback: row ? fallbacks(page.records, row) : {} } : null;
+  // Per scope, the number of the change it holds for this Instance: what a row's key shows.
+  const keyAt: Editing["keyAt"] = row
+    ? {
+        instance: keys.of({ scope: "instance", id }),
+        group: keys.of({ scope: "group", anchor: row.anchor }),
+        page: keys.of({ scope: "page", route: page.route, component: row.component }),
+      }
+    : {};
+  const editing: Editing | null = live ? { id, live, labels, fallback: row ? fallbacks(page.records, row) : {}, keyAt } : null;
   const scoped = editing ? scoping.scoped : null;
   const notGenerated = page.notGenerated.has(inspection.component);
   const adapted = row ? row.adapted : inspection.rendered === "client" && inspection.note !== "unadapted";
@@ -72,12 +90,16 @@ export function inspectorBody(id: string, row: InstanceRow | null, page: Page, r
     kind: "inspector",
     id: inspection.id,
     component: inspection.component,
+    name: reads.name(id),
+    where: whereText(inspection.component, site),
+    keys: keys.marks.find((mark) => mark.id === id)?.keys ?? [],
+    hold: editing ? holdOf(inspection.rows, editing) : null,
     verdict: instanceVerdict(inspection, adapted, page),
     tags,
     chips: row ? scopeChips(page.records, row, labels) : [],
     crumbs: reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor })),
     editing: editing ? { resetInstanceEnabled: recorded, scopes: row ? scopeOptions(page, row, scoping.scope) : null } : null,
-    members: scoped ? membersView(scoped, id, page.rows) : null,
+    members: scoped ? membersView(scoped, id, page.rows, reads.name) : null,
     note: noteKind ? { kind: noteKind, title: NOTES[noteKind].title, body: NOTES[noteKind].text(page.status) } : null,
     coverage: {
       editable,
@@ -90,7 +112,11 @@ export function inspectorBody(id: string, row: InstanceRow | null, page: Page, r
     },
     editable: inspection.rows
       .filter((candidate) => candidate.editable)
-      .map((candidate) => (scoped ? scopeProp(candidate, id, scoped, reads) : instanceProp(candidate, editing))),
+      .map((candidate) =>
+        scoped
+          ? scopeProp(candidate, id, scoped, reads, scoped.record ? keys.of(scoped.record.target) : null)
+          : instanceProp(candidate, editing),
+      ),
     // At a wider scope, inspect-only rows show the app's value alone.
     inspectOnly: inspection.rows.filter((candidate) => !candidate.editable).map((candidate) => instanceProp(candidate, scoped ? null : editing)),
     inspectOnlyMeta: page.status.overrides ? null : INSPECT_ONLY_OVERRIDES_OFF,
@@ -113,4 +139,18 @@ function scopeOptions(page: Page, row: InstanceRow, applied: Scope): ScopeOption
       title: view === null ? NO_GROUP.title : null,
     };
   });
+}
+
+/**
+ * "Hold open": the first State prop with a true/false choice, such as a menu's
+ * `open`. Clicking the panel closes the app's own menus, so holding one open is a
+ * button on the Instance, not a pill seventh in a list (critique 2026-11-19).
+ */
+function holdOf(rows: readonly PropRow[], editing: Editing): InspectorBody["hold"] {
+  const row = rows.find(
+    (candidate) => candidate.editable && candidate.state === true && candidate.options?.includes(true) && candidate.options.includes(false),
+  );
+  if (!row) return null;
+  const held = editing.live.sources[row.name] === "instance" && editing.live.overrides[row.name] === true;
+  return { prop: row.name, held, write: { id: editing.id, prop: row.name, scope: "instance" } };
 }

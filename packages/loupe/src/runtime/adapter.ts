@@ -106,7 +106,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
 
     const resolved =
       reg && identified && registered
-        ? reg.store.render({ ...identityOf(registered), current: props, stateProps })
+        ? reg.store.resolve({ ...identityOf(registered), current: props })
         : null;
     const overrides = resolved?.overrides ?? {};
 
@@ -159,7 +159,7 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
     const rendered = resolved
       ? holdStateHandlers(resolved.props, overrides, stateProps, holds.attempts, force)
       : props;
-    return createElement(Original as ElementType, rendered);
+    return createElement(Original as ElementType, withHeldKey(rendered, props, overrides, stateProps));
   }
 
   for (const key of Object.getOwnPropertyNames(Original)) {
@@ -170,6 +170,18 @@ export function createAdapter<C extends ElementType>(name: string, Original: C, 
   Adapter.displayName = `Loupe(${name})`;
   Object.defineProperty(Adapter, ADAPTER, { value: name });
   return Adapter as unknown as C;
+}
+
+/**
+ * A State prop the app leaves to the component (it passes no value), held by an
+ * Override: the component mounts again when the hold starts and when it ends. It
+ * is then controlled, or uncontrolled, from its first render and never switches
+ * between the two, which React warns about and which left a menu stuck open after
+ * a reset (critique 2026-11-19). A remount starts the component's own state over.
+ */
+export function withHeldKey(rendered: Props, current: Props, overrides: Props, stateProps: readonly string[]): Props {
+  const held = stateProps.filter((prop) => prop in overrides && current[prop] === undefined);
+  return held.length === 0 ? rendered : { ...rendered, key: `loupe-held:${held.join(",")}` };
 }
 
 function hintOf(props: Props): string | null {

@@ -71,6 +71,8 @@ export type TransformResult = {
   /** Source map as JSON, or null when nothing changed. */
   map: string | null;
   callSites: CallSite[];
+  /** Set when the source didn't parse: no call sites were read, as opposed to none written. */
+  parseError?: string;
 };
 
 // A loose view of Babel's AST: the fields this module reads.
@@ -111,9 +113,9 @@ export function transform(source: string, file: string, ctx: TransformContext): 
       sourceType: "module",
       plugins: ["typescript", "jsx"],
     }).program as unknown as Node;
-  } catch {
-    // A file mid-edit; let the real compiler report it.
-    return unchanged;
+  } catch (error) {
+    // A file mid-edit; let the real compiler report it. `loupe locate` says so.
+    return { ...unchanged, parseError: error instanceof Error ? error.message : String(error) };
   }
 
   const { adaptList } = ctx;

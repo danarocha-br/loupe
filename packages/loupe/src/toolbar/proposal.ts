@@ -3,33 +3,25 @@
 // its unmounting, as "last seen"), the route each record was set on, each route's
 // URL, viewport and theme, previewed flags, and the project's commit.
 //
-// Nothing here writes to the store or the repo: exporting clears nothing.
+// Nothing here writes to the store or the repo: copying clears nothing.
 // Once the Toolbar loads, `__loupe.proposal(options?)` returns the JSON and
-// `__loupe.proposalMarkdown(options?)` the Copy as Markdown text (`start.ts`).
-// Snapshots that aren't Outdated ride along (PER-138); `{ capture: true }` takes
-// the export's own first.
+// `__loupe.proposalText(options?)` the Copy Proposal text (`start.ts`).
 
 import { parseInstanceId } from "../call-site.js";
 import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
-import { proposalMarkdown } from "../proposal/markdown.js";
+import { proposalText } from "../proposal/text.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
 import { debugOf } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
 import { type PerPageOptions, perPage } from "../runtime/slot.js";
+import { pageWidth } from "./dock.js";
 import { previewedFlags } from "./flags-store.js";
+import { numberChanges } from "./numbers.js";
 import { readProjectContext } from "./project-server.js";
-import { captureForExport, exportableSnapshots } from "./snapshots.js";
 
 export type ProposalOptions = {
   title?: string;
   designer?: string | null;
-  /**
-   * Take a Snapshot of the screen in view first, as an export does (PER-99 §3).
-   * It replaces the previous export's Snapshot of this route, and is dropped when
-   * it repeats a manual one. A failed capture leaves the Proposal without it
-   * rather than failing.
-   */
-  capture?: boolean;
   /** Per record (`setOnKey`), the designer's note for its entry (PER-139). */
   notes?: Readonly<Record<string, string>>;
 };
@@ -127,7 +119,7 @@ export function pageTheme(root: Element = document.documentElement): "light" | "
 function routeContext(): RouteContext {
   // A hidden tab can report 0×0: no viewport rather than a wrong one.
   const viewport: [number, number] | null =
-    window.innerWidth > 0 && window.innerHeight > 0 ? [window.innerWidth, window.innerHeight] : null;
+    pageWidth() > 0 && window.innerHeight > 0 ? [pageWidth(), window.innerHeight] : null;
   return {
     url: location.href,
     viewport,
@@ -137,7 +129,7 @@ function routeContext(): RouteContext {
   };
 }
 
-const UNKNOWN_PROJECT: ProposalProject = { repo: null, commit: null, dirty: null, playgroundVersion: null };
+const UNKNOWN_PROJECT: ProposalProject = { repo: null, commit: null, dirty: null, playgroundVersion: null, install: null };
 
 /** "Button variant in MemberRowMenu", from the first change. */
 export function suggestedTitle(proposal: Proposal): string {
@@ -148,9 +140,9 @@ export function suggestedTitle(proposal: Proposal): string {
   return `${change.component} ${props} ${where}`;
 }
 
-/** The Copy as Markdown text of the Proposal. */
-export function collectProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
-  return collectProposal(options).then(proposalMarkdown);
+/** The Copy Proposal text (ADR 0002). */
+export function collectProposalText(options: ProposalOptions = {}): Promise<string> {
+  return collectProposal(options).then(proposalText);
 }
 
 /** The Proposal for the whole Override store, every route. */
@@ -160,7 +152,6 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
 
 /** The Proposal, and per change id the record it reads: what the export dialog keeps notes against. */
 export async function collectProposalKeyed(options: ProposalOptions = {}): Promise<{ proposal: Proposal; keys: Record<string, string> }> {
-  if (options.capture) await captureForExport();
   const tracker = startTracking();
   refresh(tracker);
   const reg = registry();
@@ -200,36 +191,10 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
     routes: tracker.routes,
     currentRoute: route,
     flags: Object.fromEntries(flags.map((flag) => [flag.key, flag.value as JsonValue])),
-    snapshots: exportableSnapshots(),
     notes: options.notes ?? {},
+    // The numbers the page shows: c2 is the change marked Δ2.
+    number: numberChanges,
   };
   const { proposal, keys } = buildProposalKeyed(input);
   return { proposal: options.title?.trim() ? proposal : { ...proposal, title: suggestedTitle(proposal) }, keys };
-}
-
-/**
- * Copies the Markdown summary. The clipboard gets a promise, so the write is
- * claimed during the click even though building the Proposal awaits the server.
- */
-export async function copyProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
-  const text = collectProposalMarkdown(options);
-  try {
-    if (typeof navigator.clipboard === "undefined") {
-      throw new Error("The clipboard is only available on a secure origin, localhost or HTTPS.");
-    }
-    if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function") {
-      await navigator.clipboard.write([
-        new ClipboardItem({ "text/plain": text.then((markdown) => new Blob([markdown], { type: "text/plain" })) }),
-      ]);
-    } else {
-      await navigator.clipboard.writeText(await text);
-    }
-  } catch (error) {
-    // A browser that refuses the clipboard still leaves the summary somewhere to copy from.
-    const markdown = await text;
-    console.info(`[loupe] Proposal as Markdown:\n\n${markdown}`);
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`${reason} The Markdown is in the console.`);
-  }
-  return text;
 }

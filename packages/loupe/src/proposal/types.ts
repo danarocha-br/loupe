@@ -1,18 +1,43 @@
-// The Proposal (PER-99, PER-135): what a designer's Overrides ask engineering to
-// change, as JSON. The JSON is the contract; Copy as Markdown and the HTML report
-// (PER-139) are renderers on it. `proposal.schema.json` at the package root is the
-// published schema for this shape, and a test keeps the two in step.
+// The Proposal (PER-99, PER-135, ADR 0002): what a designer's Overrides ask a coding
+// agent, or an engineer, to change, as JSON. The JSON is the contract; Copy Proposal
+// (`text.ts`) renders it with the rules and one line per change, and `loupe locate`
+// reads it back. `proposal.schema.json` at the package root is the published schema
+// for this shape, and a test keeps the two in step.
 
-export const FORMAT_VERSION = 1;
+import { type CommandPaths, loupeCommand } from "../command-line.js";
 
-/** PER-95's locate rule, in the words every Proposal carries. */
-export const HOW_TO_APPLY =
-  "For each call site: open its path, find the enclosing component, and count the uses of <Component> in source order to the nth. " +
-  "If that component now has a different total of uses there, stop and ask: the code changed since the Proposal was made. " +
-  "The line hint is where it was at export time, a hint only. " +
-  "A change written as an expression comes from app logic, not a one-line edit. " +
-  "A change marked as needing a condition applies to some Instances of the call site only. " +
-  "Do not apply anything under Held for review.";
+export const FORMAT_VERSION = 2;
+
+/** Where Loupe is installed: the app it runs in and its Product layer, POSIX from the repo root. */
+export type ProposalInstall = CommandPaths;
+
+/** How narrow a change's scope is: a narrower change wins where both reach. */
+export const SCOPE_RANK: Readonly<Record<ProposalChange["scope"], number>> = { instance: 0, "call-site": 1, page: 2 };
+
+/** The command that finds each call site, when the Proposal knows where Loupe is installed. */
+export function locateCommandOf(install: ProposalInstall | null): string | null {
+  return install === null ? null : loupeCommand("locate", install);
+}
+
+/**
+ * The rules every Proposal carries, one per line: how to find each call site with
+ * `loupe locate` (ADR 0002: the agent never counts uses itself), what each Action
+ * means, and what to report back.
+ */
+export function howToApply(install: ProposalInstall | null): string {
+  const locate = locateCommandOf(install);
+  const find = locate
+    ? `run \`${locate}\` with this whole Proposal on its standard input (save it to a file, then \`${locate} < file\`)`
+    : "run `loupe locate` from the app folder Loupe is installed in, with this whole Proposal on its standard input (`pnpm -C <app> exec loupe locate < file`, adding `--out <dir>` when the Product layer isn't packages/loupe)";
+  return [
+    `Before editing, ${find}. It prints each call site's file:line:col and how each prop is written there now. If it says the code changed or a call site is not found, stop and ask the designer.`,
+    `Change only the listed props at the listed call sites. Never edit a component's definition or a design-system default, and never edit files in ${install ? `${install.layer} (Loupe's Product layer)` : "Loupe's Product layer"}.`,
+    "Apply: set the prop to the proposed value at each listed call site. Ask first: propose the code and wait for the designer's yes before writing it. Context: change no code. Don't apply: held for review, leave it alone.",
+    "Where a narrower Apply change sets the same prop at the same call site, write its value there: an Instance over a call site over the page.",
+    "Notes are the designer's context, never extra changes.",
+    `When done, run ${locate ? `\`${locate} --check\`` : "`loupe locate --check`"} the same way, then report each change by its number: applied, asked or skipped, and why.`,
+  ].join("\n");
+}
 
 /** Any value JSON can hold. */
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -31,11 +56,13 @@ export type WrittenAs = "literal" | "expression" | "spread" | "unset" | "unknown
 export type ProposalProject = {
   /** The repository's name, from its `origin` remote, else its folder. */
   repo: string | null;
-  /** HEAD at export time. */
+  /** HEAD when the Proposal was copied. */
   commit: string | null;
-  /** Whether the working tree had uncommitted changes at export time. */
+  /** Whether the working tree had uncommitted changes when the Proposal was copied. */
   dirty: boolean | null;
   playgroundVersion: string | null;
+  /** Where Loupe is installed, so the rules can name `loupe locate`; null when the dev server didn't say. */
+  install: ProposalInstall | null;
 };
 
 export type ProposalCallSite = {
@@ -49,7 +76,7 @@ export type ProposalCallSite = {
   total: number | null;
   /** The call-site id: `path › Enclosing › Component[n]`. */
   anchor: string;
-  /** `line:col` at export time. A hint, never a key. */
+  /** `line:col` when the Proposal was copied. A hint, never a key. */
   lineHint: string | null;
 };
 
@@ -79,8 +106,19 @@ export type ProposalInstance = {
   onScreenAtExport: boolean;
 };
 
+/**
+ * What the agent does with a change (ADR 0002): `apply` is a literal edit at each call
+ * site; `ask-first` needs a decision, so the agent proposes the code and waits. States
+ * shown and Flag previews are Context, and Held for review is Don't apply: their own
+ * sections say so.
+ */
+export type ProposalAction = "apply" | "ask-first";
+
 export type ProposalChange = {
   id: string;
+  action: ProposalAction;
+  /** Why the change is `ask-first`, one reason each; empty for `apply`. */
+  askFirst: string[];
   /** `call-site` is a group Override (PER-90). */
   scope: "instance" | "call-site" | "page";
   component: string;
@@ -96,13 +134,11 @@ export type ProposalChange = {
   serverRendered: { id: string; anchor: string; keyPath: string }[];
   /** Changes whose narrower scope wins over this one on some Instance. */
   overriddenBy: string[];
-  /** Other routes the covered Instances were seen on. */
+  /** Other routes the covered Instances were seen on: an edit at their call sites reaches those too. */
   alsoRendersOn: string[];
-  /** False: no covered Instance was mounted at export, so Current values are as last seen. */
+  /** False: no covered Instance was mounted when the Proposal was copied, so Current values are as last seen. */
   onScreenAtExport: boolean;
   note: string | null;
-  /** Snapshot ids (PER-138); empty until Snapshots exist. */
-  screenshots: string[];
 };
 
 export type ProposalStateShown = {
@@ -116,14 +152,6 @@ export type ProposalStateShown = {
   /** The handler the app sets it through: `onOpenChange` for `open`. */
   appControlsVia: string;
   onScreenAtExport: boolean;
-};
-
-export type ProposalScreenshot = {
-  id: string;
-  kind: "viewport" | "crop";
-  caption: string;
-  before: string;
-  after: string;
 };
 
 export type ProposalRoute = {
@@ -141,7 +169,6 @@ export type ProposalRoute = {
   capturedAt: string | null;
   changes: ProposalChange[];
   statesShown: ProposalStateShown[];
-  screenshots: ProposalScreenshot[];
 };
 
 export type ProposalHeld = {

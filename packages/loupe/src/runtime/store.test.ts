@@ -633,45 +633,6 @@ describe("Override resolution: Overrides off", () => {
   });
 });
 
-describe("Override resolution: the before view", () => {
-  const dialog = (current: Record<string, unknown> = { open: false, tone: "plain" }) => ({
-    ...row(1, current),
-    stateProps: ["open"],
-  });
-
-  it("renders the proposed view by default: what resolve gives", () => {
-    const store = createOverrideStore();
-    store.set(instance(ROW_1), "open", true);
-    store.set(instance(ROW_1), "tone", "danger");
-    expect(store.view).toBe("proposed");
-    expect(store.render(dialog())).toEqual(store.resolve(dialog()));
-  });
-
-  it("keeps only the State-prop Overrides in the before view, and resolve ignores the view", () => {
-    const store = createOverrideStore();
-    store.set(instance(ROW_1), "open", true);
-    store.set(group(), "tone", "danger");
-    expect(store.setView("before")).toBe(true);
-    expect(store.setView("before")).toBe(false);
-    expect(store.render(dialog())).toEqual({
-      props: { open: true, tone: "plain" },
-      sources: { open: "instance", tone: "app" },
-      overrides: { open: true },
-    });
-    expect(store.resolve(dialog()).overrides).toEqual({ open: true, tone: "danger" });
-    store.setView("proposed");
-    expect(store.render(dialog()).props).toEqual({ open: true, tone: "danger" });
-  });
-
-  it("renders the Current value alone with Overrides off, in either view", () => {
-    const store = createOverrideStore();
-    store.set(instance(ROW_1), "open", true);
-    store.disable("off");
-    store.setView("before");
-    expect(store.render(dialog()).props).toEqual({ open: false, tone: "plain" });
-  });
-});
-
 describe("Override resolution: Reach", () => {
   const suspended = { reason: "ambiguous" as const, ids: [ROW_2] };
   const record = (target: ScopeTarget, excluded: string[] = [], isSuspended = false) => ({
@@ -761,5 +722,37 @@ describe("Override resolution: the record an Override goes into", () => {
       if (target) store.set(target, "variant", scope);
     }
     expect(recordsFor(store.records(), { ...identity }).map(({ reach }) => reach)).toEqual(["applies", "applies", "applies"]);
+  });
+});
+
+describe("Override store: restore, undo for a reset", () => {
+  it("puts reset records back with their values and exclusions", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "variant", "outline");
+    store.set(group(), "size", "lg");
+    store.exclude(group(), ROW_2);
+    const saved = store.records();
+    for (const record of saved) store.reset(record.target);
+    expect(store.records()).toEqual([]);
+
+    store.restore(saved);
+
+    expect(store.records()).toEqual(saved);
+    expect(store.resolve(row(1)).props).toMatchObject({ variant: "outline", size: "lg" });
+    expect(store.resolve(row(2)).props).toEqual({ variant: "ghost" });
+  });
+
+  it("replaces what a target holds now, and tells listeners each target it put back", () => {
+    const store = createOverrideStore();
+    store.set(instance(ROW_1), "variant", "outline");
+    const saved = store.records();
+    store.set(instance(ROW_1), "variant", "secondary");
+    const changed: ScopeTarget[] = [];
+    store.subscribe((target) => changed.push(target));
+
+    store.restore(saved);
+
+    expect(store.resolve(row(1)).props).toEqual({ variant: "outline" });
+    expect(changed).toEqual([instance(ROW_1)]);
   });
 });

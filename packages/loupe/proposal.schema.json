@@ -2,24 +2,36 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/danarocha-br/loupe/blob/main/packages/loupe/proposal.schema.json",
   "title": "Loupe Proposal",
-  "description": "What a designer's Overrides ask engineering to change (formatVersion 1). Nothing in it has been applied to the repo.",
+  "description": "What a designer's Overrides ask a coding agent, or an engineer, to change (formatVersion 2). Nothing in it has been applied to the repo.",
   "type": "object",
   "additionalProperties": false,
   "required": ["formatVersion", "title", "createdAt", "designer", "project", "howToApply", "routes", "heldForReview"],
   "properties": {
-    "formatVersion": { "const": 1 },
+    "formatVersion": { "const": 2 },
     "title": { "type": "string", "minLength": 1 },
     "createdAt": { "type": "string", "format": "date-time" },
     "designer": { "type": ["string", "null"], "minLength": 1 },
     "project": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["repo", "commit", "dirty", "playgroundVersion"],
+      "required": ["repo", "commit", "dirty", "playgroundVersion", "install"],
       "properties": {
         "repo": { "type": ["string", "null"] },
         "commit": { "type": ["string", "null"] },
         "dirty": { "type": ["boolean", "null"] },
-        "playgroundVersion": { "type": ["string", "null"] }
+        "playgroundVersion": { "type": ["string", "null"] },
+        "install": {
+          "description": "Where Loupe is installed, POSIX from the repo root: the app (\"\" for the root) and the Product layer. Null when the dev server didn't say.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["app", "layer"],
+              "properties": { "app": { "type": "string" }, "layer": { "type": "string", "minLength": 1 } }
+            }
+          ]
+        }
       }
     },
     "howToApply": { "type": "string", "minLength": 1 },
@@ -35,7 +47,7 @@
     "route": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["url", "route", "viewport", "dpr", "theme", "flags", "capturedAt", "changes", "statesShown", "screenshots"],
+      "required": ["url", "route", "viewport", "dpr", "theme", "flags", "capturedAt", "changes", "statesShown"],
       "properties": {
         "url": { "type": ["string", "null"] },
         "route": { "type": "string" },
@@ -50,8 +62,7 @@
         "flags": { "type": "object", "additionalProperties": { "$ref": "#/$defs/json" } },
         "capturedAt": { "type": ["string", "null"], "format": "date-time" },
         "changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
-        "statesShown": { "type": "array", "items": { "$ref": "#/$defs/stateShown" } },
-        "screenshots": { "type": "array", "items": { "$ref": "#/$defs/screenshot" } }
+        "statesShown": { "type": "array", "items": { "$ref": "#/$defs/stateShown" } }
       }
     },
     "callSite": {
@@ -109,6 +120,8 @@
       "additionalProperties": false,
       "required": [
         "id",
+        "action",
+        "askFirst",
         "scope",
         "component",
         "origin",
@@ -120,11 +133,12 @@
         "overriddenBy",
         "alsoRendersOn",
         "onScreenAtExport",
-        "note",
-        "screenshots"
+        "note"
       ],
       "properties": {
         "id": { "type": "string", "pattern": "^c\\d+$" },
+        "action": { "enum": ["apply", "ask-first"] },
+        "askFirst": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "scope": { "$ref": "#/$defs/scope" },
         "component": { "type": "string" },
         "origin": { "type": ["string", "null"] },
@@ -157,9 +171,11 @@
         "overriddenBy": { "type": "array", "items": { "type": "string", "pattern": "^c\\d+$" } },
         "alsoRendersOn": { "type": "array", "items": { "type": "string" } },
         "onScreenAtExport": { "type": "boolean" },
-        "note": { "type": ["string", "null"] },
-        "screenshots": { "type": "array", "items": { "type": "string" } }
-      }
+        "note": { "type": ["string", "null"] }
+      },
+      "if": { "properties": { "action": { "const": "apply" } } },
+      "then": { "properties": { "askFirst": { "type": "array", "maxItems": 0 } } },
+      "else": { "properties": { "askFirst": { "type": "array", "minItems": 1 } } }
     },
     "stateShown": {
       "type": "object",
@@ -174,18 +190,6 @@
         "controlled": { "type": "boolean" },
         "appControlsVia": { "type": "string", "pattern": "^on[A-Z]\\w*Change$" },
         "onScreenAtExport": { "type": "boolean" }
-      }
-    },
-    "screenshot": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "kind", "caption", "before", "after"],
-      "properties": {
-        "id": { "type": "string" },
-        "kind": { "enum": ["viewport", "crop"] },
-        "caption": { "type": "string" },
-        "before": { "type": "string" },
-        "after": { "type": "string" }
       }
     },
     "held": {

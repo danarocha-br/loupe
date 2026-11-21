@@ -44,17 +44,17 @@ export function FlagsCard() {
       </div>
       {current.status === "loading" && <div className="muted">Reading the app's flags…</div>}
       {current.status === "unavailable" && (
-        <div className="row off" role="status">
-          <div className="head">
-            <div className="title">
-              <span className="dot amber small" />
-              Flag previews are off
-            </div>
-          </div>
+        // One line until it's opened: the fix is an engineer's, and the list comes first.
+        <details className="row off" role="status">
+          <summary>
+            <span className="dot amber small" />
+            Flag previews are off
+            <span className="muted"> · why</span>
+          </summary>
           <div className="muted">{current.reason}</div>
           {/* The one fix the reader makes in a file: say which and where. */}
           {current.reason.startsWith("FLAGS_SECRET isn't set") && <Command text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} />}
-        </div>
+        </details>
       )}
       {current.status === "ready" && (
         <>
@@ -160,7 +160,7 @@ function FlagRow({
           </div>
         )}
         <div className="state">
-          {previewing ? `PREVIEWING ${(shown?.label ?? formatCurrent(value)).toUpperCase()}` : "APP DECIDES"}
+          {previewing ? `Previewing ${shown?.label ?? formatCurrent(value)}` : "App decides"}
         </div>
       </div>
     </div>

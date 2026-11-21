@@ -1,6 +1,6 @@
 // How the Proposal names a call site and a change in words. A leaf: the builder, the
-// Markdown summary, the HTML report and the export dialog all read from it, and it
-// reads nothing but the Proposal's own types.
+// Copy Proposal text, the dialog and `loupe locate` all read from it, and it reads
+// nothing but the Proposal's own types.
 
 import type { ProposalCallSite, ProposalChange, ProposalProp } from "./types.js";
 
@@ -16,15 +16,35 @@ export function siteCount(site: Pick<ProposalCallSite, "nth" | "total">): string
   return site.total === null ? ordinal(site.nth) : `${ordinal(site.nth)} of ${site.total}`;
 }
 
+/** What the agent does with each kind of entry (ADR 0002), as the Proposal and `loupe locate` label it. */
+export const ACTION_WORDS = { apply: "Apply", "ask-first": "Ask first", context: "Context", held: "Don't apply" } as const;
+
+/** "`variant`", or "Text" for a label's `children`: a prop as the Proposal names it. */
+export function propInWords(name: string): string {
+  return name === "children" ? "Text" : `\`${name}\``;
+}
+
+/** What a change reaches at its call site: "every Instance", "Instance user_3", "1 Instance", or "every <Button> on the page". */
+export function reachInWords(change: Pick<ProposalChange, "scope" | "component">, keyPath?: string | null): string {
+  if (change.scope === "page") return `every <${change.component}> on the page`;
+  if (change.scope === "call-site") return "every Instance";
+  return keyPath ? `Instance ${keyPath}` : "1 Instance";
+}
+
 /** What a caption reads of a change. */
 type Captioned = Pick<ProposalChange, "scope" | "component" | "callSites"> & { props: readonly Pick<ProposalProp, "name">[] };
 
 /** "variant on 1st of 4 <Button> in MemberRowMenu", plain text for a caption. */
 export function changeInWords(change: Captioned): string {
   const props = change.props.map((prop) => (prop.name === "children" ? "text" : prop.name)).join(", ");
-  if (change.scope === "page") return `${props} on every <${change.component}> on the page`;
+  if (change.scope === "page") return `${props} on ${reachInWords(change)}`;
   const site = change.callSites[0];
   if (!site) return `${props} on <${change.component}>`;
   const where = site.enclosing ? ` in ${site.enclosing}` : "";
-  return `${props} on ${siteCount(site)} <${site.component}>${where}${change.scope === "call-site" ? ", every Instance" : ""}`;
+  return `${props} on ${siteCount(site)} <${site.component}>${where}${change.scope === "call-site" ? `, ${reachInWords(change)}` : ""}`;
+}
+
+/** "Code changed here, review: this call site had 2 uses and now has 3". The held entry and `loupe locate` both say it. */
+export function codeChangedInWords(was: number, now: number): string {
+  return `Code changed here, review: this call site had ${was} use${was === 1 ? "" : "s"} and now has ${now}`;
 }

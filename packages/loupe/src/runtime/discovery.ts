@@ -12,6 +12,7 @@ import {
   isComposite,
   keyPathOf,
   keyPaths,
+  ownNodesOf,
   rootFibers,
   serverComponentsOn,
   walkFibers,
@@ -116,8 +117,9 @@ export function discover(doc: Document | undefined, adapted: Iterable<AdaptedIns
         const nodes = hostNodesOf(instance.fiber).filter((node) => node.isConnected);
         return nodes.length > 0 ? nodes : hostNodesOf(instance.fiber?.alternate ?? null).filter((node) => node.isConnected);
       }
+      // A server-rendered Instance's record can sit on its own DOM element's fiber.
       const entry = walked().byId.get(id);
-      return entry ? hostNodesOf(entry.fiber) : [];
+      return entry ? ownNodesOf(entry.fiber).filter((node) => node.isConnected) : [];
     },
 
     ancestors(id) {

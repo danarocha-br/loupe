@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import { PRODUCT_LAYER } from "../names.js";
 
 export type PackageJson = {
   name?: string;
@@ -52,6 +53,36 @@ export function findWorkspace(cwd: string): string | undefined {
     if (readJson<PackageJson>(join(dir, "package.json"))?.workspaces) return dir;
     if (dirname(dir) === dir) return undefined;
   }
+}
+
+/**
+ * The root `withLoupe`'s loader reads the Product layer against, so a run from the app
+ * folder agrees with it even when the workspace sits inside a larger git checkout, or the
+ * app's own package.json declares `workspaces` (PER-233). The pnpm workspace comes first,
+ * as in the loader; `findWorkspace` alone would stop at such an app.
+ */
+export function findRepoRoot(from: string): string {
+  const start = resolve(from);
+  const root = nearestHolding(start, "pnpm-workspace.yaml") ?? findWorkspace(start) ?? nearestHolding(start, ".git");
+  if (root === undefined) throw new Error(`No git repository above ${from}; pass --root <dir>`);
+  return root;
+}
+
+/** The nearest directory up from `from` that holds `name`, if there is one. */
+function nearestHolding(from: string, name: string): string | undefined {
+  for (let dir = from; ; dir = dirname(dir)) {
+    if (existsSync(join(dir, name))) return dir;
+    if (dirname(dir) === dir) return undefined;
+  }
+}
+
+/**
+ * The repo root and the Product layer a command reads, from its `--root` and `--out`,
+ * each read from the folder it runs in. `generate` and `locate` both take them.
+ */
+export function layerFromFlags(cwd: string, flags: { root?: string; out?: string }): { root: string; layer: string } {
+  const root = resolve(cwd, flags.root ?? findRepoRoot(cwd));
+  return { root, layer: resolve(cwd, flags.out ?? join(root, PRODUCT_LAYER.path)) };
 }
 
 function normalise(pattern: string): string {

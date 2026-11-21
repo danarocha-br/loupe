@@ -3,8 +3,8 @@
 Loupe is a toolbar for product designers. It runs inside a product's own
 Next.js app on your machine, lists the real components on the page, shows the
 props each one was given, and lets you try other values on the live page. When
-something works, you export a Proposal: a report with before and after
-screenshots and an exact list of the changes, for an engineer to apply.
+something works, you copy a Proposal: an exact list of the changes, each tied to
+a call site, for your coding agent to apply, or an engineer.
 
 Loupe only runs in development. It never edits the product's components, and
 nothing from it reaches a production build. In the planning documents it is
@@ -154,56 +154,106 @@ then records it.
 ## Using Loupe
 
 Start the app's dev server the way you usually do and open a page. The Loupe
-panel sits on the right of the page, over a small dock at the bottom right with
-**Pick**, the component list, **Hide** and **Capture screen**. The panel follows
-your system's light or dark setting; the sun button in its header switches it,
-and the browser remembers your choice.
+panel takes a column on the right, and the page narrows to make room for it, as
+it would beside DevTools, so the panel never covers what you're inspecting. In a
+window too narrow for both, the panel sits over the page instead. Anything the
+app fixes to the window, such as a dialog or a toast, can still run under the
+panel. The panel says so when a dialog does, and holding Alt (Option on a Mac)
+makes it see-through. Its
+header holds the two select tools (**Select one** and **Select multiple**),
+**Hide marks**, the light or dark switch and **Hide**. The panel follows your
+system's light or dark setting; the half-filled circle switches it, and the
+browser remembers your choice.
 
 1. **Find a component.** With nothing selected, the panel lists every component
    on the page, grouped by name, and the list updates as menus and dialogs open.
-   Click a row, or press **Pick** in the dock and click the component on the
-   page (Esc cancels). The selected instance is outlined.
+   Each instance is named by what it shows on screen, such as "Actions for Ana
+   Souza", with its file and line under the name. Click a row, or press a select
+   tool in the header and click the component on the page (Esc cancels). The
+   selected instance is outlined.
 2. **Inspect it.** The inspector shows the instance, the file and component it
    is drawn in (its call site), and Coverage. Each prop shows the value the app
    gave it. A prop you can change has a control; any other prop says why not,
    such as `FROM CODE` for a label the code computes. Props a component library
    added on its own sit on one collapsed line and never reach a Proposal.
-3. **Choose a scope.** Every selection opens on **This instance**. You can switch
-   to every instance drawn by the same call site (for example "All in
-   MemberRowMenu · 4") or to **All on page**. The panel outlines every instance
-   the scope reaches. To leave an instance out of a group or page change,
-   untick it in the scope's list: it keeps its own value.
-4. **Change a value.** Pick an option, or type in the **Text** field for a plain
-   label. The page updates live, and a changed row turns purple with the app's
-   own value beside it. Your change holds while the app re-renders.
+3. **Choose a scope with the select tool**, as you would in Figma. **Select one**
+   (the arrow) changes the one instance you picked. **Select multiple** selects
+   every instance drawn by the same call site (for example "All in
+   MemberRowMenu · 4"), and a link under it widens that to **All on page**.
+   Pressing a tool switches the current selection at once and lets you pick the
+   next one on the page; the tool you chose stays on for the next selection. The
+   panel outlines every instance the selection reaches. To leave an instance out
+   of a group or page change, untick it in the selection's list: it keeps its
+   own value.
+4. **Change a value.** Each prop has its own card: choose an option in its table,
+   flip its switch for true or false, or type in the **Text** field for a plain
+   label. The page updates live, and the change gets a number, the way a drawing
+   marks a revision: a numbered triangle on its card, a dashed outline around
+   every instance it reaches on the page, for a moment as it lands and while you
+   point at its row, its line in the **Changes** list, and its entry in the
+   Proposal (`c1` is 1). A change keeps its number while you make others, and a
+   change you reset leaves its number unused. The card keeps
+   the app's own value, dotted in the table and on the line under the name. Your
+   change holds while the app re-renders.
    - Label text can be changed on one instance or a call site, never page-wide.
    - A prop tagged `STATE`, such as a dialog's `open`, can be held on one
      instance only. If the app tries to change it, the row says so.
+   - **Hold open** keeps a menu or dialog open while you inspect what's inside
+     it. Clicking the panel closes the app's own menus, so select the menu (or
+     its trigger's parent) and press **Hold open**. Release hands it back to the
+     app, closed.
 5. **Reset.** Reset undoes only the scope you're on. An instance falls back to
    its group's or page's value if there is one, otherwise to the app's own value.
-   **Reset all** drops every change.
+   **Reset all** drops every change at once; the footer then offers **Undo** for
+   a few seconds.
 6. **Preview feature flags.** With nothing selected, the **Feature flags** card
    lists the app's flags and lets you flip them. It uses the app's own Flags SDK
    setup, so it needs the app's `FLAGS_SECRET`; the card says if it's missing.
    Always press **Clear flag previews** before you switch to another project:
    the preview is a cookie that other apps on `localhost` see too (see
    [Troubleshooting](#another-app-on-localhost-answers-500-with-flags-missing-flags_secret)).
-7. **Capture and export.** Press **Capture screen** in the dock whenever a state is worth
-   showing: Loupe takes a before and after pair of the whole view, plus a
-   close-up pair for each change on screen. A capture goes out of date, and is
-   left out of the export, once you change a value it showed, so capture again
-   after changing things. **Export Proposal**, at the top of the panel, also
-   captures the screen as it is. It asks for a title and downloads one
-   self-contained HTML report with the screenshots and the changes file inside.
-   **Copy as Markdown**, the copy button beside **Reset all**, copies a short
-   summary for a ticket.
-   Exporting writes nothing to the repo and clears nothing.
+7. **Copy the Proposal.** **Copy Proposal**, at the bottom of the panel, asks
+   for a title and a note per change, then copies one text: the rules for
+   applying it, one line per change, and the Proposal's JSON. Paste it into your
+   coding agent (see [Apply a Proposal with your agent](#apply-a-proposal-with-your-agent)),
+   or send it to an engineer.
+   Copying writes nothing to the repo and clears nothing.
 
 Your component changes live in the browser tab only. Reloading the page drops
 them, and they are never written to the product's code.
 
-**Hide** shrinks the panel and the dock to a small **Loupe** button; click it to
-bring the panel back.
+**Hide** gives the page its full width back and leaves a small **Loupe** button;
+click it to bring the panel back.
+
+### Apply a Proposal with your agent
+
+Paste the copied text into Claude Code, Cursor or any coding agent working in
+the product repo. The text tells the agent what to do with each change:
+
+- **Apply**: a literal edit at each listed call site.
+- **Ask first**: the change needs a condition (it reaches some instances of a
+  call site only), or the value comes from app logic, so the agent proposes the
+  code and waits for your yes.
+- **Context**: states you held open and flags you previewed. No code changes.
+- **Don't apply**: changes held for review.
+
+The agent finds each call site with `loupe locate`, which reads the same anchors
+the panel uses, so it never guesses which `<Button>` you meant. Run from the
+repo root, with your app's folder in it:
+
+```bash
+pnpm -C apps/app exec loupe locate < proposal.md
+```
+
+It prints each call site's file and line, and how each prop is written there
+now. If the code around a call site changed since you copied the Proposal, it
+says so, and the agent stops and asks. When the agent is done, the same command
+with `--check` exits 0 only once every Apply change is in the code. The
+Proposal names the exact command, `--out` included when your Product layer
+isn't `packages/loupe`.
+
+Loupe itself never edits your code: the agent does, at the call sites you
+changed, never in a design-system default and never in the Product layer.
 
 ### When the panel asks you to run `generate`
 
@@ -427,7 +477,7 @@ Loupe's; keep or delete them as you like.
 ## Demo
 
 A short recording of the whole loop on orbix-ai (install, select a component,
-change it at two scopes, export a Proposal, remove) will go here. It waits for
+change it at two scopes, copy a Proposal, apply it with an agent, remove) will go here. It waits for
 the Toolbar's visual design, which will change how the panel looks.
 
 ## Working on Loupe

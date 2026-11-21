@@ -1,23 +1,27 @@
 "use client";
 
-// The Toolbar (PER-130): one right-hand panel with a component list, selection by
-// clicking the page or a row, and an inspector, over a dock at the bottom right
-// (PER-140). It reaches the page only through `<LoupeMount />`'s development-only
-// dynamic import, so a production build never holds this module.
+// The Toolbar (PER-130): one panel with a component list, selection by clicking the
+// page or a row, and an inspector. Since the 2026-11-19 critique it is a column the
+// page makes room for (`dock.ts`), with the select tools in its
+// header (2026-11-20: one Instance or its whole call site, as Figma selects), so
+// nothing of it covers the product but the outlines and the revision marks. It
+// reaches the page only through `<LoupeMount />`'s development-only dynamic import,
+// so a production build never holds this module.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { debugOf } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
+import { useDeselect } from "./deselect.js";
+import { type Column, useColumn } from "./dock.js";
 import { Highlight } from "./highlight.js";
-import { CaptureIcon, CursorIcon, LayersIcon, PanelIcon } from "./icons.js";
+import { PanelIcon } from "./icons.js";
 import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
 import { panelView, type SeenComponents } from "./panel-view/index.js";
-import { usePicker } from "./picker.js";
-import { useCapture } from "./snapshots-card.js";
+import { type SelectMode, usePicker } from "./picker.js";
 import { startToolbar } from "./start.js";
 import { CSS, HOST_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
 
@@ -94,35 +98,46 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
 
 function ToolbarBody({ host }: { host: HTMLElement }) {
   const [selected, setSelected] = useState<string | null>(null);
-  // Never remembered: every selection opens at This instance (PER-90).
-  const [scope, setScope] = useState<Scope>("instance");
+  // The header's select tool (2026-11-20): one Instance, or every Instance from its
+  // call site, as Figma selects. It stays as chosen across selections for the page load.
+  const [mode, setMode] = useState<SelectMode>("one");
+  // Select multiple, widened to every Instance of the component on the page. A new selection starts at its call site again.
+  const [widened, setWidened] = useState(false);
+  const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
   const [hidden, setHidden] = useState(false);
+  // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
+  // the page, so a change can be judged as it will ship. Kept for the page load.
+  const [marksHidden, setMarksHidden] = useState(false);
   const [theme, toggleTheme] = useTheme(host);
-  const select = (id: string | null) => {
+  const column = useColumn(!hidden);
+  const select = (id: string | null, next?: SelectMode) => {
     setSelected(id);
-    setScope("instance");
+    setWidened(false);
+    if (next) setMode(next);
+  };
+  const changeScope = (next: Scope) => {
+    setMode(next === "instance" ? "one" : "many");
+    setWidened(next === "page");
   };
   if (hidden) {
     return (
-      <div className="dock">
-        <div className="capsule">
-          <div className="inner">
-            <button type="button" className="btn" onClick={() => setHidden(false)} title="Show the Loupe panel">
-              <PanelIcon />
-              Loupe
-            </button>
-          </div>
-        </div>
-      </div>
+      <button type="button" className="show-tab" onClick={() => setHidden(false)} title="Show the Loupe panel">
+        <PanelIcon />
+        Loupe
+      </button>
     );
   }
   return (
     <ToolbarOpen
       host={host}
+      column={column}
       selected={selected}
       onSelect={select}
+      mode={mode}
       scope={scope}
-      onScope={setScope}
+      onScope={changeScope}
+      marksHidden={marksHidden}
+      onMarks={() => setMarksHidden((was) => !was)}
       onHide={() => setHidden(true)}
       theme={theme}
       onTheme={toggleTheme}
@@ -133,19 +148,27 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
 /** Everything that watches the page, mounted only while the panel is open. */
 function ToolbarOpen({
   host,
+  column,
   selected,
   onSelect,
+  mode,
   scope,
   onScope,
+  marksHidden,
+  onMarks,
   onHide,
   theme,
   onTheme,
 }: {
   host: Element;
+  column: Column;
   selected: string | null;
-  onSelect(id: string | null): void;
+  onSelect(id: string | null, mode?: SelectMode): void;
+  mode: SelectMode;
   scope: Scope;
   onScope(scope: Scope): void;
+  marksHidden: boolean;
+  onMarks(): void;
   onHide(): void;
   theme: Theme;
   onTheme(): void;
@@ -164,15 +187,31 @@ function ToolbarOpen({
   seen.current = view.seen;
   useInstanceMeta(view.metaAnchor);
   const [hovered, setHovered] = useState<string[]>([]);
+  // A row's hover can repeat as the pointer crosses its children: the same Instances change nothing.
+  const hover = useCallback(
+    (ids: string[]) => setHovered((previous) => (previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids)),
+    [],
+  );
   const picker = usePicker(debug, host, (id) => {
     onSelect(id);
     setHovered([]);
   });
-  // The picked scope can't be reached (the Instance left, say): store the one that
-  // applies, so the Instance opens at This instance when it comes back.
-  useEffect(() => {
-    if (view.scope !== scope) onScope(view.scope);
-  }, [view.scope, scope, onScope]);
+  // A select tool sets the scope at once, for the selection there is, and arms picking
+  // for the next one; pressed again while picking, it stops.
+  const tool = (next: SelectMode) => {
+    if (picker.picking && next === mode) {
+      picker.stop();
+      return;
+    }
+    onScope(next === "one" ? "instance" : "group");
+    if (!picker.picking) picker.start();
+  };
+  // Esc, or a click on the page outside what is selected, goes back to the list.
+  const selection = useMemo(
+    () => (selected === null ? [] : [selected, ...(view.outline.members ?? []).map((member) => member.id)]),
+    [selected, view.outline.members],
+  );
+  useDeselect({ debug, host, ids: selection, active: selected !== null && !picker.picking, onDeselect: () => onSelect(null) });
 
   return (
     <>
@@ -181,115 +220,29 @@ function ToolbarOpen({
         version={version}
         selected={selected}
         selectedLabel={view.outline.label}
-        hovered={picker.picking ? (picker.hovered ? [picker.hovered] : []) : hovered}
-        members={picker.picking ? null : view.outline.members}
+        hovered={hovered}
+        members={view.outline.members}
+        marks={view.marks}
+        pick={picker.picking ? { hovered: picker.hovered, mode } : null}
+        marksHidden={marksHidden}
       />
       <Panel
         debug={debug}
         view={view}
         layer={layer}
+        column={column}
+        mode={mode}
+        picking={picker.picking}
+        onTool={tool}
         onSelect={onSelect}
         onScope={onScope}
-        onHover={setHovered}
+        onHover={hover}
+        marksHidden={marksHidden}
+        onMarks={onMarks}
         onHide={onHide}
         theme={theme}
         onTheme={onTheme}
       />
-      <Dock
-        picking={picker.picking}
-        onPick={picker.toggle}
-        listing={selected === null}
-        instances={view.instanceCount}
-        onList={() => onSelect(null)}
-        onHide={onHide}
-      />
     </>
-  );
-}
-
-/** Pick, back to the component list, hide the panel and Capture screen, with what is under way beside them. */
-function Dock({
-  picking,
-  onPick,
-  listing,
-  instances,
-  onList,
-  onHide,
-}: {
-  picking: boolean;
-  onPick(): void;
-  listing: boolean;
-  instances: number;
-  onList(): void;
-  onHide(): void;
-}) {
-  const { busy, run } = useCapture();
-  const toast =
-    busy.capturing !== null ? (
-      <>
-        <span className="dot purple" />
-        Capturing… before/after of the screen in view
-      </>
-    ) : busy.error !== null ? (
-      <>
-        <span className="dot red" />
-        Capture failed: {busy.error}
-      </>
-    ) : picking ? (
-      <>
-        <span className="dot purple" />
-        Click an Instance on the page · <kbd>Esc</kbd> cancels
-      </>
-    ) : null;
-  return (
-    <div className="dock">
-      {toast && (
-        <div className="toast" role="status">
-          {toast}
-        </div>
-      )}
-      <div className="capsule">
-        <div className="inner">
-          <button
-            type="button"
-            className="btn round"
-            aria-pressed={picking}
-            onClick={onPick}
-            title="Click an Instance on the page (Esc cancels)"
-          >
-            <CursorIcon />
-            <span className="sr-only">Pick</span>
-          </button>
-          <button
-            type="button"
-            className="btn"
-            aria-pressed={listing && !picking}
-            onClick={onList}
-            title="Every component on this page"
-          >
-            <LayersIcon />
-            <span className="n">{instances}</span>
-            <span className="sr-only"> Instances: all components</span>
-          </button>
-          <span className="sep" />
-          <button type="button" className="btn round" onClick={onHide} title="Hide the panel">
-            <PanelIcon />
-            <span className="sr-only">Hide the panel</span>
-          </button>
-          <button
-            type="button"
-            className="btn round"
-            disabled={picking || busy.capturing !== null}
-            title={busy.error ?? "A before/after Snapshot of the screen in view, for the Proposal"}
-            onClick={() => run()}
-          >
-            <CaptureIcon />
-            <span className="sr-only">
-              {busy.capturing !== null ? "Capturing…" : busy.error !== null ? "Capture failed" : "Capture screen"}
-            </span>
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
