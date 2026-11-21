@@ -5,17 +5,19 @@
 //
 // One entry per record, by the scope it was set at, never flattened per Instance
 // (PER-90). State-prop values go to "States shown", suspended records to "Held for
-// review" (PER-96, PER-97, PER-99).
+// review" (PER-96, PER-97, PER-99). Each change says what the agent does with it,
+// Apply or Ask first, and why (ADR 0002).
 
 import { pageAnchor, parseCallSiteId, parseHint, parseInstanceId } from "../call-site.js";
 import { keyOf, type OverrideRecord, type Props, type ScopeTarget } from "../runtime/store.js";
 import { stateSiblingName } from "../state-prop.js";
-import { formatCurrent } from "../toolbar/format.js";
+import { formatCurrent, plural } from "../toolbar/format.js";
 import type { CallSiteWrites } from "../writes.js";
 import { toJson } from "./json.js";
+import { codeChangedInWords, propInWords } from "./words.js";
 import {
   FORMAT_VERSION,
-  HOW_TO_APPLY,
+  howToApply,
   type JsonValue,
   type Proposal,
   type ProposalCallSite,
@@ -26,6 +28,7 @@ import {
   type ProposalProp,
   type ProposalRoute,
   type ProposalStateShown,
+  SCOPE_RANK,
   type WrittenAs,
 } from "./types.js";
 
@@ -114,6 +117,35 @@ function writtenAsOf(writes: CallSiteWrites | null, prop: string): { writtenAs: 
     return { writtenAs: writes.children === "text" ? "literal" : "expression" };
   }
   return { writtenAs: writes.spreads ? "spread" : "unset" };
+}
+
+/**
+ * Why a change needs the designer's decision before it is written (ADR 0002): it
+ * reaches some Instances of a call site only, a prop's value comes from app logic or
+ * spread props, Loupe has no record of how a call site writes it, or a page change
+ * reached server-rendered Instances the designer never saw change. Empty: a literal
+ * edit at each call site, so the change is Apply. A prop some call sites write as a
+ * literal and others don't write at all is still one literal edit each, so it stays
+ * Apply: the ADR asks first only for expressions and spreads. What a narrower change
+ * passes on is added by the builder, which knows the other changes.
+ */
+export function askFirstOf(change: Pick<ProposalChange, "needsCondition" | "props" | "serverRendered">): string[] {
+  const reasons: string[] = [];
+  if (change.needsCondition) reasons.push(change.needsCondition);
+  for (const prop of change.props) {
+    const sites = prop.perCallSite ?? [{ writtenAs: prop.writtenAs, expression: prop.expression }];
+    const expression = sites.find((site) => site.writtenAs === "expression");
+    if (expression) {
+      reasons.push(`${propInWords(prop.name)} is written as an expression${expression.expression ? `: \`${expression.expression}\`` : ""}`);
+    }
+    if (sites.some((site) => site.writtenAs === "spread")) reasons.push(`${propInWords(prop.name)} may come from props the call site spreads`);
+    if (sites.some((site) => site.writtenAs === "unknown")) reasons.push(`Loupe has no record of how the call site writes ${propInWords(prop.name)}`);
+  }
+  const server = change.serverRendered.length;
+  if (server > 0) {
+    reasons.push(`${plural(server, "server-rendered Instance")} on the page couldn't be previewed: ask whether to change ${server === 1 ? "its call site" : "their call sites"} too`);
+  }
+  return reasons;
 }
 
 export function buildProposal(input: ProposalInput): Proposal {
@@ -236,7 +268,8 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
       ...writtenAcross(anchors, name),
     }));
 
-    const routes = new Set(client.flatMap((sighting) => sighting.routes));
+    // An edit at a call site reaches every page that draws it, not only the Instances this change covers.
+    const routes = new Set(anchors.flatMap((anchor) => byAnchor(anchor).flatMap((sighting) => sighting.routes)));
     routes.delete(route);
 
     drafts.push({
@@ -245,6 +278,8 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
       covered: included,
       change: {
         id: "",
+        action: "apply",
+        askFirst: [],
         scope: record.target.scope === "group" ? "call-site" : record.target.scope,
         component,
         origin: null,
@@ -257,7 +292,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
             ? server.map((sighting) => ({ id: sighting.id, anchor: sighting.anchor, keyPath: sighting.keyPath }))
             : [],
         overriddenBy: [],
-        alsoRendersOn: record.target.scope === "page" ? [] : [...routes].sort(),
+        alsoRendersOn: [...routes].sort(),
         onScreenAtExport: client.some((sighting) => sighting.mounted),
         note: input.notes?.[setOnKey(record.target)]?.trim() || null,
       },
@@ -268,6 +303,27 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
     draft.change.id = `c${index + 1}`;
   });
   for (const draft of drafts) draft.change.overriddenBy = overriddenBy(draft, drafts);
+  // Narrowest first, so what a narrower change passes on is settled before a wider one reads it.
+  const byChangeId = new Map(drafts.map((draft) => [draft.change.id, draft.change]));
+  for (const { change } of [...drafts].sort((a, b) => SCOPE_RANK[a.change.scope] - SCOPE_RANK[b.change.scope])) {
+    change.askFirst = [...askFirstOf(change), ...passedOn(change)];
+    change.action = change.askFirst.length > 0 ? "ask-first" : "apply";
+  }
+
+  /**
+   * A narrower change that waits for the designer and sets one of this change's props
+   * on some of the same Instances: the code at that call site needs the same decision,
+   * so this change waits too, rather than letting `--check` call it done.
+   */
+  function passedOn(change: ProposalChange): string[] {
+    return change.overriddenBy.flatMap((id) => {
+      const other = byChangeId.get(id);
+      if (other?.action !== "ask-first") return [];
+      const shared = change.props.filter((prop) => other.props.some((entry) => entry.name === prop.name));
+      if (shared.length === 0) return [];
+      return [`${other.id} sets ${shared.map((prop) => propInWords(prop.name)).join(", ")} on some of the same Instances and asks first, so this does too`];
+    });
+  }
 
   /** How many Instances the call site rendered: those mounted now, else every one seen. */
   function siblingsOf(anchor: string): Sighting[] {
@@ -295,10 +351,9 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
 
   function overriddenBy(draft: Draft, all: readonly Draft[]): string[] {
     const winners = new Set<string>();
-    const rank = { instance: 0, group: 1, page: 2 } as const;
     for (const other of all) {
       if (other === draft) continue;
-      if (rank[other.record.target.scope] >= rank[draft.record.target.scope]) continue;
+      if (SCOPE_RANK[other.change.scope] >= SCOPE_RANK[draft.change.scope]) continue;
       const shared = Object.keys(other.record.values).some((prop) => prop in draft.record.values);
       if (!shared) continue;
       const reachesOne = other.covered.some((sighting) => draft.covered.some((mine) => mine.id === sighting.id));
@@ -343,7 +398,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
         reason: suspended.reason,
         detail:
           suspended.reason === "code-changed"
-            ? `Code changed here, review: this call site had ${suspended.was} use${suspended.was === 1 ? "" : "s"} and now has ${suspended.now}`
+            ? codeChangedInWords(suspended.was, suspended.now)
             : `Matches more than one Instance, review: ${suspended.ids.join(", ")}`,
         props: Object.keys(record.values).map((name) => ({ name, ...proposedOf(record.values[name]) })),
       };
@@ -355,7 +410,7 @@ export function buildProposalKeyed(input: ProposalInput): { proposal: Proposal; 
     createdAt: input.createdAt,
     designer: input.designer?.trim() ? input.designer.trim() : null,
     project: input.project,
-    howToApply: HOW_TO_APPLY,
+    howToApply: howToApply(input.project.install),
     routes,
     heldForReview,
   };

@@ -3,17 +3,20 @@
 // it (PER-100 §5), components it would add if it ran now ("not generated yet",
 // PER-179), a `formatVersion` this Loupe doesn't write (PER-85), and an
 // `adapt-list.json` that went missing while the dev server ran (PER-227).
-// Read-only: regeneration stays explicit, so nothing here writes.
+// Read-only: regeneration stays explicit, so nothing here writes. It also turns
+// the absolute paths `withLoupe` knows into the repo-relative ones the printed
+// `loupe` commands take (`command-line.ts`): `generate` here, `locate` in the
+// Proposal (ADR 0002).
 
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { parse } from "@babel/parser";
 import { ADAPT_LIST_FORMAT_VERSION, parseAdaptList } from "./adapt-list.js";
+import { type CommandPaths, loupeCommand } from "./command-line.js";
 import type { FormatNotice } from "./format-notice.js";
 import { ROOT_FLAGS, SPECIFIER_FLAG } from "./generate/first-run.js";
 import { GENERATE_FORMAT_VERSION, readHeader } from "./generate/header.js";
 import { compare, DESIGN_SYSTEM_INCLUDE, hashFile, sourceFiles, statStamp } from "./meta/sources.js";
-import { PRODUCT_LAYER } from "./names.js";
 
 export type StaleModule = {
   /** Repo-relative path of the module `generate` read. */
@@ -59,23 +62,21 @@ export type LayerPaths = {
 
 const toPosix = (file: string) => file.split(path.sep).join("/");
 
+/** The app and the Product layer, relative to the repo root: what `loupeCommand` needs. */
+export function commandPaths({ root, adaptList, app }: LayerPaths): CommandPaths {
+  return { app: toPosix(path.relative(root, app)), layer: toPosix(path.relative(root, path.dirname(adaptList))) };
+}
+
 /**
  * `pnpm -C apps/app exec loupe generate`, with `--out` only when the layer isn't the default
  * `packages/loupe`. No `--root`: run from the app, `generate` finds the workspace root that
  * `init` wrote the layer against and `loupe doctor` passes here (PER-233). Paths are quoted
  * for a POSIX shell when they need it, since the doctor's come from a ledger anyone can edit.
  */
-export function generateCommand({ root, adaptList, app }: LayerPaths): string {
-  const layer = path.dirname(adaptList);
-  const appRel = toPosix(path.relative(root, app));
-  const out = path.resolve(root, PRODUCT_LAYER.path) === layer ? "" : ` --out ${quoteForShell(toPosix(path.relative(app, layer)) || ".")}`;
-  return `${appRel === "" ? "pnpm" : `pnpm -C ${quoteForShell(appRel)}`} exec loupe generate${out}`;
+export function generateCommand(paths: LayerPaths): string {
+  return loupeCommand("generate", commandPaths(paths));
 }
 
-/** As it is when the shell reads it back unchanged, else in single quotes, a `'` inside written `'\''`. */
-function quoteForShell(file: string): string {
-  return /^[A-Za-z0-9._/@-]+$/.test(file) ? file : `'${file.replaceAll("'", `'\\''`)}'`;
-}
 
 /**
  * The command that writes `adapt-list.json` again, which names what `generate` can no

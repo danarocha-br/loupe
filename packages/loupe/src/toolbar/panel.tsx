@@ -1,7 +1,7 @@
 // The panel (PER-140; the Revision Set since 2026-11-20): a sheet in the column the
 // page makes room for, with a pinned header (the select tools, Hide marks, light or
-// dark, Hide) and footer (the Override count, Copy as Markdown, Reset all, the
-// undo offer and Export Proposal), and a scrolling middle of cards. The middle holds
+// dark, Hide) and footer (the Override count, Reset all, the undo offer and Copy
+// Proposal), and a scrolling middle of cards. The middle holds
 // either the page's numbered changes and component list (nothing selected) or the
 // inspector: one card per prop, at This instance or, with Select multiple, a group
 // or page scope (PER-134). The scope is the select tool, as in Figma: there is no
@@ -20,7 +20,7 @@ import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
 import { attempt, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
-import { ExportButton } from "./export-dialog.js";
+import { CopyProposalButton } from "./copy-dialog.js";
 import { FlagsCard } from "./flags.js";
 import { plural } from "./format.js";
 import {
@@ -28,7 +28,6 @@ import {
   CheckIcon,
   ChevronIcon,
   ContrastIcon,
-  CopyIcon,
   CursorIcon,
   InfoIcon,
   MarksHiddenIcon,
@@ -52,7 +51,6 @@ import {
   THIS_INSTANCE,
 } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { copyProposalMarkdown } from "./proposal.js";
 import { offerUndo, takeUndo, useUndoOffer } from "./undo.js";
 
 type PanelProps = {
@@ -208,7 +206,7 @@ export function Panel(props: PanelProps) {
           <Inspector {...props} body={body} notices={notices} heading={heading} />
         )}
       </div>
-      <Footer debug={props.debug} footer={view.footer} exportEnabled={view.header.exportEnabled} onSelect={props.onSelect} onHover={props.onHover} />
+      <Footer debug={props.debug} footer={view.footer} onSelect={props.onSelect} onHover={props.onHover} />
     </section>
   );
 }
@@ -876,10 +874,9 @@ const FOOTER_KEYS = 8;
 function Footer({
   debug,
   footer,
-  exportEnabled,
   onSelect,
   onHover,
-}: Pick<Actions, "debug" | "onSelect" | "onHover"> & { footer: PanelView["footer"]; exportEnabled: boolean }) {
+}: Pick<Actions, "debug" | "onSelect" | "onHover"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
   const shown = footer.keys.slice(0, FOOTER_KEYS);
   const more = footer.keys.length - shown.length;
@@ -924,7 +921,6 @@ function Footer({
         )}
       </div>
       <div className="act">
-        <CopyMarkdown disabled={!footer.copyEnabled} />
         <button
           type="button"
           className="btn"
@@ -940,41 +936,8 @@ function Footer({
           <ResetIcon />
           Reset all
         </button>
-        <ExportButton disabled={!exportEnabled} />
+        <CopyProposalButton disabled={!footer.copyEnabled} />
       </div>
     </footer>
-  );
-}
-
-/** Copy as Markdown (PER-135): the Proposal's summary, for a ticket. Clears nothing. */
-function CopyMarkdown({ disabled }: { disabled: boolean }) {
-  const [state, setState] = useState<"idle" | "copying" | "copied" | { failed: string }>("idle");
-  useEffect(() => {
-    if (state === "idle" || state === "copying") return;
-    const timer = setTimeout(() => setState("idle"), 2500);
-    return () => clearTimeout(timer);
-  }, [state]);
-  const failed = typeof state === "object" ? state.failed : null;
-  const said = state === "copied" ? "Copied" : failed !== null ? "Copy failed" : null;
-  return (
-    <button
-      type="button"
-      className={said ? "btn" : "btn icon"}
-      disabled={disabled || state === "copying"}
-      title={failed ?? "Copy as Markdown: a short summary of every Override, to paste into a ticket"}
-      onClick={() => {
-        setState("copying");
-        copyProposalMarkdown().then(
-          () => setState("copied"),
-          (error: unknown) => {
-            console.warn("[loupe] Copy as Markdown failed:", error);
-            setState({ failed: error instanceof Error ? error.message : String(error) });
-          },
-        );
-      }}
-    >
-      {state === "copied" ? <CheckIcon size={14} /> : <CopyIcon />}
-      {said ?? <span className="sr-only">Copy as Markdown</span>}
-    </button>
   );
 }

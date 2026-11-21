@@ -24,12 +24,6 @@ function Icon({ size = 16, children }: { size?: number; children: ReactNode }) {
   );
 }
 
-export const DownloadIcon = () => (
-  <Icon>
-    <path d="M12 4v11M7 10l5 5 5-5M5 20h14" strokeWidth="2" />
-  </Icon>
-);
-
 export const SunIcon = () => (
   <Icon>
     <circle cx="12" cy="12" r="3" />

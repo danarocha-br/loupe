@@ -1,6 +1,6 @@
 # Loupe
 
-A dev-only tool for designers: it inspects and overrides the props of real components in a running Next.js app, then hands engineering a Proposal. It installs into a product's repo and never reaches a production build.
+A dev-only tool for designers: it inspects and overrides the props of real components in a running Next.js app, then hands a coding agent, or an engineer, a Proposal. It installs into a product's repo and never reaches a production build.
 
 ## Components on the page
 
@@ -68,8 +68,12 @@ _Avoid_: disabled, paused
 A feature-flag value forced for this browser through the Flags SDK's override cookie.
 
 **Proposal**:
-The record of a designer's Overrides and Flag previews, handed to engineering. The HTML report and the Markdown summary are renderings of it.
+The record of a designer's Overrides and Flag previews, for a coding agent or an engineer to apply. Copy Proposal copies it as one text: the rules, one line per change, and its JSON.
 _Avoid_: report, export
+
+**Action**:
+What a Proposal tells the agent to do with an entry. **Apply**: a literal edit at each call site. **Ask first**: the change needs a condition, or its value comes from app logic or spread props, so the agent proposes the code and waits for the designer. **Context**: States shown and Flag previews, never edited. **Don't apply**: held for review.
+_Avoid_: tag, status
 
 ## Install
 

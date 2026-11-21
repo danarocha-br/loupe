@@ -3,6 +3,7 @@ import type { BuildRunner } from "./doctor/build.js";
 import { doctorUsage, parseDoctorArgs, runDoctor } from "./doctor/command.js";
 import { generateUsage, parseGenerateArgs, runGenerate } from "./generate/command.js";
 import { initUsage, parseInitArgs, runInit } from "./init/command.js";
+import { locateUsage, parseLocateArgs, runLocate } from "./locate/command.js";
 import { metaUsage, parseMetaArgs, runMeta, summarise } from "./meta/command.js";
 import { parseRemoveArgs, removeUsage, runRemove } from "./remove/command.js";
 import { version } from "./version.js";
@@ -19,6 +20,8 @@ export type Io = {
   install?: (root: string) => number;
   /** Runs `next build` for `loupe doctor --build`; the real one by default. */
   build?: BuildRunner;
+  /** Everything piped to standard input, for `loupe locate`; absent when nothing is piped. */
+  read?: () => Promise<string>;
 };
 
 const usage = `Usage: loupe <command>
@@ -28,6 +31,7 @@ Commands:
   doctor [--build]     Check an install and write nothing; --build also scans a production build
   generate [--check]   Write Adapters, meta/ and adapt-list.json into the Product layer
   init [--adopt]       Install Loupe into an app: the Product layer and four edits, recorded in a ledger
+  locate [--check]     Find each call site a copied Proposal names, and whether its changes are in the code
   remove               Undo loupe init, never overwriting a hand edit
   meta                 Read prop metadata from the TypeScript checker and cva (headless)
 
@@ -150,6 +154,20 @@ export async function run(argv: readonly string[], io: Io): Promise<number> {
       nodeVersion: io.nodeVersion ?? process.versions.node,
       build: io.build,
     });
+  }
+
+  if (first === "locate") {
+    const options = parseLocateArgs(rest);
+    if (typeof options === "string") {
+      io.err(options);
+      io.err(locateUsage);
+      return 1;
+    }
+    if (options.help) {
+      io.out(locateUsage);
+      return 0;
+    }
+    return runLocate(options, { out: io.out, err: io.err, cwd: io.cwd ?? process.cwd(), read: io.read });
   }
 
   if (first === "meta") {

@@ -1,8 +1,10 @@
 "use server";
 
 // The Proposal's project context (PER-99 §5): the repository, its commit, whether
-// the working tree had uncommitted changes, and Loupe's version. The browser can't
-// read any of it, so this Server Action reads git on the dev server at export time.
+// the working tree had uncommitted changes, Loupe's version, and where the app and
+// the Product layer sit in the repo, so the Proposal can name `loupe locate`
+// (ADR 0002). The browser can't read any of it, so this Server Action reads git and
+// what `withLoupe` handed over on the dev server, when the Proposal is copied.
 //
 // Only the Toolbar imports this module, and the Toolbar reaches the page through
 // `<LoupeMount />`'s development-only import, so a production build holds neither.
@@ -11,6 +13,7 @@ import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { commandPaths } from "../layer-status.js";
 import type { ProposalProject } from "../proposal/types.js";
 
 /** A string only this module holds: `loupe doctor --build` looks for it to prove the action stayed out. */
@@ -45,6 +48,16 @@ function loupeVersion(): string | null {
   }
 }
 
+/** Where Loupe is installed, from the paths `withLoupe` exports under `next dev`; null without them. */
+function install(): ProposalProject["install"] {
+  const root = process.env.LOUPE_ROOT;
+  const adaptList = process.env.LOUPE_ADAPT_LIST;
+  const app = process.env.LOUPE_APP;
+  if (!root || !adaptList || !app) return null;
+  const paths = commandPaths({ root, adaptList, app });
+  return { app: paths.app, layer: paths.layer || "." };
+}
+
 export async function readProjectContext(): Promise<ProposalProject> {
   const [commit, status, remote, top] = await Promise.all([
     git(["rev-parse", "HEAD"]),
@@ -58,5 +71,6 @@ export async function readProjectContext(): Promise<ProposalProject> {
     commit,
     dirty: status === null ? null : status !== "",
     playgroundVersion: loupeVersion(),
+    install: install(),
   };
 }

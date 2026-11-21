@@ -58,13 +58,14 @@ export type PanelView = {
   instanceCount: number;
   /** The plot key: per mounted Instance a numbered change reaches, its numbers. */
   marks: { id: string; keys: number[]; stamp: string }[];
-  /** Export Proposal is on while there is a record. The report line names the page and counts its changes. */
-  header: { exportEnabled: boolean; route: string; report: string };
+  /** The report line names the page and counts its changes. */
+  header: { route: string; report: string };
   /** "Overrides are off" across the panel, while the React self-check fails. */
   banner: { title: string; body: string } | null;
   footer: {
     countText: string;
     hasOverrides: boolean;
+    /** Copy Proposal is on while there is a record. */
     copyEnabled: boolean;
     /** Every record "Reset all" discards; empty while it is off. */
     resetAll: ScopeTarget[];

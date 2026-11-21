@@ -54,7 +54,7 @@ export function panelView(input: PanelInput): PanelView {
     },
     instanceCount: page.instanceCount,
     marks: keys.marks,
-    header: { exportEnabled: page.records.length > 0, route: page.route, report: headerReport(page.route, changes.length, held) },
+    header: { route: page.route, report: headerReport(page.route, changes.length, held) },
     banner: page.status.overrides ? null : { title: OVERRIDES_OFF_TITLE, body: overridesOffBanner(page.status.reason) },
     footer: {
       countText: footerCount(page.overrideCount),

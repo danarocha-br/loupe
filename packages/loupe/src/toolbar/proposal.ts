@@ -3,13 +3,13 @@
 // its unmounting, as "last seen"), the route each record was set on, each route's
 // URL, viewport and theme, previewed flags, and the project's commit.
 //
-// Nothing here writes to the store or the repo: exporting clears nothing.
+// Nothing here writes to the store or the repo: copying clears nothing.
 // Once the Toolbar loads, `__loupe.proposal(options?)` returns the JSON and
-// `__loupe.proposalMarkdown(options?)` the Copy as Markdown text (`start.ts`).
+// `__loupe.proposalText(options?)` the Copy Proposal text (`start.ts`).
 
 import { parseInstanceId } from "../call-site.js";
 import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
-import { proposalMarkdown } from "../proposal/markdown.js";
+import { proposalText } from "../proposal/text.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
 import { debugOf } from "../runtime/debug.js";
 import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
@@ -128,7 +128,7 @@ function routeContext(): RouteContext {
   };
 }
 
-const UNKNOWN_PROJECT: ProposalProject = { repo: null, commit: null, dirty: null, playgroundVersion: null };
+const UNKNOWN_PROJECT: ProposalProject = { repo: null, commit: null, dirty: null, playgroundVersion: null, install: null };
 
 /** "Button variant in MemberRowMenu", from the first change. */
 export function suggestedTitle(proposal: Proposal): string {
@@ -139,9 +139,9 @@ export function suggestedTitle(proposal: Proposal): string {
   return `${change.component} ${props} ${where}`;
 }
 
-/** The Copy as Markdown text of the Proposal. */
-export function collectProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
-  return collectProposal(options).then(proposalMarkdown);
+/** The Copy Proposal text (ADR 0002). */
+export function collectProposalText(options: ProposalOptions = {}): Promise<string> {
+  return collectProposal(options).then(proposalText);
 }
 
 /** The Proposal for the whole Override store, every route. */
@@ -194,31 +194,4 @@ export async function collectProposalKeyed(options: ProposalOptions = {}): Promi
   };
   const { proposal, keys } = buildProposalKeyed(input);
   return { proposal: options.title?.trim() ? proposal : { ...proposal, title: suggestedTitle(proposal) }, keys };
-}
-
-/**
- * Copies the Markdown summary. The clipboard gets a promise, so the write is
- * claimed during the click even though building the Proposal awaits the server.
- */
-export async function copyProposalMarkdown(options: ProposalOptions = {}): Promise<string> {
-  const text = collectProposalMarkdown(options);
-  try {
-    if (typeof navigator.clipboard === "undefined") {
-      throw new Error("The clipboard is only available on a secure origin, localhost or HTTPS.");
-    }
-    if (typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function") {
-      await navigator.clipboard.write([
-        new ClipboardItem({ "text/plain": text.then((markdown) => new Blob([markdown], { type: "text/plain" })) }),
-      ]);
-    } else {
-      await navigator.clipboard.writeText(await text);
-    }
-  } catch (error) {
-    // A browser that refuses the clipboard still leaves the summary somewhere to copy from.
-    const markdown = await text;
-    console.info(`[loupe] Proposal as Markdown:\n\n${markdown}`);
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`${reason} The Markdown is in the console.`);
-  }
-  return text;
 }

@@ -188,7 +188,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 .footer .count { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; font: 500 14px/18px ${SANS}; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .footer .count .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .footer .act { display: flex; align-items: center; gap: 6px; }
-.footer .act [data-export] { margin-left: auto; }
+.footer .act [data-copy] { margin-left: auto; }
 .footer .undo { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; color: var(--muted); }
 .footer .undo:empty { display: none; }
 .footer-keys { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0; list-style: none; margin: 0 0 0 auto; padding: 0; }

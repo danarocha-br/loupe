@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { devMount } from "../mount.js";
-import { REPORT_DATA_ID } from "../proposal/report.js";
+import { readProposal } from "../locate/input.js";
 import type { Proposal } from "../proposal/types.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
@@ -14,7 +14,7 @@ import { resetLoupe } from "../runtime/slot.js";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("./project-server.js", () => ({
-  readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3" }),
+  readProjectContext: async () => ({ repo: "orbix-ai", commit: "abcdef1234567", dirty: false, playgroundVersion: "0.0.3", install: { app: "apps/app", layer: "packages/loupe" } }),
 }));
 vi.mock("./notices.js", () => ({
   useLayerStatus: () => null,
@@ -25,7 +25,7 @@ vi.mock("./notices.js", () => ({
 }));
 
 const { default: Toolbar } = await import("./index.js");
-const { exportForm } = await import("./export.js");
+const { copyForm } = await import("./copy.js");
 const { HOST_ATTRIBUTE } = await import("./styles.js");
 
 const Button = createAdapter("Button", (props: { variant?: string; children?: string }) => (
@@ -54,10 +54,11 @@ const LoupeMount = devMount(Toolbar);
 let container: HTMLDivElement;
 let root: Root;
 let loupe: LoupeDebug;
-let downloads: { name: string; blob: Blob }[] = [];
+/** Every text put on the clipboard. */
+let copies: string[] = [];
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
-/** Settles until `done` holds: an export's build takes longer on a loaded machine. */
+/** Settles until `done` holds: building a Proposal takes longer on a loaded machine. */
 async function until(done: () => boolean, tries = 100): Promise<void> {
   for (let i = 0; i < tries && !done(); i++) await settle();
   expect(done()).toBe(true);
@@ -77,40 +78,28 @@ function type(element: HTMLInputElement | HTMLTextAreaElement, value: string): v
   });
 }
 
-const read = (blob: Blob) =>
-  new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.readAsText(blob);
-  });
-
-async function exportedProposal(): Promise<Proposal> {
-  const download = downloads.at(-1);
-  if (!download) throw new Error("nothing was downloaded");
-  const html = await read(download.blob);
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  return JSON.parse(doc.getElementById(REPORT_DATA_ID)?.textContent ?? "") as Proposal;
+/** The Proposal in the last copied text, read back the way `loupe locate` reads it. */
+function copiedProposal(): Proposal {
+  const text = copies.at(-1);
+  if (text === undefined) throw new Error("nothing was copied");
+  const proposal = readProposal(text);
+  if (typeof proposal === "string") throw new Error(proposal);
+  return proposal;
 }
 
 async function openDialog(): Promise<void> {
-  act(() => shadow().querySelector<HTMLButtonElement>("[data-export]")?.click());
+  act(() => shadow().querySelector<HTMLButtonElement>("[data-copy]")?.click());
   // Open once the preview has counted.
   await until(() => dialog()?.querySelector(".counts") != null);
 }
 
 beforeEach(async () => {
   resetLoupe();
-  downloads = [];
-  const blobs = new Map<string, Blob>();
-  URL.createObjectURL = (blob: Blob) => {
-    const url = `blob:test/${blobs.size}`;
-    blobs.set(url, blob as Blob);
-    return url;
-  };
-  URL.revokeObjectURL = () => {};
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
-    const blob = blobs.get(this.href);
-    if (blob) downloads.push({ name: this.download, blob });
+  copies = [];
+  // jsdom has no clipboard: the one a browser on localhost gives, as far as text goes.
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (text: string) => void copies.push(text) },
   });
   container = document.createElement("div");
   document.body.append(container);
@@ -132,18 +121,19 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   for (const host of document.querySelectorAll(`[${HOST_ATTRIBUTE}]`)) host.remove();
+  Reflect.deleteProperty(navigator, "clipboard");
   vi.restoreAllMocks();
 });
 
-describe("the export dialog", () => {
-  it("opens from the footer, prefilled with a title, and counts what the file will hold", async () => {
-    expect(button("Export Proposal")?.disabled).toBe(true);
+describe("the Copy Proposal dialog", () => {
+  it("opens from the footer, prefilled with a title, and counts what the text will hold", async () => {
+    expect(button("Copy Proposal")?.disabled).toBe(true);
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
 
     expect(dialog()?.open).toBe(true);
-    expect(dialog()?.getAttribute("aria-labelledby")).toBe("loupe-export-title");
+    expect(dialog()?.getAttribute("aria-labelledby")).toBe("loupe-copy-title");
     expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Button variant in MemberRow");
     expect(dialog()?.querySelector(".counts")?.textContent).toBe("1 change · 0 held for review");
     expect([...(dialog()?.querySelectorAll("[data-entry]") ?? [])].map((entry) => entry.querySelector("span")?.textContent)).toEqual([
@@ -152,11 +142,12 @@ describe("the export dialog", () => {
     expect(dialog()?.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it("holds Export back only while the title is empty", async () => {
+  it("holds Copy back only while the title is empty", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
-    const submit = button("Export", dialog() as HTMLDialogElement);
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Copy Proposal");
+    const submit = button("Copy", dialog() as HTMLDialogElement);
     expect(submit?.disabled).toBe(false);
     type(field('input[name="title"]'), "   ");
     expect(submit?.disabled).toBe(true);
@@ -164,7 +155,7 @@ describe("the export dialog", () => {
     expect(submit?.disabled).toBe(false);
   });
 
-  it("downloads one report with the title, designer and notes, and clears nothing", async () => {
+  it("copies one text with the rules, the title, designer and notes, and clears nothing", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     const records = registry().store.records();
@@ -178,23 +169,26 @@ describe("the export dialog", () => {
       if (dialog()?.open && !dialog()?.contains(this)) return;
       focus.call(this);
     });
-    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
+    act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
     await until(() => dialog() === null);
 
-    expect(downloads.map((download) => download.name)).toEqual([expect.stringMatching(/^proposal-calmer-rows-\d{8}-\d{4}\.html$/)]);
-    expect(downloads[0]?.blob.type).toBe("text/html");
-    const proposal = await exportedProposal();
-    expect(proposal).toMatchObject({ title: "Calmer rows", designer: "Dana" });
+    expect(copies).toHaveLength(1);
+    const text = copies[0] ?? "";
+    expect(text.startsWith("# Calmer rows\norbix-ai@abcdef1 · by Dana\n")).toBe(true);
+    expect(text).toContain("`pnpm -C apps/app exec loupe locate` with this whole Proposal");
+    expect(text).toContain('Note: "Ghost reads as disabled on the dark theme."');
+    const proposal = copiedProposal();
+    expect(proposal).toMatchObject({ formatVersion: 2, title: "Calmer rows", designer: "Dana" });
     const [route] = proposal.routes;
-    expect(route?.changes[0]?.note).toBe("Ghost reads as disabled on the dark theme.");
+    expect(route?.changes[0]).toMatchObject({ action: "apply", note: "Ghost reads as disabled on the dark theme." });
 
     expect(dialog()).toBeNull();
-    expect(button("Exported")).toBeDefined();
+    expect(button("Copied")).toBeDefined();
     // Focus goes back to what opened the dialog.
-    expect(shadow().activeElement).toBe(shadow().querySelector("[data-export]"));
+    expect(shadow().activeElement).toBe(shadow().querySelector("[data-copy]"));
     expect(registry().store.records()).toEqual(records);
 
-    // The next export starts from what was typed.
+    // The next copy starts from what was typed.
     await settle();
     await openDialog();
     expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Calmer rows");
@@ -202,7 +196,7 @@ describe("the export dialog", () => {
     expect(field<HTMLTextAreaElement>('[data-entry="c1"] textarea').value).toBe("Ghost reads as disabled on the dark theme.");
   });
 
-  it("closes on Cancel and on Escape, downloading nothing", async () => {
+  it("closes on Cancel and on Escape, copying nothing", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
@@ -213,17 +207,32 @@ describe("the export dialog", () => {
       field('input[name="title"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     });
     expect(dialog()).toBeNull();
-    expect(downloads).toEqual([]);
+    expect(copies).toEqual([]);
   });
 
-  it("exports under the suggested title and keeps following it while the designer leaves it alone", async () => {
+  it("copies under the suggested title and keeps following it while the designer leaves it alone", async () => {
     act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
     await settle();
     await openDialog();
-    act(() => button("Export", dialog() as HTMLDialogElement)?.click());
+    act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
     await until(() => dialog() === null);
-    expect(downloads.map((download) => download.name)).toEqual([expect.stringMatching(/^proposal-button-variant-in-memberrow-\d{8}-\d{4}\.html$/)]);
-    expect((await exportedProposal()).title).toBe("Button variant in MemberRow");
-    expect(exportForm().title).toBeNull();
+    expect(copiedProposal().title).toBe("Button variant in MemberRow");
+    expect(copyForm().title).toBeNull();
+  });
+
+  it("keeps the dialog open and says why when the browser refuses the clipboard, with the text in the console", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async () => Promise.reject(new Error("Write permission denied.")) },
+    });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+    await settle();
+    await openDialog();
+    act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
+    await until(() => dialog()?.querySelector('[role="alert"]') != null);
+    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe("Write permission denied. The Proposal is in the console.");
+    expect(String(info.mock.calls[0]?.[0])).toMatch(/^\[loupe\] Proposal:\n\n# Button variant in MemberRow\n/);
   });
 });

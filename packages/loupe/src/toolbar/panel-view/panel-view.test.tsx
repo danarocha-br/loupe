@@ -214,7 +214,7 @@ describe("the list", () => {
     });
     click("Menu");
     const shown = view();
-    expect(shown.header).toEqual({ exportEnabled: true, route: "/", report: "Home · 2 changes" });
+    expect(shown.header).toEqual({ route: "/", report: "Home · 2 changes" });
     expect(shown.footer).toMatchObject({ countText: "2 Overrides on this page", hasOverrides: true, copyEnabled: true });
     expect(shown.footer.resetAll).toEqual(
       expect.arrayContaining([

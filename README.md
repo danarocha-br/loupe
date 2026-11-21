@@ -3,8 +3,8 @@
 Loupe is a toolbar for product designers. It runs inside a product's own
 Next.js app on your machine, lists the real components on the page, shows the
 props each one was given, and lets you try other values on the live page. When
-something works, you export a Proposal: a report with an exact list of the
-changes, for an engineer to apply.
+something works, you copy a Proposal: an exact list of the changes, each tied to
+a call site, for your coding agent to apply, or an engineer.
 
 Loupe only runs in development. It never edits the product's components, and
 nothing from it reaches a production build. In the planning documents it is
@@ -188,9 +188,10 @@ browser remembers your choice.
 4. **Change a value.** Each prop has its own card: choose an option in its table,
    flip its switch for true or false, or type in the **Text** field for a plain
    label. The page updates live, and the change gets a number, the way a drawing
-   marks a revision: a numbered triangle on its card, a dashed cloud with the
-   same number around every instance it reaches on the page, its line in the
-   **Changes** list, and its entry in the Proposal (`c1` is 1). The card keeps
+   marks a revision: a numbered triangle on its card, a dashed outline around
+   every instance it reaches on the page, for a moment as it lands and while you
+   point at its row, its line in the **Changes** list, and its entry in the
+   Proposal (`c1` is 1). The card keeps
    the app's own value, dotted in the table and on the line under the name. Your
    change holds while the app re-renders.
    - Label text can be changed on one instance or a call site, never page-wide.
@@ -210,17 +211,48 @@ browser remembers your choice.
    Always press **Clear flag previews** before you switch to another project:
    the preview is a cookie that other apps on `localhost` see too (see
    [Troubleshooting](#another-app-on-localhost-answers-500-with-flags-missing-flags_secret)).
-7. **Export.** **Export Proposal**, at the bottom of the panel, asks for a
-   title and downloads one self-contained HTML report with the changes file
-   inside. **Copy as Markdown**, the copy button beside **Reset all**, copies a
-   short summary for a ticket.
-   Exporting writes nothing to the repo and clears nothing.
+7. **Copy the Proposal.** **Copy Proposal**, at the bottom of the panel, asks
+   for a title and a note per change, then copies one text: the rules for
+   applying it, one line per change, and the Proposal's JSON. Paste it into your
+   coding agent (see [Apply a Proposal with your agent](#apply-a-proposal-with-your-agent)),
+   or send it to an engineer.
+   Copying writes nothing to the repo and clears nothing.
 
 Your component changes live in the browser tab only. Reloading the page drops
 them, and they are never written to the product's code.
 
 **Hide** gives the page its full width back and leaves a small **Loupe** button;
 click it to bring the panel back.
+
+### Apply a Proposal with your agent
+
+Paste the copied text into Claude Code, Cursor or any coding agent working in
+the product repo. The text tells the agent what to do with each change:
+
+- **Apply**: a literal edit at each listed call site.
+- **Ask first**: the change needs a condition (it reaches some instances of a
+  call site only), or the value comes from app logic, so the agent proposes the
+  code and waits for your yes.
+- **Context**: states you held open and flags you previewed. No code changes.
+- **Don't apply**: changes held for review.
+
+The agent finds each call site with `loupe locate`, which reads the same anchors
+the panel uses, so it never guesses which `<Button>` you meant. Run from the
+repo root, with your app's folder in it:
+
+```bash
+pnpm -C apps/app exec loupe locate < proposal.md
+```
+
+It prints each call site's file and line, and how each prop is written there
+now. If the code around a call site changed since you copied the Proposal, it
+says so, and the agent stops and asks. When the agent is done, the same command
+with `--check` exits 0 only once every Apply change is in the code. The
+Proposal names the exact command, `--out` included when your Product layer
+isn't `packages/loupe`.
+
+Loupe itself never edits your code: the agent does, at the call sites you
+changed, never in a design-system default and never in the Product layer.
 
 ### When the panel asks you to run `generate`
 
@@ -444,7 +476,7 @@ Loupe's; keep or delete them as you like.
 ## Demo
 
 A short recording of the whole loop on orbix-ai (install, select a component,
-change it at two scopes, export a Proposal, remove) will go here. It waits for
+change it at two scopes, copy a Proposal, apply it with an agent, remove) will go here. It waits for
 the Toolbar's visual design, which will change how the panel looks.
 
 ## Working on Loupe

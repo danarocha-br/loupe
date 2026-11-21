@@ -264,7 +264,7 @@ describe("the Toolbar", () => {
   });
 
   it("adds its methods to __loupe as it mounts, and again after resetLoupe()", async () => {
-    const methods = ["proposal", "proposalMarkdown", "report", "exportProposal"];
+    const methods = ["proposal", "proposalText"];
     const onLoupe = () => methods.filter((name) => typeof (debugOf() as unknown as Record<string, unknown>)[name] === "function");
     await mount();
     expect(onLoupe()).toEqual(methods);

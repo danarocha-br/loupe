@@ -280,7 +280,7 @@ components:
     textColor: "{colors.amber-fg}"
     rounded: "{rounded.table}"
     padding: "10px 12px"
-  export-dialog:
+  copy-dialog:
     backgroundColor: "{colors.sheet}"
     textColor: "{colors.ink}"
     rounded: "{rounded.sheet}"
@@ -293,7 +293,7 @@ components:
 
 **Creative North Star: "The Revision Set"**
 
-The Loupe panel is the revision sheet pinned beside a set of drawings. On an architect's drawing a change gets a small triangle, a delta, carrying the revision's number; the same number lists the change in the revision table. Loupe numbers an Override the same way: a delta on the prop's card in the panel, in the footer and in the change list, and the same number on the change in the exported Proposal. The page itself stays the product's (2026-11-20): plain outlines show what is selected and, for a moment, what a change reached, then step back so the change can be judged as it will ship.
+The Loupe panel is the revision sheet pinned beside a set of drawings. On an architect's drawing a change gets a small triangle, a delta, carrying the revision's number; the same number lists the change in the revision table. Loupe numbers an Override the same way: a delta on the prop's card in the panel, in the footer and in the change list, and the same number on the change in the copied Proposal. The page itself stays the product's (2026-11-20): plain outlines show what is selected and, for a moment, what a change reached, then step back so the change can be judged as it will ship.
 
 The sheet itself is warm and calm. A dark ink band runs across the top, and below it the panel is a column of white cards on a warm ground: the selection, then one card per prop, each prop's options laid out as a small table of hairline cells with the chosen one filled lilac. It works the way a designer already works in Figma: the scope of a change is the select tool in the header (one Instance, or every Instance from its call site), not a control in the middle of the panel, so the cards hold only the props.
 
@@ -326,7 +326,7 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 - **Muted** (`muted`) and **Faint** (`faint`): option labels at rest, secondary lines, values; faint for counts, arrows, annotations and left-out Instances.
 - **Rule** (`rule`): the option table's hairlines and field borders. **Rule Soft** (`rule-soft`): row separators inside a card. **Rule Strong** (`rule-strong`): checkbox borders and the scrollbar. **Edge** (`edge`): the sheet's 1px outline against the product.
 - **Band** (`band` / `band-dark`): the header. **On Band** (`on-band`) for the wordmark and tools, **Band Muted** (`band-muted`) for the page crumb. **Band Hover** and **Band Pressed** are translucent washes of the sheet colour for the tools.
-- **Primary** (`primary` / `primary-dark`): Export Proposal only. Ink in light, the warm sheet colour in dark.
+- **Primary** (`primary` / `primary-dark`): Copy Proposal only. Ink in light, the warm sheet colour in dark.
 - **Pencil** (`pencil`): held for review (Suspended): the hollow ring and the held tag. Applies to nothing on the page.
 
 ### Status
@@ -352,7 +352,7 @@ A warm off-white sheet, white cards, near-black ink, and one lilac family that c
 **Character:** The panel lives in a shadow root inside a dev build and cannot load a web font, so it speaks in the operating system's own voice: on a Mac, SF Pro and SF Mono, close cousins of the Inter Tight and Geist Mono the Revision Set was drawn in. Hierarchy comes from a few steps of size and weight and slightly tight tracking on names.
 
 ### Hierarchy
-- **Headline** (600, 17px/22px, -0.015em): the selected Instance's visible name and the page name; the Export dialog's title steps up to 18px/24px.
+- **Headline** (600, 17px/22px, -0.015em): the selected Instance's visible name and the page name; the Copy Proposal dialog's title steps up to 18px/24px.
 - **Wordmark** (600, 14px/20px, -0.01em): "Loupe" in the band.
 - **Title** (500, 14px/18px, -0.01em): card titles, prop names, the component name beside the back button, and the footer's Override count.
 - **Body** (400, 13px/18px): the panel's base text and text fields. Explanatory paragraphs run 13px/19px in muted.
@@ -375,7 +375,7 @@ While the panel is open the page gives it a column on the right by taking a matc
 The sheet is three bands, top to bottom:
 - **The band** (48px): the wordmark and the page crumb on the left; on the right the two select tools in their own soft pill group, then Hide marks, light or dark, and Hide, all 30px round tools.
 - **The middle**, scrolling: cards in one column, 6px apart, 6px from the sheet's edges.
-- **The footer card**, pinned: the Override count with its deltas on the right, and below it Copy as Markdown, Reset all and Export Proposal at the right edge.
+- **The footer card**, pinned: the Override count with its deltas on the right, and below it Reset all and Copy Proposal at the right edge.
 
 A lilac status strip appears under the band for transient states: a select tool waiting for a click, a dialog under the panel, marks hidden on the page.
 
@@ -390,14 +390,14 @@ Two levels: the sheet floats, the cards do not. The sheet stands off the product
 ### Shadow Vocabulary
 - **Sheet** (`0 1px 2px rgba(27,34,32,0.05), 0 8px 24px rgba(27,34,32,0.07)`; dark `0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35)`): the docked sheet.
 - **Overlay** (`0 12px 36px rgba(27,34,32,0.22), 0 2px 6px rgba(27,34,32,0.1)`; dark `0 12px 36px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.3)`): the sheet when it overlays a narrow viewport, and the "Show Loupe" pill when the panel is hidden.
-- **Dialog** (`0 24px 64px rgba(27,34,32,0.22)`; dark `0 24px 64px rgba(0,0,0,0.6)`): the Export dialog, over a `rgba(27,34,32,0.32)` backdrop.
+- **Dialog** (`0 24px 64px rgba(27,34,32,0.22)`; dark `0 24px 64px rgba(0,0,0,0.6)`): the Copy Proposal dialog, over a `rgba(27,34,32,0.32)` backdrop.
 
 ### Named Rules
 **The Flat Cards Rule.** Cards never carry a shadow or a border. Tone separates them from the sheet; hairlines separate what is inside them.
 
 ## Shapes
 
-Soft, generous corners in three steps: the sheet and the Export dialog at 24px, cards at 18px, option tables, fields and notices at 12px. Every button, tag, chip and tool is a full pill. Inside an option table the cells meet on 1px hairlines with no radius of their own, and the table's 12px corner clips them.
+Soft, generous corners in three steps: the sheet and the Copy Proposal dialog at 24px, cards at 18px, option tables, fields and notices at 12px. Every button, tag, chip and tool is a full pill. Inside an option table the cells meet on 1px hairlines with no radius of their own, and the table's 12px corner clips them.
 
 One shape carries meaning and appears nowhere else:
 - **The delta**: an equilateral triangle, 22px wide, white with a 1.25px lilac stroke and its number at the base. Dashed and empty, it is a State prop held on one Instance. It stays in the panel and the Proposal; the page carries no numbers.
@@ -417,7 +417,7 @@ The scope of a change, chosen the way Figma selects.
 ### Buttons
 Soft pills, with the dark primary kept for the one exit.
 - **Shape:** full pill, 30px tall (26px small), `sunk` fill, no border, 12px/500.
-- **Primary:** Export Proposal only: `primary` fill, `on-primary` text, 40px tall, 13px/600. Hover brightens in light (1.3) and dims in dark (0.92).
+- **Primary:** Copy Proposal only: `primary` fill, `on-primary` text, 40px tall, 13px/600. Hover brightens in light (1.3) and dims in dark (0.92).
 - **Hover / Focus:** hover fills `sunk-hover`; focus is a 2px `lilac-line` outline at 2px offset on every focusable element. Disabled drops to 45% opacity.
 - **Back:** a 28px round button on the warm sheet colour, the arrow only.
 - **Reset:** a small pill in the top-right corner of a prop's card; on a switch row, round and icon-only.
@@ -458,7 +458,7 @@ With nothing selected: a "Changes" card (each change by its delta, the change in
 - **Tags and chips:** `sunk` pills, 11px muted (chips in 10px mono); stale ones amber; held ones a pencil ring.
 - **Dots:** 8px (6px small): `lilac-line` for Overrides, alert orange for failures, amber for warnings, a pencil ring for held, `rule` for none.
 
-### Export dialog
+### Copy Proposal dialog
 A 440px sheet with 24px corners and 6px inset, its sections white cards with 18px corners, over the dialog shadow. The title in the headline style, count tiles in the figure style, fields with 12px corners, actions right-aligned.
 
 ### Undo

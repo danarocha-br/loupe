@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { parseAdaptList } from "../adapt-list.js";
-import { findWorkspace } from "../compat/repo.js";
+import { layerFromFlags } from "../compat/repo.js";
 import { extract } from "../meta/command.js";
 import { collectSources, compare, DESIGN_SYSTEM_INCLUDE } from "../meta/sources.js";
 import type { ModuleMeta } from "../meta/types.js";
@@ -81,9 +81,8 @@ export function parseGenerateArgs(argv: readonly string[]): GenerateOptions | st
 }
 
 export function runGenerate(options: GenerateOptions, cwd: string): GenerateResult {
-  const repoRoot = path.resolve(cwd, options.root ?? findRepoRoot(cwd));
+  const { root: repoRoot, layer: outAbs } = layerFromFlags(cwd, options);
   const toRepo = (absolute: string) => path.relative(repoRoot, absolute).split(path.sep).join("/");
-  const outAbs = path.resolve(cwd, options.out ?? path.join(repoRoot, PRODUCT_LAYER.path));
   const outDir = toRepo(outAbs);
   if (outDir.startsWith("..")) throw new Error(`--out ${options.out} is outside the repo at ${repoRoot}`);
 
@@ -283,23 +282,3 @@ function packageName(dir: string): string | undefined {
   return readPackage(dir)?.name;
 }
 
-/**
- * The root `withLoupe`'s loader reads the Product layer against, so a run from the app
- * folder agrees with it even when the workspace sits inside a larger git checkout, or the
- * app's own package.json declares `workspaces` (PER-233). The pnpm workspace comes first,
- * as in the loader; `findWorkspace` alone would stop at such an app.
- */
-function findRepoRoot(from: string): string {
-  const start = path.resolve(from);
-  const root = nearestHolding(start, "pnpm-workspace.yaml") ?? findWorkspace(start) ?? nearestHolding(start, ".git");
-  if (root === undefined) throw new Error(`No git repository above ${from}; pass --root <dir>`);
-  return root;
-}
-
-/** The nearest directory up from `from` that holds `name`, if there is one. */
-function nearestHolding(from: string, name: string): string | undefined {
-  for (let dir = from; ; dir = path.dirname(dir)) {
-    if (existsSync(path.join(dir, name))) return dir;
-    if (path.dirname(dir) === dir) return undefined;
-  }
-}

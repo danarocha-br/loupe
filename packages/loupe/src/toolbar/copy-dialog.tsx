@@ -1,21 +1,21 @@
-// The header's Export Proposal and its dialog (PER-99 §8, PER-139), a modal centred
-// on the page (PER-140). The counts inform and never block; only an empty title
-// holds Export back.
+// The footer's Copy Proposal and its dialog (ADR 0002, after PER-99 §8 and PER-139),
+// a modal centred on the page (PER-140). The counts inform and never block; only an
+// empty title holds Copy back.
 
 import { type KeyboardEvent, type SyntheticEvent, useEffect, useRef, useState } from "react";
-import { type ExportPreview, type ExportResult, exportForm, exportProposal, previewExport } from "./export.js";
+import { copyProposal, type CopyPreview, copyForm, previewCopy } from "./copy.js";
 import { plural } from "./format.js";
 import { Key } from "./controls.js";
-import { DownloadIcon } from "./icons.js";
+import { CopyIcon } from "./icons.js";
 
 /** "3 changes · 1 held for review". */
-export function countsLine(preview: ExportPreview): string {
+export function countsLine(preview: CopyPreview): string {
   return [plural(preview.changes, "change"), `${preview.held} held for review`].join(" · ");
 }
 
-export function ExportButton({ disabled }: { disabled: boolean }) {
+export function CopyProposalButton({ disabled }: { disabled: boolean }) {
   const [open, setOpen] = useState(false);
-  /** The file the last export downloaded, while the button says so. */
+  /** The title of the Proposal last copied, while the button says so. */
   const [done, setDone] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -36,19 +36,19 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
         ref={trigger}
         type="button"
         className="btn primary"
-        data-export=""
+        data-copy=""
         disabled={disabled}
-        title={done === null ? "Download the HTML report for engineering" : `Downloaded ${done}`}
+        title={done === null ? "Copy the Proposal for your coding agent or an engineer" : `Copied "${done}"`}
         onClick={() => setOpen(true)}
       >
-        <DownloadIcon />
-        {done === null ? "Export Proposal" : "Exported"}
+        <CopyIcon size={16} />
+        {done === null ? "Copy Proposal" : "Copied"}
       </button>
       {open && (
-        <ExportDialog
-          onClose={(result) => {
+        <CopyDialog
+          onClose={(copied) => {
             setOpen(false);
-            if (result) setDone(result.fileName);
+            if (copied !== undefined) setDone(copied);
           }}
         />
       )}
@@ -56,9 +56,10 @@ export function ExportButton({ disabled }: { disabled: boolean }) {
   );
 }
 
-function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
-  const form = exportForm();
-  const [preview, setPreview] = useState<ExportPreview | { failed: string } | null>(null);
+/** `onClose` gets the copied Proposal's title, or nothing when the dialog was cancelled. */
+function CopyDialog({ onClose }: { onClose(copied?: string): void }) {
+  const form = copyForm();
+  const [preview, setPreview] = useState<CopyPreview | { failed: string } | null>(null);
   const [title, setTitle] = useState(form.title ?? "");
   const [designer, setDesigner] = useState(form.designer);
   const [notes, setNotes] = useState<Record<string, string>>({ ...form.notes });
@@ -79,12 +80,12 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
 
   useEffect(() => {
     let live = true;
-    previewExport().then(
+    previewCopy().then(
       (result) => {
         if (!live) return;
         setPreview(result);
         // Prefilled from the first change until the designer writes their own.
-        if (exportForm().title === null) setTitle(result.suggestedTitle);
+        if (copyForm().title === null) setTitle(result.suggestedTitle);
       },
       (failure: unknown) => live && setPreview({ failed: failure instanceof Error ? failure.message : String(failure) }),
     );
@@ -100,10 +101,10 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
     running.current = true;
     setBusy(true);
     setError(null);
-    exportProposal({ title, designer, notes }).then(
-      (result) => onClose(result),
+    copyProposal({ title, designer, notes }).then(
+      () => onClose(title.trim()),
       (failure: unknown) => {
-        console.warn("[loupe] Export failed:", failure);
+        console.warn("[loupe] Copy Proposal failed:", failure);
         running.current = false;
         setBusy(false);
         setError(failure instanceof Error ? failure.message : String(failure));
@@ -120,7 +121,7 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
     <dialog
       ref={element}
       className="dialog"
-      aria-labelledby="loupe-export-title"
+      aria-labelledby="loupe-copy-title"
       onCancel={cancel}
       onKeyDown={(event) => event.key === "Escape" && cancel(event)}
     >
@@ -132,8 +133,8 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
       >
         <div className="sec">
           <div className="head">
-            <h2 id="loupe-export-title">Export Proposal</h2>
-            <span className="meta">HTML report</span>
+            <h2 id="loupe-copy-title">Copy Proposal</h2>
+            <span className="meta">Markdown and JSON</span>
           </div>
           <label className="field">
             <span>Title</span>
@@ -144,7 +145,7 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
-                exportForm().title = event.target.value;
+                copyForm().title = event.target.value;
               }}
             />
           </label>
@@ -157,7 +158,7 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
               value={designer}
               onChange={(event) => {
                 setDesigner(event.target.value);
-                exportForm().designer = event.target.value;
+                copyForm().designer = event.target.value;
               }}
             />
           </label>
@@ -209,7 +210,7 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
                     onChange={(event) => {
                       const next = { ...notes, [entry.key]: event.target.value };
                       setNotes(next);
-                      exportForm().notes = next;
+                      copyForm().notes = next;
                     }}
                   />
                 </label>
@@ -230,8 +231,8 @@ function ExportDialog({ onClose }: { onClose(result?: ExportResult): void }) {
             Cancel
           </button>
           <button type="submit" className="btn primary" disabled={title.trim() === "" || busy}>
-            <DownloadIcon />
-            {busy ? "Exporting…" : "Export"}
+            <CopyIcon size={16} />
+            {busy ? "Copying…" : "Copy"}
           </button>
         </div>
       </form>
