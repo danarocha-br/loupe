@@ -4,6 +4,7 @@ import {
   bodyRect,
   centreOf,
   DEFAULT_PLACE,
+  FLARE,
   glue,
   MARGIN,
   nearestEdge,
@@ -28,9 +29,9 @@ describe("where the collapsed pill lands (2026-11-22)", () => {
     expect(placeFor(600, 800 - BODY.height / 2 - REACH, VIEWPORT).edge).toBeNull();
   });
 
-  it("keeps a docked pill's ends clear of the corners", () => {
+  it("keeps a docked pill's fillets clear of the corners", () => {
     const centre = centreOf(glue("bottom", 0, VIEWPORT), VIEWPORT);
-    expect(centre.x - BODY.width / 2).toBe(MARGIN);
+    expect(centre.x - BODY.width / 2 - FLARE).toBe(MARGIN);
     expect(centre.y + BODY.height / 2).toBe(VIEWPORT.height);
   });
 

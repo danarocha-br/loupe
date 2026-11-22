@@ -562,7 +562,7 @@ Soft corners in steps: the sheet's left corners at 24px; cards, the header, the 
 Three shapes carry meaning and appear nowhere else:
 - **The delta**: a triangle, 22 × 20px, card-filled with a 1.25px lilac stroke and its number at the base. Dashed and empty, it is a State prop held on one Instance, which the Proposal shows as a state, not a numbered change. It stays in the panel and the Proposal; the page carries no numbers.
 - **The switch**: a 42 × 22px pill on a 1.5px `switch-off` edge, whose thumb is the filled half it sits in, rounded on its outer side, with a 16px hole through its middle where the card shows.
-- **The collapsed pill**: a 44 × 32px stadium in `band` with Loupe's L, rigid. Docked, it sits flush on its side as a tab, its two corners on that side square and the far ones 16px.
+- **The collapsed pill**: a 44 × 32px stadium in `band` with Loupe's L, rigid. Docked, it sits flush on its side as a tab, its two corners on that side square and the far ones 16px, and flares into the edge with two 8px concave fillets outside its box, as a browser tab into its toolbar.
 
 On the page, a solid outline is the one Instance in hand and a dashed coral one is the rest of what it reaches. Grey dashes mean "not applied": a left-out Instance's outline, a hovered outline. In the panel a dashed tag means not there now ("Not visible now", "No Instance mounted").
 
@@ -659,13 +659,14 @@ Hide in the header collapses the panel to a flat dark pill with Loupe's L, the f
 - **Open:** a click, or Enter, opens the panel; focus goes to its heading.
 - **Rigid under the pointer:** dragged past 4px it follows the pointer exactly, a stadium that never changes shape, leans or lags, and nothing opens.
 - **A preview of where it will dock:** held within 56px of a side, a faint copy of the docked tab (`band` at 16% opacity) shows flush on that side, following the pointer along it; it fades in and out over 120ms. As a window shows where it will snap: a target, not a deformation.
-- **Let go** while the preview shows, it lands in it, however fast it was moving: it travels there over 260ms on `cubic-bezier(0.23, 1, 0.32, 1)`, its corners on that side squaring off over the same 260ms and curve. **Flicked** out of reach (faster than 0.3px/ms), it carries on as far as it would coast in 140ms, and docks if that reaches a side. Anywhere else it stays free where it was dropped, kept 8px inside the window. Docked, it keeps 8px clear of the corners. It is placed by `translate`, so its travel stays off layout.
+- **Let go** while the preview shows, it lands in it, however fast it was moving: it travels there over 260ms on `cubic-bezier(0.23, 1, 0.32, 1)`, its corners on that side squaring off over the same 260ms and curve. **Flicked** out of reach (faster than 0.3px/ms), it carries on as far as it would coast in 140ms, and docks if that reaches a side. Anywhere else it stays free where it was dropped, kept 8px inside the window. It is placed by `translate`, so its travel stays off layout.
+- **Joined to its side:** docked, two 8px concave fillets flare from the pill into the window's edge, outside its box, so it reads as joined to the frame rather than parked against it. They are the docked shape, never the drag: none while held; on landing they arrive 140ms in (120ms fade, 200ms scale from 0.5 on `cubic-bezier(0.23, 1, 0.32, 1)`, from the corner where pill and edge meet), just as the pill settles; picked up, they go in 80ms. The preview shows them too. They take the body's colour on hover and the dark hairline traces them. Docked, the fillets keep 8px clear of the window's corners.
 - **Keyboard:** the arrow keys dock it on the side they point at, so it moves without a pointer.
 - **Kept** in this browser (`loupe:launcher`), in fractions of the window, so it holds across a resize and a reload.
 - **Hover** lightens its fill (`band-hover`); focus draws a 2px coral outline 2px out, following its corners.
 - **Opening: a handle and its drawer.** The pill tucks into its side (160ms; a free pill settles away to 0.9 and fades) as the panel slides out of the window's right edge, 300ms on the drawer curve, `cubic-bezier(0.32, 0.72, 0, 1)`. The page makes room in the click itself, before the panel draws, so the page map is drawn at its final shape from the first frame.
 - **Closing, quicker:** the panel slides back out of the window in 220ms on `cubic-bezier(0.23, 1, 0.32, 1)`; it ends on the slide's own `transitionend` (300ms at most), and the page takes its column back in the same task the panel goes, so there is never a frame with an empty column; then the pill slides out of its side again (240ms). Hide pressed mid-open turns the slide round from where it is.
-- **Reduced motion:** nothing travels; the panel and the pill fade (150ms), a dock is instant, and the preview still fades.
+- **Reduced motion:** nothing travels; the panel and the pill fade (150ms), a dock is instant, the fillets fade without scaling, and the preview still fades.
 - Nothing animates on the page's first load: the panel is simply there.
 
 ### Undo

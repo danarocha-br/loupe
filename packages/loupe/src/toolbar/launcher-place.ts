@@ -20,6 +20,8 @@ export const BODY = { width: 44, height: 32 } as const;
 export const REACH = 56;
 /** How far a free pill, or a glued one's ends, keep from the window's edges and corners. */
 export const MARGIN = 8;
+/** The concave fillets a docked pill flares into its side with, outside its box (styles.ts). */
+export const FLARE = 8;
 
 /** Where it starts: on the right side, low, where the "Show Loupe" tab used to sit. */
 export const DEFAULT_PLACE: Place = { edge: "right", at: 0.85 };
@@ -34,10 +36,10 @@ function sizeOn(edge: Edge): { length: number; depth: number } {
   return horizontal(edge) ? { length: BODY.width, depth: BODY.height } : { length: BODY.height, depth: BODY.width };
 }
 
-/** The range a glued body's centre can take along its side, keeping its ends clear of the corners. */
+/** The range a glued body's centre can take along its side, keeping its fillets clear of the corners. */
 function alongRange(edge: Edge, viewport: Viewport): [number, number] {
   const side = horizontal(edge) ? viewport.width : viewport.height;
-  const half = sizeOn(edge).length / 2 + MARGIN;
+  const half = sizeOn(edge).length / 2 + FLARE + MARGIN;
   return [half, side - half];
 }
 

@@ -402,6 +402,26 @@ button:disabled { cursor: default; opacity: 0.45; }
 .launcher[data-edge="left"], .dock-ghost[data-edge="left"] { border-radius: 0 16px 16px 0; }
 .launcher[data-edge="top"], .dock-ghost[data-edge="top"] { border-radius: 0 0 16px 16px; }
 .launcher[data-edge="bottom"], .dock-ghost[data-edge="bottom"] { border-radius: 16px 16px 0 0; }
+/* Docked, the tab flares into its side, as a browser tab into its toolbar: two 8px concave
+   fillets outside its box, where it meets the window's edge. They are the docked shape, never
+   the drag: they arrive as it lands and go at once when it is picked up. The mask uses alpha
+   only, so its black is not a colour. */
+.launcher::before, .launcher::after, .dock-ghost::before, .dock-ghost::after {
+  content: ""; position: absolute; width: 8px; height: 8px; pointer-events: none; background-color: inherit;
+  opacity: 0; scale: 0.5; transition: opacity 80ms ease-out, scale 80ms ease-out;
+}
+.launcher:not([data-edge="free"])::before, .launcher:not([data-edge="free"])::after {
+  opacity: 1; scale: 1; transition: opacity 120ms ease-out 140ms, scale 200ms cubic-bezier(0.23, 1, 0.32, 1) 140ms;
+}
+.dock-ghost[data-edge]::before, .dock-ghost[data-edge]::after { opacity: 1; scale: 1; transition: none; }
+.launcher[data-edge="right"]::before, .dock-ghost[data-edge="right"]::before { left: 36px; top: -8px; mask: radial-gradient(circle at 0 0, transparent 7.5px, black 8px); transform-origin: 100% 100%; }
+.launcher[data-edge="right"]::after, .dock-ghost[data-edge="right"]::after { left: 36px; top: 32px; mask: radial-gradient(circle at 0 100%, transparent 7.5px, black 8px); transform-origin: 100% 0; }
+.launcher[data-edge="left"]::before, .dock-ghost[data-edge="left"]::before { left: 0; top: -8px; mask: radial-gradient(circle at 100% 0, transparent 7.5px, black 8px); transform-origin: 0 100%; }
+.launcher[data-edge="left"]::after, .dock-ghost[data-edge="left"]::after { left: 0; top: 32px; mask: radial-gradient(circle at 100% 100%, transparent 7.5px, black 8px); transform-origin: 0 0; }
+.launcher[data-edge="top"]::before, .dock-ghost[data-edge="top"]::before { left: -8px; top: 0; mask: radial-gradient(circle at 0 100%, transparent 7.5px, black 8px); transform-origin: 100% 0; }
+.launcher[data-edge="top"]::after, .dock-ghost[data-edge="top"]::after { left: 44px; top: 0; mask: radial-gradient(circle at 100% 100%, transparent 7.5px, black 8px); transform-origin: 0 0; }
+.launcher[data-edge="bottom"]::before, .dock-ghost[data-edge="bottom"]::before { left: -8px; top: 24px; mask: radial-gradient(circle at 0 0, transparent 7.5px, black 8px); transform-origin: 100% 100%; }
+.launcher[data-edge="bottom"]::after, .dock-ghost[data-edge="bottom"]::after { left: 44px; top: 24px; mask: radial-gradient(circle at 100% 0, transparent 7.5px, black 8px); transform-origin: 0 100%; }
 .launcher .mark { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
 .launcher .glyph { display: block; }
 .launcher.dragging { cursor: grabbing; }
@@ -430,6 +450,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 }
 @media (prefers-reduced-motion: reduce) {
   .launcher, .launcher.settling, .launcher.leaving { transition: opacity 150ms ease-out; }
+  .launcher::before, .launcher::after, .launcher:not([data-edge="free"])::before, .launcher:not([data-edge="free"])::after { scale: none; transition: opacity 150ms ease-out; }
   .launcher.leaving[data-edge] { transform: none; opacity: 0; }
   @starting-style { .launcher[data-edge] { transform: none; opacity: 0; } }
 }
