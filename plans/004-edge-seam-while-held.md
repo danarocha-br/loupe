@@ -1,6 +1,6 @@
 # 004 — While held in reach, the window's edge lights a short seam where the pill will join it
 
-- **Status**: TODO (an alternative or a complement to 003; see README)
+- **Status**: DONE
 - **Commit**: 44b2399
 - **Severity**: LOW
 - **Category**: Physicality (attachment cue)

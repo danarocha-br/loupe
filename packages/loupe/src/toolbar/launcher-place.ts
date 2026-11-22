@@ -104,6 +104,25 @@ export function bodyRect(place: Place, viewport: Viewport): Rect {
   return { left: centre.x - BODY.width / 2, top: centre.y - BODY.height / 2, width: BODY.width, height: BODY.height };
 }
 
+/** How far the seam on the edge runs past the pill's side, each way, and how thick it is. */
+const SEAM_RUN = 24;
+const SEAM = 2;
+
+/** The seam a held pill lights on `edge`, centred on its docked centre `at`: a thin box on the window's edge. */
+export function seamRect(edge: Edge, at: { x: number; y: number }, viewport: Viewport): Rect {
+  const length = sizeOn(edge).length + SEAM_RUN * 2;
+  switch (edge) {
+    case "left":
+      return { left: 0, top: at.y - length / 2, width: SEAM, height: length };
+    case "right":
+      return { left: viewport.width - SEAM, top: at.y - length / 2, width: SEAM, height: length };
+    case "top":
+      return { left: at.x - length / 2, top: 0, width: length, height: SEAM };
+    case "bottom":
+      return { left: at.x - length / 2, top: viewport.height - SEAM, width: length, height: SEAM };
+  }
+}
+
 /** The body's centre in px, wherever the place puts it. */
 export function centreOf(place: Place, viewport: Viewport): { x: number; y: number } {
   if (place.edge === null) return freeCentre(place.x * viewport.width, place.y * viewport.height, viewport);

@@ -22,6 +22,7 @@ import {
   REACH,
   readPlace,
   type Rect,
+  seamRect,
   type Viewport,
 } from "./launcher-place.js";
 
@@ -223,6 +224,8 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
         aria-hidden="true"
         style={ghost ? { translate: `${round(ghost.at.x - BODY.width / 2)}px ${round(ghost.at.y - BODY.height / 2)}px` } : undefined}
       />
+      {/* The edge's side of the join: a short seam where the pill will meet it. */}
+      <span className={shown ? "dock-seam shown" : "dock-seam"} aria-hidden="true" style={ghost ? seamStyle(seamRect(ghost.edge, ghost.at, viewport)) : undefined} />
       <button
         type="button"
         className={classes}
@@ -254,3 +257,5 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;
+
+const seamStyle = (rect: Rect) => ({ translate: `${round(rect.left)}px ${round(rect.top)}px`, width: `${rect.width}px`, height: `${rect.height}px` });

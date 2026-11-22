@@ -433,6 +433,9 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Where the held pill would dock if let go now: the docked shape, faint, flush on its side. */
 .dock-ghost { position: fixed; left: 0; top: 0; z-index: 2147483646; width: 44px; height: 32px; border-radius: 16px; background: var(--band); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
 .dock-ghost.shown { opacity: 0.16; }
+/* The edge's side of the join: while a held pill is in reach, a short accent seam on the window's edge where it will meet it. */
+.dock-seam { position: fixed; left: 0; top: 0; z-index: 2147483646; border-radius: 1px; background: var(--accent); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
+.dock-seam.shown { opacity: 1; }
 /* The handle: as the panel opens it tucks into its side (free, it settles away), and as the
    panel closes it slides back out of its side. A transform, apart from the translate that places it. */
 .launcher.leaving { pointer-events: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 120ms ease-out; }
@@ -835,6 +838,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .launcher { background: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
   .dock-ghost { forced-color-adjust: none; background: ButtonText; }
+  .dock-seam { forced-color-adjust: none; background: Highlight; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
   .pills .is-default::after, .legend i { forced-color-adjust: none; background: CanvasText; }

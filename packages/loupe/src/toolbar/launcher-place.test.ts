@@ -11,6 +11,7 @@ import {
   placeFor,
   REACH,
   readPlace,
+  seamRect,
 } from "./launcher-place.js";
 
 const VIEWPORT = { width: 1200, height: 800 };
@@ -44,6 +45,11 @@ describe("where the collapsed pill lands (2026-11-22)", () => {
 
   it("gives the body's box for a place", () => {
     expect(bodyRect({ edge: null, x: 0.5, y: 0.5 }, VIEWPORT)).toEqual({ left: 600 - BODY.width / 2, top: 400 - BODY.height / 2, width: BODY.width, height: BODY.height });
+  });
+
+  it("lights a seam on the edge it would dock on, centred on the preview, 24px past the pill's side each way", () => {
+    expect(seamRect("right", { x: 1178, y: 400 }, VIEWPORT)).toEqual({ left: 1198, top: 360, width: 2, height: 80 });
+    expect(seamRect("bottom", { x: 600, y: 784 }, VIEWPORT)).toEqual({ left: 554, top: 798, width: 92, height: 2 });
   });
 
   it("finds the side the body is closest to", () => {

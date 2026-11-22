@@ -94,16 +94,21 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
   });
 
   it("shows where it would dock while held in reach of a side, and nothing while held mid-page", () => {
+    const seam = () => container.querySelector(".dock-seam") as HTMLElement;
     pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     expect(ghost().classList.contains("shown")).toBe(false);
+    expect(seam().classList.contains("shown")).toBe(false);
     // The pointer puts the body 30px off the bottom: in reach.
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 16 - 30 - 6 });
     expect(pill().dataset.edge).toBe("free");
     expect(ghost().classList.contains("shown")).toBe(true);
     expect(ghost().dataset.edge).toBe("bottom");
+    // And the edge lights a seam where the pill will meet it.
+    expect(seam().classList.contains("shown")).toBe(true);
     // Back out of reach: the preview goes.
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
     expect(ghost().classList.contains("shown")).toBe(false);
+    expect(seam().classList.contains("shown")).toBe(false);
   });
 
   it("docks into the preview when let go in reach", () => {

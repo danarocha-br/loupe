@@ -9,7 +9,7 @@ any agent, or `improve-animations execute <plan>`.
 | [001](001-column-in-step-with-panel.md) | Move the page's column in the same frame as the panel | HIGH | DONE |
 | [002](002-dock-without-goo.md) | Dock the pill crisply: a rigid pill, a flat side, and a preview of where it will land | HIGH | DONE |
 | [003](003-tab-flares-into-its-side.md) | Docked, the tab flares into its side: two static fillets that arrive as it lands | MEDIUM | DONE |
-| [004](004-edge-seam-while-held.md) | While held in reach, the window's edge lights a short seam where the pill will join it | LOW | TODO |
+| [004](004-edge-seam-while-held.md) | While held in reach, the window's edge lights a short seam where the pill will join it | LOW | DONE |
 
 ## Order and dependencies
 
