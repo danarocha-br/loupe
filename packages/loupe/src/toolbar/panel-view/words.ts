@@ -104,7 +104,8 @@ export const TEXT = {
   seenNotMounted: "Seen on this page, not mounted now. Select its menu or dialog and press Hold open to inspect it.",
   notOnPage: "Not on the page now",
   showsWhenMounted: "It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open.",
-  untick: "Untick one to leave it out: it keeps its own value.",
+  untick: "Untick one to leave it out. It keeps its own value.",
+  picked: "picked",
   current: "App value:",
   state: "State prop",
   empty: "empty",
@@ -141,6 +142,22 @@ export function instanceLabel(id: string, hint: string | null): string {
   const site = parseHint(hint);
   const where = site ? `${site.path.split("/").at(-1)}:${site.line}` : id;
   return `${where}${callSiteLabels(id).key}`;
+}
+
+/** Over a component's call sites, opened: "3 call sites · pick one to inspect". */
+export const sitesText = (count: number) => (count === 1 ? "1 call site · pick it to inspect" : `${count} call sites · pick one to inspect`);
+
+/** A call site's file and line, from its hint: "member-row-menu.tsx:37". Its anchor when it has no hint. */
+export function siteWhere(anchor: string, hint: string | null): string {
+  const site = parseHint(hint);
+  return site ? `${site.path.split("/").at(-1)}:${site.line}` : callSiteLabels(anchor).short;
+}
+
+/** What a call site's Instances show, the first two by name: "Ana Souza, Bruno Lima +2". */
+export function siteNames(names: readonly string[]): string {
+  if (names.length === 1) return names[0] as string;
+  const shown = names.slice(0, 2).map(isolate).join(", ");
+  return names.length > 2 ? `${shown} +${names.length - 2}` : shown;
 }
 
 /** The key path that tells repeated Instances apart, or the whole id when there is none. */
@@ -221,6 +238,12 @@ export function footerCount(changes: number, states: number): string {
   return states > 0 ? `${plural(changes, "change")} · ${statesShown(states)}` : plural(changes, "change");
 }
 
+/** The footer's word after its big number. */
+export const changesWord = (count: number) => (count === 1 ? "change" : "changes");
+
+/** The footer's chip for the State props held open, as Paper draws it: "1 held". */
+export const heldChip = (count: number) => (count > 0 ? `${count} held` : null);
+
 /** What a held State prop shows: "open held at true". */
 export function stateDetail(prop: string, value: string): string {
   return `${prop} held at ${value}`;
@@ -268,7 +291,10 @@ export function scopeLabel(name: string, scope: Scope, size: number, server: num
 
 export const leftOutChip = (label: string) => `Left out of ${label}`;
 /** How many of a scope's Instances a change here reaches: "Reaches 3 of 4". */
-export const previewedText = (included: number, total: number) => `Reaches ${included} of ${total}`;
+export const REACHES = "Reaches";
+export const previewedText = (included: number, total: number) => `${REACHES} ${included} of ${total}`;
+/** The Instances of the component on the page that a call site doesn't reach: "3 more on this page". */
+export const moreOnPage = (more: number) => (more > 0 ? `${more} more on this page` : null);
 export const siteLabel = (anchor: string) => (anchor ? callSiteLabels(anchor).short : "No call site");
 
 // ── Prop rows ───────────────────────────────────────────────────────────────

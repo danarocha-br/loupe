@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { GroupItem } from "./panel-view/types.js";
 
@@ -58,8 +58,8 @@ const HUES = 7;
 export const hueOf = (index: number) => `hue-${index % HUES}`;
 
 /**
- * Every component on screen as a tinted block where it sits, over the rows of "On this
- * page": the rows are its legend. Point to find, click to inspect. Nothing is drawn
+ * Every component on screen as a tinted block where it sits, fit into a dotted well over
+ * the rows of "On this page": the rows are its legend. Point to find, click to inspect. Nothing is drawn
  * while nothing has a box (an Instance that isn't mounted, or a page with no layout).
  */
 export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
@@ -80,21 +80,24 @@ export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
   // The largest first, so a small block inside a large one stays on top to be pointed at.
   blocks.sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
   return (
-    <div className="map-sheet" style={{ aspectRatio: `${W} / ${H}` }} data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
-      {blocks.map((b) => (
-        <button
-          key={`${b.group.component}:${b.id}`}
-          type="button"
-          className={`blk ${b.hue}${lit === b.group.component ? " lit" : ""}`}
-          style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
-          title={`${b.group.component} ${b.group.count}`}
-          aria-label={`Inspect this ${b.group.component}`}
-          onMouseOver={() => onPoint(b.group)}
-          onFocus={() => onPoint(b.group)}
-          onBlur={() => onPoint(null)}
-          onClick={() => onSelect(b.id)}
-        />
-      ))}
+    <div className="map-sheet" data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
+      {/* The page's shape, fit into the well: blocks sit at their place in it. */}
+      <div className="fit" style={{ "--ratio": W / H } as CSSProperties}>
+        {blocks.map((b) => (
+          <button
+            key={`${b.group.component}:${b.id}`}
+            type="button"
+            className={`blk ${b.hue}${lit === b.group.component ? " lit" : ""}`}
+            style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
+            title={`${b.group.component} ${b.group.count}`}
+            aria-label={`Inspect this ${b.group.component}`}
+            onMouseOver={() => onPoint(b.group)}
+            onFocus={() => onPoint(b.group)}
+            onBlur={() => onPoint(null)}
+            onClick={() => onSelect(b.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }

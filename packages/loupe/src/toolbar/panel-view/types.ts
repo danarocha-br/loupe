@@ -59,7 +59,7 @@ export type PanelView = {
   /** The plot key: per mounted Instance a numbered change reaches, its numbers. */
   marks: { id: string; keys: number[]; stamp: string }[];
   /** The report line names the page and counts its changes. */
-  header: { route: string; report: string };
+  header: { route: string; /** The page's name alone: "Home". */ page: string; report: string };
   /** "Overrides are off" across the panel, while the React self-check fails. */
   banner: { title: string; body: string } | null;
   footer: {
@@ -69,10 +69,10 @@ export type PanelView = {
     copyEnabled: boolean;
     /** Every record "Reset all" discards; empty while it is off. */
     resetAll: ScopeTarget[];
-    /** The plot key's numbered changes, in every state of the panel. */
-    keys: ChangeItem[];
-    /** The State props held open: dashed deltas after the numbered ones. */
-    states: StateItem[];
+    /** The numbered changes: the big number, and its word, "change" or "changes". */
+    changes: { count: number; word: string };
+    /** The State props held open, which the Proposal shows as states: the chip's words, and each one for its tooltip. */
+    states: { chip: string | null; title: string };
   };
   body: ListBody | InspectorBody | GoneBody;
 };
@@ -98,24 +98,47 @@ export type GroupItem = {
   component: string;
   /** "×4". */
   count: string;
+  /** Its mounted Instances. */
+  mountedCount: number;
+  /** Its bar: its count over the most used component's, 0 to 1. */
+  share: number;
+  /** No Override can reach it: drawn with the eye, its reason in the row's tooltip. */
+  inspectOnly: boolean;
+  /** "3 call sites · pick one to inspect". */
+  sitesText: string;
+  /** Its mounted Instances by call site, each a card to pick one from. */
+  sites: CallSiteItem[];
   verdict: Verdict;
   /** The tag's tooltip: the command for "Not generated yet", the reason for "Inspect only". */
   statusTitle: string | null;
-  notes: { kind: "overrides" | "stale" | "not-mounted" | "reason"; text: string }[];
+  notes: { kind: "overrides" | "stale" | "not-mounted"; text: string }[];
   /** The mounted Instances, outlined while the row is hovered. */
   outlineIds: string[];
   instances: InstanceItem[];
 };
 
-/** A State prop an Instance Override holds: a state shown in the Proposal, marked with a dashed delta, no number. */
+/** A call site of a component on the page: where it is written, and what its Instances show. */
+export type CallSiteItem = {
+  anchor: string;
+  /** Its file and line: "member-row-menu.tsx:37". */
+  label: string;
+  /** What its Instances show, the first two by name: "Ana Souza, Bruno Lima +2". */
+  names: string;
+  ids: string[];
+  /** Each Instance, a dot on the card: what its tooltip and its name for a screen reader say. */
+  instances: { id: string; label: string }[];
+  /** The Instance its card selects: the first. */
+  select: string;
+  /** False when no Override can reach its Instances: drawn with the inspect-only eye. */
+  supported: boolean;
+};
+
+/** A State prop an Instance Override holds: a state shown in the Proposal, not a numbered change. */
 export type StateItem = {
   /** "open held at true". */
   detail: string;
   /** The Instance's name, or its label when it shows none. */
   where: string;
-  /** The Instance, while it is mounted. */
-  select: string | null;
-  reached: string[];
 };
 
 /** One numbered change: "1 · variant · Actions for Ana Souza". */
@@ -169,6 +192,8 @@ export type InspectorBody = {
   name: string | null;
   /** The component and its call site's file and line: "Button · member-row-menu.tsx:37". */
   where: string;
+  /** Where it is written, set apart where the line starts: "member-row-menu.tsx" and ":37 · use 1 of 2". */
+  source: { file: string; line: string };
   /** The numbered changes that reach it. */
   keys: number[];
   /** "Hold open": a State prop with a true/false choice, held at true from one button. */
@@ -209,6 +234,8 @@ export type MembersView = {
   scope: "group" | "page";
   /** "3 of 4 previewed". */
   countText: string;
+  /** How far the scope reaches: "Reaches", its members in and in all, the component's on the page, and the rest said. */
+  reach: { lead: string; included: number; total: number; page: number; moreText: string | null };
   /** The scope's record is Suspended: shown, never changed. */
   suspended: boolean;
   members: MemberItem[];
@@ -243,8 +270,12 @@ export type SiteItem = {
 /** The app's value as a row shows it: written, the metadata's default, or not set. */
 export type ValueText = { kind: "set" | "default" | "unset"; text: string };
 
+/** A prop's glyph on its row, by what the prop does. */
+export type PropGlyph = "size" | "variant" | "off" | "focus" | "text" | "state" | "other";
+
 export type PropItem = {
   name: string;
+  glyph: PropGlyph;
   /** `Text` for label text, otherwise the prop's name. */
   label: string;
   /** The prop's own name after a label that isn't it: `children` after `Text`. */

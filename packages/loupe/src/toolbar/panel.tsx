@@ -1,10 +1,10 @@
-// The panel (PER-140; the Revision Set since 2026-11-20): a sheet in the column the
-// page makes room for, with a pinned header (the select tools, Hide marks, light or
-// dark, Hide) and footer (the Override count, Reset all, the undo offer and Copy
-// Proposal), and a scrolling middle of cards. The middle holds
+// The panel (PER-140; Paper's "Inspector as property rows" since 2026-11-22): a sheet
+// in the column the page makes room for, with a pinned header card (the wordmark, the
+// select tools, Hide marks, Hide) and footer card (the change count, Reset all, the
+// undo offer, light or dark and Copy Proposal), and a scrolling middle of cards. The middle holds
 // either the page's numbered changes and component list (nothing selected) or the
-// inspector: one card per prop, at This instance or, with Select multiple, a group
-// or page scope (PER-134). The scope is the select tool, as in Figma: there is no
+// inspector: one card of property rows, at This instance or, with Select multiple, a
+// group or page scope (PER-134). The scope is the select tool, as in Figma: there is no
 // scope control in the middle, only a link that widens a call site to the page.
 //
 // Revision marks: every change the Proposal would list carries its number (c1 reads
@@ -18,7 +18,7 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState } from "rea
 import type { LayerStatus } from "../layer-status.js";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope, ScopeTarget } from "../runtime/store.js";
-import { attempt, Breakable, HeldKey, Key, PropRowView } from "./controls.js";
+import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyProposalButton } from "./copy-dialog.js";
 import { FlagsCard } from "./flags.js";
@@ -29,15 +29,23 @@ import {
   ChevronIcon,
   ContrastIcon,
   CursorIcon,
+  ElbowIcon,
+  EyeIcon,
+  FileIcon,
   InfoIcon,
+  LayersIcon,
   MarksHiddenIcon,
   MarksIcon,
   PanelIcon,
+  PROP_ICONS,
   ResetIcon,
   SelectManyIcon,
+  WidenIcon,
+  Wordmark,
 } from "./icons.js";
 import { layerAnnouncement, LayerNotices, NotGeneratedNotice } from "./notices.js";
 import {
+  type CallSiteItem,
   type GoneBody,
   type GroupItem,
   type InspectorBody,
@@ -51,7 +59,6 @@ import {
   inspectOnlyTitle,
   LEGEND,
   TEXT,
-  THIS_INSTANCE,
 } from "./panel-view/index.js";
 import { hueOf, PageMap } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
@@ -95,6 +102,16 @@ const PANEL_INSET = 8;
  * pointer crosses the row's children changes nothing (`ToolbarOpen` keeps the ids).
  */
 type Actions = Pick<PanelProps, "debug" | "onSelect" | "onScope" | "onHover">;
+
+/** Pointing at or focusing something outlines `ids` on the page, and leaving it clears them: over, not enter (see above). */
+function hoverProps(onHover: Actions["onHover"], ids: string[]) {
+  return {
+    onMouseOver: () => onHover(ids),
+    onMouseLeave: () => onHover([]),
+    onFocus: () => onHover(ids),
+    onBlur: () => onHover([]),
+  };
+}
 
 /** The header's two select tools: what each is called, and the scope it opens a selection at. */
 const SELECT_TOOLS: { mode: SelectMode; scope: Scope; label: string; hint: string; title: string; icon: ReactNode }[] = [
@@ -167,10 +184,13 @@ export function Panel(props: PanelProps) {
     >
       <header className="header">
         <div className="brand">
-          <span className="wordmark">Loupe</span>
-          <span className="report" title={`${view.header.report} · ${view.header.route}`}>
-            / {view.header.report}
-          </span>
+          <Wordmark />
+          {/* The page, while nothing is selected: an Instance's identity names it beside the component instead. */}
+          {body.kind === "list" && (
+            <span className="report" title={`${view.header.report} · ${view.header.route}`}>
+              / {view.header.page}
+            </span>
+          )}
         </div>
         <div className="tools">
           <div className="select-tools" role="group" aria-label="Select">
@@ -189,6 +209,7 @@ export function Panel(props: PanelProps) {
               </button>
             ))}
           </div>
+          <span className="divider" aria-hidden="true" />
           <button
             type="button"
             className="tool"
@@ -203,16 +224,6 @@ export function Panel(props: PanelProps) {
           >
             {props.marksHidden ? <MarksHiddenIcon /> : <MarksIcon />}
             <span className="sr-only">Hide marks</span>
-          </button>
-          <button
-            type="button"
-            className="tool"
-            aria-pressed={props.theme === "dark"}
-            onClick={props.onTheme}
-            title={props.theme === "dark" ? "Switch to light" : "Switch to dark"}
-          >
-            <ContrastIcon />
-            <span className="sr-only">Dark theme</span>
           </button>
           <button type="button" className="tool" onClick={props.onHide} title="Hide the panel">
             <PanelIcon />
@@ -239,7 +250,7 @@ export function Panel(props: PanelProps) {
           <Inspector {...props} body={body} notices={notices} heading={heading} />
         )}
       </div>
-      <Footer debug={props.debug} footer={view.footer} onSelect={props.onSelect} onHover={props.onHover} />
+      <Footer debug={props.debug} footer={view.footer} theme={props.theme} onTheme={props.onTheme} />
     </section>
   );
 }
@@ -385,7 +396,7 @@ function ComponentList({
               onClick={() => onTool(tool.mode)}
               title={tool.title}
             >
-              <span className="glyph">{tool.icon}</span>
+              <ToolPreview mode={tool.mode} />
               <span className="t">{tool.label}</span>
               <span className="h">{tool.hint}</span>
             </button>
@@ -422,7 +433,7 @@ function ComponentList({
         </div>
       )}
       <HeldForReviewCard debug={debug} items={body.suspended} meta={body.suspendedMeta} />
-      <div className="section list-card on-page">
+      <div className="section on-page">
         <div className="head">
           <h3>On this page</h3>
           <span className="meta">{body.summary}</span>
@@ -430,78 +441,7 @@ function ComponentList({
         <PageMap debug={debug} groups={body.groups} lit={lit} onPoint={point} onSelect={onSelect} />
         <ul className="list" aria-label="Components on this page">
           {body.groups.map((group, index) => (
-            <li key={group.component} className={`group ${hueOf(index)}${lit === group.component ? " lit" : ""}`}>
-              <details>
-                <summary
-                  onMouseOver={() => point(group)}
-                  onMouseLeave={() => point(null)}
-                  onFocus={() => point(group)}
-                  onBlur={() => point(null)}
-                >
-                  {/* The whole name, wrapping where its words meet: a long one is never cut short (layout review). */}
-                  <span className="cname">
-                    <i className="hue-dot" />
-                    <Breakable text={group.component} />
-                  </span>{" "}
-                  <span className="times">{group.count}</span>
-                  <span className="sub">
-                    {group.notes.map((note) =>
-                      note.kind === "overrides" ? (
-                        <span key={note.kind} className="changed">
-                          {note.text}
-                        </span>
-                      ) : note.kind === "stale" ? (
-                        <span key={note.kind} className="stale">
-                          <span className="dot small amber" />
-                          {note.text}
-                        </span>
-                      ) : (
-                        <span key={note.kind}>{note.text}</span>
-                      ),
-                    )}
-                  </span>
-                  <span className="verdict">
-                    {group.verdict.status && group.verdict.status.kind !== "supported" && (
-                      <StatusView status={group.verdict.status} title={group.statusTitle} />
-                    )}
-                  </span>
-                  <ChevronIcon />
-                </summary>
-                <ul className="list instances">
-                  {group.instances.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        data-instance={item.id}
-                        onClick={() => onSelect(item.id)}
-                        {...(item.mounted
-                          ? {
-                              onMouseOver: () => onHover([item.id]),
-                              onMouseLeave: () => onHover([]),
-                              onFocus: () => onHover([item.id]),
-                              onBlur: () => onHover([]),
-                            }
-                          : {})}
-                      >
-                        <Keys keys={item.keys} />
-                        <span className="who">
-                          {item.name && (
-                            <span className="screen-name" dir="auto" lang={appLang()}>
-                              {item.name}
-                            </span>
-                          )}
-                          <span className="site">{item.label}</span>
-                        </span>
-                        {item.tags.map((tag) => (
-                          <TagView key={tag.kind} tag={tag} />
-                        ))}
-                      </button>
-                      {item.values.length > 0 && <HeldValues values={item.values} />}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </li>
+            <GroupRow key={group.component} group={group} hue={hueOf(index)} lit={lit === group.component} point={point} onSelect={onSelect} onHover={onHover} />
           ))}
         </ul>
       </div>
@@ -523,6 +463,155 @@ function ComponentList({
       )}
       <FlagsCard />
     </>
+  );
+}
+
+/** What each select tool does, drawn small: three controls, one ringed or every one from a call site. */
+function ToolPreview({ mode }: { mode: SelectMode }) {
+  const many = mode === "many";
+  return (
+    <span className="preview" aria-hidden="true">
+      <span className={many ? "chip dashed" : "chip"} />
+      <span className="chip ringed" />
+      <span className={many ? "chip dashed" : "chip"} />
+      <svg className="pointer" viewBox="238 238 36 36" focusable="false">
+        <path d="M247.171 248.005l5.315 17.434c0.354 1.16 1.906 1.232 2.341 0.121l2.854-6.582c0.212-0.535 0.675-0.959 1.24-1.09l7.272-1.705c1.17-0.273 1.21-1.928 0.131-2.352l-17.597-7.366c-1.08-0.454-1.866 0.535-1.553 1.544z" />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * One component on the page (Rows option B): its name, a bar for how much the page
+ * uses it next to the most used, and its count. Opened, its call sites as cards: a
+ * card inspects the call site's Instances, a dot one of them.
+ */
+function GroupRow({
+  group,
+  hue,
+  lit,
+  point,
+  onSelect,
+  onHover,
+}: Pick<Actions, "onSelect" | "onHover"> & { group: GroupItem; hue: string; lit: boolean; point(group: GroupItem | null): void }) {
+  const { inspectOnly } = group;
+  const unmounted = group.instances.filter((item) => !item.mounted);
+  return (
+    <li className={`group ${hue}${lit ? " lit" : ""}${inspectOnly ? " inspect-only" : ""}`}>
+      <details>
+        <summary
+          onMouseOver={() => point(group)}
+          onMouseLeave={() => point(null)}
+          onFocus={() => point(group)}
+          onBlur={() => point(null)}
+          title={group.statusTitle ?? undefined}
+        >
+          {/* The whole name, wrapping where its words meet: a long one is never cut short (layout review). */}
+          <span className="cname">
+            <span>
+              <Breakable text={group.component} />
+            </span>
+            {inspectOnly && <EyeIcon />}
+          </span>{" "}
+          <span className="bar" aria-hidden="true">
+            <i style={{ width: `${Math.round(group.share * 1000) / 10}%` }} />
+          </span>
+          <span className="times">{group.count}</span>
+          <span className="sub">
+            {/* No board draws it, but it says what to run: the one verdict the row keeps in words. */}
+            {group.verdict.status?.kind === "not-generated" && <StatusView status={group.verdict.status} title={group.statusTitle} />}
+            {group.notes.map((note) =>
+              note.kind === "overrides" ? (
+                <span key={note.kind} className="changed">
+                  {note.text}
+                </span>
+              ) : note.kind === "stale" ? (
+                <span key={note.kind} className="stale">
+                  <span className="dot small amber" />
+                  {note.text}
+                </span>
+              ) : (
+                <span key={note.kind}>{note.text}</span>
+              ),
+            )}
+          </span>
+          <ChevronIcon />
+        </summary>
+        {group.sites.length > 0 && (
+          <div className="sites">
+            <div className="sites-head">{group.sitesText}</div>
+            {group.sites.map((site) => (
+              <SiteCard key={site.anchor} site={site} onSelect={onSelect} onHover={onHover} />
+            ))}
+          </div>
+        )}
+        {unmounted.length > 0 && (
+          <ul className="list unmounted">
+            {unmounted.map((item) => (
+              <li key={item.id}>
+                <button type="button" data-instance={item.id} onClick={() => onSelect(item.id)}>
+                  <Keys keys={item.keys} />
+                  <span className="who">
+                    <span className="site">{item.label}</span>
+                  </span>
+                  {item.tags.map((tag) => (
+                    <TagView key={tag.kind} tag={tag} />
+                  ))}
+                </button>
+                {item.values.length > 0 && <HeldValues values={item.values} />}
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+    </li>
+  );
+}
+
+/** A call site's card: where it is written and what it shows; its dots are its Instances, each one to pick alone. */
+function SiteCard({ site, onSelect, onHover }: Pick<Actions, "onSelect" | "onHover"> & { site: CallSiteItem }) {
+  const several = site.ids.length > 1;
+  return (
+    <div className="site-card" onMouseOver={() => onHover(site.ids)} onMouseLeave={() => onHover([])}>
+      {/* Every Instance from the call site at once, as Select multiple picks them; one alone as Select one. */}
+      <button
+        type="button"
+        className="open"
+        data-site-card={site.anchor}
+        onClick={() => onSelect(site.select, several ? "many" : undefined)}
+        {...hoverProps(onHover, site.ids)}
+        aria-label={`Inspect ${site.label}: ${site.names}`}
+      />
+      <span className="where">
+        <span className="file">{site.label}</span>
+        <span className="names">
+          <span>{site.names}</span>
+          {!site.supported && <EyeIcon />}
+        </span>
+      </span>
+      <span className="dots">
+        {site.instances.map(({ id, label }) => {
+          const hover = hoverProps(onHover, [id]);
+          return (
+            <button
+              key={id}
+              type="button"
+              data-instance={id}
+              title={label}
+              aria-label={`Inspect ${label}`}
+              onClick={() => onSelect(id)}
+              {...hover}
+              // The card outlines its whole call site: a dot outlines its one Instance.
+              onMouseOver={(event) => {
+                event.stopPropagation();
+                hover.onMouseOver();
+              }}
+            />
+          );
+        })}
+      </span>
+      <ChevronIcon />
+    </div>
   );
 }
 
@@ -667,11 +756,6 @@ function isSwitch(item: PropItem): boolean {
   return values.includes(true) && values.includes(false);
 }
 
-/** "Button · member-row-menu.tsx:37" without the component, which the title line names. */
-function siteOf(where: string, component: string): string {
-  return where.startsWith(`${component} · `) ? where.slice(component.length + 3) : where;
-}
-
 function Inspector({
   debug,
   onSelect,
@@ -692,120 +776,139 @@ function Inspector({
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
-  // The exceptions: a server or stale tag, and the scopes acting on it, unless the members card already names its scope.
+  // The exceptions: a server or stale tag, and the scopes acting on it, unless the scope's own section already names its scope.
   const chips = body.members ? [] : body.chips;
-  // The marks' legend sits under the first table that carries one.
-  const legendAt = cards.findIndex((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
+  // The marks' legend: a row of its own under the options, when any of them marks a default.
+  const legend = cards.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
   const row = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={onSelect} onHover={onHover} />;
+  const propRow = (item: PropItem, toggle: boolean) => (
+    <div key={item.name} className={`prop${toggle ? " switch-row" : ""}${item.overridden ? " overridden" : ""}`}>
+      <span className="glyph" aria-hidden="true">
+        {PROP_ICONS[item.glyph]}
+      </span>
+      {row(item)}
+    </div>
+  );
   return (
     <>
-      <div className="section identity">
-        <div className="title-line">
-          <div className="lead">
-            <BackButton onSelect={onSelect} />
-            {named && (
-              <span className="component">
-                <Breakable text={body.component} />
-              </span>
-            )}
+      {notices}
+      <div className="section inspector">
+        <div className="identity">
+          <div className="title-line">
+            <div className="lead">
+              <BackButton onSelect={onSelect} />
+              {named && (
+                <span className="component">
+                  <Breakable text={body.component} />
+                </span>
+              )}
+              <span className="report route">/ {view.header.page}</span>
+            </div>
+            {body.verdict.status && <StatusView status={body.verdict.status} check />}
+            <Keys keys={body.keys} />
           </div>
-          {body.verdict.status && <StatusView status={body.verdict.status} check />}
-          <Keys keys={body.keys} />
-        </div>
-        {/* The app's own words, in whatever script it writes: `dir="auto"` lays them out their way. */}
-        <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component} dir="auto" lang={body.name ? appLang() : undefined}>
-          {body.name ?? body.component}
-        </h2>
-        {/* Where it is written, and which of that call site's Instances it is; the full path and key in the tooltip. */}
-        <div className="id" data-testid="instance-id" data-id={body.id} title={site ? `${site.title}\n${body.id}` : body.id}>
-          {site ? site.text : siteOf(body.where, body.component)}
-        </div>
-        {body.crumbs.length > 0 && (
-          <div className="inside" data-testid="inside">
-            Inside{" "}
-            {[...body.crumbs].reverse().map((crumb, index) => (
-              <span key={crumb.id}>
-                {index > 0 && (
-                  <span className="sep" aria-hidden="true">
-                    ›
-                  </span>
-                )}
-                <button type="button" onClick={() => onSelect(crumb.id)}>
-                  {crumb.label}
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-        {(body.tags.length > 0 || chips.length > 0) && (
-          <div className="verdicts" data-testid="chips">
-            {body.tags.map((tag) => (
-              <TagView key={tag.kind} tag={tag} />
-            ))}
-            {chips.map((chip) => (
-              <span key={chip} className="tag">
-                {chip}
-              </span>
-            ))}
-          </div>
-        )}
-        {body.coverage.notGenerated && (
-          <div className="warn" data-testid="not-generated">
-            <span className="dot" />
+          {/* The app's own words, in whatever script it writes: `dir="auto"` lays them out their way. */}
+          <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component} dir="auto" lang={body.name ? appLang() : undefined}>
+            {body.name ?? body.component}
+          </h2>
+          {/* Where it is written, and which of that call site's Instances it is; the full path and key in the tooltip. */}
+          <div className="id" data-testid="instance-id" data-id={body.id} title={site ? `${site.title}\n${body.id}` : body.id}>
+            <FileIcon />
+            {/* The file names the place, the line finds it: set apart, lighter. */}
             <span>
-              <StatusView status={body.coverage.notGenerated.tag} /> {TEXT.run}{" "}
-              <span className="mono verbatim">{body.coverage.notGenerated.command}</span> {TEXT.fromRootToReadProps}
+              {body.source.file}
+              <span className="line">{body.source.line}</span>
             </span>
           </div>
-        )}
-        {(holdButton || resetInstance) && (
-          <div className="actions">
-            {holdButton && (
-              <button
-                type="button"
-                className={holdButton.held ? "btn small holding" : "btn small"}
-                aria-pressed={holdButton.held}
-                data-hold={holdButton.prop}
-                onClick={() =>
-                  attempt(() =>
-                    holdButton.held
-                      ? debug.reset(holdButton.write.id, holdButton.write.prop, "instance")
-                      : debug.set(holdButton.write.id, holdButton.write.prop, true, "instance"),
-                  )
-                }
-              >
-                {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
-              </button>
-            )}
-            {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
+          {(body.tags.length > 0 || chips.length > 0) && (
+            <div className="verdicts" data-testid="chips">
+              {body.tags.map((tag) => (
+                <TagView key={tag.kind} tag={tag} />
+              ))}
+              {chips.map((chip) => (
+                <span key={chip} className="tag">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
+          {body.coverage.notGenerated && (
+            <div className="warn" data-testid="not-generated">
+              <span className="dot" />
+              <span>
+                <StatusView status={body.coverage.notGenerated.tag} /> {TEXT.run}{" "}
+                <span className="mono verbatim">{body.coverage.notGenerated.command}</span> {TEXT.fromRootToReadProps}
+              </span>
+            </div>
+          )}
+          {(holdButton || resetInstance) && (
+            <div className="actions">
+              {holdButton && (
+                <button
+                  type="button"
+                  className={holdButton.held ? "btn small holding" : "btn small"}
+                  aria-pressed={holdButton.held}
+                  data-hold={holdButton.prop}
+                  onClick={() =>
+                    attempt(() =>
+                      holdButton.held
+                        ? debug.reset(holdButton.write.id, holdButton.write.prop, "instance")
+                        : debug.set(holdButton.write.id, holdButton.write.prop, true, "instance"),
+                    )
+                  }
+                >
+                  {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
+                </button>
+              )}
+              {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
+            </div>
+          )}
+          {mode === "many" && body.editing?.scopes && view.scope === "instance" && <NoGroup options={body.editing.scopes} onScope={onScope} />}
+          {body.crumbs.length > 0 && (
+            <div className="inside" data-testid="inside">
+              <span className="inside-label">Inside</span>
+              <ol>
+                {[...body.crumbs].reverse().map((crumb, index) => (
+                  <li key={crumb.id} style={{ paddingLeft: index === 0 ? 0 : (index - 1) * 18 }}>
+                    {index > 0 && <ElbowIcon />}
+                    <button type="button" onClick={() => onSelect(crumb.id)}>
+                      {crumb.label}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+        {body.note && (
+          <div className="note-card" role="note">
+            <InfoIcon />
+            <div className="text">
+              <h3>{body.note.title}</h3>
+              <p className="body">{body.note.body}</p>
+            </div>
           </div>
         )}
-        {mode === "many" && body.editing?.scopes && view.scope === "instance" && <NoGroup options={body.editing.scopes} onScope={onScope} />}
+        {body.members && (
+          <ScopeSection
+            debug={debug}
+            members={body.members}
+            options={body.editing?.scopes ?? null}
+            selected={body.id}
+            onScope={onScope}
+            onHover={onHover}
+          />
+        )}
+        {cards.map((item) => propRow(item, false))}
+        {legend && <Legend app={cards.some((card) => card.change !== null && card.counts === null)} />}
+        {switches.map((item) => propRow(item, true))}
+        <InspectOnly key={body.id} body={body} row={row} />
       </div>
-      {notices}
-      {body.note && (
-        <div className="section note-card" role="note">
-          <InfoIcon />
-          <div className="text">
-            <h3>{body.note.title}</h3>
-            <p className="body">{body.note.body}</p>
-          </div>
-        </div>
-      )}
-      {body.members && <MembersCard debug={debug} members={body.members} options={body.editing?.scopes ?? null} onScope={onScope} onHover={onHover} />}
-      {cards.map((item, index) => (
-        <div key={item.name} className={item.overridden ? "section prop-card overridden" : "section prop-card"}>
-          {row(item)}
-          {index === legendAt && <Legend app={cards.some((card) => card.change !== null && card.counts === null)} />}
-        </div>
-      ))}
-      {switches.length > 0 && <div className="section switches">{switches.map(row)}</div>}
-      <InspectOnly key={body.id} body={body} row={row} />
     </>
   );
 }
 
-/** What a table's marks mean, once, under the first table that carries one. */
+/** What a chip's marks mean, once, on a row of its own under the options. */
 function Legend({ app }: { app: boolean }) {
   return (
     <div className="legend" aria-hidden="true">
@@ -828,9 +931,9 @@ function Legend({ app }: { app: boolean }) {
 }
 
 /**
- * The props it shows but can't change here, folded to one line (open when nothing
- * else can change). Closed, the line names them; one cause for them all is said
- * once, under the line, instead of a tag on every row.
+ * The props it shows but can't change here, folded to one row (open when nothing
+ * else can change). Closed, the row names them; one cause for them all is said
+ * once, under the row, instead of a tag on every row.
  */
 function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): ReactNode }) {
   const [open, setOpen] = useState(body.editable.length === 0);
@@ -840,15 +943,18 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
   const shared = only ? items.find((item) => item.reason === only) : undefined;
   const rows = shared ? items.map((item) => ({ ...item, reason: null })) : items;
   return (
-    <div className="section inspect">
+    <div className="inspect">
       <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary>
-          <ChevronIcon />
+          <span className="glyph" aria-hidden="true">
+            {PROP_ICONS.inspect}
+          </span>
           <span className="summary-text" data-testid="inspect-only">
             {inspectOnlyTitle(items.length)}
             {!open && items.length > 0 && <span className="muted"> · {items.map((item) => item.name).join(", ")}</span>}
           </span>
-          {body.inspectOnlyMeta && <span className="meta">{body.inspectOnlyMeta}</span>}
+          {body.inspectOnlyMeta ? <span className="meta">{body.inspectOnlyMeta}</span> : <span />}
+          <ChevronIcon />
         </summary>
         {shared?.reason && (
           <p className="why">
@@ -895,66 +1001,93 @@ function NoGroup({ options, onScope }: { options: ScopeOption[]; onScope(scope: 
   );
 }
 
-/** Widens a call site's selection to the page, or narrows it back. */
+/** Widens a call site's selection to the page, or narrows it back: "Widen to All on page · 7". */
 function WidenButton({ option, verb, onScope }: { option: ScopeOption; verb: string; onScope(scope: Scope): void }) {
   return (
     <button type="button" className="widen" data-scope={option.scope} title={option.title ?? option.label} onClick={() => onScope(option.scope)}>
+      <WidenIcon />
       {/* What it can't change stays in the tooltip: "(1 server-rendered, inspect only)". */}
       {verb} {option.label.replace(/ \(.*\)$/, "")}
     </button>
   );
 }
 
+/** As many dots as a scope's meter can show: past this, the words alone say how far it reaches. */
+const METER_MAX = 12;
+
 /**
- * Who a group or page change reaches, with a box to leave each one out. A page
- * scope groups them by call site, so one box leaves a whole call site out.
+ * Select multiple's scope: who a group or page change reaches, a dot for each of the
+ * component's Instances on the page, the way to widen or narrow it, and its Instances
+ * folded behind their count, each with a box to leave it out. A page scope groups them
+ * by call site, so one box leaves a whole call site out.
  */
-function MembersCard({
+function ScopeSection({
   debug,
   members,
   options,
+  selected,
   onScope,
   onHover,
-}: Pick<Actions, "debug" | "onHover" | "onScope"> & { members: MembersView; options: ScopeOption[] | null }) {
-  const { scope } = members;
+}: Pick<Actions, "debug" | "onHover" | "onScope"> & { members: MembersView; options: ScopeOption[] | null; selected: string }) {
+  const { scope, reach } = members;
   const current = options?.find((option) => option.scope === scope) ?? null;
   // At a call site, widen to the page; at the page, narrow back to the call site.
   const other = options?.find((option) => option.scope === (scope === "group" ? "page" : "group") && option.enabled) ?? null;
+  // Open while one is left out, as Figma keeps layers out of the properties until asked.
+  const [open, setOpen] = useState(members.members.some((member) => member.out));
   const toggle = (action: "include" | "exclude", id: string) =>
     attempt(() => (action === "include" ? debug.include(id, scope) : debug.exclude(id, scope)));
-  const memberItem = (member: MembersView["members"][number]) => (
-    <li key={member.id} onMouseOver={() => onHover([member.id])} onMouseLeave={() => onHover([])}>
-      <label>
-        <input
-          type="checkbox"
-          data-member={member.id}
-          checked={!member.out}
-          disabled={members.suspended}
-          onChange={() => toggle(member.toggle, member.id)}
-          onFocus={() => onHover([member.id])}
-          onBlur={() => onHover([])}
-        />
-        {/* By name only: the key that tells Instances apart is for engineers, in the tooltip. */}
-        <span className={member.out ? "who out" : "who"} title={member.id}>
-          <span className="screen-name" dir="auto" lang={member.name ? appLang() : undefined}>
-            {member.name ?? member.label}
+  const memberItem = (member: MembersView["members"][number]) => {
+    const picked = member.id === selected;
+    return (
+      <li key={member.id} {...hoverProps(onHover, [member.id])}>
+        <label>
+          <input
+            type="checkbox"
+            data-member={member.id}
+            checked={!member.out}
+            disabled={members.suspended}
+            onChange={() => toggle(member.toggle, member.id)}
+          />
+          {/* By name only: the key that tells Instances apart is for engineers, in the tooltip. */}
+          <span className={`who${member.out ? " out" : ""}${picked ? " picked" : ""}`} title={member.id}>
+            <span className="screen-name" dir="auto" lang={member.name ? appLang() : undefined}>
+              {member.name ?? member.label}
+            </span>
           </span>
-          {member.label === THIS_INSTANCE && member.name && <span className="self">{THIS_INSTANCE}</span>}
-        </span>
-        {member.tag && <TagView tag={member.tag} />}
-      </label>
-    </li>
-  );
+          {member.tag && <TagView tag={member.tag} />}
+          {picked && <span className="tag picked">{TEXT.picked}</span>}
+        </label>
+      </li>
+    );
+  };
+  const name = current ? current.label.replace(/ · \d+.*$/, "") : "Instances";
   return (
-    <div className="section members" data-testid="members">
-      <div className="head">
-        <h3 title={current?.title ?? undefined}>
-          <Breakable text={current ? current.label.replace(/ · \d+.*$/, "") : "Instances"} />
-        </h3>
-        <span className="meta">{members.countText}</span>
-      </div>
-      {(other || members.reset.enabled) && (
-        <div className="selection-actions">
+    <>
+      <div className="scope" data-testid="members">
+        <div className="scope-title">
+          <div className="lead">
+            <LayersIcon />
+            <h3 title={current?.title ?? undefined}>
+              <Breakable text={name} />
+            </h3>
+          </div>
+          {reach.page <= METER_MAX && (
+            <span className="meter" aria-hidden="true">
+              {Array.from({ length: reach.page }, (_, index) => (
+                <i key={index} className={index < reach.included ? "in" : undefined} />
+              ))}
+            </span>
+          )}
+        </div>
+        <p className="reach">
+          {reach.lead}{" "}
+          <b>
+            {reach.included} of {reach.total}
+          </b>
+          {reach.moreText && <> · {reach.moreText}</>}
+        </p>
+        <div className="scope-actions">
           {other && <WidenButton option={other} verb={scope === "group" ? "Widen to" : "Narrow to"} onScope={onScope} />}
           {members.reset.enabled && (
             <button
@@ -970,78 +1103,79 @@ function MembersCard({
               Reset this scope
             </button>
           )}
+          <button type="button" className="count-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {plural(members.members.length, "Instance")}
+            <ChevronIcon />
+          </button>
         </div>
-      )}
-      {/* The list folds away, as Figma keeps layers out of the properties: open while one is left out. */}
-      <details className="fold" open={members.members.some((member) => member.out)}>
-        <summary>
-          <ChevronIcon />
-          {plural(members.members.length, "Instance")}
-        </summary>
-        <div className="muted">{TEXT.untick}</div>
-      {members.sites === null ? (
-        <ul className="list">{members.members.map(memberItem)}</ul>
-      ) : (
-        members.sites.map((site) => (
-          <fieldset key={site.anchor} className="site">
-            <legend>
-              <label onMouseOver={() => onHover(site.members.map((member) => member.id))} onMouseLeave={() => onHover([])}>
-                <input
-                  type="checkbox"
-                  data-site={site.anchor}
-                  checked={site.allIn}
-                  disabled={members.suspended}
-                  onFocus={() => onHover(site.members.map((member) => member.id))}
-                  onBlur={() => onHover([])}
-                  onChange={() => {
-                    for (const id of site.toggle.ids) toggle(site.toggle.action, id);
-                  }}
-                />
-                <span className="screen-name" title={site.anchor}>
-                  {site.label}
+      </div>
+      <div className="members" hidden={!open}>
+        <p className="hint">{TEXT.untick}</p>
+        {members.sites === null ? (
+          <ul className="list">{members.members.map(memberItem)}</ul>
+        ) : (
+          members.sites.map((site) => (
+            <fieldset key={site.anchor} className="site">
+              <legend>
+                <label onMouseOver={() => onHover(site.members.map((member) => member.id))} onMouseLeave={() => onHover([])}>
+                  <input
+                    type="checkbox"
+                    data-site={site.anchor}
+                    checked={site.allIn}
+                    disabled={members.suspended}
+                    onFocus={() => onHover(site.members.map((member) => member.id))}
+                    onBlur={() => onHover([])}
+                    onChange={() => {
+                      for (const id of site.toggle.ids) toggle(site.toggle.action, id);
+                    }}
+                  />
+                  <span className="who">
+                    <span className="screen-name" title={site.anchor}>
+                      {site.label} <span className="muted">· {site.count}</span>
+                    </span>
+                  </span>
+                </label>
+              </legend>
+              <ul className="list">{site.members.map(memberItem)}</ul>
+            </fieldset>
+          ))
+        )}
+        {members.server.length > 0 && (
+          <ul className="list" aria-label="Server-rendered">
+            {members.server.map((server) => (
+              <li key={server.id}>
+                <span className="server-name" title={server.id}>
+                  {server.label}
                 </span>
-                <span className="muted">· {site.count}</span>
-              </label>
-            </legend>
-            <ul className="list">{site.members.map(memberItem)}</ul>
-          </fieldset>
-        ))
-      )}
-      {members.server.length > 0 && (
-        <ul className="list" aria-label="Server-rendered">
-          {members.server.map((server) => (
-            <li key={server.id}>
-              <span className="server-name" title={server.id}>
-                {server.label}
-              </span>
-              <TagView tag={server.tag} />
-            </li>
-          ))}
-        </ul>
-      )}
-      {members.outUnmounted.length > 0 && (
-        <ul className="list" aria-label="Left out, not mounted">
-          {members.outUnmounted.map((out) => (
-            <li key={out.id}>
-              <span className="mono muted">{out.id}</span> <TagView tag={out.tag} />
-            </li>
-          ))}
-        </ul>
-      )}
-      </details>
-    </div>
+                <TagView tag={server.tag} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {members.outUnmounted.length > 0 && (
+          <ul className="list" aria-label="Left out, not mounted">
+            {members.outUnmounted.map((out) => (
+              <li key={out.id}>
+                <span className="mono muted">{out.id}</span> <TagView tag={out.tag} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
   );
 }
 
-/** The plot key's numbers in the footer, in every state: each selects what its change reaches. */
-const FOOTER_KEYS = 8;
-
+/**
+ * The footer: how many changes the Proposal will list and the states it shows, Reset
+ * all, the undo offer after a reset, light or dark, and Copy Proposal.
+ */
 function Footer({
   debug,
   footer,
-  onSelect,
-  onHover,
-}: Pick<Actions, "debug" | "onSelect" | "onHover"> & { footer: PanelView["footer"] }) {
+  theme,
+  onTheme,
+}: Pick<Actions, "debug"> & Pick<PanelProps, "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
   // The offer stays until the Overrides move on from what the drop left (undo.ts).
   useEffect(() => {
@@ -1067,17 +1201,41 @@ function Footer({
     if (button.disabled) focusHeading(button);
     else button.focus();
   });
-  const shown = footer.keys.slice(0, FOOTER_KEYS);
-  // The states shown take what room the numbered changes leave.
-  const states = footer.states.slice(0, FOOTER_KEYS - shown.length);
-  const more = footer.keys.length + footer.states.length - shown.length - states.length;
   return (
     <footer className="footer">
       <div className="tally">
         <span className="count" aria-live="polite">
-          <span className={footer.hasOverrides ? "dot override" : "dot none"} />
-          <span className="text">{footer.countText}</span>
+          <span className="sr-only">{footer.countText}</span>
+          <span className="n" aria-hidden="true">
+            {footer.changes.count}
+          </span>
+          <span className="word" aria-hidden="true">
+            {footer.changes.word}
+          </span>
+          {footer.states.chip && (
+            <span className="held-chip" aria-hidden="true" title={footer.states.title}>
+              <span className="dot" />
+              {footer.states.chip}
+            </span>
+          )}
         </span>
+        <button
+          type="button"
+          className="btn reset-all"
+          ref={resetAllButton}
+          disabled={footer.resetAll.length === 0}
+          onClick={() => {
+            // Kept so the footer can put them back: Reset all asks nothing, so it is undoable.
+            const saved = debug.records();
+            const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
+            for (const target of footer.resetAll) debug.discard(target);
+            focusUndo.current = true;
+            offerUndo(resetText(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
+          }}
+        >
+          <ResetIcon />
+          Reset all
+        </button>
         <span className="undo" role="status">
           {offer && (
             <>
@@ -1096,67 +1254,17 @@ function Footer({
             </>
           )}
         </span>
-        {!offer && shown.length + states.length > 0 && (
-          <ol className="footer-keys" aria-label="Changes">
-            {shown.map((change) => (
-              <li key={change.n}>
-                <button
-                  type="button"
-                  title={`${change.detail} · ${change.where}`}
-                  disabled={change.select === null}
-                  onClick={() => change.select !== null && onSelect(change.select)}
-                  onMouseOver={() => onHover(change.reached)}
-                  onMouseLeave={() => onHover([])}
-                  onFocus={() => onHover(change.reached)}
-                  onBlur={() => onHover([])}
-                >
-                  <Key n={change.n} />
-                  <span className="sr-only">
-                    {change.detail}, {change.where}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {states.map((state) => (
-              <li key={`${state.select ?? state.where} ${state.detail}`}>
-                <button
-                  type="button"
-                  title={`${state.detail} · ${state.where}`}
-                  disabled={state.select === null}
-                  onClick={() => state.select !== null && onSelect(state.select)}
-                  onMouseOver={() => onHover(state.reached)}
-                  onMouseLeave={() => onHover([])}
-                  onFocus={() => onHover(state.reached)}
-                  onBlur={() => onHover([])}
-                >
-                  <HeldKey />
-                  <span className="sr-only">
-                    State shown: {state.detail}, {state.where}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {more > 0 && <li className="more">+{more}</li>}
-          </ol>
-        )}
       </div>
       <div className="act">
         <button
           type="button"
-          className="btn"
-          ref={resetAllButton}
-          disabled={footer.resetAll.length === 0}
-          onClick={() => {
-            // Kept so the footer can put them back: Reset all asks nothing, so it is undoable.
-            const saved = debug.records();
-            const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
-            for (const target of footer.resetAll) debug.discard(target);
-            focusUndo.current = true;
-            offerUndo(resetText(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
-          }}
+          className="theme"
+          aria-pressed={theme === "dark"}
+          onClick={onTheme}
+          title={theme === "dark" ? "Switch to light" : "Switch to dark"}
         >
-          <ResetIcon />
-          Reset all
+          <ContrastIcon />
+          <span className="sr-only">Dark theme</span>
         </button>
         <CopyProposalButton disabled={!footer.copyEnabled} />
       </div>

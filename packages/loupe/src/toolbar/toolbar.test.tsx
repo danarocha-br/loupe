@@ -736,7 +736,6 @@ describe("a change landing on the page", () => {
   };
   const quiet = () => [...shadow().querySelectorAll<HTMLElement>(".ring, .mark")].map((outline) => outline.classList.contains("quiet"));
   const changeRow = () => shadow().querySelector<HTMLButtonElement>(".keylist button") as HTMLButtonElement;
-  const footerKey = () => shadow().querySelector<HTMLButtonElement>(".footer-keys button") as HTMLButtonElement;
   const leave = async (element: Element) => {
     act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
     await settle();
@@ -755,18 +754,6 @@ describe("a change landing on the page", () => {
     expect(quiet()).toEqual([false, false, false, false]);
     await linger();
     expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
-    expect(quiet()).toEqual([true, true, true, true]);
-
-    // Pointing at the change in the footer outlines what it reaches again, while pointed.
-    await hover(footerKey());
-    expect(quiet()).toEqual([false, false, false, false]);
-    await leave(footerKey());
-    expect(quiet()).toEqual([true, true, true, true]);
-    act(() => footerKey().focus());
-    await settle();
-    expect(quiet()).toEqual([false, false, false, false]);
-    act(() => footerKey().blur());
-    await settle();
     expect(quiet()).toEqual([true, true, true, true]);
 
     // Another value lands again, under the same number.

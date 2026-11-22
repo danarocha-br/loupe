@@ -1,15 +1,15 @@
 // A prop row of the inspector and its control (PER-131, PER-134, PER-137): options
 // for a closed set, a field for label text, the app's own value beside an Override,
-// Reset, and the holding notice for a State prop (PER-96). Since the Revision Set
-// (2026-11-20) a closed set is a table of options with the chosen one in lilac and a
-// true/false prop is a switch; a row that shows an Override carries its change's
+// Reset, and the holding notice for a State prop (PER-96). Since Paper's "Inspector as
+// property rows" (2026-11-22) a closed set is a row of chips with the chosen one in
+// salmon, and a true/false prop is a switch; a row that shows an Override carries its change's
 // revision delta before its name, or an empty dashed delta for a held State prop,
 // which the Proposal shows as a state, not a numbered change.
 //
 // The row comes decided from `panelView()` (PER-214); this file draws it, makes the
 // write its data names, and keeps the Text field's unsent text while it has focus.
 
-import { type CSSProperties, Fragment, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
 import { Delta, LockIcon, ResetIcon } from "./icons.js";
@@ -277,9 +277,9 @@ function moveIn(event: KeyboardEvent<HTMLDivElement>) {
 }
 
 /**
- * A closed set of options as one table: the value that shows now in lilac, the app's
+ * A closed set of options as chips: the value that shows now in salmon, the app's
  * own value ringed and tagged under an Override, the design system's default with a
- * dot, each with its count at a scope; a field for label text (PER-113); or why neither.
+ * dot after it, each with its count at a scope; a field for label text (PER-113); or why neither.
  */
 function ControlView({ control, label, app, debug }: { control: Control; label: string; app: string | null; debug: LoupeDebug }) {
   if (control.kind === "refused") {
@@ -293,15 +293,11 @@ function ControlView({ control, label, app, debug }: { control: Control; label: 
   const { write } = control;
   const set = (next: unknown) => attempt(() => debug.set(write.id, write.prop, next, write.scope));
   if (control.kind === "options") {
-    const count = control.options.length;
-    // Four or fewer fit one line; more run three across, the last one spanning what its line leaves.
-    const columns = count <= 4 ? count : 3;
-    const lastSpan = count % columns === 0 ? 1 : columns - (count % columns) + 1;
     // One stop for the whole table: the chosen option, or the first while none is.
     const pressed = control.options.findIndex((option) => option.pressed);
     const stop = pressed === -1 ? 0 : pressed;
     return (
-      <div className="pills" role="radiogroup" aria-label={label} style={{ "--cols": columns } as CSSProperties} onKeyDown={moveIn}>
+      <div className="pills" role="radiogroup" aria-label={label} onKeyDown={moveIn}>
         {control.options.map((option, index) => {
           const isApp = option.label === app && !option.pressed;
           const marks = [isApp && "app", option.isDefault && "is-default"].filter(Boolean).join(" ");
@@ -313,7 +309,6 @@ function ControlView({ control, label, app, debug }: { control: Control; label: 
               role="radio"
               aria-checked={option.pressed}
               tabIndex={index === stop ? 0 : -1}
-              style={index === count - 1 && lastSpan > 1 ? { gridColumn: `span ${lastSpan}` } : undefined}
               className={marks || undefined}
               // The exact value and its marks for a pointer; the cell wraps the value in full.
               title={notes ? `${option.label}: ${notes}` : option.label}

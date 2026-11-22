@@ -29,7 +29,7 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     ["light", LIGHT],
     ["dark", DARK],
   ])("keeps faint text at 4.5:1 on every surface it sits on, %s", (_, theme) => {
-    for (const surface of ["card", "hover", "sheet", "sunk"]) {
+    for (const surface of ["card", "hover", "well", "sunk"]) {
       expect(contrast(theme.faint as string, theme[surface] as string), surface).toBeGreaterThanOrEqual(4.5);
     }
   });

@@ -14,7 +14,7 @@ import { disableOverrides } from "../../runtime/registry.js";
 import { resetLoupe } from "../../runtime/slot.js";
 import type { Scope } from "../../runtime/store.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, GROUP, MENU, members, Page, site } from "../members.fixture.js";
-import { type GoneBody, type InspectorBody, type ListBody, panelView, type PanelView, type PropItem, type SeenComponents } from "./index.js";
+import { type GoneBody, type InspectorBody, isolate, type ListBody, panelView, type PanelView, type PropItem, type SeenComponents } from "./index.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -84,6 +84,34 @@ describe("the list", () => {
     expect(group(body, "Button")?.outlineIds).toEqual([row("ana"), row("bia"), row("caio"), row("dani"), MENU]);
   });
 
+  it("puts the most used component first, each with its share of the most used", () => {
+    render();
+    click("Menu");
+    const body = listOf(view());
+    expect(body.groups.map((candidate) => [candidate.component, candidate.mountedCount, candidate.share])).toEqual([
+      ["Button", 5, 1],
+      ["Dialog", 1, 0.2],
+      ["MenuItem", 1, 0.2],
+    ]);
+  });
+
+  it("gathers a component's Instances by call site, each named by what its Instances show", () => {
+    render();
+    const sites = group(listOf(view()), "Button")?.sites;
+    expect(sites).toEqual([
+      {
+        anchor: members("Button", 1),
+        label: "members.tsx:11",
+        names: `${isolate("ana")}, ${isolate("bia")} +2`,
+        ids: [row("ana"), row("bia"), row("caio"), row("dani")],
+        instances: ["ana", "bia", "caio", "dani"].map((name) => ({ id: row(name), label: name })),
+        select: row("ana"),
+        supported: true,
+      },
+      { anchor: MENU, label: "members.tsx:12", names: "Menu", ids: [MENU], instances: [{ id: MENU, label: "Menu" }], select: MENU, supported: true },
+    ]);
+  });
+
   it("lists a menu's component while it is open, then under Appears on interaction", () => {
     render();
     view();
@@ -92,7 +120,9 @@ describe("the list", () => {
     expect(item?.count).toBe("×1");
     // An Adapter with no prop that can be Editable.
     expect(item?.verdict).toMatchObject({ supported: false, reason: "no-editable", status: { text: "Inspect only" } });
-    expect(item?.notes).toEqual([{ kind: "reason", text: "No Editable prop" }]);
+    // Why is the eye's, in the row's tooltip: no line repeats it.
+    expect(item?.notes).toEqual([]);
+    expect(item?.inspectOnly).toBe(true);
     expect(item?.statusTitle).toBe("No Editable prop");
 
     click("Menu");
@@ -214,8 +244,8 @@ describe("the list", () => {
     });
     click("Menu");
     const shown = view();
-    expect(shown.header).toEqual({ route: "/", report: "Home · 2 changes" });
-    expect(shown.footer).toMatchObject({ countText: "2 changes", hasOverrides: true, copyEnabled: true, states: [] });
+    expect(shown.header).toEqual({ route: "/", page: "Home", report: "Home · 2 changes" });
+    expect(shown.footer).toMatchObject({ countText: "2 changes", changes: { count: 2, word: "changes" }, hasOverrides: true, copyEnabled: true, states: { chip: null } });
     expect(shown.footer.resetAll).toEqual(
       expect.arrayContaining([
         { scope: "instance", id: item },
@@ -271,9 +301,10 @@ describe("the Inspector", () => {
     expect(body.note).toBeNull();
     expect(body.editing).toBeNull();
     expect(body.inspectOnlyMeta).toBe("Overrides off");
-    expect(listOf(view()).groups.map((candidate) => candidate.notes.find((note) => note.kind === "reason")?.text)).toEqual([
-      "Overrides are off",
-      "Overrides are off",
+    // Each row draws the eye, and says why in its tooltip.
+    expect(listOf(view()).groups.map((candidate) => [candidate.inspectOnly, candidate.statusTitle])).toEqual([
+      [true, "Overrides are off"],
+      [true, "Overrides are off"],
     ]);
   });
 
@@ -464,6 +495,8 @@ describe("group and page scopes", () => {
     expect(shown.outline.members?.filter((member) => member.out)).toEqual([{ id: BIA, out: true }]);
     const scoped = inspector(shown).members;
     expect(scoped?.countText).toBe("Reaches 3 of 4");
+    // The page has one more Button than the call site: the scope says so, and can widen to it.
+    expect(scoped?.reach).toEqual({ lead: "Reaches", included: 3, total: 4, page: 5, moreText: "1 more on this page" });
     expect(scoped?.sites).toBeNull();
     expect(scoped?.members.find((member) => member.id === BIA)).toEqual({
       id: BIA,
@@ -642,7 +675,7 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
     expect(shown.marks).toEqual([]);
     // The footer counts it apart, with an unnumbered dashed delta, and so does the band.
     expect(shown.footer.countText).toBe("0 changes · 1 state shown");
-    expect(shown.footer.states).toEqual([expect.objectContaining({ detail: "open held at true", select: DIALOG, reached: [DIALOG] })]);
+    expect(shown.footer.states).toEqual({ chip: "1 held", title: expect.stringContaining("open held at true") });
     expect(shown.header.report).toBe("Home · 1 state shown");
   });
 

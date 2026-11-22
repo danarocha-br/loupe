@@ -296,7 +296,9 @@ describe("anchored client Instances without an Adapter", () => {
       reasonText: "No Adapter",
       status: { kind: "inspect-only", text: "Inspect only" },
     });
-    expect(card?.notes).toContainEqual({ kind: "reason", text: "No Adapter" });
+    // The row's eye says it, with the reason in its tooltip.
+    expect(card?.inspectOnly).toBe(true);
+    expect(card?.statusTitle).toBe("No Adapter");
     expect(inspect.mock.calls.map(([id]) => id)).not.toContain(at("NewCard"));
   });
 
@@ -306,8 +308,9 @@ describe("anchored client Instances without an Adapter", () => {
     const list = panelView({ debug: loupe, layer, selected: null, scope: "instance", seen: NONE_SEEN }).body as ListBody;
     const card = list.groups.find((group) => group.component === "NewCard");
     expect(card?.verdict).toMatchObject({ supported: false, reason: "not-generated", status: { kind: "not-generated", text: "Not generated yet" } });
-    // The tag says it; the reason line would repeat it.
-    expect(card?.notes.some((note) => note.kind === "reason")).toBe(false);
+    // The eye says it, with the command in its tooltip: no line repeats it.
+    expect(card?.inspectOnly).toBe(true);
+    expect(card?.notes).toEqual([]);
     expect(card?.statusTitle).toBe("pnpm exec loupe generate");
     expect(list.notGenerated).toEqual({ names: ["NewCard"], command: "pnpm exec loupe generate" });
 

@@ -7,7 +7,8 @@ import { formatCurrent } from "../format.js";
 import type { Keys } from "./keys.js";
 import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
-import type { ChangeItem, GroupItem, InstanceItem, ListBody, StateItem, Tag } from "./types.js";
+import type { InstanceRow } from "../../runtime/debug.js";
+import type { CallSiteItem, ChangeItem, GroupItem, InstanceItem, ListBody, StateItem, Tag } from "./types.js";
 import { componentVerdict } from "./verdict.js";
 import {
   heldValues,
@@ -18,6 +19,9 @@ import {
   overridesNote,
   pageName,
   reachText,
+  siteNames,
+  sitesText,
+  siteWhere,
   stateDetail,
   suspendedMeta,
   suspensionReason,
@@ -29,16 +33,16 @@ import {
 
 export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
   const marked = new Map(keys.marks.map((mark) => [mark.id, mark.keys]));
-  const groups = page.groups.map((group): GroupItem => {
+  const most = Math.max(1, ...page.groups.map((group) => group.instances.length));
+  // Most used first: the bars then read as a ranking; ties stay alphabetical.
+  const ranked = [...page.groups].sort((a, b) => b.instances.length - a.instances.length);
+  const groups = ranked.map((group): GroupItem => {
     const verdict = componentVerdict(group, reads, page);
     const notes: GroupItem["notes"] = [];
     if (group.overrides > 0) notes.push({ kind: "overrides", text: overridesNote(group.overrides) });
     if (page.stale.has(group.component)) notes.push({ kind: "stale", text: TAGS.stale.text });
     if (group.held.length > 0) notes.push({ kind: "not-mounted", text: notMountedNote(group.held.length) });
-    // "Not generated yet" is its tag, and a component with nothing mounted has no tag to explain.
-    if (!verdict.supported && verdict.reason !== "not-generated" && verdict.reason !== "not-mounted") {
-      notes.push({ kind: "reason", text: verdict.reasonText });
-    }
+    // Why it is inspect only is the eye's, in the row's tooltip (`statusTitle`): the line keeps what changed.
     const mounted = group.instances.map((row): InstanceItem => {
       const tags: Tag[] = [];
       if (row.rendered === "server") tags.push(TAGS.server);
@@ -68,6 +72,12 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
     return {
       component: group.component,
       count: timesText(group.instances.length),
+      mountedCount: group.instances.length,
+      share: group.instances.length / most,
+      // A component with nothing mounted has no tag, and no eye either.
+      inspectOnly: !verdict.supported && verdict.status !== null,
+      sites: callSites(group.instances, reads, verdict.supported),
+      sitesText: sitesText(new Set(group.instances.map((row) => row.anchor)).size),
       verdict,
       statusTitle: verdict.supported ? null : verdict.reason === "not-generated" ? page.command : verdict.reasonText,
       notes,
@@ -100,6 +110,26 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
     groups,
     interaction: page.interaction,
   };
+}
+
+/** A component's mounted Instances by call site, in page order, each named by what its Instances show. */
+function callSites(rows: readonly InstanceRow[], reads: Reads, supported: boolean): CallSiteItem[] {
+  const bySite = new Map<string, InstanceRow[]>();
+  for (const row of rows) bySite.set(row.anchor, [...(bySite.get(row.anchor) ?? []), row]);
+  return [...bySite].map(([anchor, siteRows]) => {
+    const [first] = siteRows as [InstanceRow];
+    const instances = siteRows.map((row) => ({ id: row.id, label: reads.name(row.id) ?? instanceLabel(row.id, row.hint) }));
+    return {
+      anchor,
+      label: siteWhere(anchor, first.hint),
+      names: siteNames(instances.map((instance) => instance.label)),
+      ids: instances.map((instance) => instance.id),
+      instances,
+      select: first.id,
+      // An Instance on the server, or one with no Adapter, keeps the component's own word.
+      supported: supported && siteRows.every((row) => row.rendered === "client" && row.adapted),
+    };
+  });
 }
 
 /** The plot key's numbered changes as the panel lists them: what each changes, from what to what, and where. */
@@ -135,12 +165,7 @@ export function stateItems(page: Page, reads: Reads): StateItem[] {
     const held = Object.keys(record.values).filter((prop) => stateProps.get(id)?.includes(prop));
     const mounted = page.rows.some((row) => row.id === id && row.rendered === "client");
     const where = (mounted ? reads.name(id) : null) ?? targetLabel(record.target);
-    return held.map((prop) => ({
-      detail: stateDetail(prop, formatCurrent(record.values[prop])),
-      where,
-      select: mounted ? id : null,
-      reached: mounted ? [id] : [],
-    }));
+    return held.map((prop) => ({ detail: stateDetail(prop, formatCurrent(record.values[prop])), where }));
   });
 }
 
