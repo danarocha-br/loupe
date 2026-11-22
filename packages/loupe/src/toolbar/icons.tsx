@@ -275,3 +275,26 @@ export const EyeIcon = () => (
     {EYE}
   </Icon>
 );
+
+/** The split button's chevron: up, toward the popover it opens. */
+export const ChevronUpIcon = () => (
+  <Icon size={16} stroke={2}>
+    <path d="M6 15l6-6 6 6" />
+  </Icon>
+);
+
+/** An exclamation mark, alone: a refused copy's badge. */
+const EXCLAIM = <path d="M12 7v6M12 17h.01" />;
+export const ExclaimIcon = () => (
+  <Icon size={13} stroke={2.25}>
+    {EXCLAIM}
+  </Icon>
+);
+
+/** An exclamation mark in a ring: the button's Not copied. */
+export const AlertIcon = () => (
+  <Icon size={16} stroke={2}>
+    {EXCLAIM}
+    <circle cx="12" cy="12" r="9" />
+  </Icon>
+);

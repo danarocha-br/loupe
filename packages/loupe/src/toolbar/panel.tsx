@@ -20,7 +20,7 @@ import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope, ScopeTarget } from "../runtime/store.js";
 import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
-import { CopyProposalButton } from "./copy-dialog.js";
+import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
 import { plural } from "./format.js";
 import {
@@ -1266,7 +1266,7 @@ function Footer({
           <ContrastIcon />
           <span className="sr-only">Dark theme</span>
         </button>
-        <CopyProposalButton disabled={!footer.copyEnabled} />
+        <CopyFlow disabled={!footer.copyEnabled} />
       </div>
     </footer>
   );

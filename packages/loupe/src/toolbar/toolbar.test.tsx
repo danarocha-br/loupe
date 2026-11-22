@@ -648,6 +648,15 @@ describe("leaving a selection, and hiding the marks", () => {
     await keyEscape(textField());
     expect(selectedId()).toBe(ANA);
 
+    // Copy Proposal's popover closes on its own Esc, wherever its focus is.
+    await clickInPanel(pill("variant", '"default"'));
+    await clickInPanel(shadow().querySelector("[data-copy-details]") as HTMLButtonElement);
+    const copyButton = [...shadow().querySelectorAll<HTMLButtonElement>(".copy-popover button")].at(-1) as HTMLButtonElement;
+    act(() => copyButton.focus());
+    await keyEscape(copyButton);
+    expect(shadow().querySelector(".copy-popover")).toBeNull();
+    expect(selectedId()).toBe(ANA);
+
     await escape();
     expect(selectedId()).toBeNull();
   });

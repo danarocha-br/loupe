@@ -71,19 +71,36 @@ const LIGHT: Tokens = {
   "warn-dot": "#C98A12",
   select: "rgba(254, 68, 55, 0.2)",
   kbd: "rgba(10, 10, 10, 0.08)",
-  "focus-glow": "rgba(254, 68, 55, 0.2)",
+  "focus-glow": "rgba(254, 68, 55, 0.18)",
   "field-edge": "#8F8A83",
   "tools-wash": "#EFEFEC",
   "map-dot": "rgba(27, 34, 32, 0.16)",
-  backdrop: "rgba(27, 34, 32, 0.32)",
   "on-check": "#FFFFFF",
   shadow: "0 0 0 1px rgba(27, 34, 32, 0.05), 0 1px 2px rgba(27, 34, 32, 0.06), 0 4px 12px rgba(27, 34, 32, 0.04)",
   "tile-shadow": "inset 0 0 0 1px rgba(27, 34, 32, 0.08), 0 1px 2px rgba(27, 34, 32, 0.05)",
   "site-shadow": "0 0 0 1px rgba(27, 34, 32, 0.06), 0 1px 2px rgba(27, 34, 32, 0.05)",
   "raised-shadow": "0 0 0 1px rgba(27, 34, 32, 0.06), 0 1px 2px rgba(27, 34, 32, 0.14)",
   "primary-shadow": "inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(27, 34, 32, 0.25)",
+  "copied-bg": "#DFF7E4",
+  "copied-fg": "#14532D",
+  "copied-edge": "rgba(20, 83, 45, 0.12)",
+  "copied-rule": "rgba(20, 83, 45, 0.18)",
+  "warn-edge": "rgba(201, 138, 18, 0.35)",
+  "warn-rule": "rgba(122, 75, 0, 0.2)",
+  "warn-wash": "rgba(122, 75, 0, 0.1)",
+  "warn-muted": "#8A6A2A",
+  "on-primary-rule": "rgba(255, 255, 255, 0.18)",
+  "on-primary-wash": "rgba(255, 255, 255, 0.14)",
+  toast: "#1B2220",
+  "copied-badge": "#27917E",
+  "on-toast": "#FFFFFF",
+  "toast-muted": "#A3AAA7",
+  "toast-edge": "rgba(255, 255, 255, 0.06)",
+  "popover-edge": "rgba(27, 34, 32, 0.08)",
+  "text-select": "rgba(1, 72, 134, 0.12)",
+  "popover-shadow": "0 0 0 1px rgba(27, 34, 32, 0.08), 0 16px 40px rgba(27, 34, 32, 0.18), 0 2px 6px rgba(27, 34, 32, 0.08)",
+  "toast-shadow": "0 8px 24px rgba(27, 34, 32, 0.28)",
   "overlay-shadow": "0 12px 36px rgba(27, 34, 32, 0.22), 0 2px 6px rgba(27, 34, 32, 0.1)",
-  "dialog-shadow": "0 24px 64px rgba(27, 34, 32, 0.22)",
 };
 
 const DARK: Tokens = {
@@ -136,15 +153,32 @@ const DARK: Tokens = {
   "field-edge": "#646C69",
   "tools-wash": "#242928",
   "map-dot": "rgba(255, 255, 255, 0.14)",
-  backdrop: "rgba(27, 34, 32, 0.32)",
   "on-check": "#0E1110",
   shadow: "0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.25)",
   "tile-shadow": "inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)",
   "site-shadow": "0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.3)",
   "raised-shadow": "0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.4)",
   "primary-shadow": "inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.4)",
+  "copied-bg": "#143A25",
+  "copied-fg": "#93E2AC",
+  "copied-edge": "rgba(147, 226, 172, 0.16)",
+  "copied-rule": "rgba(147, 226, 172, 0.24)",
+  "warn-edge": "rgba(217, 150, 59, 0.4)",
+  "warn-rule": "rgba(229, 181, 103, 0.24)",
+  "warn-wash": "rgba(229, 181, 103, 0.12)",
+  "warn-muted": "#C9A56A",
+  "on-primary-rule": "rgba(27, 34, 32, 0.18)",
+  "on-primary-wash": "rgba(27, 34, 32, 0.08)",
+  toast: "#2E3432",
+  "copied-badge": "#2FA58F",
+  "on-toast": "#F6F3EF",
+  "toast-muted": "#A3AAA7",
+  "toast-edge": "rgba(255, 255, 255, 0.08)",
+  "popover-edge": "rgba(255, 255, 255, 0.1)",
+  "text-select": "rgba(141, 194, 245, 0.24)",
+  "popover-shadow": "0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)",
+  "toast-shadow": "0 8px 24px rgba(0, 0, 0, 0.5)",
   "overlay-shadow": "0 12px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3)",
-  "dialog-shadow": "0 24px 64px rgba(0, 0, 0, 0.6)",
 };
 
 const declare = (tokens: Tokens) =>
@@ -204,11 +238,11 @@ export const CSS = `
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* Text */
-.panel, .show-tab, .dialog {
+.panel, .show-tab {
   font: 400 ${size(13)}/1.3846 ${SANS}; color: var(--ink);
 }
 /* Paragraphs keep their last word company; headings balance instead. */
-.panel, .dialog { overflow-wrap: break-word; text-wrap: pretty; }
+.panel { overflow-wrap: break-word; text-wrap: pretty; }
 .mono { font-family: ${MONO}; font-weight: 400; font-size: ${size(12)}; }
 .verbatim { white-space: pre-wrap; }
 .muted { color: var(--muted); font-weight: 400; }
@@ -272,16 +306,70 @@ button:disabled { cursor: default; opacity: 0.45; }
 .middle > * { flex: none; }
 
 /* The footer: the count and Reset all, then light or dark and Copy Proposal */
-.footer { flex: none; display: flex; flex-direction: column; gap: 10px; margin: 0 6px 6px; padding: 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
+.footer { position: relative; flex: none; display: flex; flex-direction: column; gap: 10px; margin: 0 6px 6px; padding: 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
 .footer .tally { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; min-height: 24px; }
 .footer .count { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .footer .count .n { font: 600 ${size(20)}/1.2 ${SANS}; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .footer .count .word { font: 500 ${size(13)}/1.3846 ${SANS}; color: var(--muted); white-space: nowrap; }
-.footer .held-chip { display: inline-flex; align-items: center; gap: 5px; height: 18px; margin-left: 4px; padding: 0 7px 0 6px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); font: 500 ${size(10)}/1.4 ${MONO}; white-space: nowrap; }
+.footer .held-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; margin-left: 4px; padding: 0 8px 0 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); font: 500 ${size(10)}/1.4 ${MONO}; white-space: nowrap; }
 .footer .held-chip .dot { width: 6px; height: 6px; background: var(--warn-dot); }
 .footer .reset-all { height: 24px; padding: 0 8px 0 6px; gap: 5px; color: var(--muted); }
 .footer .act { display: flex; align-items: center; gap: 8px; }
-.footer .act [data-copy] { flex: 1; min-width: 0; }
+/* Copy Proposal (Copy flow v2 · A): a split button, its main half copying in one click, its chevron opening the details */
+.split { flex: 1; min-width: 0; display: flex; align-items: center; height: 40px; overflow: hidden; border-radius: 999px; background: var(--primary); color: var(--on-primary); box-shadow: var(--primary-shadow); transition: background-color 160ms ease-out, color 160ms ease-out; }
+.split button { height: 40px; color: inherit; }
+.split-main { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 ${size(13)}/1.3077 ${SANS}; white-space: nowrap; }
+.split-rule { flex: none; width: 1px; height: 20px; background: var(--on-primary-rule); }
+.split-more { flex: none; display: grid; place-items: center; width: 41px; background: var(--on-primary-wash); }
+/* Hover belongs to the ink button: the green and amber states are read, not pressed again. */
+@media (hover: hover) { .split[data-state="idle"] .split-main:not(:disabled):hover { background: var(--on-primary-wash); } .split[data-state="idle"] .split-more:not(:disabled):hover { background: var(--on-primary-rule); } }
+.split:has(button:disabled) { opacity: 0.45; }
+.split button:disabled { opacity: 1; }
+.split button:focus-visible { outline-offset: -3px; border-radius: 999px; }
+.split[data-state="copied"] { background: var(--copied-bg); color: var(--copied-fg); box-shadow: inset 0 0 0 1px var(--copied-edge); }
+.split[data-state="copied"] .split-rule { background: var(--copied-rule); }
+.split[data-state="copied"] .split-more { background: none; }
+.split[data-state="failed"] { background: var(--warn-bg); color: var(--warn-fg); box-shadow: inset 0 0 0 1px var(--warn-edge); }
+.split[data-state="failed"] .split-rule { background: var(--warn-rule); }
+.split[data-state="failed"] .split-more { background: var(--warn-wash); }
+/* Over the footer, pointing down at what opened it: the chevron, or the button a one-click copy came from. */
+.copy-popover { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 10px); z-index: 1; padding: 14px; border-radius: 18px; background: var(--card); box-shadow: var(--popover-shadow); }
+.copy-popover .caret { position: absolute; bottom: -11px; right: 16px; }
+.copy-popover[data-anchor="copy"] .caret { right: auto; left: calc(50% - 8px); }
+.copy-popover .caret .fill { fill: var(--card); }
+.copy-popover .caret .edge { fill: none; stroke: var(--popover-edge); }
+.copy-popover .details { display: flex; flex-direction: column; gap: 12px; }
+.copy-popover .field { display: flex; flex-direction: column; gap: 4px; }
+.copy-popover .field > label, .copy-popover .field > span:not(.field-error) { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
+.copy-popover .optional { color: var(--faint); }
+.copy-popover input { width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); font: 400 ${size(13)}/1.3846 ${SANS}; outline: none; }
+.copy-popover input::placeholder { color: var(--faint); }
+.copy-popover input:focus { background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--focus-glow); }
+.copy-popover input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--alert); }
+.copy-popover .field-error { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-fg); }
+.copy-popover .btn.primary { width: 100%; }
+.not-copied { display: flex; gap: 10px; }
+.not-copied .badge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); }
+.not-copied h3 { padding-top: 1px; font: 600 ${size(13)}/1.3846 ${SANS}; letter-spacing: 0; color: var(--warn-fg); }
+.not-copied p { margin-top: 2px; font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-muted); }
+.proposal-text { position: relative; height: 130px; margin-top: 15px; overflow: hidden; border-radius: 12px; background: var(--hover); box-shadow: inset 0 0 0 1px var(--popover-edge); }
+.proposal-text textarea { display: block; width: 100%; height: 100%; padding: 10px; border: 0; resize: none; background: none; color: var(--ink); font: 400 ${size(10)}/1.5 ${MONO}; white-space: pre-wrap; outline: none; scrollbar-width: thin; }
+.proposal-text textarea::selection { background: var(--text-select); }
+.proposal-text textarea:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 12px; }
+/* The text runs on below the fold: it fades rather than stopping at a line. */
+.proposal-text::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 32px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--hover)); }
+.popover-actions { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
+.popover-actions.alone { grid-template-columns: minmax(0, 1fr); }
+.popover-actions .btn { height: 40px; font: 500 ${size(13)}/1.3077 ${SANS}; }
+.popover-actions .btn.primary { font-weight: 600; }
+.copy-toast { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 10px); z-index: 1; display: flex; align-items: flex-start; gap: 10px; min-height: 50px; padding: 8px 12px 9px; border-radius: 14px; background: var(--toast); color: var(--on-toast); box-shadow: inset 0 0 0 1px var(--toast-edge), var(--toast-shadow); animation: loupe-toast-in 180ms ease-out; }
+.copy-toast .badge { flex: none; margin-top: 5px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--copied-badge); color: var(--on-toast); }
+.copy-toast .what { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.copy-toast .line { display: flex; min-width: 0; font: 600 ${size(12)}/1.3333 ${SANS}; white-space: nowrap; }
+.copy-toast .copied-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.copy-toast .sub { font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--toast-muted); }
+@keyframes loupe-toast-in { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .copy-toast { animation: none; } .split { transition: none; } }
 .footer .theme { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--sunk); color: var(--primary); box-shadow: inset 0 0 0 1px var(--hairline); transition: background-color 120ms ease-out; }
 @media (hover: hover) { .footer .theme:hover { background: var(--sunk-hover); } }
 .footer .undo { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: ${size(12)}; line-height: 1.4167; color: var(--muted); }
@@ -636,36 +724,9 @@ fieldset.site .list > li { padding-left: 42px; }
 @keyframes loupe-mark-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ring[data-ring], .mark[data-mark], .ring[data-ring].quiet, .mark[data-mark].quiet { animation: none; transition: none; } }
 
-/* The Export dialog, centred on the page. Only its sections scroll: Cancel and Copy stay in view at any
-   height or zoom, and \`dvh\` leaves room for a phone browser's toolbar (layout review 2026-11-20). */
-.dialog { width: 440px; max-width: calc(100% - 32px); max-height: min(780px, calc(100dvh - 32px)); overflow: hidden; padding: 6px; border: 0; border-radius: 24px; background: var(--ground); color: var(--ink); box-shadow: 0 0 0 1px var(--edge), var(--dialog-shadow); scrollbar-width: thin; }
-/* Older engines don't let ::backdrop inherit the host's tokens: the value stands in for it there. */
-.dialog::backdrop { background: var(--backdrop, rgba(27, 34, 32, 0.32)); }
-.dialog[open] { display: flex; flex-direction: column; }
-.dialog form { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
-.dialog .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; border-radius: 18px; scrollbar-width: thin; }
-.dialog .actions { flex: none; }
-.dialog .sec { display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
-.dialog .sec.soft { gap: 10px; }
-.dialog h2 { margin: 0; font: 600 ${size(18)}/1.3333 ${SANS}; letter-spacing: -0.015em; }
-.dialog .field { display: flex; flex-direction: column; gap: 6px; }
-.dialog .field input, .dialog .field textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--field-edge); border-radius: 12px; background: var(--card); color: var(--ink); font: 400 ${size(13)}/1.3846 ${SANS}; outline: none; }
-.dialog .field textarea { min-height: 52px; resize: vertical; }
-.dialog .field input:focus, .dialog .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-glow); }
-.dialog .field > span:not(.field-error), .dialog .field > label { font-weight: 500; }
-.dialog .field input[aria-invalid="true"] { border-color: var(--alert); }
-.dialog .field-error { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-fg); }
-.dialog .notes { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
-.dialog .notes legend { padding: 0 0 10px; font-weight: 600; }
-.dialog .notes .field > .entry { display: flex; align-items: flex-start; gap: 8px; font: 400 ${size(12)}/1.5 ${SANS}; color: var(--muted); }
-.dialog .tiles { display: flex; flex-wrap: wrap; gap: 20px; }
-.dialog .tile { display: flex; flex-direction: column; gap: 2px; }
-.dialog .tile b { font: 600 ${size(20)}/1.2 ${SANS}; font-variant-numeric: tabular-nums; }
-.dialog .actions { justify-content: flex-end; gap: 8px; padding: 6px 4px 4px; }
-
 /* iOS Safari zooms the page into any field under 16px: on a touch screen they are 16px. */
 @media (pointer: coarse) {
-  .row .text, .dialog .field input, .dialog .field textarea { font-size: max(16px, ${size(16)}); line-height: 1.375; }
+  .row .text, .copy-popover input { font-size: max(16px, ${size(16)}); line-height: 1.375; }
 }
 
 /* The page map: every component a tinted block where it sits, one hue each, fit into a dotted well; each row is its legend. */
@@ -697,7 +758,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .big-tool .h { margin: 2px 8px 0; font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--faint); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
-  .panel, .dialog, .show-tab, .section, .card, .footer, .header { border: 1px solid transparent; }
+  .panel, .copy-popover, .show-tab, .section, .card, .footer, .header { border: 1px solid transparent; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
   .pills .is-default::after, .legend i { forced-color-adjust: none; background: CanvasText; }

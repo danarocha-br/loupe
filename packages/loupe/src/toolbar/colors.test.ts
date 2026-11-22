@@ -53,9 +53,9 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     // Read the source, where the page's values still show as `${PAGE.…}`: the built string can't tell them apart.
     const source = readFileSync(new URL("./styles.ts", import.meta.url), "utf8");
     const rules = source.slice(source.indexOf("export const CSS = `")).split("\n");
-    // Shadows are surfaces' depth, not colour roles; the backdrop keeps a stand-in for engines where it can't inherit.
+    // Shadows are surfaces' depth, not colour roles.
     const literal = /#[0-9A-Fa-f]{6}\b|rgba?\(/;
-    const offenders = rules.filter((line) => literal.test(line) && !/shadow:/.test(line) && !line.includes("var(--backdrop, rgba("));
+    const offenders = rules.filter((line) => literal.test(line) && !/shadow:/.test(line));
     expect(offenders).toEqual([]);
   });
 });
