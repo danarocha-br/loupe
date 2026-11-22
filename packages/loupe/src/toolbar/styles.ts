@@ -392,23 +392,27 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Collapsed (launcher.tsx): a flat dark pill with the L, free or docked on a side, its fillets drawn past its box */
+/* Collapsed (launcher.tsx): a flat dark pill with the L, free or docked flush on a side, its corners there square */
 .launcher {
-  position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; width: 44px; height: 32px; padding: 0; background: none; color: var(--on-band);
+  position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; width: 44px; height: 32px; padding: 0; border-radius: 16px; background: var(--band); color: var(--on-band);
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-edge);
-  transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out;
+  transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out, border-radius 260ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms ease-out;
 }
-.launcher .shape { position: absolute; inset: 0; display: block; overflow: visible; }
-.launcher .shape path { fill: var(--band); transition: fill 120ms ease-out; }
+.launcher[data-edge="right"], .dock-ghost[data-edge="right"] { border-radius: 16px 0 0 16px; }
+.launcher[data-edge="left"], .dock-ghost[data-edge="left"] { border-radius: 0 16px 16px 0; }
+.launcher[data-edge="top"], .dock-ghost[data-edge="top"] { border-radius: 0 0 16px 16px; }
+.launcher[data-edge="bottom"], .dock-ghost[data-edge="bottom"] { border-radius: 16px 16px 0 0; }
 .launcher .mark { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
 .launcher .glyph { display: block; }
 .launcher.dragging { cursor: grabbing; }
 /* After a drop, a dock or a key: it travels to its place, quick out and a soft landing. */
-.launcher.settling { transition: translate 260ms cubic-bezier(0.23, 1, 0.32, 1), transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out; }
-@media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover .shape path { fill: var(--band-hover); } }
-/* The ring follows the pill's own outline, fillets and all. */
-.launcher:focus-visible { outline: none; }
-.launcher:focus-visible .shape path { stroke: var(--accent); stroke-width: 4; paint-order: stroke; }
+.launcher.settling { transition: translate 260ms cubic-bezier(0.23, 1, 0.32, 1), transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out, border-radius 260ms cubic-bezier(0.23, 1, 0.32, 1), background-color 120ms ease-out; }
+@media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover { background: var(--band-hover); } }
+/* An outline follows the pill's corners, round or square. */
+.launcher:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Where the held pill would dock if let go now: the docked shape, faint, flush on its side. */
+.dock-ghost { position: fixed; left: 0; top: 0; z-index: 2147483646; width: 44px; height: 32px; border-radius: 16px; background: var(--band); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
+.dock-ghost.shown { opacity: 0.16; }
 /* The handle: as the panel opens it tucks into its side (free, it settles away), and as the
    panel closes it slides back out of its side. A transform, apart from the translate that places it. */
 .launcher.leaving { pointer-events: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 120ms ease-out; }
@@ -807,8 +811,9 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 @media (forced-colors: active) {
   .panel, .copy-popover, .section, .card, .footer, .header { border: 1px solid transparent; }
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
-  .launcher .shape path { fill: ButtonText; }
-  .launcher:focus-visible .shape path { stroke: Highlight; }
+  .launcher { background: ButtonText; }
+  .launcher:focus-visible { outline-color: Highlight; }
+  .dock-ghost { forced-color-adjust: none; background: ButtonText; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
   .pills .is-default::after, .legend i { forced-color-adjust: none; background: CanvasText; }

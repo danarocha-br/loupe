@@ -4,14 +4,9 @@ import {
   bodyRect,
   centreOf,
   DEFAULT_PLACE,
-  FILLET,
   glue,
-  leanCentre,
-  leanGap,
   MARGIN,
   nearestEdge,
-  nearRadius,
-  pillPath,
   placeFor,
   REACH,
   readPlace,
@@ -33,37 +28,10 @@ describe("where the collapsed pill lands (2026-11-22)", () => {
     expect(placeFor(600, 800 - BODY.height / 2 - REACH, VIEWPORT).edge).toBeNull();
   });
 
-  it("keeps a docked pill's fillets clear of the corners", () => {
+  it("keeps a docked pill's ends clear of the corners", () => {
     const centre = centreOf(glue("bottom", 0, VIEWPORT), VIEWPORT);
-    expect(centre.x - BODY.width / 2 - FILLET).toBe(MARGIN);
+    expect(centre.x - BODY.width / 2).toBe(MARGIN);
     expect(centre.y + BODY.height / 2).toBe(VIEWPORT.height);
-  });
-
-  it("draws a held pill in as to a magnet: closer than the pointer puts it, meeting the pointer at the edge of reach", () => {
-    expect(leanGap(REACH)).toBe(REACH);
-    expect(leanGap(REACH + 20)).toBe(REACH + 20);
-    expect(leanGap(REACH / 2)).toBeLessThan(REACH / 2);
-    expect(leanGap(0)).toBe(0);
-    // Toward the bottom: the pointer puts the body 28px off it; it is shown nearer.
-    const centre = leanCentre("bottom", 600, 800 - BODY.height / 2 - 28, VIEWPORT);
-    expect(centre.x).toBe(600);
-    expect(800 - BODY.height / 2 - centre.y).toBeLessThan(28);
-  });
-
-  it("flattens the side that faces the edge as it nears: round out of reach, nearly square at it", () => {
-    expect(nearRadius(REACH)).toBe(BODY.height / 2);
-    expect(nearRadius(0)).toBe(2);
-    expect(nearRadius(REACH / 2)).toBeGreaterThan(2);
-    expect(nearRadius(REACH / 2)).toBeLessThan(BODY.height / 2);
-  });
-
-  it("draws one outline from a stadium to a docked tab, the near corner turning concave once it is a fillet", () => {
-    // Free: a stadium, every corner convex.
-    expect(pillPath(null, 16, 0)).toBe("M16 32A16 16 0 0 1 0 16L0 16A16 16 0 0 1 16 0L28 0A16 16 0 0 1 44 16L44 16A16 16 0 0 1 28 32Z");
-    // Docked on the bottom: flush, fillets flaring 8px past the box each side.
-    expect(pillPath("bottom", 0, 8)).toBe("M-8 32A8 8 0 0 0 0 24L0 16A16 16 0 0 1 16 0L28 0A16 16 0 0 1 44 16L44 24A8 8 0 0 0 52 32Z");
-    // On the right side it faces the right: the fillets start and end on x = 44.
-    expect(pillPath("right", 0, 8)).toMatch(/^M44 -8A8 8 0 0 1 36 0/);
   });
 
   it("holds its place across a resize, in fractions of the window", () => {

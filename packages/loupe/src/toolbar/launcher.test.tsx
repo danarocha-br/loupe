@@ -27,6 +27,7 @@ afterEach(() => {
 });
 
 const pill = () => container.querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
+const ghost = () => container.querySelector<HTMLElement>(".dock-ghost") as HTMLElement;
 
 const fire = (type: string, at: { clientX: number; clientY: number }) =>
   act(() => {
@@ -69,11 +70,9 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     expect(opened).toHaveBeenCalledTimes(1);
   });
 
-  it("stays free where it is dropped away from the sides, a stadium again once its fillets have gone back", async () => {
+  it("stays free where it is dropped away from the sides", () => {
     dragTo(window.innerWidth / 2, window.innerHeight / 2);
     expect(pill().dataset.edge).toBe("free");
-    await act(async () => await new Promise((resolve) => setTimeout(resolve, 250)));
-    expect(pill().querySelector("path")?.getAttribute("d")).toMatch(/^M16 32A16 16 0 0 1/);
   });
 
   it("moves to a side with the arrow keys, without a pointer", () => {
@@ -84,30 +83,38 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     expect(pill().style.translate.startsWith("0px ")).toBe(true);
   });
 
-  it("is drawn in near a side, as to a magnet: closer than the pointer, its facing side flattening, and let go there it docks", () => {
-    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
+  it("stays rigid and exactly under the pointer while held, with no lean", () => {
+    const [left = "0", top = "0"] = pill().style.translate.split(" ");
+    const [x0, y0] = [Number.parseFloat(left), Number.parseFloat(top)];
+    fire("pointerdown", { clientX: x0 + 10, clientY: y0 + 10 });
+    const [x, y] = [window.innerWidth / 2, window.innerHeight - 16 - 30];
+    fire("pointermove", { clientX: x, clientY: y });
     expect(pill().classList.contains("dragging")).toBe(true);
+    expect(pill().style.translate).toBe(`${x - 10}px ${y - 10}px`);
+  });
+
+  it("shows where it would dock while held in reach of a side, and nothing while held mid-page", () => {
+    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
+    expect(ghost().classList.contains("shown")).toBe(false);
+    // The pointer puts the body 30px off the bottom: in reach.
+    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 16 - 30 - 6 });
     expect(pill().dataset.edge).toBe("free");
-    // The pointer puts the body 30px off the bottom: it is shown nearer, not docked yet.
+    expect(ghost().classList.contains("shown")).toBe(true);
+    expect(ghost().dataset.edge).toBe("bottom");
+    // Back out of reach: the preview goes.
+    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
+    expect(ghost().classList.contains("shown")).toBe(false);
+  });
+
+  it("docks into the preview when let go in reach", () => {
+    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     const pointerY = window.innerHeight - 16 - 30 - 6;
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: pointerY });
-    expect(pill().dataset.edge).toBe("free");
-    const top = Number.parseFloat(pill().style.translate.split(" ")[1] as string);
-    expect(top).toBeGreaterThan(window.innerHeight - 32 - 30);
-    // Its bottom corners are tighter than a stadium's 16px.
-    const start = Number(/^M(-?[\d.]+) 32/.exec(pill().querySelector("path")?.getAttribute("d") ?? "")?.[1]);
-    expect(start).toBeLessThan(16);
-    // Let go there: it docks.
     fire("pointerup", { clientX: window.innerWidth / 2, clientY: pointerY });
     expect(pill().dataset.edge).toBe("bottom");
     expect(pill().classList.contains("dragging")).toBe(false);
-  });
-
-  it("docks while still held once it meets the edge", () => {
-    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
-    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 16 - 2 - 6 });
-    expect(pill().dataset.edge).toBe("bottom");
-    expect(pill().classList.contains("dragging")).toBe(true);
+    expect(pill().classList.contains("settling")).toBe(true);
+    expect(ghost().classList.contains("shown")).toBe(false);
   });
 
   it("carries on as far as a flick would coast, and docks on the side that takes it there", () => {
@@ -121,6 +128,24 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
       // 200px down in 50ms: let go well out of reach, it coasts to the bottom.
       fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 + 200 });
       fire("pointerup", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 + 200 });
+      expect(pill().dataset.edge).toBe("bottom");
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("lands in the preview it shows when let go, however fast it was moving", () => {
+    const now = vi.spyOn(performance, "now").mockReturnValue(1000);
+    try {
+      pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
+      now.mockReturnValue(1200);
+      fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
+      now.mockReturnValue(1250);
+      // 300px sideways in 50ms, ending 30px off the bottom: the bottom's preview is showing.
+      const pointerY = window.innerHeight - 16 - 30 - 6;
+      fire("pointermove", { clientX: window.innerWidth / 2 - 300, clientY: pointerY });
+      expect(ghost().dataset.edge).toBe("bottom");
+      fire("pointerup", { clientX: window.innerWidth / 2 - 300, clientY: pointerY });
       expect(pill().dataset.edge).toBe("bottom");
     } finally {
       now.mockRestore();

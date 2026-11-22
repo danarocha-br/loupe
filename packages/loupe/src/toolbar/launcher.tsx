@@ -1,10 +1,11 @@
 // The collapsed Toolbar (2026-11-22): a dark pill with Loupe's L, in place of the
 // "Show Loupe" tab. A click opens the panel: the pill tucks into its side as the panel
-// slides out of its own, a handle and its drawer. Dragged, it follows the pointer;
-// near a side it is drawn in as to a magnet, its facing side flattening, and docked,
-// two small fillets grow out of the edge to hold it (`launcher-place.ts`). Let go or
-// flicked within reach of a side, it docks there; anywhere else it stays free. The
-// arrow keys dock it on the side they point at, so it moves without a pointer too.
+// slides out of its own, a handle and its drawer. Dragged, it stays rigid and exactly
+// under the pointer; within reach of a side, a faint copy shows where it would dock, as
+// a window shows where it will snap (`launcher-place.ts`). Let go or flicked within
+// reach of a side, it travels into that place and its corners on that side square off;
+// anywhere else it stays free. The arrow keys dock it on the side they point at, so it
+// moves without a pointer too.
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import {
@@ -12,24 +13,15 @@ import {
   BODY,
   bodyRect,
   centreOf,
-  DOCK,
   type Edge,
-  FILLET,
-  freePlace,
-  gapTo,
   glue,
-  leanCentre,
-  leanGap,
   nearestEdge,
-  nearRadius,
   type Place,
   PLACE_KEY,
-  pillPath,
   placeFor,
   REACH,
   readPlace,
   type Rect,
-  UNDOCK,
   type Viewport,
 } from "./launcher-place.js";
 
@@ -84,57 +76,22 @@ type Drag = { pointer: number; startX: number; startY: number; fromX: number; fr
 
 /** How long a dock, or a flick's travel, takes: quick out, a soft landing. */
 const SETTLE_MS = 260;
-/** The fillets growing out of the edge as it docks, and going back as it leaves. */
-const FILLET_IN_MS = 220;
-const FILLET_OUT_MS = 120;
 /** A release faster than this (px/ms) is a flick: the pill carries on as far as it would coast. */
 const FLICK = 0.3;
 const COAST_MS = 140;
 
-/** A number that eases to `target` over `ms`, from wherever it is when the target changes. */
-function useTween(target: number, ms: number): number {
-  const [value, setValue] = useState(target);
-  const current = useRef(target);
-  useEffect(() => {
-    const from = current.current;
-    if (from === target) return;
-    if (typeof requestAnimationFrame !== "function" || ms === 0 || reducedMotion()) {
-      current.current = target;
-      setValue(target);
-      return;
-    }
-    // Timed from its first frame: a frame's timestamp can come before `performance.now()` read here.
-    let start: number | null = null;
-    let frame = 0;
-    const step = (now: number) => {
-      start ??= now;
-      const t = Math.min(1, Math.max(0, (now - start) / ms));
-      // The same strong ease-out as the travel: most of it at once, a soft finish.
-      const eased = 1 - (1 - t) ** 4;
-      current.current = from + (target - from) * eased;
-      setValue(current.current);
-      if (t < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [target, ms]);
-  return value;
-}
+/** A held pill: where the pointer puts its centre, and the side it would dock on if let go now. */
+type Held = { x: number; y: number; edge: Edge | null };
 
-function reducedMotion(): boolean {
-  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-/** A held pill: where the pointer puts its centre, the side drawing it in (if one is), and whether that side has it. */
-type Held = { x: number; y: number; edge: Edge | null; docked: boolean };
-
-function holdAt(x: number, y: number, viewport: Viewport, wasDocked: Edge | null): Held {
+function holdAt(x: number, y: number, viewport: Viewport): Held {
   const { edge, gap } = nearestEdge(x, y, viewport);
-  if (gap >= REACH) return { x, y, edge: null, docked: false };
-  const shown = leanGap(gap);
-  // Docked while held, it stays docked until it is pulled out past `UNDOCK`, so it doesn't flicker on the line.
-  const docked = wasDocked === edge ? shown <= UNDOCK : shown <= DOCK;
-  return { x, y, edge, docked };
+  return { x, y, edge: gap < REACH ? edge : null };
+}
+
+/** A held body's centre: where the pointer puts it, its box kept on the window. */
+function onWindow(x: number, y: number, viewport: Viewport): { x: number; y: number } {
+  const keep = (value: number, half: number, side: number) => Math.min(side - half, Math.max(half, value));
+  return { x: keep(x, BODY.width / 2, viewport.width), y: keep(y, BODY.height / 2, viewport.height) };
 }
 
 /** The pill's body in the viewport, read where it is stored. */
@@ -170,19 +127,14 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
     keep(next);
   };
 
-  // What shows: docked, flush on its side; held in reach, leaning in, its facing side flattening; else where it is.
-  const docked = held ? held.docked : place.edge !== null;
-  const facing = held ? held.edge : place.edge;
-  const centre = held
-    ? held.edge
-      ? held.docked
-        ? centreOf(glue(held.edge, along(held.edge, held.x, held.y), viewport), viewport)
-        : leanCentre(held.edge, held.x, held.y, viewport)
-      : centreOf(freePlace(held.x, held.y, viewport), viewport)
-    : centreOf(place, viewport);
-  const fillet = useTween(docked ? FILLET : 0, docked ? FILLET_IN_MS : FILLET_OUT_MS);
-  const near = held?.edge && !held.docked ? nearRadius(leanGap(gapTo(held.edge, held.x, held.y, viewport))) : docked ? 0 : BODY.height / 2;
-  const path = pillPath(facing, near, fillet > 0.05 ? fillet : 0);
+  // Held, it is exactly where the pointer puts it (only kept on the window); let go, where its place is.
+  const centre = held ? onWindow(held.x, held.y, viewport) : centreOf(place, viewport);
+  // Where it would dock if let go now: the docked place on the side in reach. Once out of
+  // reach, or let go, the preview fades where it last was rather than jumping away.
+  const shown = held?.edge ? { edge: held.edge, at: centreOf(glue(held.edge, along(held.edge, held.x, held.y), viewport), viewport) } : null;
+  const lastGhost = useRef(shown);
+  if (shown) lastGhost.current = shown;
+  const ghost = lastGhost.current;
 
   const down = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || leaving) return;
@@ -212,14 +164,11 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
     if (!current.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
     const now = performance.now();
     current.samples = [...current.samples.filter((sample) => now - sample.t < 100), { t: now, x: event.clientX, y: event.clientY }];
-    // Picked up from a side, it starts docked there, and comes away once pulled past `UNDOCK`.
-    const before = latest.current ? (latest.current.docked ? latest.current.edge : null) : place.edge;
     current.moved = true;
-    const next = holdAt(current.fromX + dx, current.fromY + dy, viewport, before);
-    if (next.docked !== (before !== null) || (next.docked && next.edge !== before)) travel();
-    hold(next);
+    // Nothing travels while held: it is where the pointer puts it, rigid, its preview showing where it would dock.
+    hold(holdAt(current.fromX + dx, current.fromY + dy, viewport));
   };
-  /** Let go: within reach of a side, docked there; flicked, as far as it would coast; else where it is. */
+  /** Let go: within reach of a side, into its preview there; flicked, as far as it would coast; else where it is. */
   const drop = (current: Drag) => {
     const last = latest.current;
     if (last) {
@@ -228,7 +177,8 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
       const dt = first && end && end.t - first.t >= 16 ? end.t - first.t : 0;
       const vx = dt > 0 && first && end ? (end.x - first.x) / dt : 0;
       const vy = dt > 0 && first && end ? (end.y - first.y) / dt : 0;
-      const flicked = Math.hypot(vx, vy) > FLICK;
+      // A preview showing is a promise: let go there, it lands in it, however fast it was moving.
+      const flicked = last.edge === null && Math.hypot(vx, vy) > FLICK;
       const x = last.x + (flicked ? vx * COAST_MS : 0);
       const y = last.y + (flicked ? vy * COAST_MS : 0);
       travel();
@@ -265,35 +215,41 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
 
   const classes = ["launcher", held && "dragging", settling && "settling", leaving && "leaving"].filter(Boolean).join(" ");
   return (
-    <button
-      type="button"
-      className={classes}
-      data-edge={docked && facing ? facing : "free"}
-      // Placed by translate, not left and top, so its travel stays off layout.
-      style={{ translate: `${round(centre.x - BODY.width / 2)}px ${round(centre.y - BODY.height / 2)}px` }}
-      aria-label="Show Loupe"
-      title="Show Loupe · drag it anywhere, or to a side to keep it there"
-      tabIndex={leaving ? -1 : undefined}
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={cancel}
-      onKeyDown={key}
-      onClick={() => {
-        if (swallowClick.current || leaving) {
-          swallowClick.current = false;
-          return;
-        }
-        onOpen();
-      }}
-    >
-      <svg className="shape" width={BODY.width} height={BODY.height} viewBox={`0 0 ${BODY.width} ${BODY.height}`} aria-hidden="true" focusable="false">
-        <path d={path} />
-      </svg>
-      <span className="mark">
-        <LoupeL />
-      </span>
-    </button>
+    <>
+      {/* Under the pill, mounted while it is, so it can fade out as well as in. */}
+      <span
+        className={shown ? "dock-ghost shown" : "dock-ghost"}
+        data-edge={ghost?.edge}
+        aria-hidden="true"
+        style={ghost ? { translate: `${round(ghost.at.x - BODY.width / 2)}px ${round(ghost.at.y - BODY.height / 2)}px` } : undefined}
+      />
+      <button
+        type="button"
+        className={classes}
+        data-edge={held ? "free" : (place.edge ?? "free")}
+        // Placed by translate, not left and top, so its travel stays off layout.
+        style={{ translate: `${round(centre.x - BODY.width / 2)}px ${round(centre.y - BODY.height / 2)}px` }}
+        aria-label="Show Loupe"
+        title="Show Loupe · drag it anywhere, or to a side to keep it there"
+        tabIndex={leaving ? -1 : undefined}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={cancel}
+        onKeyDown={key}
+        onClick={() => {
+          if (swallowClick.current || leaving) {
+            swallowClick.current = false;
+            return;
+          }
+          onOpen();
+        }}
+      >
+        <span className="mark">
+          <LoupeL />
+        </span>
+      </button>
+    </>
   );
 }
 
