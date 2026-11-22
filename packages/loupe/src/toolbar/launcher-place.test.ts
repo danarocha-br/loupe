@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BODY, centreOf, DEFAULT_PLACE, FILLET, glue, layout, MARGIN, placeFor, readPlace, SNAP } from "./launcher-place.js";
+import { BODY, centreOf, DEFAULT_PLACE, FILLET, glue, layout, MARGIN, nearestEdge, placeFor, pullOf, RAIL, railBox, REACH, readPlace, SNAP } from "./launcher-place.js";
 
 const VIEWPORT = { width: 1200, height: 800 };
 
@@ -63,5 +63,19 @@ describe("where the collapsed pill lands (2026-11-22)", () => {
     for (const stored of [null, "", "{", "[]", '{"edge":"middle","at":0.5}', '{"edge":"top","at":4}']) {
       expect(readPlace(stored)).toEqual(DEFAULT_PLACE);
     }
+  });
+
+  it("pulls harder as the pill nears a side: nothing out of reach, full where it glues", () => {
+    expect(pullOf(REACH)).toBe(0);
+    expect(pullOf(REACH + 50)).toBe(0);
+    expect(pullOf((SNAP + REACH) / 2)).toBeCloseTo(0.5);
+    expect(pullOf(SNAP)).toBe(1);
+    expect(pullOf(-10)).toBe(1);
+    expect(nearestEdge(600, 800 - BODY.height / 2 - 60, VIEWPORT)).toEqual({ edge: "bottom", gap: 60 });
+  });
+
+  it("lays the side's rail along its edge, centred on the pill, never off the window", () => {
+    expect(railBox("bottom", 600, VIEWPORT)).toEqual({ left: 600 - RAIL.length / 2, top: 800 - RAIL.thickness, width: RAIL.length, height: RAIL.thickness });
+    expect(railBox("right", 10, VIEWPORT)).toEqual({ left: 1200 - RAIL.thickness, top: 0, width: RAIL.thickness, height: RAIL.length });
   });
 });

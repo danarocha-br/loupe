@@ -656,10 +656,14 @@ A split button filling the footer beside the theme button (Paper, "Copy flow v2 
 ### Collapsed
 Hide in the header collapses the panel to a dark pill with Loupe's L, the first letter of the wordmark, in `on-band` (after the designer's reference, 2026-11-22). It starts glued to the right side, low.
 - **Open:** a click, or Enter, opens the panel; focus goes to its heading.
-- **Move:** dragged past 4px it follows the pointer as a free pill, and nothing opens. Let go within 40px of a side, it glues there and flares into the edge; let go anywhere else, it stays free where it was dropped, kept 8px inside the window. Glued, its fillets keep 8px clear of the corners. It eases to its place over 220ms (none under reduced motion).
+- **Move:** dragged past 4px it lifts (scale 1.06, a longer softer shadow) and follows the pointer exactly, and nothing opens. Within 120px of a side, that side answers with a **rail**: a 4px dark band along the edge, 200px long, fading out at its ends, centred on the pill, stronger the closer it comes. Within 40px the side takes it while it is still held: the pill travels to the edge over 180ms, sets back down to full size, flares into it, and the rail goes full strength, so letting go changes nothing the eye didn't see. Held glued, it lets go only once pulled 52px out, so it doesn't flicker on the line. Let go anywhere else, it stays free where it was dropped, kept 8px inside the window. Glued, its fillets keep 8px clear of the corners. It eases to its place over 220ms.
 - **Keyboard:** the arrow keys glue it to the side they point at, so it moves without a pointer.
 - **Kept** in this browser (`loupe:launcher`), in fractions of the window, so it holds across a resize and a reload.
 - **Hover** brightens it; focus draws a 2px coral ring along its own outline.
+- **Opening:** the pill goes at once, and the panel comes in from its side, growing from where the pill was: 24px of travel and scale 0.98 to 1 over 420ms on `cubic-bezier(0.2, 0, 0, 1)`, opacity over 200ms. The page makes room for it at once.
+- **Closing:** quicker and smaller: 12px back toward its side and scale 0.99, opacity over 150ms, the rest over 200ms. The page takes its column back once the panel has gone, and the pill grows back out of its side (free, it fades up from 0.96) over 300ms.
+- **Reduced motion:** no lift, travel or scale anywhere: the panel and the pill cross-fade, and a glued pill still jumps to its side.
+- Nothing animates on the page's first load: the panel is simply there.
 
 ### Undo
 Reset all, Reset this Instance, Reset this scope and Discard act immediately; the footer then offers "Reset N Overrides · Undo" ("Discarded N held Overrides · Undo") on its own line. The offer has no timer: it stays until it is taken, a newer offer replaces it, or the Overrides change some other way. One offer at a time.
@@ -673,7 +677,7 @@ Reset all, Reset this Instance, Reset this scope and Discard act immediately; th
 - **Narrow windows:** under 360px the column narrows to the viewport, so at 320px nothing is off-screen. The middle keeps its scrolling to itself (`overscroll-behavior: contain`).
 - **Touch:** on a coarse pointer, text fields and the popover's fields are 16px so iOS Safari doesn't zoom.
 - **Forced colours:** cards, the header, footer, sheet and popover get transparent borders back, the collapsed pill is drawn in `ButtonText` with its L in `ButtonFace`; the chip that shows now, the switch and a ticked box are drawn in `Highlight`; the app's value takes a dashed outline; dots, the meter and the legend's marks are drawn in `CanvasText`.
-- **Reduced motion:** the switch's thumb and the chevrons move to their place without travelling there; the toast appears without rising; the page's outlines appear and go without fading. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
+- **Reduced motion:** the switch's thumb and the chevrons move to their place without travelling there; the panel and the collapsed pill cross-fade instead of travelling; the toast appears without rising; the page's outlines appear and go without fading. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
 - Apostrophes in panel text are typographic (’).
 
 ## Do's and Don'ts

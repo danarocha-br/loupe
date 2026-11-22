@@ -57,16 +57,69 @@ function freeCentre(x: number, y: number, viewport: Viewport): { x: number; y: n
  * it, otherwise free where it was let go. `x`, `y` are the body's centre in px.
  */
 export function placeFor(x: number, y: number, viewport: Viewport): Place {
-  const gaps: [Edge, number][] = [
-    ["left", x - BODY.width / 2],
-    ["right", viewport.width - x - BODY.width / 2],
-    ["top", y - BODY.height / 2],
-    ["bottom", viewport.height - y - BODY.height / 2],
-  ];
-  const [edge, gap] = gaps.reduce((nearest, next) => (next[1] < nearest[1] ? next : nearest));
-  if (gap <= SNAP) return glue(edge, horizontal(edge) ? x : y, viewport);
+  const { edge, gap } = nearestEdge(x, y, viewport);
+  return gap <= SNAP ? glue(edge, along(edge, x, y), viewport) : freePlace(x, y, viewport);
+}
+
+/** Free where it was let go, kept inside the window. */
+export function freePlace(x: number, y: number, viewport: Viewport): Place {
   const centre = freeCentre(x, y, viewport);
   return { edge: null, x: centre.x / viewport.width, y: centre.y / viewport.height };
+}
+
+/** How far the body's side facing `edge` is from it, in px; negative once past it. */
+export function gapTo(edge: Edge, x: number, y: number, viewport: Viewport): number {
+  switch (edge) {
+    case "left":
+      return x - BODY.width / 2;
+    case "right":
+      return viewport.width - x - BODY.width / 2;
+    case "top":
+      return y - BODY.height / 2;
+    case "bottom":
+      return viewport.height - y - BODY.height / 2;
+  }
+}
+
+const EDGES: readonly Edge[] = ["left", "right", "top", "bottom"];
+
+/** The side the body is closest to, and how close. */
+export function nearestEdge(x: number, y: number, viewport: Viewport): { edge: Edge; gap: number } {
+  return EDGES.map((edge) => ({ edge, gap: gapTo(edge, x, y, viewport) })).reduce((nearest, next) => (next.gap < nearest.gap ? next : nearest));
+}
+
+/** The body's centre measured along a side. */
+export const along = (edge: Edge, x: number, y: number) => (horizontal(edge) ? x : y);
+
+/** While dragging, a side starts to answer from this far off: its rail fades in as the pill comes closer. */
+export const REACH = 120;
+/** Once glued in a drag, it lets go of the side only this far out, so it doesn't flicker on the line. */
+export const RELEASE = SNAP + 12;
+
+/** How strongly a side pulls at this gap: 0 out of reach, rising to 1 where it glues. */
+export function pullOf(gap: number): number {
+  if (gap <= SNAP) return 1;
+  if (gap >= REACH) return 0;
+  return 1 - (gap - SNAP) / (REACH - SNAP);
+}
+
+/** The rail a side shows while the pill is dragged near it: a short dark band along the edge, centred on the pill. */
+export const RAIL = { length: 200, thickness: 4 } as const;
+
+export function railBox(edge: Edge, at: number, viewport: Viewport): { left: number; top: number; width: number; height: number } {
+  const side = horizontal(edge) ? viewport.width : viewport.height;
+  const start = clamp(at - RAIL.length / 2, 0, side - RAIL.length);
+  const far = (horizontal(edge) ? viewport.height : viewport.width) - RAIL.thickness;
+  switch (edge) {
+    case "top":
+      return { left: start, top: 0, width: RAIL.length, height: RAIL.thickness };
+    case "bottom":
+      return { left: start, top: far, width: RAIL.length, height: RAIL.thickness };
+    case "left":
+      return { left: 0, top: start, width: RAIL.thickness, height: RAIL.length };
+    case "right":
+      return { left: far, top: start, width: RAIL.thickness, height: RAIL.length };
+  }
 }
 
 /** Glued to `edge` with the body's centre at `along` px on it, kept clear of the corners. */

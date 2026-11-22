@@ -5,7 +5,26 @@
 // glue it to the side they point at, so it moves without a pointer too.
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
-import { type Box, centreOf, dragging, type Edge, glue, layout, type Place, PLACE_KEY, placeFor, readPlace, type Viewport } from "./launcher-place.js";
+import {
+  along,
+  type Box,
+  centreOf,
+  dragging,
+  type Edge,
+  freePlace,
+  gapTo,
+  glue,
+  layout,
+  nearestEdge,
+  type Place,
+  PLACE_KEY,
+  pullOf,
+  railBox,
+  readPlace,
+  RELEASE,
+  SNAP,
+  type Viewport,
+} from "./launcher-place.js";
 
 /** A press that travels further than this is a drag, not a click. */
 const DRAG_THRESHOLD = 4;
@@ -54,28 +73,71 @@ export const LoupeL = () => (
 
 type Drag = { pointer: number; startX: number; startY: number; fromX: number; fromY: number; moved: boolean };
 
-export function Launcher({ onOpen }: { onOpen(): void }) {
+/** How long the pill eases between following the pointer and a side's pull, either way. */
+const MAGNET_MS = 180;
+
+/**
+ * Where a drag is now: the side gluing it, if one is, kept until the pill is pulled
+ * `RELEASE` away from it so it doesn't flicker on the line; else the side it nears.
+ */
+function pullAt(x: number, y: number, viewport: Viewport, glued: Edge | null): { glued: Edge | null; edge: Edge; pull: number } {
+  if (glued !== null && gapTo(glued, x, y, viewport) <= RELEASE) return { glued, edge: glued, pull: 1 };
+  const { edge, gap } = nearestEdge(x, y, viewport);
+  return { glued: gap <= SNAP ? edge : null, edge, pull: pullOf(gap) };
+}
+
+type Held = { x: number; y: number; glued: Edge | null; edge: Edge; pull: number };
+
+/** Where the body's centre is, for the panel to open from it. */
+export type From = { x: number; y: number };
+
+export function Launcher({ onOpen }: { onOpen(from: From): void }) {
   const viewport = useViewport();
   const [place, setPlace] = useState<Place>(storedPlace);
-  // While dragging: the body's centre, following the pointer.
-  const [held, setHeld] = useState<{ x: number; y: number } | null>(null);
+  // While dragging: the body's centre, following the pointer, and the side pulling at it.
+  const [held, setHeld] = useState<Held | null>(null);
+  // Pointer moves can outrun a render: each reads the drag as the last one left it.
+  const latest = useRef<Held | null>(null);
+  const hold = (next: Held | null) => {
+    latest.current = next;
+    setHeld(next);
+  };
+  // For a moment as a side takes the pill or lets it go, it travels there instead of jumping.
+  const [easing, setEasing] = useState(false);
+  const easeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const drag = useRef<Drag | null>(null);
   // The click that ends a drag isn't a click on the pill.
   const swallowClick = useRef(false);
+  useEffect(() => () => clearTimeout(easeTimer.current), []);
 
   const settle = (next: Place) => {
     setPlace(next);
     keep(next);
   };
+  const ease = () => {
+    setEasing(true);
+    clearTimeout(easeTimer.current);
+    easeTimer.current = setTimeout(() => setEasing(false), MAGNET_MS);
+  };
 
-  const box: Box = held ? dragging(held.x, held.y, viewport) : layout(place, viewport);
+  // A glued side shows its shape already, so letting go changes nothing the eye didn't see.
+  const box: Box = held
+    ? held.glued
+      ? layout(glue(held.glued, along(held.glued, held.x, held.y), viewport), viewport)
+      : dragging(held.x, held.y, viewport)
+    : layout(place, viewport);
 
   const down = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     swallowClick.current = false;
     const centre = centreOf(place, viewport);
     drag.current = { pointer: event.pointerId, startX: event.clientX, startY: event.clientY, fromX: centre.x, fromY: centre.y, moved: false };
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    try {
+      // Moves keep coming to the pill even when the pointer outruns it.
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      // The pointer is already gone (lifted, or synthetic): the drag still works while it is over the pill.
+    }
   };
   const move = (event: PointerEvent<HTMLButtonElement>) => {
     const current = drag.current;
@@ -83,8 +145,19 @@ export function Launcher({ onOpen }: { onOpen(): void }) {
     const dx = event.clientX - current.startX;
     const dy = event.clientY - current.startY;
     if (!current.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    const x = current.fromX + dx;
+    const y = current.fromY + dy;
+    // Picked up from a side, it starts glued there: it peels off once pulled `RELEASE` away.
+    const before = latest.current ? latest.current.glued : place.edge;
     current.moved = true;
-    setHeld({ x: current.fromX + dx, y: current.fromY + dy });
+    const next = pullAt(x, y, viewport, before);
+    if (next.glued !== before) ease();
+    hold({ x, y, ...next });
+  };
+  const drop = () => {
+    const last = latest.current;
+    if (last) settle(last.glued ? glue(last.glued, along(last.glued, last.x, last.y), viewport) : freePlace(last.x, last.y, viewport));
+    hold(null);
   };
   const up = (event: PointerEvent<HTMLButtonElement>) => {
     const current = drag.current;
@@ -92,50 +165,61 @@ export function Launcher({ onOpen }: { onOpen(): void }) {
     drag.current = null;
     if (!current.moved) return;
     swallowClick.current = true;
-    settle(placeFor(current.fromX + event.clientX - current.startX, current.fromY + event.clientY - current.startY, viewport));
-    setHeld(null);
+    drop();
   };
   const cancel = () => {
     const current = drag.current;
     drag.current = null;
-    if (current?.moved && held) settle(placeFor(held.x, held.y, viewport));
-    setHeld(null);
+    if (current?.moved) drop();
+    else hold(null);
   };
   const key = (event: KeyboardEvent<HTMLButtonElement>) => {
     const edge = ARROWS[event.key];
     if (!edge) return;
     event.preventDefault();
     const centre = centreOf(place, viewport);
-    settle(glue(edge, edge === "top" || edge === "bottom" ? centre.x : centre.y, viewport));
+    settle(glue(edge, along(edge, centre.x, centre.y), viewport));
   };
 
+  const rail = held && held.pull > 0 ? railBox(held.edge, along(held.edge, held.x, held.y), viewport) : null;
+  const classes = ["launcher", held && "dragging", held?.glued && "glued", easing && "easing"].filter(Boolean).join(" ");
   return (
-    <button
-      type="button"
-      className={`launcher${held ? " dragging" : ""}`}
-      data-edge={box.edge ?? "free"}
-      style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-      aria-label="Show Loupe"
-      title="Show Loupe · drag it anywhere, or to a side to keep it there"
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={up}
-      onPointerCancel={cancel}
-      onKeyDown={key}
-      onClick={() => {
-        if (swallowClick.current) {
-          swallowClick.current = false;
-          return;
-        }
-        onOpen();
-      }}
-    >
-      <svg className="shape" width={box.width} height={box.height} viewBox={`0 0 ${box.width} ${box.height}`} aria-hidden="true" focusable="false">
-        <path d={box.path} />
-      </svg>
-      <span className="mark" style={{ left: box.body.x, top: box.body.y }}>
-        <LoupeL />
-      </span>
-    </button>
+    <>
+      {rail && held && (
+        <span
+          className="dock-rail"
+          data-edge={held.edge}
+          aria-hidden="true"
+          style={{ left: rail.left, top: rail.top, width: rail.width, height: rail.height, opacity: held.pull }}
+        />
+      )}
+      <button
+        type="button"
+        className={classes}
+        data-edge={box.edge ?? "free"}
+        style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
+        aria-label="Show Loupe"
+        title="Show Loupe · drag it anywhere, or to a side to keep it there"
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={cancel}
+        onKeyDown={key}
+        onClick={() => {
+          if (swallowClick.current) {
+            swallowClick.current = false;
+            return;
+          }
+          onOpen(centreOf(place, viewport));
+        }}
+      >
+        <svg className="shape" width={box.width} height={box.height} viewBox={`0 0 ${box.width} ${box.height}`} aria-hidden="true" focusable="false">
+          <path d={box.path} />
+        </svg>
+        <span className="mark" style={{ left: box.body.x, top: box.body.y }}>
+          <LoupeL />
+        </span>
+      </button>
+    </>
   );
 }

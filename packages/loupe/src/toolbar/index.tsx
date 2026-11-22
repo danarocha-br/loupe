@@ -16,7 +16,7 @@ import { useDeselect } from "./deselect.js";
 import { type Column, useColumn } from "./dock.js";
 import { Highlight } from "./highlight.js";
 import { useInstanceMeta } from "./instance-meta.js";
-import { Launcher } from "./launcher.js";
+import { type From, Launcher } from "./launcher.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
@@ -129,6 +129,11 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
   return [theme, toggle];
 }
 
+/** How long the panel's exit runs (styles.ts `.panel.leaving`); none where nothing can play it, as in a test's DOM. */
+function exitMs(): number {
+  return typeof matchMedia === "function" ? 200 : 0;
+}
+
 function ToolbarBody({ host }: { host: HTMLElement }) {
   const [selected, setSelected] = useState<string | null>(null);
   // The header's select tool (2026-11-20): one Instance, or every Instance from its
@@ -138,6 +143,12 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const [widened, setWidened] = useState(false);
   const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
   const [hidden, setHidden] = useState(false);
+  // Hide plays the panel's exit first; the page takes its column back once the panel has gone.
+  const [leaving, setLeaving] = useState(false);
+  // Where the pill was when it opened the panel: the panel grows from there.
+  const [from, setFrom] = useState<From | null>(null);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(leaveTimer.current), []);
   // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
   // the page, so a change can be judged as it will ship. Kept for the page load.
   const [marksHidden, setMarksHidden] = useState(false);
@@ -164,8 +175,9 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   if (hidden) {
     return (
       <Launcher
-        onOpen={() => {
+        onOpen={(at) => {
           focusSwap.current = focusIsHere();
+          setFrom(at);
           setHidden(false);
         }}
       />
@@ -182,9 +194,21 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
       onScope={changeScope}
       marksHidden={marksHidden}
       onMarks={() => setMarksHidden((was) => !was)}
+      leaving={leaving}
+      from={from}
       onHide={() => {
+        if (leaving) return;
         focusSwap.current = focusIsHere();
-        setHidden(true);
+        const ms = exitMs();
+        if (ms === 0) {
+          setHidden(true);
+          return;
+        }
+        setLeaving(true);
+        leaveTimer.current = setTimeout(() => {
+          setLeaving(false);
+          setHidden(true);
+        }, ms);
       }}
       theme={theme}
       onTheme={toggleTheme}
@@ -204,6 +228,8 @@ function ToolbarOpen({
   marksHidden,
   onMarks,
   onHide,
+  leaving,
+  from,
   theme,
   onTheme,
 }: {
@@ -217,6 +243,8 @@ function ToolbarOpen({
   marksHidden: boolean;
   onMarks(): void;
   onHide(): void;
+  leaving: boolean;
+  from: From | null;
   theme: Theme;
   onTheme(): void;
 }) {
@@ -287,6 +315,8 @@ function ToolbarOpen({
         marksHidden={marksHidden}
         onMarks={onMarks}
         onHide={onHide}
+        leaving={leaving}
+        from={from}
         theme={theme}
         onTheme={onTheme}
       />

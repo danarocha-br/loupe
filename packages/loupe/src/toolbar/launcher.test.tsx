@@ -9,14 +9,14 @@ import { PLACE_KEY } from "./launcher-place.js";
 
 let root: Root;
 let container: HTMLElement;
-let opened: ReturnType<typeof vi.fn<() => void>>;
+let opened: ReturnType<typeof vi.fn<(from: { x: number; y: number }) => void>>;
 
 beforeEach(() => {
   localStorage.clear();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  opened = vi.fn<() => void>();
+  opened = vi.fn<(from: { x: number; y: number }) => void>();
   act(() => root.render(<Launcher onOpen={opened} />));
 });
 
@@ -28,16 +28,21 @@ afterEach(() => {
 
 const pill = () => container.querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
 
+const fire = (type: string, at: { clientX: number; clientY: number }) =>
+  act(() => {
+    pill().dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, ...at }));
+  });
+
+/** Presses the pill and moves the pointer to (x, y), still held; returns the body's centre it is dragged to. */
+function pressAndMove(x: number, y: number) {
+  const { left, top } = pill().style;
+  fire("pointerdown", { clientX: Number.parseFloat(left) + 10, clientY: Number.parseFloat(top) + 10 });
+  fire("pointermove", { clientX: x, clientY: y });
+}
+
 /** A pointer drag from the pill's body to (x, y), released there, with the click a browser sends after it. */
 function dragTo(x: number, y: number) {
-  const { left, top } = pill().style;
-  const from = { clientX: Number.parseFloat(left) + 10, clientY: Number.parseFloat(top) + 10 };
-  const fire = (type: string, at: { clientX: number; clientY: number }) =>
-    act(() => {
-      pill().dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, ...at }));
-    });
-  fire("pointerdown", from);
-  fire("pointermove", { clientX: x, clientY: y });
+  pressAndMove(x, y);
   fire("pointerup", { clientX: x, clientY: y });
   act(() => pill().click());
 }
@@ -76,5 +81,36 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     });
     expect(pill().dataset.edge).toBe("left");
     expect(pill().style.left).toBe("0px");
+  });
+
+  it("lifts while held, and shows the side it nears a rail before it glues", () => {
+    // Pulled off the right side into the middle: lifted, free, no rail.
+    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
+    expect(pill().classList.contains("dragging")).toBe(true);
+    expect(pill().dataset.edge).toBe("free");
+    expect(container.querySelector(".dock-rail")).toBeNull();
+    // Toward the bottom, within reach but not glued: the bottom's rail fades in.
+    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 100 });
+    const rail = container.querySelector<HTMLElement>(".dock-rail") as HTMLElement;
+    expect(rail.dataset.edge).toBe("bottom");
+    expect(Number(rail.style.opacity)).toBeGreaterThan(0);
+    expect(Number(rail.style.opacity)).toBeLessThan(1);
+    expect(pill().dataset.edge).toBe("free");
+    // Close enough: it glues while still held, showing the shape it will keep, and the rail is full.
+    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 30 });
+    expect(pill().dataset.edge).toBe("bottom");
+    expect(pill().classList.contains("glued")).toBe(true);
+    expect((container.querySelector(".dock-rail") as HTMLElement).style.opacity).toBe("1");
+    // Let go: it stays as shown, and the rail goes.
+    fire("pointerup", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 30 });
+    expect(pill().dataset.edge).toBe("bottom");
+    expect(pill().classList.contains("dragging")).toBe(false);
+    expect(container.querySelector(".dock-rail")).toBeNull();
+  });
+
+  it("opens the panel from where the pill is", () => {
+    act(() => pill().click());
+    const [at] = opened.mock.calls[0] as unknown as [{ x: number; y: number }];
+    expect(at.x).toBe(window.innerWidth - 22);
   });
 });
