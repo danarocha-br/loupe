@@ -2,21 +2,21 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Launcher } from "./launcher.js";
+import { Launcher, type Rect } from "./launcher.js";
 import { PLACE_KEY } from "./launcher-place.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let root: Root;
 let container: HTMLElement;
-let opened: ReturnType<typeof vi.fn<(from: { x: number; y: number }) => void>>;
+let opened: ReturnType<typeof vi.fn<(from: Rect) => void>>;
 
 beforeEach(() => {
   localStorage.clear();
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  opened = vi.fn<(from: { x: number; y: number }) => void>();
+  opened = vi.fn<(from: Rect) => void>();
   act(() => root.render(<Launcher onOpen={opened} />));
 });
 
@@ -35,7 +35,7 @@ const fire = (type: string, at: { clientX: number; clientY: number }) =>
 
 /** Presses the pill and moves the pointer to (x, y), still held; returns the body's centre it is dragged to. */
 function pressAndMove(x: number, y: number) {
-  const { left, top } = pill().style;
+  const [left = "0", top = "0"] = pill().style.translate.split(" ");
   fire("pointerdown", { clientX: Number.parseFloat(left) + 10, clientY: Number.parseFloat(top) + 10 });
   fire("pointermove", { clientX: x, clientY: y });
 }
@@ -80,37 +80,41 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
       pill().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
     });
     expect(pill().dataset.edge).toBe("left");
-    expect(pill().style.left).toBe("0px");
+    expect(pill().style.translate.startsWith("0px ")).toBe(true);
   });
 
-  it("lifts while held, and shows the side it nears a rail before it glues", () => {
-    // Pulled off the right side into the middle: lifted, free, no rail.
+  it("reaches for the pill with a neck near a side, and the side takes it if let go while the neck holds", () => {
+    // Pulled off the right side into the middle: free, nothing reaching for it.
     pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     expect(pill().classList.contains("dragging")).toBe(true);
     expect(pill().dataset.edge).toBe("free");
-    expect(container.querySelector(".dock-rail")).toBeNull();
-    // Toward the bottom, within reach but not glued: the bottom's rail fades in.
-    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 100 });
-    const rail = container.querySelector<HTMLElement>(".dock-rail") as HTMLElement;
-    expect(rail.dataset.edge).toBe("bottom");
-    expect(Number(rail.style.opacity)).toBeGreaterThan(0);
-    expect(Number(rail.style.opacity)).toBeLessThan(1);
+    expect(container.querySelector(".neck")).toBeNull();
+    // Near the bottom: still free, and the bottom reaches for it.
+    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 60 });
     expect(pill().dataset.edge).toBe("free");
-    // Close enough: it glues while still held, showing the shape it will keep, and the rail is full.
-    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 30 });
-    expect(pill().dataset.edge).toBe("bottom");
-    expect(pill().classList.contains("glued")).toBe(true);
-    expect((container.querySelector(".dock-rail") as HTMLElement).style.opacity).toBe("1");
-    // Let go: it stays as shown, and the rail goes.
-    fire("pointerup", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 30 });
+    expect((container.querySelector(".neck") as SVGElement).dataset.edge).toBe("bottom");
+    // Let go there: the side takes it, and the neck goes.
+    fire("pointerup", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 60 });
     expect(pill().dataset.edge).toBe("bottom");
     expect(pill().classList.contains("dragging")).toBe(false);
-    expect(container.querySelector(".dock-rail")).toBeNull();
+    expect(container.querySelector(".neck")).toBeNull();
   });
 
-  it("opens the panel from where the pill is", () => {
+  it("sits flush on a side it is dragged right up to, still held, with no neck", () => {
+    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
+    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 12 });
+    expect(pill().dataset.edge).toBe("bottom");
+    expect(container.querySelector(".neck")).toBeNull();
+  });
+
+  it("is placed by translate, so its travel stays off layout", () => {
+    expect(pill().style.translate).toMatch(/px .*px/);
+    expect(pill().style.left).toBe("");
+  });
+
+  it("opens the panel from the pill's body", () => {
     act(() => pill().click());
-    const [at] = opened.mock.calls[0] as unknown as [{ x: number; y: number }];
-    expect(at.x).toBe(window.innerWidth - 22);
+    const [at] = opened.mock.calls[0] as [Rect];
+    expect(at).toMatchObject({ left: window.innerWidth - 44, width: 44, height: 32 });
   });
 });

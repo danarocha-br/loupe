@@ -16,7 +16,8 @@ import { useDeselect } from "./deselect.js";
 import { type Column, useColumn } from "./dock.js";
 import { Highlight } from "./highlight.js";
 import { useInstanceMeta } from "./instance-meta.js";
-import { type From, Launcher } from "./launcher.js";
+import { Launcher, pillRect, type Rect } from "./launcher.js";
+import { canMorph, type Morph, morph } from "./morph.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
@@ -129,11 +130,6 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
   return [theme, toggle];
 }
 
-/** How long the panel's exit runs (styles.ts `.panel.leaving`); none where nothing can play it, as in a test's DOM. */
-function exitMs(): number {
-  return typeof matchMedia === "function" ? 200 : 0;
-}
-
 function ToolbarBody({ host }: { host: HTMLElement }) {
   const [selected, setSelected] = useState<string | null>(null);
   // The header's select tool (2026-11-20): one Instance, or every Instance from its
@@ -143,12 +139,49 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const [widened, setWidened] = useState(false);
   const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
   const [hidden, setHidden] = useState(false);
-  // Hide plays the panel's exit first; the page takes its column back once the panel has gone.
-  const [leaving, setLeaving] = useState(false);
-  // Where the pill was when it opened the panel: the panel grows from there.
-  const [from, setFrom] = useState<From | null>(null);
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(leaveTimer.current), []);
+  // Opening grows the pill into the panel, and closing shrinks it back (morph.ts); the page
+  // takes its column back once the panel has gone. `from` is the pill the panel grows out of.
+  const [from, setFrom] = useState<Rect | null>(null);
+  const running = useRef<{ direction: "open" | "close"; morph: Morph } | null>(null);
+  const panelOf = () => host.shadowRoot?.querySelector<HTMLElement>(".panel") ?? null;
+  // Opened from the pill: before the first paint, so the full panel never shows for a frame.
+  useLayoutEffect(() => {
+    if (hidden || from === null) return;
+    const panel = panelOf();
+    const root = host.shadowRoot;
+    setFrom(null);
+    if (!panel || !root || !canMorph()) return;
+    const opening = morph(root, panel, from, "open");
+    running.current = { direction: "open", morph: opening };
+    opening.finished.then(() => {
+      if (running.current?.morph === opening) running.current = null;
+    });
+  }, [hidden, from, host]);
+  useEffect(() => () => running.current?.morph.cancel(), []);
+  const hide = () => {
+    const current = running.current;
+    if (current?.direction === "close") return;
+    focusSwap.current = focusIsHere();
+    const gone = () => {
+      running.current = null;
+      setHidden(true);
+    };
+    // Closed mid-open: the open plays back from where it is.
+    if (current?.direction === "open") {
+      current.morph.reverse(gone);
+      running.current = { direction: "close", morph: current.morph };
+      return;
+    }
+    const panel = panelOf();
+    const root = host.shadowRoot;
+    if (!panel || !root || !canMorph()) {
+      gone();
+      return;
+    }
+    const closing = morph(root, panel, pillRect(), "close");
+    running.current = { direction: "close", morph: closing };
+    closing.finished.then(gone);
+  };
   // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
   // the page, so a change can be judged as it will ship. Kept for the page load.
   const [marksHidden, setMarksHidden] = useState(false);
@@ -194,22 +227,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
       onScope={changeScope}
       marksHidden={marksHidden}
       onMarks={() => setMarksHidden((was) => !was)}
-      leaving={leaving}
-      from={from}
-      onHide={() => {
-        if (leaving) return;
-        focusSwap.current = focusIsHere();
-        const ms = exitMs();
-        if (ms === 0) {
-          setHidden(true);
-          return;
-        }
-        setLeaving(true);
-        leaveTimer.current = setTimeout(() => {
-          setLeaving(false);
-          setHidden(true);
-        }, ms);
-      }}
+      onHide={hide}
       theme={theme}
       onTheme={toggleTheme}
     />
@@ -228,8 +246,6 @@ function ToolbarOpen({
   marksHidden,
   onMarks,
   onHide,
-  leaving,
-  from,
   theme,
   onTheme,
 }: {
@@ -243,8 +259,6 @@ function ToolbarOpen({
   marksHidden: boolean;
   onMarks(): void;
   onHide(): void;
-  leaving: boolean;
-  from: From | null;
   theme: Theme;
   onTheme(): void;
 }) {
@@ -315,8 +329,6 @@ function ToolbarOpen({
         marksHidden={marksHidden}
         onMarks={onMarks}
         onHide={onHide}
-        leaving={leaving}
-        from={from}
         theme={theme}
         onTheme={onTheme}
       />

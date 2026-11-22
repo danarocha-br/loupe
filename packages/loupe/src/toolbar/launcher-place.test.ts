@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BODY, centreOf, DEFAULT_PLACE, FILLET, glue, layout, MARGIN, nearestEdge, placeFor, pullOf, RAIL, railBox, REACH, readPlace, SNAP } from "./launcher-place.js";
+import { BODY, bodyRect, centreOf, DEFAULT_PLACE, FILLET, glue, layout, MARGIN, neckPath, nearestEdge, placeFor, pullOf, readPlace, SNAP } from "./launcher-place.js";
 
 const VIEWPORT = { width: 1200, height: 800 };
 
@@ -65,17 +65,27 @@ describe("where the collapsed pill lands (2026-11-22)", () => {
     }
   });
 
-  it("pulls harder as the pill nears a side: nothing out of reach, full where it glues", () => {
-    expect(pullOf(REACH)).toBe(0);
-    expect(pullOf(REACH + 50)).toBe(0);
-    expect(pullOf((SNAP + REACH) / 2)).toBeCloseTo(0.5);
-    expect(pullOf(SNAP)).toBe(1);
-    expect(pullOf(-10)).toBe(1);
-    expect(nearestEdge(600, 800 - BODY.height / 2 - 60, VIEWPORT)).toEqual({ edge: "bottom", gap: 60 });
+  it("pulls harder as the pill nears a side: nothing from where it glues on out, full at the edge", () => {
+    expect(pullOf(SNAP)).toBe(0);
+    expect(pullOf(SNAP + 50)).toBe(0);
+    expect(pullOf(SNAP / 2)).toBeCloseTo(0.5);
+    expect(pullOf(0)).toBe(1);
+    expect(nearestEdge(600, 800 - BODY.height / 2 - 30, VIEWPORT)).toEqual({ edge: "bottom", gap: 30 });
   });
 
-  it("lays the side's rail along its edge, centred on the pill, never off the window", () => {
-    expect(railBox("bottom", 600, VIEWPORT)).toEqual({ left: 600 - RAIL.length / 2, top: 800 - RAIL.thickness, width: RAIL.length, height: RAIL.thickness });
-    expect(railBox("right", 10, VIEWPORT)).toEqual({ left: 1200 - RAIL.thickness, top: 0, width: RAIL.thickness, height: RAIL.length });
+  it("reaches for the pill with a neck only within reach, flaring onto the edge and into the body", () => {
+    const y = (gap: number) => 800 - BODY.height / 2 - gap;
+    expect(neckPath("bottom", 600, y(SNAP), VIEWPORT)).toBeNull();
+    expect(neckPath("bottom", 600, y(0), VIEWPORT)).toBeNull();
+    const neck = neckPath("bottom", 600, y(20), VIEWPORT) as string;
+    // It starts inside the body (8px past its side) and ends on the edge, at y = 800.
+    expect(neck.startsWith(`M${600 - 7.5} ${800 - 28}`)).toBe(true);
+    expect(neck).toContain(" 800L");
+    // Mapped onto the right side, it ends on x = 1200.
+    expect(neckPath("right", 1200 - BODY.width / 2 - 20, 400, VIEWPORT)).toMatch(/C[^C]* 1200 [\d.]+L1200 /);
+  });
+
+  it("gives the body's box for a place, where a closing panel lands", () => {
+    expect(bodyRect({ edge: null, x: 0.5, y: 0.5 }, VIEWPORT)).toEqual({ left: 600 - BODY.width / 2, top: 400 - BODY.height / 2, width: BODY.width, height: BODY.height });
   });
 });

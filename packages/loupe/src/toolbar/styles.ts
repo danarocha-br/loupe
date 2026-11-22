@@ -101,10 +101,9 @@ const LIGHT: Tokens = {
   "popover-shadow": "0 0 0 1px rgba(27, 34, 32, 0.08), 0 16px 40px rgba(27, 34, 32, 0.18), 0 2px 6px rgba(27, 34, 32, 0.08)",
   "toast-shadow": "0 8px 24px rgba(27, 34, 32, 0.28)",
   "overlay-shadow": "0 12px 36px rgba(27, 34, 32, 0.22), 0 2px 6px rgba(27, 34, 32, 0.1)",
-  /** A filter, not a box-shadow: it follows the collapsed pill's outline, fillets and all. */
-  "launcher-shadow": "drop-shadow(0 4px 10px rgba(27, 34, 32, 0.24)) drop-shadow(0 1px 2px rgba(27, 34, 32, 0.2))",
-  /** Picked up: a longer, softer shadow, as if lifted off the page. */
-  "launcher-lift": "drop-shadow(0 12px 24px rgba(27, 34, 32, 0.3)) drop-shadow(0 2px 6px rgba(27, 34, 32, 0.18))",
+  /** The collapsed pill is flat, as the reference draws it: in light, no edge at all. */
+  "launcher-edge": "none",
+  "band-hover": "#2E3835",
 };
 
 const DARK: Tokens = {
@@ -183,8 +182,9 @@ const DARK: Tokens = {
   "popover-shadow": "0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)",
   "toast-shadow": "0 8px 24px rgba(0, 0, 0, 0.5)",
   "overlay-shadow": "0 12px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3)",
-  "launcher-shadow": "drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.25))",
-  "launcher-lift": "drop-shadow(0 12px 24px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.3))",
+  /** In dark, a hairline keeps the flat pill apart from a dark page. A filter, so it follows the outline, fillets and all. */
+  "launcher-edge": "drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.35))",
+  "band-hover": "#35403C",
 };
 
 const declare = (tokens: Tokens) =>
@@ -287,17 +287,9 @@ button:disabled { cursor: default; opacity: 0.45; }
   position: fixed; top: 8px; right: 0; bottom: 8px; z-index: 2147483647; width: 344px;
   display: flex; flex-direction: column; overflow: hidden; background: var(--ground);
   border-radius: 24px 0 0 24px; box-shadow: 0 0 0 1px var(--edge), 0 8px 24px var(--edge);
-  transition: opacity 200ms ease-out, translate 420ms cubic-bezier(0.2, 0, 0, 1), scale 420ms cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity 120ms ease-out;
 }
-/* Opening: the sheet comes in from its side, growing from where the pill was (\`--from\`, set as it opens). */
-@starting-style { .panel { opacity: 0; translate: 24px 0; scale: 0.98; } }
-.panel { transform-origin: var(--from, 100% 100%); }
-/* Closing: quicker and smaller, back toward its side; the page takes its column back once it has gone. */
-.panel.leaving { opacity: 0; translate: 12px 0; scale: 0.99; pointer-events: none; transition: opacity 150ms ease-out, translate 200ms ease-out, scale 200ms ease-out; }
-@media (prefers-reduced-motion: reduce) {
-  .panel, .panel.leaving { translate: none; scale: none; transition: opacity 200ms ease-out; }
-  @starting-style { .panel { translate: none; scale: none; } }
-}
+
 .panel.overlay { box-shadow: 0 0 0 1px var(--edge), var(--overlay-shadow); }
 /* Alt held: see through to what runs under the column, such as an app's own dialog. */
 .panel.peek { opacity: 0.08; pointer-events: none; }
@@ -392,48 +384,27 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Collapsed (launcher.tsx): a dark pill with the L, free or glued to a side, flaring into it */
+/* Collapsed (launcher.tsx): a flat dark pill with the L, free or glued to a side, flaring into it */
 .launcher {
-  position: fixed; z-index: 2147483647; display: block; padding: 0; background: none; color: var(--on-band);
-  touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-shadow);
-  transition: left 220ms cubic-bezier(0.2, 0, 0, 1), top 220ms cubic-bezier(0.2, 0, 0, 1), opacity 200ms ease-out, translate 300ms cubic-bezier(0.2, 0, 0, 1), scale 150ms ease-out, filter 120ms ease-out;
+  position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; padding: 0; background: none; color: var(--on-band);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-edge);
 }
-/* It scales from the side it is glued to, so the flush side stays on the edge. */
-.launcher[data-edge="right"] { transform-origin: right center; }
-.launcher[data-edge="left"] { transform-origin: left center; }
-.launcher[data-edge="top"] { transform-origin: center top; }
-.launcher[data-edge="bottom"] { transform-origin: center bottom; }
 .launcher .shape { position: absolute; inset: 0; display: block; overflow: visible; }
-.launcher .shape path { fill: var(--band); }
+.launcher .shape path, .neck path { fill: var(--band); }
 .launcher .mark { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
 .launcher .glyph { display: block; }
-/* Held: lifted off the page, a little larger, following the pointer exactly. A side's pull sets it back down, flush. */
-.launcher.dragging { cursor: grabbing; scale: 1.06; filter: var(--launcher-lift); transition: scale 150ms ease-out, filter 150ms ease-out; }
-.launcher.dragging.glued { scale: 1; filter: var(--launcher-shadow); }
-/* As a side takes it or lets it go, it travels there rather than jumping. */
-.launcher.dragging.easing { transition: left 180ms cubic-bezier(0.2, 0, 0, 1), top 180ms cubic-bezier(0.2, 0, 0, 1), scale 150ms ease-out, filter 150ms ease-out; }
-@media (hover: hover) { .launcher:not(.dragging):hover { filter: var(--launcher-shadow) brightness(1.25); } }
+.launcher.dragging { cursor: grabbing; }
+/* A side taking it or letting it go: it travels there, quick, rather than jumping. */
+.launcher.easing { transition: translate 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover .shape path { fill: var(--band-hover); } }
 /* The ring follows the pill's own outline, fillets and all. */
 .launcher:focus-visible { outline: none; }
 .launcher:focus-visible .shape path { stroke: var(--accent); stroke-width: 4; paint-order: stroke; }
-/* As the panel closes, the pill grows back out of its side (or, free, fades up where it was). */
-@starting-style {
-  .launcher { opacity: 0; }
-  .launcher[data-edge="free"] { scale: 0.96; }
-  .launcher[data-edge="right"] { translate: 100% 0; }
-  .launcher[data-edge="left"] { translate: -100% 0; }
-  .launcher[data-edge="top"] { translate: 0 -100%; }
-  .launcher[data-edge="bottom"] { translate: 0 100%; }
-}
-/* A side the pill nears answers with a rail: a short dark band along the edge, stronger as it comes closer, full once it glues. */
-.dock-rail { position: fixed; z-index: 2147483646; pointer-events: none; border-radius: 2px; transition: opacity 120ms ease-out; }
-.dock-rail[data-edge="top"], .dock-rail[data-edge="bottom"] { background: linear-gradient(to right, transparent, var(--band) 30%, var(--band) 70%, transparent); }
-.dock-rail[data-edge="left"], .dock-rail[data-edge="right"] { background: linear-gradient(to bottom, transparent, var(--band) 30%, var(--band) 70%, transparent); }
-@media (prefers-reduced-motion: reduce) {
-  .launcher, .launcher.dragging, .launcher.dragging.easing { transition: opacity 200ms ease-out, filter 120ms ease-out; }
-  .launcher.dragging { scale: none; }
-  @starting-style { .launcher[data-edge] { translate: none; scale: none; } }
-}
+/* The neck a side reaches out with while the pill is held near it: the same dark stuff, under the pill. */
+.neck { position: fixed; inset: 0; z-index: 2147483646; width: 100%; height: 100%; pointer-events: none; overflow: visible; filter: var(--launcher-edge); }
+@media (prefers-reduced-motion: reduce) { .launcher.easing { transition: none; } }
+/* Opening and closing (morph.ts): the pill's dark body grows into the panel's box and back. */
+.morph-shell { position: fixed; z-index: 2147483646; pointer-events: none; background: var(--band); }
 
 /* Cards on the sheet */
 /* Every card: text 14px from its left edge, 12px above and 14px below. */
@@ -812,7 +783,9 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 @media (forced-colors: active) {
   .panel, .copy-popover, .section, .card, .footer, .header { border: 1px solid transparent; }
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
-  .launcher .shape path { fill: ButtonText; }
+  .launcher .shape path, .neck path { fill: ButtonText; }
+  .neck { filter: none; }
+  .morph-shell { display: none; }
   .launcher:focus-visible .shape path { stroke: Highlight; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }

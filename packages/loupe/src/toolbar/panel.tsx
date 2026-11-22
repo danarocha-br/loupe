@@ -81,10 +81,6 @@ type PanelProps = {
   marksHidden: boolean;
   onMarks(): void;
   onHide(): void;
-  /** The exit is playing: the panel goes once it ends. */
-  leaving?: boolean;
-  /** Where the collapsed pill was when it opened the panel, in the viewport: the panel grows from there. */
-  from?: { x: number; y: number } | null;
   theme: "light" | "dark";
   onTheme(): void;
 };
@@ -182,9 +178,9 @@ export function Panel(props: PanelProps) {
     ) : null;
   return (
     <section
-      className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.leaving ? " leaving" : ""}`}
+      className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}`}
       aria-label="Loupe"
-      style={{ width: column.width - PANEL_INSET * 2, ...originFrom(props.from ?? null, column) }}
+      style={{ width: column.width - PANEL_INSET * 2 }}
     >
       <header className="header">
         <div className="brand">
@@ -257,17 +253,6 @@ export function Panel(props: PanelProps) {
       <Footer debug={props.debug} footer={view.footer} theme={props.theme} onTheme={props.onTheme} />
     </section>
   );
-}
-
-/**
- * The panel's `--from`: the pill's centre in the panel's own box, which sits against the
- * window's right edge, `PANEL_INSET` from the top. Its scale grows from there as it opens.
- */
-function originFrom(from: { x: number; y: number } | null, column: Column): Record<string, string> {
-  if (from === null || typeof document === "undefined") return {};
-  const width = column.width - PANEL_INSET * 2;
-  const left = (document.documentElement.clientWidth || window.innerWidth) - width;
-  return { "--from": `${Math.round(from.x - left)}px ${Math.round(from.y - PANEL_INSET)}px` };
 }
 
 /**

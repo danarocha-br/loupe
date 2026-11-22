@@ -91,35 +91,60 @@ export function nearestEdge(x: number, y: number, viewport: Viewport): { edge: E
 /** The body's centre measured along a side. */
 export const along = (edge: Edge, x: number, y: number) => (horizontal(edge) ? x : y);
 
-/** While dragging, a side starts to answer from this far off: its rail fades in as the pill comes closer. */
-export const REACH = 120;
-/** Once glued in a drag, it lets go of the side only this far out, so it doesn't flicker on the line. */
-export const RELEASE = SNAP + 12;
+/**
+ * While dragging, a side within `SNAP` reaches for the pill with a neck of the same dark
+ * stuff, after the reference: thin as a thread at `SNAP`, thicker as the pill comes in.
+ * Let go while the neck holds and the side takes it. Within `MAGNET` the side has it
+ * already, flush, and it lets go only past `MAGNET_RELEASE`, so it doesn't flicker on the line.
+ */
+export const MAGNET = 10;
+export const MAGNET_RELEASE = 22;
 
-/** How strongly a side pulls at this gap: 0 out of reach, rising to 1 where it glues. */
+/** How strongly a side pulls at this gap: 0 at `SNAP` and beyond, 1 at the edge. */
 export function pullOf(gap: number): number {
-  if (gap <= SNAP) return 1;
-  if (gap >= REACH) return 0;
-  return 1 - (gap - SNAP) / (REACH - SNAP);
+  if (gap >= SNAP) return 0;
+  if (gap <= 0) return 1;
+  return 1 - gap / SNAP;
 }
 
-/** The rail a side shows while the pill is dragged near it: a short dark band along the edge, centred on the pill. */
-export const RAIL = { length: 200, thickness: 4 } as const;
+const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
-export function railBox(edge: Edge, at: number, viewport: Viewport): { left: number; top: number; width: number; height: number } {
-  const side = horizontal(edge) ? viewport.width : viewport.height;
-  const start = clamp(at - RAIL.length / 2, 0, side - RAIL.length);
-  const far = (horizontal(edge) ? viewport.height : viewport.width) - RAIL.thickness;
-  switch (edge) {
-    case "top":
-      return { left: start, top: 0, width: RAIL.length, height: RAIL.thickness };
-    case "bottom":
-      return { left: start, top: far, width: RAIL.length, height: RAIL.thickness };
-    case "left":
-      return { left: 0, top: start, width: RAIL.thickness, height: RAIL.length };
-    case "right":
-      return { left: far, top: start, width: RAIL.thickness, height: RAIL.length };
-  }
+/**
+ * The neck between a held pill and the side it nears, as a path in viewport px, or null
+ * out of reach. Drawn in (along, out-from-the-edge) and mapped onto the side: wide where
+ * it flares into the edge, pinched at its waist, overlapping into the body so the two
+ * read as one shape.
+ */
+export function neckPath(edge: Edge, x: number, y: number, viewport: Viewport): string | null {
+  const gap = gapTo(edge, x, y, viewport);
+  if (gap >= SNAP || gap <= 0) return null;
+  const p = pullOf(gap);
+  const u0 = along(edge, x, y);
+  const half = lerp(5, 10, p); // where it leaves the body
+  const waist = lerp(1.2, 8, p ** 1.6);
+  const flare = lerp(3, 18, p); // where it meets the edge
+  const body = gap + 8; // 8px into the body
+  const map = (u: number, v: number): [number, number] => {
+    switch (edge) {
+      case "bottom":
+        return [u, viewport.height - v];
+      case "top":
+        return [u, v];
+      case "right":
+        return [viewport.width - v, u];
+      case "left":
+        return [v, u];
+    }
+  };
+  const pt = (u: number, v: number) => map(u, v).map((n) => Math.round(n * 10) / 10).join(" ");
+  // From the body down one side to the edge, along the edge, and back up the other side.
+  const side = (sign: 1 | -1, down: boolean) => {
+    const at = (offset: number) => u0 + sign * offset;
+    return down
+      ? `L${pt(at(half), gap)}C${pt(at(half), gap * 0.7)} ${pt(at(waist), gap * 0.75)} ${pt(at(waist), gap * 0.5)}C${pt(at(waist), gap * 0.2)} ${pt(at(waist + (flare - waist) * 0.35), 0)} ${pt(at(flare), 0)}`
+      : `C${pt(at(waist + (flare - waist) * 0.35), 0)} ${pt(at(waist), gap * 0.2)} ${pt(at(waist), gap * 0.5)}C${pt(at(waist), gap * 0.75)} ${pt(at(half), gap * 0.7)} ${pt(at(half), gap)}L${pt(at(half), body)}`;
+  };
+  return `M${pt(u0 - half, body)}${side(-1, true)}L${pt(u0 + flare, 0)}${side(1, false)}Z`;
 }
 
 /** Glued to `edge` with the body's centre at `along` px on it, kept clear of the corners. */
@@ -127,6 +152,12 @@ export function glue(edge: Edge, along: number, viewport: Viewport): Place {
   const side = horizontal(edge) ? viewport.width : viewport.height;
   const [min, max] = alongRange(edge, viewport);
   return { edge, at: side === 0 ? 0.5 : clamp(along, min, max) / side };
+}
+
+/** The pill's body as a box in the viewport: where a closing panel lands and an opening one starts. */
+export function bodyRect(place: Place, viewport: Viewport): { left: number; top: number; width: number; height: number } {
+  const centre = centreOf(place, viewport);
+  return { left: centre.x - BODY.width / 2, top: centre.y - BODY.height / 2, width: BODY.width, height: BODY.height };
 }
 
 /** The body's centre in px, wherever the place puts it. */
