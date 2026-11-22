@@ -414,11 +414,12 @@ components:
     backgroundColor: "{colors.hover}"
     rounded: "{rounded.well}"
     height: "108px"
-  show-tab:
+  launcher:
     backgroundColor: "{colors.band}"
     textColor: "{colors.on-band}"
     rounded: "{rounded.pill}"
-    height: "38px"
+    width: "44px"
+    height: "32px"
 ---
 
 # Design System: Loupe Toolbar
@@ -461,7 +462,7 @@ A grey ground, white cards, near-black ink; salmon for what shows now, coral for
 - **Icon Faint** (`icon-faint`, 3.45:1): the chevrons of list rows and site cards. **Line Faint** (`line-faint`): the line number after a call site's file, set apart. **Tree** and **Tree Ink** (`tree`, `tree-ink`): the "Inside" tree's elbows and the parent's name.
 - **Rule** (`rule`): hairlines between rows and the page map's bar track. **Rule Strong** (`rule-strong`): the scrollbar, a meter's empty dots, the dashed tag. **Field Edge** (`field-edge`): the 3:1 edge of anything found by its outline: text fields, the copy popover's fields, an unticked checkbox and the ring on the app's own value. **Hairline**, **Divider** and **Edge**: the chip's inner ring, the header's tool divider, the sheet's outline against the product. **Tools Wash** (`tools-wash`): the select tools' pill. **Map Dot** (`map-dot`): the page map's dotted grid. `kbd`: a key's wash.
 - **Primary** (`primary`, `on-primary`): the Copy Proposal split button and the popovers' main action. Ink in light, the warm off-white in dark. `on-primary-rule` and `on-primary-wash` draw the split's rule and its chevron half.
-- **Band** (`band`, `on-band`): only the "Show Loupe" pill while the panel is hidden. `on-ink` is declared in both themes and nothing draws it.
+- **Band** (`band`, `on-band`): only the collapsed pill with the L, while the panel is hidden. `on-ink` is declared in both themes and nothing draws it.
 - **Pencil** (`held`): held for review (Suspended): the hollow ring and the held tag. Applies to nothing on the page.
 
 ### Status
@@ -542,7 +543,8 @@ Three levels: the sheet stands off the product, the cards stand on the sheet, an
 
 ### Shadow Vocabulary
 - **Sheet** (`0 0 0 1px edge, 0 8px 24px edge`): the docked sheet.
-- **Overlay** (`overlay-shadow`: `0 12px 36px rgba(27,34,32,0.22), 0 2px 6px rgba(27,34,32,0.1)`): the sheet when it overlays a narrow viewport, and the "Show Loupe" pill.
+- **Overlay** (`overlay-shadow`: `0 12px 36px rgba(27,34,32,0.22), 0 2px 6px rgba(27,34,32,0.1)`): the sheet when it overlays a narrow viewport.
+- **Launcher** (`launcher-shadow`, a `drop-shadow` filter so it follows the outline, fillets and all): the collapsed pill.
 - **Card** (`shadow`: `0 0 0 1px rgba(27,34,32,0.05), 0 1px 2px rgba(27,34,32,0.06), 0 4px 12px rgba(27,34,32,0.04)`): every card, the header and the footer.
 - **Tile** (`tile-shadow`, an inset ring and a 1px drop) and **Site** (`site-shadow`): start tiles and call-site cards at rest. **Raised** (`raised-shadow`): either one under the pointer, and the select tool in use.
 - **Primary** (`primary-shadow`): a 1px inner highlight on top and a 1px drop, on the split button and the popovers' main action.
@@ -556,9 +558,10 @@ Dark replaces each with a white ring and darker drops.
 
 Soft corners in steps: the sheet's left corners at 24px; cards, the header, the footer and the copy popover at 18px; start tiles, the status strip and the toast at 14px; wells, text fields, notices, call-site cards and the page map at 12px; the popover's fields at 10px; option chips and the page outline at 8px; a checkbox and a key at 5px; the size tag and the map's blocks at 4px. Every button, tag, status chip and tool is a full pill.
 
-Two shapes carry meaning and appear nowhere else:
+Three shapes carry meaning and appear nowhere else:
 - **The delta**: a triangle, 22 × 20px, card-filled with a 1.25px lilac stroke and its number at the base. Dashed and empty, it is a State prop held on one Instance, which the Proposal shows as a state, not a numbered change. It stays in the panel and the Proposal; the page carries no numbers.
 - **The switch**: a 42 × 22px pill on a 1.5px `switch-off` edge, whose thumb is the filled half it sits in, rounded on its outer side, with a 16px hole through its middle where the card shows.
+- **The collapsed pill**: a 44 × 32px stadium in `band` with Loupe's L. Glued to a side, the side that meets the edge goes flush and flares into it with two 8px concave fillets, a tab growing out of the window's frame.
 
 On the page, a solid outline is the one Instance in hand and a dashed coral one is the rest of what it reaches. Grey dashes mean "not applied": a left-out Instance's outline, a hovered outline. In the panel a dashed tag means not there now ("Not visible now", "No Instance mounted").
 
@@ -650,18 +653,26 @@ A split button filling the footer beside the theme button (Paper, "Copy flow v2 
 - **Dots:** 8px (6px small): alert orange for failures, amber for warnings, a pencil ring for held for review; in Feature flags, lilac while a flag is previewing and a hollow ring while it isn't.
 - **Held chip:** in the footer, "1 held" in 10px mono on amber with a 6px amber dot: State props held open, which the Proposal shows as states.
 
+### Collapsed
+Hide in the header collapses the panel to a dark pill with Loupe's L, the first letter of the wordmark, in `on-band` (after the designer's reference, 2026-11-22). It starts glued to the right side, low.
+- **Open:** a click, or Enter, opens the panel; focus goes to its heading.
+- **Move:** dragged past 4px it follows the pointer as a free pill, and nothing opens. Let go within 40px of a side, it glues there and flares into the edge; let go anywhere else, it stays free where it was dropped, kept 8px inside the window. Glued, its fillets keep 8px clear of the corners. It eases to its place over 220ms (none under reduced motion).
+- **Keyboard:** the arrow keys glue it to the side they point at, so it moves without a pointer.
+- **Kept** in this browser (`loupe:launcher`), in fractions of the window, so it holds across a resize and a reload.
+- **Hover** brightens it; focus draws a 2px coral ring along its own outline.
+
 ### Undo
 Reset all, Reset this Instance, Reset this scope and Discard act immediately; the footer then offers "Reset N Overrides · Undo" ("Discarded N held Overrides · Undo") on its own line. The offer has no timer: it stays until it is taken, a newer offer replaces it, or the Overrides change some other way. One offer at a time.
 
 ### Access (review 2026-11-20)
-- **Focus follows the work:** a selection made in the panel, Back and the "Inside" links move focus to the new view's heading; Reset all moves it to its Undo and Undo back to Reset all; a reset or Discard that removes its own button moves it to the heading, a row's Reset to the row's own control; Hide and Show swap it between the panel's heading and the "Show Loupe" tab; the copy popover takes focus into its title field or its Try again, and gives it back to the half that opened it. A pick on the page leaves the app's focus where it is.
+- **Focus follows the work:** a selection made in the panel, Back and the "Inside" links move focus to the new view's heading; Reset all moves it to its Undo and Undo back to Reset all; a reset or Discard that removes its own button moves it to the heading, a row's Reset to the row's own control; Hide and Show swap it between the panel's heading and the collapsed pill; the copy popover takes focus into its title field or its Try again, and gives it back to the half that opened it. A pick on the page leaves the app's focus where it is.
 - **Live regions are always mounted:** the status strip's region, the footer's Undo line, the copy status, and the panel's own status and alert lines that speak the notices. Only their text changes, so a screen reader hears it.
 - **Preview by keyboard:** focus on a change row, a component row, a block of the page map, a call-site card or dot, a member or the "keep" link outlines what it reaches, as the pointer does.
 - **Hover** styles apply only where a pointer can hover, so a tap never leaves one stuck.
 - **Left to right** in any app: the host sets `direction: ltr`; the app's own words keep `dir="auto"`.
 - **Narrow windows:** under 360px the column narrows to the viewport, so at 320px nothing is off-screen. The middle keeps its scrolling to itself (`overscroll-behavior: contain`).
 - **Touch:** on a coarse pointer, text fields and the popover's fields are 16px so iOS Safari doesn't zoom.
-- **Forced colours:** cards, the header, footer, sheet, popover and "Show Loupe" get transparent borders back; the chip that shows now, the switch and a ticked box are drawn in `Highlight`; the app's value takes a dashed outline; dots, the meter and the legend's marks are drawn in `CanvasText`.
+- **Forced colours:** cards, the header, footer, sheet and popover get transparent borders back, the collapsed pill is drawn in `ButtonText` with its L in `ButtonFace`; the chip that shows now, the switch and a ticked box are drawn in `Highlight`; the app's value takes a dashed outline; dots, the meter and the legend's marks are drawn in `CanvasText`.
 - **Reduced motion:** the switch's thumb and the chevrons move to their place without travelling there; the toast appears without rising; the page's outlines appear and go without fading. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
 - Apostrophes in panel text are typographic (’).
 

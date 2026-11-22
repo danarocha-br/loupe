@@ -101,6 +101,8 @@ const LIGHT: Tokens = {
   "popover-shadow": "0 0 0 1px rgba(27, 34, 32, 0.08), 0 16px 40px rgba(27, 34, 32, 0.18), 0 2px 6px rgba(27, 34, 32, 0.08)",
   "toast-shadow": "0 8px 24px rgba(27, 34, 32, 0.28)",
   "overlay-shadow": "0 12px 36px rgba(27, 34, 32, 0.22), 0 2px 6px rgba(27, 34, 32, 0.1)",
+  /** A filter, not a box-shadow: it follows the collapsed pill's outline, fillets and all. */
+  "launcher-shadow": "drop-shadow(0 4px 10px rgba(27, 34, 32, 0.24)) drop-shadow(0 1px 2px rgba(27, 34, 32, 0.2))",
 };
 
 const DARK: Tokens = {
@@ -179,6 +181,7 @@ const DARK: Tokens = {
   "popover-shadow": "0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)",
   "toast-shadow": "0 8px 24px rgba(0, 0, 0, 0.5)",
   "overlay-shadow": "0 12px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3)",
+  "launcher-shadow": "drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.25))",
 };
 
 const declare = (tokens: Tokens) =>
@@ -238,7 +241,7 @@ export const CSS = `
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* Text */
-.panel, .show-tab {
+.panel {
   font: 400 ${size(13)}/1.3846 ${SANS}; color: var(--ink);
 }
 /* Paragraphs keep their last word company; headings balance instead. */
@@ -376,12 +379,22 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.show-tab {
-  position: fixed; right: 12px; bottom: 12px; z-index: 2147483647; display: inline-flex; align-items: center; gap: 8px;
-  height: 38px; padding: 0 16px 0 12px; border-radius: 999px; background: var(--band); color: var(--on-band);
-  box-shadow: var(--overlay-shadow); font-weight: 600;
+/* Collapsed (launcher.tsx): a dark pill with the L, free or glued to a side, flaring into it */
+.launcher {
+  position: fixed; z-index: 2147483647; display: block; padding: 0; background: none; color: var(--on-band);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-shadow);
+  transition: left 220ms cubic-bezier(0.2, 0.8, 0.2, 1), top 220ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 120ms ease-out;
 }
-@media (hover: hover) { .show-tab:hover { filter: brightness(1.2); } }
+.launcher .shape { position: absolute; inset: 0; display: block; overflow: visible; }
+.launcher .shape path { fill: var(--band); }
+.launcher .mark { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
+.launcher .glyph { display: block; }
+.launcher.dragging { cursor: grabbing; transition: none; }
+@media (hover: hover) { .launcher:not(.dragging):hover { filter: var(--launcher-shadow) brightness(1.25); } }
+/* The ring follows the pill's own outline, fillets and all. */
+.launcher:focus-visible { outline: none; }
+.launcher:focus-visible .shape path { stroke: var(--accent); stroke-width: 4; paint-order: stroke; }
+@media (prefers-reduced-motion: reduce) { .launcher { transition: none; } }
 
 /* Cards on the sheet */
 /* Every card: text 14px from its left edge, 12px above and 14px below. */
@@ -758,7 +771,10 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .big-tool .h { margin: 2px 8px 0; font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--faint); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
-  .panel, .copy-popover, .show-tab, .section, .card, .footer, .header { border: 1px solid transparent; }
+  .panel, .copy-popover, .section, .card, .footer, .header { border: 1px solid transparent; }
+  .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
+  .launcher .shape path { fill: ButtonText; }
+  .launcher:focus-visible .shape path { stroke: Highlight; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
   .pills .is-default::after, .legend i { forced-color-adjust: none; background: CanvasText; }

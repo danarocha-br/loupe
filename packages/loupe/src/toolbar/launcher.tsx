@@ -1,0 +1,141 @@
+// The collapsed Toolbar (2026-11-22): a dark pill with Loupe's L, in place of the
+// "Show Loupe" tab. A click opens the panel. Dragged, it follows the pointer, and
+// dropped near a side of the window it glues there, flaring into the edge; dropped
+// anywhere else it stays free where it was let go (`launcher-place.ts`). The arrow keys
+// glue it to the side they point at, so it moves without a pointer too.
+
+import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { type Box, centreOf, dragging, type Edge, glue, layout, type Place, PLACE_KEY, placeFor, readPlace, type Viewport } from "./launcher-place.js";
+
+/** A press that travels further than this is a drag, not a click. */
+const DRAG_THRESHOLD = 4;
+
+const ARROWS: Record<string, Edge> = { ArrowUp: "top", ArrowRight: "right", ArrowDown: "bottom", ArrowLeft: "left" };
+
+/** The window less its scrollbars: a glued pill sits against what the page shows, not under a scrollbar. */
+function viewportNow(): Viewport {
+  const root = document.documentElement;
+  return { width: root.clientWidth || window.innerWidth, height: root.clientHeight || window.innerHeight };
+}
+
+function useViewport(): Viewport {
+  const [viewport, setViewport] = useState(viewportNow);
+  useEffect(() => {
+    const resize = () => setViewport(viewportNow());
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  return viewport;
+}
+
+/** Storage can throw (a private window, blocked site data): it then starts where it always does. */
+function storedPlace(): Place {
+  try {
+    return readPlace(localStorage.getItem(PLACE_KEY));
+  } catch {
+    return readPlace(null);
+  }
+}
+
+function keep(place: Place) {
+  try {
+    localStorage.setItem(PLACE_KEY, JSON.stringify(place));
+  } catch {
+    // Not remembered: it stays where it is for this page load.
+  }
+}
+
+/** Loupe's L, from the wordmark, in `currentColor`. */
+export const LoupeL = () => (
+  <svg className="glyph" width="11" height="18" viewBox="1 1 126 208" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M81.955 189.73C89.305 189.73 95.71 187.652 101.17 183.496C106.84 179.151 110.095 171.5 110.935 160.542H127C126.58 170.744 124.48 179.529 120.7 186.896C116.92 194.075 111.565 199.554 104.635 203.332C97.915 207.111 89.41 209 79.12 209C70.51 209 62.53 207.489 55.18 204.466C47.83 201.254 41.845 196.059 37.225 188.88C32.815 181.701 30.61 171.972 30.61 159.692V127.67C25.99 129.182 21.16 130.599 16.12 131.921C11.08 133.243 6.04 134.471 1 135.605V118.886C6.46 117.563 11.605 116.241 16.435 114.918C21.265 113.407 25.99 111.99 30.61 110.668V42.9401C30.61 35.1944 32.08 28.2044 35.02 21.97C38.17 15.5468 43 10.446 49.51 6.66757C56.23 2.88919 65.05 1 75.97 1C88.15 1 97.81 4.68392 104.95 12.0518C112.3 19.2307 115.975 29.4323 115.975 42.6567C115.975 54.9364 113.35 66.1771 108.1 76.3788C103.06 86.3915 96.025 95.1762 86.995 102.733C77.965 110.29 67.78 116.241 56.44 120.586V158.842C56.44 168.288 58.435 175.845 62.425 181.512C66.625 186.991 73.135 189.73 81.955 189.73ZM94.87 43.5068C94.87 34.8165 93.295 28.2988 90.145 23.9537C86.995 19.6085 82.27 17.436 75.97 17.436C67.99 17.436 62.74 19.8919 60.22 24.8038C57.7 29.5268 56.44 35.7611 56.44 43.5068V102.45C69.04 96.4042 78.595 88.4696 85.105 78.6458C91.615 68.822 94.87 57.109 94.87 43.5068Z" />
+  </svg>
+);
+
+type Drag = { pointer: number; startX: number; startY: number; fromX: number; fromY: number; moved: boolean };
+
+export function Launcher({ onOpen }: { onOpen(): void }) {
+  const viewport = useViewport();
+  const [place, setPlace] = useState<Place>(storedPlace);
+  // While dragging: the body's centre, following the pointer.
+  const [held, setHeld] = useState<{ x: number; y: number } | null>(null);
+  const drag = useRef<Drag | null>(null);
+  // The click that ends a drag isn't a click on the pill.
+  const swallowClick = useRef(false);
+
+  const settle = (next: Place) => {
+    setPlace(next);
+    keep(next);
+  };
+
+  const box: Box = held ? dragging(held.x, held.y, viewport) : layout(place, viewport);
+
+  const down = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return;
+    swallowClick.current = false;
+    const centre = centreOf(place, viewport);
+    drag.current = { pointer: event.pointerId, startX: event.clientX, startY: event.clientY, fromX: centre.x, fromY: centre.y, moved: false };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const move = (event: PointerEvent<HTMLButtonElement>) => {
+    const current = drag.current;
+    if (!current || current.pointer !== event.pointerId) return;
+    const dx = event.clientX - current.startX;
+    const dy = event.clientY - current.startY;
+    if (!current.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    current.moved = true;
+    setHeld({ x: current.fromX + dx, y: current.fromY + dy });
+  };
+  const up = (event: PointerEvent<HTMLButtonElement>) => {
+    const current = drag.current;
+    if (!current || current.pointer !== event.pointerId) return;
+    drag.current = null;
+    if (!current.moved) return;
+    swallowClick.current = true;
+    settle(placeFor(current.fromX + event.clientX - current.startX, current.fromY + event.clientY - current.startY, viewport));
+    setHeld(null);
+  };
+  const cancel = () => {
+    const current = drag.current;
+    drag.current = null;
+    if (current?.moved && held) settle(placeFor(held.x, held.y, viewport));
+    setHeld(null);
+  };
+  const key = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const edge = ARROWS[event.key];
+    if (!edge) return;
+    event.preventDefault();
+    const centre = centreOf(place, viewport);
+    settle(glue(edge, edge === "top" || edge === "bottom" ? centre.x : centre.y, viewport));
+  };
+
+  return (
+    <button
+      type="button"
+      className={`launcher${held ? " dragging" : ""}`}
+      data-edge={box.edge ?? "free"}
+      style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
+      aria-label="Show Loupe"
+      title="Show Loupe · drag it anywhere, or to a side to keep it there"
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={cancel}
+      onKeyDown={key}
+      onClick={() => {
+        if (swallowClick.current) {
+          swallowClick.current = false;
+          return;
+        }
+        onOpen();
+      }}
+    >
+      <svg className="shape" width={box.width} height={box.height} viewBox={`0 0 ${box.width} ${box.height}`} aria-hidden="true" focusable="false">
+        <path d={box.path} />
+      </svg>
+      <span className="mark" style={{ left: box.body.x, top: box.body.y }}>
+        <LoupeL />
+      </span>
+    </button>
+  );
+}

@@ -962,7 +962,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     await mount();
     focusIn(panelButton("Hide panel"));
     await clickInPanel(panelButton("Hide panel"));
-    const tab = shadow().querySelector<HTMLButtonElement>(".show-tab") as HTMLButtonElement;
+    const tab = shadow().querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
     expect(tab.getAttribute("aria-label")).toBe("Show Loupe");
     expect(shadow().activeElement).toBe(tab);
     await clickInPanel(tab);

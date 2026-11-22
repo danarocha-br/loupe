@@ -15,8 +15,8 @@ import type { Scope } from "../runtime/store.js";
 import { useDeselect } from "./deselect.js";
 import { type Column, useColumn } from "./dock.js";
 import { Highlight } from "./highlight.js";
-import { PanelIcon } from "./icons.js";
 import { useInstanceMeta } from "./instance-meta.js";
+import { Launcher } from "./launcher.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
@@ -149,7 +149,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   useEffect(() => {
     if (!focusSwap.current) return;
     focusSwap.current = false;
-    host.shadowRoot?.querySelector<HTMLElement>(hidden ? ".show-tab" : "h2.name")?.focus();
+    host.shadowRoot?.querySelector<HTMLElement>(hidden ? ".launcher" : "h2.name")?.focus();
   }, [hidden, host]);
   const focusIsHere = () => (host.shadowRoot?.activeElement ?? null) !== null;
   const select = (id: string | null, next?: SelectMode) => {
@@ -163,19 +163,12 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   };
   if (hidden) {
     return (
-      <button
-        type="button"
-        className="show-tab"
-        aria-label="Show Loupe"
-        onClick={() => {
+      <Launcher
+        onOpen={() => {
           focusSwap.current = focusIsHere();
           setHidden(false);
         }}
-        title="Show the Loupe panel"
-      >
-        <PanelIcon />
-        Loupe
-      </button>
+      />
     );
   }
   return (
