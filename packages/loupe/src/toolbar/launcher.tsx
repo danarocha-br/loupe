@@ -1,33 +1,39 @@
 // The collapsed Toolbar (2026-11-22): a dark pill with Loupe's L, in place of the
-// "Show Loupe" tab. A click opens the panel, which grows out of the pill
-// (`morph.ts`). Dragged, it follows the pointer; near a side, the side reaches for it
-// with a neck of the same dark stuff, and let go while the neck holds, the side takes
-// it and it sits flush, flaring into the edge (after the designer's reference). Dropped
-// anywhere else it stays free where it was let go (`launcher-place.ts`). The arrow keys
-// glue it to the side they point at, so it moves without a pointer too.
+// "Show Loupe" tab. A click opens the panel: the pill tucks into its side as the panel
+// slides out of its own, a handle and its drawer. Dragged, it follows the pointer;
+// near a side it is drawn in as to a magnet, its facing side flattening, and docked,
+// two small fillets grow out of the edge to hold it (`launcher-place.ts`). Let go or
+// flicked within reach of a side, it docks there; anywhere else it stays free. The
+// arrow keys dock it on the side they point at, so it moves without a pointer too.
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import {
   along,
-  type Box,
+  BODY,
   bodyRect,
   centreOf,
-  dragging,
+  DOCK,
   type Edge,
+  FILLET,
   freePlace,
   gapTo,
   glue,
-  layout,
-  MAGNET,
-  MAGNET_RELEASE,
-  neckPath,
+  leanCentre,
+  leanGap,
   nearestEdge,
+  nearRadius,
   type Place,
   PLACE_KEY,
+  pillPath,
+  placeFor,
+  REACH,
   readPlace,
-  SNAP,
+  type Rect,
+  UNDOCK,
   type Viewport,
 } from "./launcher-place.js";
+
+export type { Rect };
 
 /** A press that travels further than this is a drag, not a click. */
 const DRAG_THRESHOLD = 4;
@@ -74,31 +80,69 @@ export const LoupeL = () => (
   </svg>
 );
 
-type Drag = { pointer: number; startX: number; startY: number; fromX: number; fromY: number; moved: boolean };
+type Drag = { pointer: number; startX: number; startY: number; fromX: number; fromY: number; moved: boolean; samples: { t: number; x: number; y: number }[] };
 
-/** How long the pill travels when a side takes it or lets it go, mid-drag. */
-const MAGNET_MS = 180;
+/** How long a dock, or a flick's travel, takes: quick out, a soft landing. */
+const SETTLE_MS = 260;
+/** The fillets growing out of the edge as it docks, and going back as it leaves. */
+const FILLET_IN_MS = 220;
+const FILLET_OUT_MS = 120;
+/** A release faster than this (px/ms) is a flick: the pill carries on as far as it would coast. */
+const FLICK = 0.3;
+const COAST_MS = 140;
 
-type Held = { x: number; y: number; flush: Edge | null; near: Edge | null };
-
-/**
- * Where a drag is now: flush on a side once within `MAGNET` of it, held there until pulled
- * `MAGNET_RELEASE` out; otherwise free, with the side it is within `SNAP` of reaching for it.
- */
-function holdAt(x: number, y: number, viewport: Viewport, flush: Edge | null): Held {
-  if (flush !== null && gapTo(flush, x, y, viewport) <= MAGNET_RELEASE) return { x, y, flush, near: flush };
-  const { edge, gap } = nearestEdge(x, y, viewport);
-  return { x, y, flush: gap <= MAGNET ? edge : null, near: gap < SNAP ? edge : null };
+/** A number that eases to `target` over `ms`, from wherever it is when the target changes. */
+function useTween(target: number, ms: number): number {
+  const [value, setValue] = useState(target);
+  const current = useRef(target);
+  useEffect(() => {
+    const from = current.current;
+    if (from === target) return;
+    if (typeof requestAnimationFrame !== "function" || ms === 0 || reducedMotion()) {
+      current.current = target;
+      setValue(target);
+      return;
+    }
+    // Timed from its first frame: a frame's timestamp can come before `performance.now()` read here.
+    let start: number | null = null;
+    let frame = 0;
+    const step = (now: number) => {
+      start ??= now;
+      const t = Math.min(1, Math.max(0, (now - start) / ms));
+      // The same strong ease-out as the travel: most of it at once, a soft finish.
+      const eased = 1 - (1 - t) ** 4;
+      current.current = from + (target - from) * eased;
+      setValue(current.current);
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, ms]);
+  return value;
 }
 
-/** The pill's body in the viewport, read where it is stored: where a closing panel lands. */
+function reducedMotion(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** A held pill: where the pointer puts its centre, the side drawing it in (if one is), and whether that side has it. */
+type Held = { x: number; y: number; edge: Edge | null; docked: boolean };
+
+function holdAt(x: number, y: number, viewport: Viewport, wasDocked: Edge | null): Held {
+  const { edge, gap } = nearestEdge(x, y, viewport);
+  if (gap >= REACH) return { x, y, edge: null, docked: false };
+  const shown = leanGap(gap);
+  // Docked while held, it stays docked until it is pulled out past `UNDOCK`, so it doesn't flicker on the line.
+  const docked = wasDocked === edge ? shown <= UNDOCK : shown <= DOCK;
+  return { x, y, edge, docked };
+}
+
+/** The pill's body in the viewport, read where it is stored. */
 export function pillRect(): Rect {
   return bodyRect(storedPlace(), viewportNow());
 }
 
-export type Rect = { left: number; top: number; width: number; height: number };
-
-export function Launcher({ onOpen }: { onOpen(from: Rect): void }) {
+export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?: boolean }) {
   const viewport = useViewport();
   const [place, setPlace] = useState<Place>(storedPlace);
   const [held, setHeld] = useState<Held | null>(null);
@@ -108,36 +152,51 @@ export function Launcher({ onOpen }: { onOpen(from: Rect): void }) {
     latest.current = next;
     setHeld(next);
   };
-  // For a moment as a side takes the pill or lets it go, it travels there instead of jumping.
-  const [easing, setEasing] = useState(false);
-  const easeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // For a moment after a drop, a dock or a key, it travels to its place instead of jumping.
+  const [settling, setSettling] = useState(false);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const drag = useRef<Drag | null>(null);
-  // The click that ends a drag isn't a click on the pill.
+  // The click the browser sends after a drag isn't a click on the pill.
   const swallowClick = useRef(false);
-  useEffect(() => () => clearTimeout(easeTimer.current), []);
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
 
+  const travel = () => {
+    setSettling(true);
+    clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(() => setSettling(false), SETTLE_MS);
+  };
   const settle = (next: Place) => {
     setPlace(next);
     keep(next);
   };
-  const ease = () => {
-    setEasing(true);
-    clearTimeout(easeTimer.current);
-    easeTimer.current = setTimeout(() => setEasing(false), MAGNET_MS);
-  };
 
-  const box: Box = held
-    ? held.flush
-      ? layout(glue(held.flush, along(held.flush, held.x, held.y), viewport), viewport)
-      : dragging(held.x, held.y, viewport)
-    : layout(place, viewport);
-  const neck = held && !held.flush && held.near ? neckPath(held.near, held.x, held.y, viewport) : null;
+  // What shows: docked, flush on its side; held in reach, leaning in, its facing side flattening; else where it is.
+  const docked = held ? held.docked : place.edge !== null;
+  const facing = held ? held.edge : place.edge;
+  const centre = held
+    ? held.edge
+      ? held.docked
+        ? centreOf(glue(held.edge, along(held.edge, held.x, held.y), viewport), viewport)
+        : leanCentre(held.edge, held.x, held.y, viewport)
+      : centreOf(freePlace(held.x, held.y, viewport), viewport)
+    : centreOf(place, viewport);
+  const fillet = useTween(docked ? FILLET : 0, docked ? FILLET_IN_MS : FILLET_OUT_MS);
+  const near = held?.edge && !held.docked ? nearRadius(leanGap(gapTo(held.edge, held.x, held.y, viewport))) : docked ? 0 : BODY.height / 2;
+  const path = pillPath(facing, near, fillet > 0.05 ? fillet : 0);
 
   const down = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || leaving) return;
     swallowClick.current = false;
-    const centre = centreOf(place, viewport);
-    drag.current = { pointer: event.pointerId, startX: event.clientX, startY: event.clientY, fromX: centre.x, fromY: centre.y, moved: false };
+    const from = centreOf(place, viewport);
+    drag.current = {
+      pointer: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      fromX: from.x,
+      fromY: from.y,
+      moved: false,
+      samples: [{ t: performance.now(), x: event.clientX, y: event.clientY }],
+    };
     try {
       // Moves keep coming to the pill even when the pointer outruns it.
       event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -151,20 +210,29 @@ export function Launcher({ onOpen }: { onOpen(from: Rect): void }) {
     const dx = event.clientX - current.startX;
     const dy = event.clientY - current.startY;
     if (!current.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-    // Picked up from a side, it starts flush there: it peels off once pulled `MAGNET_RELEASE` out.
-    const before = latest.current ? latest.current.flush : place.edge;
+    const now = performance.now();
+    current.samples = [...current.samples.filter((sample) => now - sample.t < 100), { t: now, x: event.clientX, y: event.clientY }];
+    // Picked up from a side, it starts docked there, and comes away once pulled past `UNDOCK`.
+    const before = latest.current ? (latest.current.docked ? latest.current.edge : null) : place.edge;
     current.moved = true;
     const next = holdAt(current.fromX + dx, current.fromY + dy, viewport, before);
-    if (next.flush !== before) ease();
+    if (next.docked !== (before !== null) || (next.docked && next.edge !== before)) travel();
     hold(next);
   };
-  /** Let go while the neck holds, or flush, and the side takes it; anywhere else it stays free. */
-  const drop = () => {
+  /** Let go: within reach of a side, docked there; flicked, as far as it would coast; else where it is. */
+  const drop = (current: Drag) => {
     const last = latest.current;
     if (last) {
-      const side = last.flush ?? last.near;
-      if (side && last.flush === null) ease();
-      settle(side ? glue(side, along(side, last.x, last.y), viewport) : freePlace(last.x, last.y, viewport));
+      const [first, end] = [current.samples[0], current.samples.at(-1)];
+      // Under a frame's worth of samples there is no telling a speed: not a flick.
+      const dt = first && end && end.t - first.t >= 16 ? end.t - first.t : 0;
+      const vx = dt > 0 && first && end ? (end.x - first.x) / dt : 0;
+      const vy = dt > 0 && first && end ? (end.y - first.y) / dt : 0;
+      const flicked = Math.hypot(vx, vy) > FLICK;
+      const x = last.x + (flicked ? vx * COAST_MS : 0);
+      const y = last.y + (flicked ? vy * COAST_MS : 0);
+      travel();
+      settle(placeFor(x, y, viewport));
     }
     hold(null);
   };
@@ -178,59 +246,55 @@ export function Launcher({ onOpen }: { onOpen(from: Rect): void }) {
     setTimeout(() => {
       swallowClick.current = false;
     }, 0);
-    drop();
+    drop(current);
   };
   const cancel = () => {
     const current = drag.current;
     drag.current = null;
-    if (current?.moved) drop();
+    if (current?.moved) drop(current);
     else hold(null);
   };
   const key = (event: KeyboardEvent<HTMLButtonElement>) => {
     const edge = ARROWS[event.key];
     if (!edge) return;
     event.preventDefault();
-    const centre = centreOf(place, viewport);
-    ease();
-    settle(glue(edge, along(edge, centre.x, centre.y), viewport));
+    const at = centreOf(place, viewport);
+    travel();
+    settle(glue(edge, along(edge, at.x, at.y), viewport));
   };
 
-  const classes = ["launcher", held && "dragging", easing && "easing"].filter(Boolean).join(" ");
+  const classes = ["launcher", held && "dragging", settling && "settling", leaving && "leaving"].filter(Boolean).join(" ");
   return (
-    <>
-      {neck && (
-        <svg className="neck" aria-hidden="true" focusable="false" viewBox={`0 0 ${viewport.width} ${viewport.height}`} data-edge={held?.near ?? undefined}>
-          <path d={neck} />
-        </svg>
-      )}
-      <button
-        type="button"
-        className={classes}
-        data-edge={box.edge ?? "free"}
-        // Placed by translate, not left and top, so its travel stays off layout.
-        style={{ translate: `${box.left}px ${box.top}px`, width: box.width, height: box.height }}
-        aria-label="Show Loupe"
-        title="Show Loupe · drag it anywhere, or to a side to keep it there"
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={cancel}
-        onKeyDown={key}
-        onClick={() => {
-          if (swallowClick.current) {
-            swallowClick.current = false;
-            return;
-          }
-          onOpen(bodyRect(place, viewport));
-        }}
-      >
-        <svg className="shape" width={box.width} height={box.height} viewBox={`0 0 ${box.width} ${box.height}`} aria-hidden="true" focusable="false">
-          <path d={box.path} />
-        </svg>
-        <span className="mark" style={{ left: box.body.x, top: box.body.y }}>
-          <LoupeL />
-        </span>
-      </button>
-    </>
+    <button
+      type="button"
+      className={classes}
+      data-edge={docked && facing ? facing : "free"}
+      // Placed by translate, not left and top, so its travel stays off layout.
+      style={{ translate: `${round(centre.x - BODY.width / 2)}px ${round(centre.y - BODY.height / 2)}px` }}
+      aria-label="Show Loupe"
+      title="Show Loupe · drag it anywhere, or to a side to keep it there"
+      tabIndex={leaving ? -1 : undefined}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={cancel}
+      onKeyDown={key}
+      onClick={() => {
+        if (swallowClick.current || leaving) {
+          swallowClick.current = false;
+          return;
+        }
+        onOpen();
+      }}
+    >
+      <svg className="shape" width={BODY.width} height={BODY.height} viewBox={`0 0 ${BODY.width} ${BODY.height}`} aria-hidden="true" focusable="false">
+        <path d={path} />
+      </svg>
+      <span className="mark">
+        <LoupeL />
+      </span>
+    </button>
   );
 }
+
+const round = (n: number) => Math.round(n * 10) / 10;

@@ -287,7 +287,15 @@ button:disabled { cursor: default; opacity: 0.45; }
   position: fixed; top: 8px; right: 0; bottom: 8px; z-index: 2147483647; width: 344px;
   display: flex; flex-direction: column; overflow: hidden; background: var(--ground);
   border-radius: 24px 0 0 24px; box-shadow: 0 0 0 1px var(--edge), 0 8px 24px var(--edge);
-  transition: opacity 120ms ease-out;
+  transition: opacity 120ms ease-out, translate 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* The drawer: it slides out of the window's right edge as the pill tucks away, and back into it on Hide, quicker. */
+@starting-style { .panel { translate: calc(100% + 8px) 0; } }
+.panel.closing { translate: calc(100% + 8px) 0; pointer-events: none; transition: translate 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .panel { transition: opacity 150ms ease-out; }
+  @starting-style { .panel { translate: none; opacity: 0; } }
+  .panel.closing { translate: none; opacity: 0; transition: opacity 150ms ease-out; }
 }
 
 .panel.overlay { box-shadow: 0 0 0 1px var(--edge), var(--overlay-shadow); }
@@ -384,27 +392,43 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Collapsed (launcher.tsx): a flat dark pill with the L, free or glued to a side, flaring into it */
+/* Collapsed (launcher.tsx): a flat dark pill with the L, free or docked on a side, its fillets drawn past its box */
 .launcher {
-  position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; padding: 0; background: none; color: var(--on-band);
+  position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; width: 44px; height: 32px; padding: 0; background: none; color: var(--on-band);
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-edge);
+  transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out;
 }
 .launcher .shape { position: absolute; inset: 0; display: block; overflow: visible; }
-.launcher .shape path, .neck path { fill: var(--band); }
-.launcher .mark { position: absolute; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
+.launcher .shape path { fill: var(--band); transition: fill 120ms ease-out; }
+.launcher .mark { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
 .launcher .glyph { display: block; }
 .launcher.dragging { cursor: grabbing; }
-/* A side taking it or letting it go: it travels there, quick, rather than jumping. */
-.launcher.easing { transition: translate 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+/* After a drop, a dock or a key: it travels to its place, quick out and a soft landing. */
+.launcher.settling { transition: translate 260ms cubic-bezier(0.23, 1, 0.32, 1), transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out; }
 @media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover .shape path { fill: var(--band-hover); } }
 /* The ring follows the pill's own outline, fillets and all. */
 .launcher:focus-visible { outline: none; }
 .launcher:focus-visible .shape path { stroke: var(--accent); stroke-width: 4; paint-order: stroke; }
-/* The neck a side reaches out with while the pill is held near it: the same dark stuff, under the pill. */
-.neck { position: fixed; inset: 0; z-index: 2147483646; width: 100%; height: 100%; pointer-events: none; overflow: visible; filter: var(--launcher-edge); }
-@media (prefers-reduced-motion: reduce) { .launcher.easing { transition: none; } }
-/* Opening and closing (morph.ts): the pill's dark body grows into the panel's box and back. */
-.morph-shell { position: fixed; z-index: 2147483646; pointer-events: none; background: var(--band); }
+/* The handle: as the panel opens it tucks into its side (free, it settles away), and as the
+   panel closes it slides back out of its side. A transform, apart from the translate that places it. */
+.launcher.leaving { pointer-events: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 120ms ease-out; }
+.launcher.leaving[data-edge="right"] { transform: translateX(100%); }
+.launcher.leaving[data-edge="left"] { transform: translateX(-100%); }
+.launcher.leaving[data-edge="top"] { transform: translateY(-100%); }
+.launcher.leaving[data-edge="bottom"] { transform: translateY(100%); }
+.launcher.leaving[data-edge="free"] { transform: scale(0.9); opacity: 0; }
+@starting-style {
+  .launcher[data-edge="right"] { transform: translateX(100%); }
+  .launcher[data-edge="left"] { transform: translateX(-100%); }
+  .launcher[data-edge="top"] { transform: translateY(-100%); }
+  .launcher[data-edge="bottom"] { transform: translateY(100%); }
+  .launcher[data-edge="free"] { transform: scale(0.9); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .launcher, .launcher.settling, .launcher.leaving { transition: opacity 150ms ease-out; }
+  .launcher.leaving[data-edge] { transform: none; opacity: 0; }
+  @starting-style { .launcher[data-edge] { transform: none; opacity: 0; } }
+}
 
 /* Cards on the sheet */
 /* Every card: text 14px from its left edge, 12px above and 14px below. */
@@ -783,9 +807,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 @media (forced-colors: active) {
   .panel, .copy-popover, .section, .card, .footer, .header { border: 1px solid transparent; }
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
-  .launcher .shape path, .neck path { fill: ButtonText; }
-  .neck { filter: none; }
-  .morph-shell { display: none; }
+  .launcher .shape path { fill: ButtonText; }
   .launcher:focus-visible .shape path { stroke: Highlight; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }

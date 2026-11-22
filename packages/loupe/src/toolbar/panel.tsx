@@ -81,6 +81,8 @@ type PanelProps = {
   marksHidden: boolean;
   onMarks(): void;
   onHide(): void;
+  /** Hide was pressed: the panel slides back out of the window, and goes once it has. */
+  closing?: boolean;
   theme: "light" | "dark";
   onTheme(): void;
 };
@@ -178,8 +180,9 @@ export function Panel(props: PanelProps) {
     ) : null;
   return (
     <section
-      className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}`}
+      className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
       aria-label="Loupe"
+      inert={props.closing || undefined}
       style={{ width: column.width - PANEL_INSET * 2 }}
     >
       <header className="header">

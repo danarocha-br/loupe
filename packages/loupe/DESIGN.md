@@ -562,7 +562,7 @@ Soft corners in steps: the sheet's left corners at 24px; cards, the header, the 
 Three shapes carry meaning and appear nowhere else:
 - **The delta**: a triangle, 22 × 20px, card-filled with a 1.25px lilac stroke and its number at the base. Dashed and empty, it is a State prop held on one Instance, which the Proposal shows as a state, not a numbered change. It stays in the panel and the Proposal; the page carries no numbers.
 - **The switch**: a 42 × 22px pill on a 1.5px `switch-off` edge, whose thumb is the filled half it sits in, rounded on its outer side, with a 16px hole through its middle where the card shows.
-- **The collapsed pill**: a 44 × 32px stadium in `band` with Loupe's L. Glued to a side, the side that meets the edge goes flush and flares into it with two 8px concave fillets, a tab growing out of the window's frame.
+- **The collapsed pill**: a 44 × 32px stadium in `band` with Loupe's L. Near a side, its facing corners tighten; docked, that side goes flush and two 8px concave fillets grow out of the edge, a tab growing out of the window's frame.
 
 On the page, a solid outline is the one Instance in hand and a dashed coral one is the rest of what it reaches. Grey dashes mean "not applied": a left-out Instance's outline, a hovered outline. In the panel a dashed tag means not there now ("Not visible now", "No Instance mounted").
 
@@ -655,15 +655,16 @@ A split button filling the footer beside the theme button (Paper, "Copy flow v2 
 - **Held chip:** in the footer, "1 held" in 10px mono on amber with a 6px amber dot: State props held open, which the Proposal shows as states.
 
 ### Collapsed
-Hide in the header collapses the panel to a flat dark pill with Loupe's L, the first letter of the wordmark, in `on-band` (after the designer's "agent blob" reference, 2026-11-22). No shadow: in light it is the `band` colour alone; in dark a 0.5px light hairline (`launcher-edge`) keeps it apart from a dark page. It starts glued to the right side, low.
+Hide in the header collapses the panel to a flat dark pill with Loupe's L, the first letter of the wordmark, in `on-band` (after the designer's "agent blob" reference, 2026-11-22, made quieter). No shadow: in light it is the `band` colour alone; in dark a 0.5px light hairline (`launcher-edge`) keeps it apart from a dark page. It starts docked on the right side, low.
 - **Open:** a click, or Enter, opens the panel; focus goes to its heading.
-- **Move:** dragged past 4px it follows the pointer exactly, and nothing opens. Within 40px of a side, that side reaches for it with a **neck** of the same dark stuff: a thread at 40px, thickening as the pill comes in, pinched at its waist and flaring onto the edge, as a drop of ink would be drawn to the frame. Let go while the neck holds and the side takes it: the pill travels flush over 180ms and flares into the edge with two 8px concave fillets. Within 10px the side has it already, still held, and lets go only once it is pulled 22px out. Let go anywhere else, it stays free where it was dropped, kept 8px inside the window. Glued, its fillets keep 8px clear of the corners. It is placed by `translate`, so its travel stays off layout.
-- **Keyboard:** the arrow keys glue it to the side they point at, so it moves without a pointer.
+- **Drawn to a side, as to a magnet:** dragged past 4px it follows the pointer exactly, and nothing opens. Within 56px of a side it leans in, shown nearer the edge than the pointer puts it, and the corners facing the edge tighten from 16px toward square. Reaching the edge, it **docks** while still held: that side goes flush and two 8px concave fillets grow out of the edge over 220ms to hold it, so it reads as part of the window's frame. Docked while held, it comes away only once pulled 10px out, its fillets going back over 120ms.
+- **Let go** within reach of a side, it docks there, travelling 260ms on `cubic-bezier(0.23, 1, 0.32, 1)`; **flicked** (faster than 0.3px/ms), it carries on as far as it would coast in 140ms, and docks if that reaches a side. Anywhere else it stays free where it was dropped, a stadium again, kept 8px inside the window. Docked, its fillets keep 8px clear of the corners. It is placed by `translate`, so its travel stays off layout.
+- **Keyboard:** the arrow keys dock it on the side they point at, so it moves without a pointer.
 - **Kept** in this browser (`loupe:launcher`), in fractions of the window, so it holds across a resize and a reload.
 - **Hover** lightens its fill (`band-hover`); focus draws a 2px coral ring along its own outline.
-- **Opening is one shape** (`morph.ts`): the pill's dark body grows into the panel's box, its dark turning into the panel's ground, and the panel's content fades in once the shape mostly covers it (from 45% to 85%). 320ms on the drawer curve, `cubic-bezier(0.32, 0.72, 0, 1)`. Both the shape and the panel move by `clip-path: inset(… round …)`, from the pill's 16px corner to the panel's 24px left corners.
-- **Closing is the same shape played the other way, quicker:** 220ms. The content goes first (by 35%), then the ground darkens and the shape shrinks onto the pill's body, and the pill is there when it lands. The page takes its column back once it has gone. Hide pressed mid-open plays the open back from where it is.
-- **Reduced motion, or no Web Animations:** no morph; the panel and the pill simply swap.
+- **Opening: a handle and its drawer.** The pill tucks into its side (160ms; a free pill settles away to 0.9 and fades) as the panel slides out of the window's right edge, 300ms on the drawer curve, `cubic-bezier(0.32, 0.72, 0, 1)`. The page makes room at once.
+- **Closing, quicker:** the panel slides back out of the window in 220ms on `cubic-bezier(0.23, 1, 0.32, 1)`; once it has gone the page takes its column back and the pill slides out of its side again (240ms). Hide pressed mid-open turns the slide round from where it is.
+- **Reduced motion:** nothing travels; the panel and the pill fade (150ms), and a docked pill's fillets are simply there.
 - Nothing animates on the page's first load: the panel is simply there.
 
 ### Undo
@@ -678,7 +679,7 @@ Reset all, Reset this Instance, Reset this scope and Discard act immediately; th
 - **Narrow windows:** under 360px the column narrows to the viewport, so at 320px nothing is off-screen. The middle keeps its scrolling to itself (`overscroll-behavior: contain`).
 - **Touch:** on a coarse pointer, text fields and the popover's fields are 16px so iOS Safari doesn't zoom.
 - **Forced colours:** cards, the header, footer, sheet and popover get transparent borders back, the collapsed pill is drawn in `ButtonText` with its L in `ButtonFace`; the chip that shows now, the switch and a ticked box are drawn in `Highlight`; the app's value takes a dashed outline; dots, the meter and the legend's marks are drawn in `CanvasText`.
-- **Reduced motion:** the switch's thumb and the chevrons move to their place without travelling there; the panel and the collapsed pill swap without the morph; the toast appears without rising; the page's outlines appear and go without fading. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
+- **Reduced motion:** the switch's thumb and the chevrons move to their place without travelling there; the panel and the collapsed pill fade instead of sliding; the toast appears without rising; the page's outlines appear and go without fading. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
 - Apostrophes in panel text are typographic (’).
 
 ## Do's and Don'ts

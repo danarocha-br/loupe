@@ -16,8 +16,7 @@ import { useDeselect } from "./deselect.js";
 import { type Column, useColumn } from "./dock.js";
 import { Highlight } from "./highlight.js";
 import { useInstanceMeta } from "./instance-meta.js";
-import { Launcher, pillRect, type Rect } from "./launcher.js";
-import { canMorph, type Morph, morph } from "./morph.js";
+import { Launcher } from "./launcher.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
@@ -130,6 +129,15 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
   return [theme, toggle];
 }
 
+/** The drawer's close and the handle's tuck (styles.ts `.panel.closing`, `.launcher.leaving`). */
+const CLOSE_MS = 220;
+const TUCK_MS = 160;
+
+/** Whether the page can play the open and close: none in a test's DOM, where they would only wait. */
+function animates(): boolean {
+  return typeof matchMedia === "function";
+}
+
 function ToolbarBody({ host }: { host: HTMLElement }) {
   const [selected, setSelected] = useState<string | null>(null);
   // The header's select tool (2026-11-20): one Instance, or every Instance from its
@@ -139,48 +147,41 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const [widened, setWidened] = useState(false);
   const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
   const [hidden, setHidden] = useState(false);
-  // Opening grows the pill into the panel, and closing shrinks it back (morph.ts); the page
-  // takes its column back once the panel has gone. `from` is the pill the panel grows out of.
-  const [from, setFrom] = useState<Rect | null>(null);
-  const running = useRef<{ direction: "open" | "close"; morph: Morph } | null>(null);
-  const panelOf = () => host.shadowRoot?.querySelector<HTMLElement>(".panel") ?? null;
-  // Opened from the pill: before the first paint, so the full panel never shows for a frame.
-  useLayoutEffect(() => {
-    if (hidden || from === null) return;
-    const panel = panelOf();
-    const root = host.shadowRoot;
-    setFrom(null);
-    if (!panel || !root || !canMorph()) return;
-    const opening = morph(root, panel, from, "open");
-    running.current = { direction: "open", morph: opening };
-    opening.finished.then(() => {
-      if (running.current?.morph === opening) running.current = null;
-    });
-  }, [hidden, from, host]);
-  useEffect(() => () => running.current?.morph.cancel(), []);
-  const hide = () => {
-    const current = running.current;
-    if (current?.direction === "close") return;
+  // A handle and its drawer: opening tucks the pill into its side while the panel slides
+  // out of its own; closing slides the panel back out of the window, and once it has gone
+  // the page takes its column back and the pill slides out of its side again.
+  const [closing, setClosing] = useState(false);
+  const [tucking, setTucking] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const tuckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(closeTimer.current);
+      clearTimeout(tuckTimer.current);
+    },
+    [],
+  );
+  const open = () => {
     focusSwap.current = focusIsHere();
-    const gone = () => {
-      running.current = null;
+    setHidden(false);
+    if (!animates()) return;
+    setTucking(true);
+    clearTimeout(tuckTimer.current);
+    tuckTimer.current = setTimeout(() => setTucking(false), TUCK_MS);
+  };
+  const hide = () => {
+    if (closing) return;
+    focusSwap.current = focusIsHere();
+    if (!animates()) {
       setHidden(true);
-    };
-    // Closed mid-open: the open plays back from where it is.
-    if (current?.direction === "open") {
-      current.morph.reverse(gone);
-      running.current = { direction: "close", morph: current.morph };
       return;
     }
-    const panel = panelOf();
-    const root = host.shadowRoot;
-    if (!panel || !root || !canMorph()) {
-      gone();
-      return;
-    }
-    const closing = morph(root, panel, pillRect(), "close");
-    running.current = { direction: "close", morph: closing };
-    closing.finished.then(gone);
+    // Mid-open, the panel's slide turns round from where it is (a transition, not a timeline).
+    setClosing(true);
+    closeTimer.current = setTimeout(() => {
+      setClosing(false);
+      setHidden(true);
+    }, CLOSE_MS);
   };
   // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
   // the page, so a change can be judged as it will ship. Kept for the page load.
@@ -205,32 +206,27 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     setMode(next === "instance" ? "one" : "many");
     setWidened(next === "page");
   };
-  if (hidden) {
-    return (
-      <Launcher
-        onOpen={(at) => {
-          focusSwap.current = focusIsHere();
-          setFrom(at);
-          setHidden(false);
-        }}
-      />
-    );
-  }
   return (
-    <ToolbarOpen
-      host={host}
-      column={column}
-      selected={selected}
-      onSelect={select}
-      mode={mode}
-      scope={scope}
-      onScope={changeScope}
-      marksHidden={marksHidden}
-      onMarks={() => setMarksHidden((was) => !was)}
-      onHide={hide}
-      theme={theme}
-      onTheme={toggleTheme}
-    />
+    <>
+      {(hidden || tucking) && <Launcher leaving={!hidden} onOpen={open} />}
+      {!hidden && (
+        <ToolbarOpen
+          host={host}
+          column={column}
+          selected={selected}
+          onSelect={select}
+          mode={mode}
+          scope={scope}
+          onScope={changeScope}
+          marksHidden={marksHidden}
+          onMarks={() => setMarksHidden((was) => !was)}
+          onHide={hide}
+          closing={closing}
+          theme={theme}
+          onTheme={toggleTheme}
+        />
+      )}
+    </>
   );
 }
 
@@ -246,6 +242,7 @@ function ToolbarOpen({
   marksHidden,
   onMarks,
   onHide,
+  closing,
   theme,
   onTheme,
 }: {
@@ -259,6 +256,7 @@ function ToolbarOpen({
   marksHidden: boolean;
   onMarks(): void;
   onHide(): void;
+  closing: boolean;
   theme: Theme;
   onTheme(): void;
 }) {
@@ -329,6 +327,7 @@ function ToolbarOpen({
         marksHidden={marksHidden}
         onMarks={onMarks}
         onHide={onHide}
+        closing={closing}
         theme={theme}
         onTheme={onTheme}
       />

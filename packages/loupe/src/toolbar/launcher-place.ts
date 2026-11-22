@@ -1,8 +1,9 @@
-// Where the collapsed Toolbar sits (2026-11-22, after the designer's "agent blob"
-// reference): a small dark pill with Loupe's L that can be dragged anywhere on the
-// window. Dropped near a side, it glues to it: the side of the pill that faces the edge
-// goes flush and flares into it with two concave fillets, a tab growing out of the
-// window's frame. Dropped anywhere else, it stays there as a free pill.
+// Where the collapsed Toolbar sits (2026-11-22): a small dark pill with Loupe's L that
+// can be dragged anywhere on the window. Near a side it is drawn to it, as to a magnet:
+// it leans in faster than the pointer, and the side of it that faces the edge flattens.
+// Docked, that side goes flush and two small fillets grow out of the edge to hold it,
+// so the pill reads as part of the window's frame. Dropped anywhere else, or flicked
+// short of a side, it stays free.
 //
 // Pure geometry, so it can be tested without a layout: a place is kept in fractions
 // of the viewport, so it holds across a resize, and laid out in px for the viewport there is.
@@ -18,16 +19,18 @@ export type Viewport = { width: number; height: number };
 export const BODY = { width: 44, height: 32 } as const;
 /** The concave fillets where a glued pill flares into its side. */
 export const FILLET = 8;
-/** Dropped this close to a side, it glues to it. */
-export const SNAP = 40;
+/** Within this of a side, the pill is drawn to it, and let go, docks there. */
+export const REACH = 56;
+/** Shown this close while held, it is docked already; it lets go only past `UNDOCK`. */
+export const DOCK = 4;
+export const UNDOCK = 10;
 /** How far a free pill, or a glued one's fillets, keep from the window's edges and corners. */
 export const MARGIN = 8;
 
 /** Where it starts: on the right side, low, where the "Show Loupe" tab used to sit. */
 export const DEFAULT_PLACE: Place = { edge: "right", at: 0.85 };
 
-/** The laid-out pill: its box on the viewport, the body's centre inside the box, and the outline to fill. */
-export type Box = { left: number; top: number; width: number; height: number; edge: Edge | null; body: { x: number; y: number }; path: string };
+export type Rect = { left: number; top: number; width: number; height: number };
 
 const clamp = (value: number, min: number, max: number) => (max < min ? (min + max) / 2 : Math.min(max, Math.max(min, value)));
 const horizontal = (edge: Edge) => edge === "top" || edge === "bottom";
@@ -53,12 +56,13 @@ function freeCentre(x: number, y: number, viewport: Viewport): { x: number; y: n
 }
 
 /**
- * Where a drop lands: glued to the nearest side when the body comes within `SNAP` of
- * it, otherwise free where it was let go. `x`, `y` are the body's centre in px.
+ * Where a drop lands: docked on the nearest side when the body is within `REACH` of it,
+ * where it was already leaning in; otherwise free where it was let go. `x`, `y` are the
+ * body's centre in px, where the pointer put it (or a flick would carry it).
  */
 export function placeFor(x: number, y: number, viewport: Viewport): Place {
   const { edge, gap } = nearestEdge(x, y, viewport);
-  return gap <= SNAP ? glue(edge, along(edge, x, y), viewport) : freePlace(x, y, viewport);
+  return gap < REACH ? glue(edge, along(edge, x, y), viewport) : freePlace(x, y, viewport);
 }
 
 /** Free where it was let go, kept inside the window. */
@@ -91,60 +95,84 @@ export function nearestEdge(x: number, y: number, viewport: Viewport): { edge: E
 /** The body's centre measured along a side. */
 export const along = (edge: Edge, x: number, y: number) => (horizontal(edge) ? x : y);
 
-/**
- * While dragging, a side within `SNAP` reaches for the pill with a neck of the same dark
- * stuff, after the reference: thin as a thread at `SNAP`, thicker as the pill comes in.
- * Let go while the neck holds and the side takes it. Within `MAGNET` the side has it
- * already, flush, and it lets go only past `MAGNET_RELEASE`, so it doesn't flicker on the line.
- */
-export const MAGNET = 10;
-export const MAGNET_RELEASE = 22;
-
-/** How strongly a side pulls at this gap: 0 at `SNAP` and beyond, 1 at the edge. */
-export function pullOf(gap: number): number {
-  if (gap >= SNAP) return 0;
-  if (gap <= 0) return 1;
-  return 1 - gap / SNAP;
-}
-
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 
 /**
- * The neck between a held pill and the side it nears, as a path in viewport px, or null
- * out of reach. Drawn in (along, out-from-the-edge) and mapped onto the side: wide where
- * it flares into the edge, pinched at its waist, overlapping into the body so the two
- * read as one shape.
+ * The magnet: how close the body is shown to a side it is `gap` from. Out of reach, where
+ * the pointer puts it; in reach, closer, so it leans in faster than the pointer moves and
+ * meets the edge before the pointer does. Continuous at `REACH`, so nothing jumps.
  */
-export function neckPath(edge: Edge, x: number, y: number, viewport: Viewport): string | null {
-  const gap = gapTo(edge, x, y, viewport);
-  if (gap >= SNAP || gap <= 0) return null;
-  const p = pullOf(gap);
-  const u0 = along(edge, x, y);
-  const half = lerp(5, 10, p); // where it leaves the body
-  const waist = lerp(1.2, 8, p ** 1.6);
-  const flare = lerp(3, 18, p); // where it meets the edge
-  const body = gap + 8; // 8px into the body
-  const map = (u: number, v: number): [number, number] => {
-    switch (edge) {
-      case "bottom":
-        return [u, viewport.height - v];
-      case "top":
-        return [u, v];
-      case "right":
-        return [viewport.width - v, u];
-      case "left":
-        return [v, u];
-    }
+export function leanGap(gap: number): number {
+  if (gap >= REACH) return gap;
+  if (gap <= 0) return 0;
+  return gap * (gap / REACH) ** 0.6;
+}
+
+/** The corner on the side facing the edge, at the gap shown: round out of reach, nearly square at the edge. */
+export function nearRadius(shown: number): number {
+  const t = Math.min(1, Math.max(0, shown / REACH));
+  return lerp(2, BODY.height / 2, t * t * (3 - 2 * t));
+}
+
+/** A held body's centre, drawn toward `edge` from where the pointer put it. */
+export function leanCentre(edge: Edge, x: number, y: number, viewport: Viewport): { x: number; y: number } {
+  const free = freeCentre(x, y, viewport);
+  const shown = leanGap(gapTo(edge, x, y, viewport));
+  switch (edge) {
+    case "left":
+      return { x: BODY.width / 2 + shown, y: free.y };
+    case "right":
+      return { x: viewport.width - BODY.width / 2 - shown, y: free.y };
+    case "top":
+      return { x: free.x, y: BODY.height / 2 + shown };
+    case "bottom":
+      return { x: free.x, y: viewport.height - BODY.height / 2 - shown };
+  }
+}
+
+/**
+ * The pill's outline in its own box (`BODY`, origin top left), facing `edge`: the far
+ * corners round, the near ones at `near`, and once docked, a concave `fillet` each side
+ * growing out of the edge, drawn past the box. Only one of `near` and `fillet` is ever
+ * above 0, so one arc per corner turns from convex into concave through a square corner.
+ * Free and far from every side, it is a stadium. Drawn as if on the bottom side, then mapped.
+ */
+export function pillPath(edge: Edge | null, near: number, fillet: number): string {
+  const facing = edge ?? "bottom";
+  const { length: l, depth: d } = sizeOn(facing);
+  const r = Math.min(BODY.height / 2, l / 2);
+  const concave = fillet > 0;
+  const k = concave ? fillet : Math.min(near, r);
+  const out = concave ? fillet : -k;
+  // Bottom drawing: y grows toward the edge, the near side at y = d.
+  const points: [string, number, number][] = [
+    ["M", -out, d],
+    ["N", 0, d - k],
+    ["L", 0, r],
+    ["F", r, 0],
+    ["L", l - r, 0],
+    ["F", l, r],
+    ["L", l, d - k],
+    ["N", l + out, d],
+  ];
+  const map: Record<Edge, { at(x: number, y: number): [number, number]; mirror: boolean }> = {
+    bottom: { at: (x, y) => [x, y], mirror: false },
+    top: { at: (x, y) => [x, d - y], mirror: true },
+    right: { at: (x, y) => [y, x], mirror: true },
+    left: { at: (x, y) => [d - y, x], mirror: false },
   };
-  const pt = (u: number, v: number) => map(u, v).map((n) => Math.round(n * 10) / 10).join(" ");
-  // From the body down one side to the edge, along the edge, and back up the other side.
-  const side = (sign: 1 | -1, down: boolean) => {
-    const at = (offset: number) => u0 + sign * offset;
-    return down
-      ? `L${pt(at(half), gap)}C${pt(at(half), gap * 0.7)} ${pt(at(waist), gap * 0.75)} ${pt(at(waist), gap * 0.5)}C${pt(at(waist), gap * 0.2)} ${pt(at(waist + (flare - waist) * 0.35), 0)} ${pt(at(flare), 0)}`
-      : `C${pt(at(waist + (flare - waist) * 0.35), 0)} ${pt(at(waist), gap * 0.2)} ${pt(at(waist), gap * 0.5)}C${pt(at(waist), gap * 0.75)} ${pt(at(half), gap * 0.7)} ${pt(at(half), gap)}L${pt(at(half), body)}`;
-  };
-  return `M${pt(u0 - half, body)}${side(-1, true)}L${pt(u0 + flare, 0)}${side(1, false)}Z`;
+  const { at, mirror } = map[facing];
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return `${points
+    .map(([command, x, y]) => {
+      const [px, py] = at(x, y).map(round) as [number, number];
+      if (command === "M" || command === "L") return `${command}${px} ${py}`;
+      // F: a far corner, convex. N: a near corner, convex until it is a fillet, then concave.
+      const radius = command === "F" ? r : round(k);
+      const convex = command === "F" || !concave;
+      return `A${radius} ${radius} 0 0 ${Number(convex) ^ Number(mirror)} ${px} ${py}`;
+    })
+    .join("")}Z`;
 }
 
 /** Glued to `edge` with the body's centre at `along` px on it, kept clear of the corners. */
@@ -154,8 +182,8 @@ export function glue(edge: Edge, along: number, viewport: Viewport): Place {
   return { edge, at: side === 0 ? 0.5 : clamp(along, min, max) / side };
 }
 
-/** The pill's body as a box in the viewport: where a closing panel lands and an opening one starts. */
-export function bodyRect(place: Place, viewport: Viewport): { left: number; top: number; width: number; height: number } {
+/** The pill's body as a box in the viewport. */
+export function bodyRect(place: Place, viewport: Viewport): Rect {
   const centre = centreOf(place, viewport);
   return { left: centre.x - BODY.width / 2, top: centre.y - BODY.height / 2, width: BODY.width, height: BODY.height };
 }
@@ -176,72 +204,6 @@ export function centreOf(place: Place, viewport: Viewport): { x: number; y: numb
     case "right":
       return { x: viewport.width - depth / 2, y: along };
   }
-}
-
-/** A free body: a stadium, as wide as it is long, its ends fully round. */
-function stadium(): string {
-  const { width: w, height: h } = BODY;
-  const r = h / 2;
-  return `M${r} 0H${w - r}A${r} ${r} 0 0 1 ${w - r} ${h}H${r}A${r} ${r} 0 0 1 ${r} 0Z`;
-}
-
-/**
- * A glued body, drawn as if on the bottom side and then mapped onto its own: the far
- * end round, the near side flush, and a concave fillet each side flaring into the edge.
- */
-function tab(edge: Edge): { path: string; width: number; height: number } {
-  const { length: l, depth: d } = sizeOn(edge);
-  const f = FILLET;
-  // The free pill's own corner, so gluing changes only the side that meets the edge.
-  const r = Math.min(BODY.height / 2, l / 2, d - f);
-  // On the bottom side, the box is l + 2f wide and d tall; y grows away from the far end.
-  const points: [string, number, number][] = [
-    ["M", 0, d],
-    ["A0", f, d - f],
-    ["L", f, r],
-    ["A1", f + r, 0],
-    ["L", f + l - r, 0],
-    ["A1", f + l, r],
-    ["L", f + l, d - f],
-    ["A0", l + 2 * f, d],
-  ];
-  // Each side's map from the bottom drawing, and whether it mirrors (which flips an arc's sweep).
-  const map: Record<Edge, { at(x: number, y: number): [number, number]; mirror: boolean }> = {
-    bottom: { at: (x, y) => [x, y], mirror: false },
-    top: { at: (x, y) => [x, d - y], mirror: true },
-    right: { at: (x, y) => [y, x], mirror: true },
-    left: { at: (x, y) => [d - y, x], mirror: false },
-  };
-  const { at, mirror } = map[edge];
-  const path = points
-    .map(([command, x, y]) => {
-      const [px, py] = at(x, y);
-      if (command === "M" || command === "L") return `${command}${px} ${py}`;
-      const radius = command === "A0" ? f : r;
-      const sweep = Number(command === "A1") ^ Number(mirror);
-      return `A${radius} ${radius} 0 0 ${sweep} ${px} ${py}`;
-    })
-    .join("");
-  return horizontal(edge) ? { path: `${path}Z`, width: l + 2 * f, height: d } : { path: `${path}Z`, width: d, height: l + 2 * f };
-}
-
-/** The pill laid out for a viewport: where its box goes, where the body's centre is in it, and its outline. */
-export function layout(place: Place, viewport: Viewport): Box {
-  const centre = centreOf(place, viewport);
-  if (place.edge === null) {
-    const { width, height } = BODY;
-    return { left: centre.x - width / 2, top: centre.y - height / 2, width, height, edge: null, body: { x: width / 2, y: height / 2 }, path: stadium() };
-  }
-  const { path, width, height } = tab(place.edge);
-  const left = place.edge === "right" ? viewport.width - width : place.edge === "left" ? 0 : centre.x - width / 2;
-  const top = place.edge === "bottom" ? viewport.height - height : place.edge === "top" ? 0 : centre.y - height / 2;
-  return { left, top, width, height, edge: place.edge, body: { x: centre.x - left, y: centre.y - top }, path };
-}
-
-/** A free pill's box while it is being dragged, its centre following the pointer. */
-export function dragging(x: number, y: number, viewport: Viewport): Box {
-  const free = freeCentre(x, y, viewport);
-  return layout({ edge: null, x: free.x / viewport.width, y: free.y / viewport.height }, viewport);
 }
 
 /** Where the pill was left is kept in this browser, as the theme is. */
