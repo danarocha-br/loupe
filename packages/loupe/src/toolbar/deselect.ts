@@ -15,7 +15,7 @@ const APP_OVERLAYS = '[role="dialog"], [role="alertdialog"], [role="menu"], [rol
 const TEXT_FIELDS = 'textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]';
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image"]);
 
-function inTextField(target: EventTarget | undefined): boolean {
+export function inTextField(target: EventTarget | undefined): boolean {
   if (!(target instanceof Element)) return false;
   if (target.closest(TEXT_FIELDS)) return true;
   return target instanceof HTMLInputElement && !NOT_TEXT.has(target.type);
