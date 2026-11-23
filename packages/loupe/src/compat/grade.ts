@@ -158,26 +158,34 @@ function gradeRouter(app: Pkg): Item {
 
 function gradeBundler(app: Pkg): Item {
   const dev = devCommand(app.json.scripts);
-  if (dev?.webpack) {
-    return {
-      key: "bundler",
-      grade: "untested",
-      label: "Dev server uses webpack (`next dev --webpack`)",
-      seen: "webpack",
-      detail:
-        "`withLoupe` registers the dev loader as a webpack rule too, and it works on this repo's test app, but it has not been proven on another repo. If no component shows up, try Turbopack.",
-    };
-  }
+  const webpack = Boolean(dev?.webpack);
   const babel = babelConfig(app.abs);
   const compiler = usesReactCompiler(app.abs);
-  if (babel || compiler) {
-    const parts = [babel ? `Babel config (${app.dir}/${babel})` : "", compiler ? "React Compiler" : ""];
+  if (webpack || babel || compiler) {
+    // One row, so adding a Babel config or the React Compiler to an app whose webpack
+    // setup was accepted changes `seen` and asks again.
+    const parts = [
+      webpack ? "Dev server uses webpack (`next dev --webpack`)" : "",
+      babel ? `Babel config (${app.dir}/${babel})` : "",
+      compiler ? "React Compiler" : "",
+    ];
+    const details = [
+      webpack
+        ? "`withLoupe` registers the dev loader as a webpack rule too, and it works on this repo's test app, but it has not been proven on another repo. If no component shows up, try Turbopack."
+        : "",
+      babel || compiler
+        ? "Loupe's dev loader hasn't been tested alongside " +
+          (webpack ? "the " : "") +
+          [babel ? "the Babel config" : "", compiler ? "the React Compiler" : ""].filter(Boolean).join(" or ") +
+          ", so if components don't show up, try without it."
+        : "",
+    ];
     return {
       key: "bundler",
       grade: "untested",
       label: parts.filter(Boolean).join(" and "),
-      seen: [babel, compiler ? "reactCompiler" : ""].filter(Boolean).join("+"),
-      detail: "Loupe's dev loader hasn't been tested alongside it, so if components don't show up, try without it.",
+      seen: [webpack ? "webpack" : "", babel, compiler ? "reactCompiler" : ""].filter(Boolean).join("+"),
+      detail: details.filter(Boolean).join(" "),
     };
   }
   if (!dev) {

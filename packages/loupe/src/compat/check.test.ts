@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { run } from "../cli.js";
@@ -173,6 +173,31 @@ describe("loupe check with untested items", () => {
     await check(root, ["yes"], [], node24);
     const later = await check(root, ["yes"], [], "24.2.0");
     expect(later.questions).toHaveLength(1);
+  });
+
+  it("asks again when a Babel config or the React Compiler joins an accepted webpack setup", async () => {
+    const webpack = {
+      "apps/web/package.json": {
+        name: "web",
+        scripts: { dev: "next dev --webpack" },
+        dependencies: { next: "16.3.6", "@repo/design-system": "workspace:*" },
+      },
+    };
+    const root = makeRepo(webpack);
+    const first = await check(root, ["yes"]);
+    expect(first.questions).toHaveLength(1);
+    expect(first.text).toMatch(/! Dev server uses webpack \(`next dev --webpack`\) +not tested yet/);
+    expect((await check(root)).questions).toEqual([]);
+
+    writeFileSync(join(root, "apps/web/.babelrc"), "{}\n");
+    const withBabel = await check(root, ["yes"]);
+    expect(withBabel.questions).toHaveLength(1);
+    expect(withBabel.text).toMatch(/! Dev server uses webpack \(`next dev --webpack`\) and Babel config \(apps\/web\/\.babelrc\) +not tested yet/);
+
+    writeFileSync(join(root, "apps/web/next.config.ts"), "export default { reactCompiler: true };\n");
+    const withCompiler = await check(root, ["yes"]);
+    expect(withCompiler.questions).toHaveLength(1);
+    expect(withCompiler.text).toContain("and React Compiler");
   });
 
   it("writes nothing on a no", async () => {

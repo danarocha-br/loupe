@@ -72,8 +72,12 @@ export function withLoupe<C extends Config>(
     }
     if (notice) console.error(`[loupe] ${notice}`);
 
+    // Next sets TURBOPACK for a Turbopack run and leaves it unset under `--webpack`. Only
+    // a Turbopack run reads `turbopack.rules`, so only there can a host's own `*.tsx`
+    // rule conflict with ours; a webpack run leaves the host's Turbopack rules as they are.
+    const turbopack = Boolean(process.env.TURBOPACK);
     const rules = base.turbopack?.rules ?? {};
-    if (LOADER_RULE in rules) {
+    if (turbopack && LOADER_RULE in rules) {
       throw new Error(
         `withLoupe: turbopack.rules already has a "${LOADER_RULE}" rule, and Loupe will not merge into it.`,
       );
@@ -86,12 +90,16 @@ export function withLoupe<C extends Config>(
         ...base.turbopack,
         rules: {
           ...rules,
-          [LOADER_RULE]: {
-            // Design-system packages linked from the workspace are not foreign,
-            // so their own call sites are anchored too.
-            condition: { all: ["development", { not: "foreign" }] },
-            loaders: [loader],
-          },
+          ...(LOADER_RULE in rules
+            ? {}
+            : {
+                [LOADER_RULE]: {
+                  // Design-system packages linked from the workspace are not foreign,
+                  // so their own call sites are anchored too.
+                  condition: { all: ["development", { not: "foreign" }] },
+                  loaders: [loader],
+                },
+              }),
         },
       },
       webpack(webpackConfig: any, context: any) {
@@ -105,6 +113,8 @@ export function withLoupe<C extends Config>(
           // "pre" so the loader reads the source before Next's own transforms, as
           // Turbopack runs it. Webpack resolves workspace symlinks to real paths,
           // so a linked design system is outside node_modules and is anchored too.
+          // (A host hook that sets `resolve.symlinks: false` keeps the linked path, which
+          // is inside node_modules, and that package's own call sites go unanchored.)
           enforce: "pre",
           exclude: /[\\/]node_modules[\\/]/,
           use: [loader],

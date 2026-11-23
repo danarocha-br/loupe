@@ -18,6 +18,7 @@ const config = { agentRules: false, turbopack: { rules: { "*.svg": { loaders: ["
 
 afterEach(() => {
   delete process.env.LOUPE;
+  delete process.env.TURBOPACK;
 });
 
 describe("withLoupe", () => {
@@ -108,11 +109,20 @@ describe("withLoupe", () => {
     expect(await withLoupe(config, options)(PHASE_DEVELOPMENT_SERVER)).toBe(config);
   });
 
-  it("refuses to merge into an existing *.tsx rule", async () => {
+  it("refuses to merge into an existing *.tsx rule under Turbopack", async () => {
+    process.env.TURBOPACK = "auto";
     const taken = { turbopack: { rules: { "*.tsx": { loaders: ["other"] } } } };
     await expect(withLoupe(taken, options)(PHASE_DEVELOPMENT_SERVER)).rejects.toThrow(
       /already has a "\*\.tsx" rule/,
     );
+  });
+
+  it("leaves a host's *.tsx Turbopack rule alone under webpack, where nothing reads it", async () => {
+    // Next leaves TURBOPACK unset for `next dev --webpack`.
+    const taken = { turbopack: { rules: { "*.tsx": { loaders: ["other"] } } } };
+    const result = await withLoupe(taken, options)(PHASE_DEVELOPMENT_SERVER);
+    expect(result.turbopack.rules).toEqual({ "*.tsx": { loaders: ["other"] } });
+    expect(result).toHaveProperty("webpack");
   });
 
   it("fails at startup on a broken adapt-list.json", async () => {
