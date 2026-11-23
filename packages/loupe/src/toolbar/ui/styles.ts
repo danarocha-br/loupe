@@ -2,6 +2,7 @@
 // A module of its own so the collapsed pill, which adopts the stylesheet, loads the
 // strings and never a primitive's component or UI SDK (the panel's chunk has those).
 
+import ANNOUNCER_CSS from "./announcer/announcer.css?inline";
 import BUTTON_CSS from "./button/button.css?inline";
 import CHIP_GROUP_CSS from "./chip-group/chip-group.css?inline";
 import DELTA_CSS from "./delta/delta.css?inline";
@@ -15,4 +16,4 @@ import TAG_CSS from "./tag/tag.css?inline";
 import TOGGLE_CSS from "./toggle/toggle.css?inline";
 
 /** Every primitive's CSS, in order. */
-export const PRIMITIVES_CSS: string = [BUTTON_CSS, TOGGLE_CSS, CHIP_GROUP_CSS, FOLD_CSS, SWITCH_CSS, FIELD_CSS, POPOVER_CSS, TAG_CSS, DOT_CSS, DELTA_CSS, KBD_CSS].join("\n");
+export const PRIMITIVES_CSS: string = [ANNOUNCER_CSS, BUTTON_CSS, TOGGLE_CSS, CHIP_GROUP_CSS, FOLD_CSS, SWITCH_CSS, FIELD_CSS, POPOVER_CSS, TAG_CSS, DOT_CSS, DELTA_CSS, KBD_CSS].join("\n");

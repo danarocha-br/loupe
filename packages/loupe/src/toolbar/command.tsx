@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { CopyIcon } from "./icons.js";
-import { Button } from "./ui/index.js";
+import { Button, useAnnounce } from "./ui/index.js";
 
 /** Said under the command when the clipboard refuses it: what failed, and what to do instead. */
 export const COPY_REFUSED = "Couldn’t reach the clipboard. Select the command and copy it.";
@@ -11,6 +11,7 @@ export const COPY_REFUSED = "Couldn’t reach the clipboard. Select the command 
 /** The command in mono, after a `$`, with a Copy button that says whether it worked. */
 export function Command({ text, copy = text, prompt = true }: { text: string; copy?: string; prompt?: boolean }) {
   const [copied, setCopied] = useState<boolean | null>(null);
+  const announce = useAnnounce();
   // "Copied" steps back after a moment; a refusal stays until the next try, since it says what to do.
   useEffect(() => {
     if (copied !== true) return;
@@ -32,7 +33,11 @@ export function Command({ text, copy = text, prompt = true }: { text: string; co
               .then(() => navigator.clipboard.writeText(copy))
               .then(
                 () => setCopied(true),
-                () => setCopied(false),
+                () => {
+                  setCopied(false);
+                  // Each refusal, a second one too: what to do instead.
+                  announce(COPY_REFUSED, { politeness: "assertive" });
+                },
               )
           }
         >
@@ -40,10 +45,8 @@ export function Command({ text, copy = text, prompt = true }: { text: string; co
           {copied === null ? "Copy" : copied ? "Copied" : "Copy failed"}
         </Button>
       </div>
-      {/* Always there and empty until a refusal, so a screen reader hears the sentence when it lands. */}
-      <p className="muted command-refused" role="status">
-        {copied === false ? COPY_REFUSED : ""}
-      </p>
+      {/* For the eye: the announcer says it as it lands. */}
+      <p className="muted command-refused">{copied === false ? COPY_REFUSED : ""}</p>
     </div>
   );
 }

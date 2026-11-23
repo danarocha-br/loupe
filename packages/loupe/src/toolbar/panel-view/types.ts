@@ -304,7 +304,8 @@ export type PropItem = {
   /** "Current:" with the app's own value, under a row an Override holds. */
   current: ValueText | null;
   /** A State prop the app tried to change while an Override holds it: the notice's sentence around the two values. */
-  held: { before: string; value: string; middle: string; tried: string; after: string } | null;
+  /** `text`: the whole sentence, for the announcer; the rest draws it with its values in `code`. */
+  held: { before: string; value: string; middle: string; tried: string; after: string; text: string } | null;
   /** `inNotice`: Reset sits in the held notice, not on the row's line. */
   reset: { label: string; write: Write; inNotice: boolean } | null;
   /** The members a narrower scope keeps at their own value; `select` is the one the note selects. */

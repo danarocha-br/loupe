@@ -23,6 +23,7 @@ import type { SelectMode } from "./picker.js";
 import { useFocusShortcut } from "./shortcut.js";
 import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
 import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
+import { Announcer } from "./ui/announcer/announcer.js";
 
 export type { Theme } from "./surface/index.js";
 
@@ -42,7 +43,13 @@ function ToolbarSurface() {
   useEffect(startToolbar, []);
   const root = useToolbarSurface();
   if (!root) return null;
-  return createPortal(<ToolbarBody host={root.host as HTMLElement} />, root);
+  // The announcer's regions are there from the pill on, before the panel has anything to say.
+  return createPortal(
+    <Announcer>
+      <ToolbarBody host={root.host as HTMLElement} />
+    </Announcer>,
+    root,
+  );
 }
 
 /** Open or closed, as it was left in this browser: closed on a first visit. */

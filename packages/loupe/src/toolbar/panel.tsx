@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Tag, type TagLook, Toggle } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Tag, type TagLook, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -64,7 +64,7 @@ import {
 import { appLang } from "./app-lang.js";
 import { hueOf, PageMap } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
-import { keepUndoWhile, offerUndo, recordsKey, takeUndo, useUndoOffer } from "./undo.js";
+import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndoOffer } from "./undo.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -148,10 +148,8 @@ export function Panel(props: PanelProps) {
   );
   // The notices' cards come and go with the view; what they say is announced from here.
   const layerSaid = layerAnnouncement(props.layer);
-  const announced = {
-    alert: layerSaid.alert,
-    status: [layerSaid.status, view.banner ? `${view.banner.title}. ${view.banner.body}` : ""].filter(Boolean).join(" "),
-  };
+  useAnnounceChange(layerSaid.alert, { politeness: "assertive" });
+  useAnnounceChange([layerSaid.status, view.banner ? `${view.banner.title}. ${view.banner.body}` : ""].filter(Boolean).join(" "));
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
   // Read while rendering, before React swaps the view: once the row that had focus is
@@ -167,18 +165,17 @@ export function Panel(props: PanelProps) {
     if (middle.current) middle.current.scrollTop = 0;
     if (focusWasHere.current) heading.current?.focus();
   }, [opened, body.kind]);
-  const status = props.picking ? (
-      <>
-        {props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected"} ·{" "}
-        <Kbd>Esc</Kbd> cancels
-      </>
-    ) : covered ? (
-      <>
-        A dialog on the page runs under the panel · hold <Kbd>Alt</Kbd> to see through
-      </>
-    ) : props.marksHidden ? (
-      <>Outlines are hidden on the page</>
-    ) : null;
+  // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer
+  // as they change. A key is a `{ key }` part.
+  const strip: StripPart[] | null = props.picking
+    ? [props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected", " · ", { key: "Esc" }, " cancels"]
+    : covered
+      ? ["A dialog on the page runs under the panel · hold ", { key: "Alt" }, " to see through"]
+      : props.marksHidden
+        ? ["Outlines are hidden on the page"]
+        : null;
+  useAnnounceChange(strip ? strip.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
+  const status = strip?.map((part, index) => (typeof part === "string" ? part : <Kbd key={index}>{part.key}</Kbd>));
   return (
     <section
       className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
@@ -236,16 +233,7 @@ export function Panel(props: PanelProps) {
           </Button>
         </div>
       </header>
-      {/* Each region is always there and only its text changes, so a screen reader hears it. */}
-      <div className="status-region" role="status">
-        {status && <div className="status-line">{status}</div>}
-      </div>
-      <p className="sr-only" role="status" data-testid="announce-status">
-        {announced.status}
-      </p>
-      <p className="sr-only" role="alert" data-testid="announce-alert">
-        {announced.alert}
-      </p>
+      <div className="status-region">{status && <div className="status-line">{status}</div>}</div>
       <div className="middle" ref={middle}>
         {body.kind === "list" ? (
           <ComponentList {...props} body={body} notices={notices} heading={heading} />
@@ -678,6 +666,39 @@ function BackButton({ onSelect }: Pick<Actions, "onSelect">) {
 function focusHeading(from: HTMLElement) {
   const root = from.getRootNode();
   if (root instanceof ShadowRoot) root.querySelector<HTMLElement>("h2.name")?.focus();
+}
+
+/** A piece of the status strip: its words, or a key drawn in `kbd`. */
+type StripPart = string | { key: string };
+
+/**
+ * How long after an undo offer is made the count's next change still counts as the
+ * offer's own: the count reaches the view a commit or two after the offer.
+ */
+const OFFER_COUNT_MS = 500;
+
+/**
+ * The footer's announcements: each undo offer as it is made, and the count as it
+ * changes, except the one change that comes with an offer (Reset all says "Reset 2
+ * Overrides", not "0 changes" too). A change made while an offer is still up is said,
+ * and so is the count Undo puts back.
+ */
+function useFooterAnnouncements(offer: UndoOffer | null, count: string): void {
+  const announce = useAnnounce();
+  const last = useRef({ offer, count, offerCountUntil: 0 });
+  useEffect(() => {
+    const seen = last.current;
+    if (offer !== seen.offer) {
+      seen.offer = offer;
+      if (offer) announce(offer.text);
+      seen.offerCountUntil = offer ? performance.now() + OFFER_COUNT_MS : 0;
+    }
+    if (count !== seen.count) {
+      seen.count = count;
+      if (performance.now() < seen.offerCountUntil) seen.offerCountUntil = 0;
+      else announce(count);
+    }
+  });
 }
 
 /** "Reset 2 Overrides": what the footer's undo offer says a reset dropped. */
@@ -1196,6 +1217,7 @@ function Footer({
   onTheme,
 }: Pick<Actions, "debug"> & Pick<PanelProps, "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
+  useFooterAnnouncements(offer, footer.countText);
   // The offer stays until the Overrides move on from what the drop left (undo.ts).
   useEffect(() => {
     if (offer !== null) keepUndoWhile(recordsKey(debug));
@@ -1225,7 +1247,7 @@ function Footer({
   return (
     <footer ref={frame} className="footer">
       <div className="tally">
-        <span className="count" aria-live="polite">
+        <span className="count">
           <span className="sr-only">{footer.countText}</span>
           <span className="n" aria-hidden="true">
             {footer.changes.count}
@@ -1256,7 +1278,7 @@ function Footer({
           <ResetIcon />
           Reset all
         </Button>
-        <span className="undo" role="status">
+        <span className="undo">
           {offer && (
             <>
               <span className="what">{offer.text}</span>

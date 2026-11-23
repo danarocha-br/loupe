@@ -1,0 +1,6 @@
+/*
+ * Announcer (ADR 0003, ADR 0008): its two live regions, there for a screen reader and
+ * never for the eye. Hidden by size and clipping, not `display` or `visibility`, which
+ * would take them out of the accessibility tree. In the `primitives` layer.
+ */
+[data-announcer] { position: fixed; inset-block-start: 0; inset-inline-start: 0; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; pointer-events: none; }

@@ -13,11 +13,12 @@ afterEach(cleanup);
 describe("Kbd", () => {
   it("is a native kbd, read in its sentence", () => {
     const screen = renderInSurface(
-      <p role="status">
+      <p>
         Click an Instance on the page · <Kbd>Esc</Kbd> cancels
       </p>,
     );
-    expect(screen.getByRole("status").textContent).toBe("Click an Instance on the page · Esc cancels");
+    // The sentence reads whole, the key in it: what the status strip draws and the announcer says.
+    expect(screen.getByText(/^Click an Instance/).textContent).toBe("Click an Instance on the page · Esc cancels");
     const key = screen.getByText("Esc");
     expect([key.tagName, key.hasAttribute("data-kbd"), key.getAttribute("role")]).toEqual(["KBD", true, null]);
   });

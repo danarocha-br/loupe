@@ -290,14 +290,30 @@ describe("open or closed, kept in this browser", () => {
 
   it("opens a panel left open on a fresh page load, the page making room while its module loads", async () => {
     localStorage.setItem(OPEN_KEY, "open");
-    act(() => root.render(<Harness />));
-    // Before the module has loaded: the column is already the panel's.
-    await act(async () => {});
-    expect(loaded()).toBe(false);
-    expect(document.documentElement.style.marginRight).not.toBe("");
-    await until(() => panel() !== null);
-    expect(pill()).toBeNull();
-    expect(trackersStarted()).toBe(true);
+    // The panel's module is held until the test lets it go, so "before it has loaded" is
+    // true by construction: a bare tick races the import, which CI's runner won (2026-11-23).
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    vi.doMock("./open.js", async () => {
+      await gate;
+      return await vi.importActual("./open.js");
+    });
+    try {
+      act(() => root.render(<Harness />));
+      // Before the module has loaded: the column is already the panel's.
+      await act(async () => {});
+      await settle();
+      expect(loaded()).toBe(false);
+      expect(document.documentElement.style.marginRight).not.toBe("");
+      expect(panel()).toBeNull();
+      release();
+      await until(() => panel() !== null);
+      expect(pill()).toBeNull();
+      expect(trackersStarted()).toBe(true);
+    } finally {
+      release();
+      vi.doUnmock("./open.js");
+    }
   });
 
   it("starts closed when storage can't be read", async () => {

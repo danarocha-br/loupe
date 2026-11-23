@@ -10,7 +10,7 @@ import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
 import { ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
-import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, useAnnounceChange } from "./ui/index.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [
@@ -20,6 +20,9 @@ const ON_OFF: FlagOption[] = [
 
 export function FlagsCard() {
   const current = useSyncExternalStore(onFlagsChange, flagsView);
+  // A refused write, said as it lands, each time: the card shows it below.
+  const error = current.status === "ready" ? (current.error ?? "") : "";
+  useAnnounceChange(error, { politeness: "assertive", key: error === "" ? null : current });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     // Once per page load, not on every return from the inspector.
@@ -66,10 +69,6 @@ export function FlagsCard() {
         <h3>Feature flags</h3>
         {meta && <span className="meta">{meta}</span>}
       </div>
-      {/* Always there, so an error is announced when its text lands; the card shows it below. */}
-      <p className="sr-only" role="alert">
-        {current.status === "ready" ? (current.error ?? "") : ""}
-      </p>
       {current.status === "loading" && <div className="muted">Reading the app’s flags…</div>}
       {current.status === "unavailable" && (
         // One line until it's opened: the fix is an engineer's, and the list comes first.

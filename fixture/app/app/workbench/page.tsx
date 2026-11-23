@@ -13,7 +13,7 @@ export default function WorkbenchPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-medium">Loupe workbench</h1>
         <p className="text-sm text-muted-foreground">
-          ChipGroup, Button and Toggle, Switch, Fold, Field, Popover, and the marks: Tag, Dot, Delta and Kbd. Every key is the primitive’s own; Escape stays the app’s.
+          ChipGroup, Button and Toggle, Switch, Fold, Field, Popover, the marks (Tag, Dot, Delta and Kbd) and the Announcer. Every key is the primitive’s own; Escape stays the app’s.
         </p>
       </header>
       <WorkbenchMount />

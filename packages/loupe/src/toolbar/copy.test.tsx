@@ -13,6 +13,7 @@ import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { BLOCKED } from "./copy.js";
 import { TITLE_MISSING } from "./copy-flow.js";
+import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import { loadPanel } from "./start.js";
 
@@ -75,8 +76,10 @@ const screen = () => within(shadow() as unknown as HTMLElement);
 /** The popover over the footer: the details to copy with, or why a copy failed. */
 const popover = () => screen().queryByRole("dialog");
 const toast = () => shadow().querySelector<HTMLElement>(".copy-toast");
-/** What a screen reader hears: the status region the flow keeps mounted. */
-const announced = () => shadow().querySelector("[data-testid=copy-status]")?.textContent ?? "";
+/** What a screen reader hears from the toolbar's announcer, since the toolbar mounted. */
+let heard: Heard;
+/** The copies the announcer said, apart from the count's changes. */
+const copied = () => heard.polite.filter((said) => said.startsWith("Copied"));
 const button = (text: string, scope: ParentNode = shadow()) =>
   [...scope.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent === text);
 /** A text box in the popover, by name: "Title", "Designer optional", "The Proposal". */
@@ -147,6 +150,7 @@ beforeEach(async () => {
   );
   await settle();
   await settle();
+  heard = listen(shadow());
 });
 
 afterEach(() => {
@@ -171,9 +175,24 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(copy().textContent).toBe("Copied");
     expect(shadow().querySelector(".split")?.getAttribute("data-state")).toBe("copied");
     expect(toast()?.textContent).toBe("Copied “Button variant in MemberRow”Paste it into your coding agent");
-    // The region was there, empty, before the copy: what lands in it is announced.
-    expect(announced()).toBe("Copied “Button variant in MemberRow”. Paste it into your coding agent.");
+    // The toast is for the eye: the announcer says it, once.
+    // The footer's count may have been said before it ("1 change"): the copy is said once.
+    await until(() => copied().length > 0);
+    expect(copied()).toEqual(["Copied “Button variant in MemberRow”. Paste it into your coding agent."]);
+    expect(heard.assertive).toEqual([]);
     expect(popover()).toBeNull();
+  });
+
+  it("announces each copy once, two of the same title in a row included", async () => {
+    await change();
+    act(() => copy().click());
+    await until(() => copies.length === 1 && copied().length === 1);
+    act(() => copy().click());
+    await until(() => copies.length === 2 && copied().length === 2);
+    await settle();
+    await settle();
+    const said = "Copied “Button variant in MemberRow”. Paste it into your coding agent.";
+    expect(copied()).toEqual([said, said]);
   });
 
   it("opens the details from the chevron, prefilled and focused, and copies with them", async () => {
@@ -222,15 +241,47 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(title.getAttribute("aria-invalid")).toBe("true");
     expect(popover()?.querySelector(`#${title.getAttribute("aria-describedby")}`)?.textContent).toBe(TITLE_MISSING);
     expect(shadow().activeElement).toBe(title);
+    // Focus was in the field already (Enter there, as far as focus goes): nothing moved to read it, so it is said.
+    await until(() => heard.assertive.length === 1);
+    expect(heard.assertive).toEqual([TITLE_MISSING]);
     type(title, "Calmer rows");
     expect(title.hasAttribute("aria-invalid")).toBe(false);
     expect(within(popover() as HTMLElement).queryByText(TITLE_MISSING)).toBeNull();
     // Empty, it says the same in the page: the browser's own bubble would sit outside Loupe.
     type(title, "");
+    // Pressed from the button, focus moves to the field, whose description reads the error: not said twice.
+    act(() => submit?.focus());
     act(() => submit?.click());
     await settle();
+    await settle();
     expect(copies).toEqual([]);
+    expect(shadow().activeElement).toBe(title);
     expect(within(popover() as HTMLElement).getByText(TITLE_MISSING)).toBeDefined();
+    expect(heard.assertive).toEqual([TITLE_MISSING]);
+    expect(heard.polite).not.toContain(TITLE_MISSING);
+  });
+
+  it("moves focus to an empty title only once its error describes it, from the button the first time", async () => {
+    await change();
+    await openDetails();
+    const title = field("Title");
+    type(title, "");
+    const submit = button("Copy with these details") as HTMLButtonElement;
+    // What a screen reader reads as focus lands: the field's description at that moment.
+    let readOnFocus: string | null = null;
+    title.addEventListener("focus", () => {
+      const ids = title.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+      readOnFocus = ids.map((id) => shadow().getElementById(id)?.textContent ?? "").join(" ");
+    });
+    act(() => submit.focus());
+    act(() => submit.click());
+    await settle();
+    await settle();
+    expect(shadow().activeElement).toBe(title);
+    expect(title.getAttribute("aria-invalid")).toBe("true");
+    expect(readOnFocus).toBe(TITLE_MISSING);
+    // Focus moved and read it: the announcer says nothing more.
+    expect(heard.assertive).toEqual([]);
   });
 
   it("leaves a press on the split button to the split: the chevron's own, or another copy", async () => {
@@ -251,7 +302,9 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await change();
     act(() => copy().click());
     await until(() => popover() !== null);
-    expect(within(popover() as HTMLElement).queryByRole("alert")?.textContent).toBe("The project server didn’t answer.");
+    expect(within(popover() as HTMLElement).getByText("The project server didn’t answer.")).toBeDefined();
+    await until(() => heard.assertive.length > 0);
+    expect(heard.assertive).toEqual(["The project server didn’t answer."]);
     expect(field("The Proposal")).toBeNull();
     expect(button("Select all")).toBeUndefined();
     expect(button("Try again")).toBeDefined();
@@ -292,7 +345,10 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(popover()).toBe(screen().getByRole("dialog", { name: "Couldn’t copy automatically" }));
     expect(shadow().activeElement).toBe(button("Try again"));
     expect(within(popover() as HTMLElement).getByRole("heading").textContent).toBe("Couldn’t copy automatically");
-    expect(within(popover() as HTMLElement).queryByRole("alert")?.textContent).toBe("Write permission denied. Your Proposal is below.");
+    // Shown in the popover, and said once by the announcer: focus on Try again says nothing of why.
+    expect(within(popover() as HTMLElement).getByText("Write permission denied. Your Proposal is below.")).toBeDefined();
+    await until(() => heard.assertive.length > 0);
+    expect(heard.assertive).toEqual(["Write permission denied. Your Proposal is below."]);
     const text = field<HTMLTextAreaElement>("The Proposal");
     expect(text.readOnly).toBe(true);
     expect(text.value.startsWith("# Button variant in MemberRow\n")).toBe(true);
@@ -332,7 +388,9 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(popover()?.getAttribute("data-caret")).toBe("end");
     // The details closed and the refusal opened: focus is on its Try again, not back on the chevron.
     expect(shadow().activeElement).toBe(button("Try again"));
-    expect(within(popover() as HTMLElement).queryByRole("alert")?.textContent).toBe(`${BLOCKED} Your Proposal is below.`);
+    expect(within(popover() as HTMLElement).getByText(`${BLOCKED} Your Proposal is below.`)).toBeDefined();
+    await until(() => heard.assertive.length > 0);
+    expect(heard.assertive).toEqual([`${BLOCKED} Your Proposal is below.`]);
     // A failed copy from the details leaves the button as it was: the popover says what happened.
     expect(copy().textContent).toBe("Copy Proposal");
   });

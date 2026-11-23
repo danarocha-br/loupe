@@ -344,13 +344,15 @@ export function keepingText(keeping: number, inScope: number): string {
 
 /** The held notice around its two values: "Your Override holds this at true; the app tried to set false." */
 export function heldNotice(value: unknown, tried: unknown) {
-  return {
+  const parts = {
     before: "Your Override holds this at",
     value: formatCurrent(value),
     middle: "; the app tried to set",
     tried: formatCurrent(tried),
     after: ".",
   };
+  // As the row draws it: a space after `before` and after `middle`, none around the rest.
+  return { ...parts, text: `${parts.before} ${parts.value}${parts.middle} ${parts.tried}${parts.after}` };
 }
 
 // ── The Inspector's own words (the 2026-11-20 layout pass) ──────────────────────

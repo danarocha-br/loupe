@@ -13,6 +13,7 @@ import Toolbar from "./index.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import { loadPanel } from "./start.js";
 import { CSS, HOST_ATTRIBUTE } from "./styles.js";
+import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -81,9 +82,15 @@ afterEach(() => {
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
 const panelText = () => shadow().querySelector(".panel")?.textContent ?? "";
-// The missing-layer card. Its words reach a screen reader through the panel's alert region, which is always there.
+// The missing-layer card. Its words reach a screen reader through the toolbar's announcer.
 const missingNotice = () => shadow().querySelector("[data-testid=missing-notice]");
-const announced = (kind: "alert" | "status") => shadow().querySelector(`[data-testid=announce-${kind}]`)?.textContent ?? null;
+/** What the toolbar's announcer has said since it mounted. */
+let heard: Heard;
+/** Settles until the announcer has said something at `politeness`, and returns all it said there. */
+async function said(politeness: "polite" | "assertive"): Promise<string[]> {
+  for (let i = 0; i < 40 && heard[politeness].length === 0; i++) await settle();
+  return heard[politeness];
+}
 const summaryOf = (component: string) =>
   [...shadow().querySelectorAll("button[aria-expanded]")].find((row) => row.textContent?.startsWith(component))?.textContent ?? "";
 
@@ -97,6 +104,8 @@ async function mount() {
       </>,
     ),
   );
+  // The surface and its announcer are there once the first render is: listening before the layer's status lands.
+  heard = listen(shadow());
   await settle();
   await settle();
 }
@@ -135,8 +144,6 @@ describe("the Product layer's notices", () => {
     await mount();
     const notice = shadow().querySelector("[data-testid=stale-notice]") as HTMLElement;
     const copy = [...notice.querySelectorAll("button")].find((button) => button.textContent === "Copy") as HTMLButtonElement;
-    // The region is there before anything goes wrong, empty, so the sentence is announced when it lands.
-    expect(notice.querySelector("[role=status].command-refused")?.textContent).toBe("");
     // jsdom has no clipboard, as an insecure origin has none.
     await act(async () => {
       copy.click();
@@ -144,6 +151,8 @@ describe("the Product layer's notices", () => {
     });
     expect(copy.textContent).toBe("Copy failed");
     expect(notice.querySelector(".command-refused")?.textContent).toBe(COPY_REFUSED);
+    // Shown under the command, and said once by the announcer.
+    expect(await said("assertive")).toEqual([COPY_REFUSED]);
     // It stays: it says what to do instead, so it doesn't time out like "Copied".
     await act(async () => await new Promise((resolve) => setTimeout(resolve, 2100)));
     expect(notice.querySelector(".command-refused")?.textContent).toBe(COPY_REFUSED);
@@ -196,8 +205,10 @@ describe("a missing Product layer (PER-227)", () => {
     server.status = MISSING;
     await mount();
     const notice = missingNotice();
-    // The card comes and goes with the view; the panel's alert region, always there, says it.
-    expect(announced("alert")).toContain("Product layer missing");
+    // The card comes and goes with the view; the announcer says it, once.
+    const alerts = await said("assertive");
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toContain("Product layer missing");
     expect(notice?.textContent).toContain("Product layer missing");
     expect(notice?.textContent).toContain("adapt-list.json is gone");
     // The words are `missingLayerAdvice`'s, tested on its own; here, that the card carries them and shows the command.
