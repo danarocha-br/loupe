@@ -259,6 +259,8 @@ export const TYPE = {
   paragraph: { family: "sans", weight: 400, size: 13, lineHeight: 19 },
   /** Buttons, Widen, the count toggle. */
   control: { family: "sans", weight: 500, size: 12, lineHeight: 16 },
+  /** Copy Proposal and the primary button: Control stepped up to 13px and 600. */
+  action: { family: "sans", weight: 600, size: 13, lineHeight: 17 },
   /** Option chips. */
   option: { family: "sans", weight: 400, size: 12, lineHeight: 16 },
   /** Field labels, the "Inside" label. */

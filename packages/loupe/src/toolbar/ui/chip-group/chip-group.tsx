@@ -3,9 +3,10 @@
 // stop and the ARIA; each Chip's content is the caller's. See chip-group.md.
 
 import { Radio, RadioGroup } from "@ui-sdk/react/radio";
-import { createContext, type KeyboardEvent, type MouseEvent, type ReactNode, useContext } from "react";
+import { createContext, type MouseEvent, type ReactNode, useContext } from "react";
+import type { DataAttributes } from "../data-attributes.js";
+import { onEnter } from "../enter.js";
 
-type DataAttributes = { [name: `data-${string}`]: string | undefined };
 
 export type ChipGroupProps = {
   /** The group's accessible name. */
@@ -75,12 +76,6 @@ export function Chip({ value, children, tag, dot, count = null, description, tit
   const onClick = (_event: MouseEvent<HTMLButtonElement>) => {
     if (group.value === value) group.choose(value);
   };
-  // Enter chooses too (UI SDK's radio leaves it to a form); held down, it chooses once.
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== "Enter" || event.altKey || event.ctrlKey || event.metaKey) return;
-    event.preventDefault();
-    if (!event.repeat) group.choose(value);
-  };
   return (
     <Radio
       {...data}
@@ -91,7 +86,7 @@ export function Chip({ value, children, tag, dot, count = null, description, tit
       data-tagged={tag ? "" : undefined}
       data-dotted={dot ? "" : undefined}
       onClick={onClick}
-      onKeyDown={onKeyDown}
+      onKeyDown={onEnter(() => group.choose(value))}
     >
       <span data-part="label">{children}</span>
       {tag && (

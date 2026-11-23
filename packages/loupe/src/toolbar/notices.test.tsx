@@ -85,7 +85,7 @@ const panelText = () => shadow().querySelector(".panel")?.textContent ?? "";
 const missingNotice = () => shadow().querySelector("[data-testid=missing-notice]");
 const announced = (kind: "alert" | "status") => shadow().querySelector(`[data-testid=announce-${kind}]`)?.textContent ?? null;
 const summaryOf = (component: string) =>
-  [...shadow().querySelectorAll("summary")].find((summary) => summary.textContent?.startsWith(component))?.textContent ?? "";
+  [...shadow().querySelectorAll("button[aria-expanded]")].find((row) => row.textContent?.startsWith(component))?.textContent ?? "";
 
 async function mount() {
   act(() =>
@@ -283,7 +283,7 @@ describe("components that are new since the last generate", () => {
   it("says in the Inspector where to run the command (PER-233)", async () => {
     server.status = { ...FRESH, notGenerated: ["NewCard"] };
     await mountWithNew();
-    const row = [...shadow().querySelectorAll("summary")].find((summary) => summary.textContent?.startsWith("NewCard"));
+    const row = [...shadow().querySelectorAll("button[aria-expanded]")].find((trigger) => trigger.textContent?.startsWith("NewCard"));
     act(() => (row?.parentElement?.querySelector("button[data-instance]") as HTMLButtonElement).click());
     await settle();
     expect(shadow().querySelector("[data-testid=not-generated]")?.textContent).toBe(
@@ -299,7 +299,7 @@ describe("components that are new since the last generate", () => {
     server.status = { ...FRESH, command, notGenerated: ["NewCard"] };
     await mountWithNew();
     expect(shown("not-generated-notice")).toBe(command);
-    const row = [...shadow().querySelectorAll("summary")].find((summary) => summary.textContent?.startsWith("NewCard"));
+    const row = [...shadow().querySelectorAll("button[aria-expanded]")].find((trigger) => trigger.textContent?.startsWith("NewCard"));
     act(() => (row?.parentElement?.querySelector("button[data-instance]") as HTMLButtonElement).click());
     await settle();
     expect(shown("not-generated")).toBe(command);

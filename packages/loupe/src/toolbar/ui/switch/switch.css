@@ -1,0 +1,44 @@
+/*
+ * Switch (ADR 0003). Written against UI SDK's `[data-checked]` and `[data-disabled]` on
+ * the switch and its thumb, and the switch's own parts, `[data-switch]` and
+ * `[data-switch-thumb]`. Values from the tokens. In the stylesheet's `primitives` layer.
+ *
+ * A pill on a taupe edge; the thumb is the filled half it sits in, a round hole through
+ * it: taupe on the left off, teal on the right on. Each at 3:1 on the card.
+ */
+
+[data-switch] {
+  --switch-height: 22px;
+  position: relative; flex: none; display: block; width: 42px; height: var(--switch-height); padding: 0; overflow: hidden;
+  border: 0; border-radius: var(--radius-pill); background: var(--card); box-shadow: inset 0 0 0 1.5px var(--switch-off);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+[data-switch][data-disabled] { cursor: default; opacity: 0.45; }
+
+/* The half it's on, with its outer corners round; it slides across with them, its colour following. */
+[data-switch-thumb] {
+  position: absolute; inset: 0 auto 0 0; width: 50%;
+  border-radius: calc(var(--switch-height) / 2) 0 0 calc(var(--switch-height) / 2); background: var(--switch-off);
+  transition:
+    transform var(--duration-toast) var(--ease-thumb),
+    border-radius var(--duration-toast) var(--ease-thumb),
+    background-color var(--duration-fold) var(--ease-out);
+}
+[data-switch-thumb]::after { content: ""; position: absolute; inset: 0; width: 16px; height: 16px; margin: auto; border-radius: 50%; background: var(--card); }
+[data-switch-thumb][data-checked] {
+  transform: translateX(calc(100% + 6px));
+  border-radius: 0 calc(var(--switch-height) / 2) calc(var(--switch-height) / 2) 0; background: var(--switch-on);
+}
+
+/* Under reduced motion the thumb still moves to its place, without travelling there. */
+@media (prefers-reduced-motion: reduce) {
+  [data-switch-thumb] { transition: none; }
+}
+
+/* Forced colours drop backgrounds and box-shadows: the edge, the thumb and its hole in system colours, on in Highlight. */
+@media (forced-colors: active) {
+  [data-switch] { forced-color-adjust: none; background: Canvas; box-shadow: inset 0 0 0 1.5px ButtonText; }
+  [data-switch-thumb] { forced-color-adjust: none; background: ButtonText; }
+  [data-switch-thumb]::after { forced-color-adjust: none; background: Canvas; }
+  [data-switch-thumb][data-checked] { background: Highlight; }
+}

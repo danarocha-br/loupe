@@ -1,0 +1,15 @@
+/*
+ * Toggle (ADR 0003): Button's looks (button.css), and the pressed state on top, against
+ * UI SDK's `[data-pressed]` and the toggle's own `[data-unmarked]`. In the `primitives` layer.
+ */
+
+/* A soft pill pressed holds something: salmon, with its ring ("Holding open · Release"). */
+[data-toggle][data-look="soft"][data-pressed]:not([data-unmarked]) { background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); }
+
+/* A tool pressed is filled `sunk` with a `primary` icon (Hide marks). */
+[data-toggle][data-look="tool"][data-pressed]:not([data-unmarked]) { background: var(--sunk); color: var(--primary); }
+
+/* Forced colours drop the fills: pressed is the system's highlight. As specific as the looks' pressed rules, and later, so it wins. */
+@media (forced-colors: active) {
+  [data-toggle][data-look][data-pressed]:not([data-unmarked]) { forced-color-adjust: none; background: Highlight; color: HighlightText; border-color: Highlight; }
+}

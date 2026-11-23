@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Chip, ChipGroup } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -116,6 +116,9 @@ function hoverProps(onHover: Actions["onHover"], ids: string[]) {
   };
 }
 
+/** The header's select tools are chips of a radio group drawn as Button's round tool. */
+const TOOL_LOOK = lookAttributes({ look: "tool", iconOnly: true });
+
 /** The header's two select tools: what each is called, and the scope it opens a selection at. */
 const SELECT_TOOLS: { mode: SelectMode; scope: Scope; label: string; hint: string; title: string; icon: ReactNode }[] = [
   {
@@ -205,6 +208,7 @@ export function Panel(props: PanelProps) {
               <Chip
                 key={tool.mode}
                 value={tool.mode}
+                {...TOOL_LOOK}
                 className="tool"
                 data-scope={tool.scope}
                 data-armed={props.picking && props.mode === tool.mode ? "" : undefined}
@@ -216,12 +220,12 @@ export function Panel(props: PanelProps) {
             ))}
           </ChipGroup>
           <span className="divider" aria-hidden="true" />
-          <button
-            type="button"
-            className="tool"
+          <Toggle
+            look="tool"
+            iconOnly
             data-marks=""
-            aria-pressed={props.marksHidden}
-            onClick={props.onMarks}
+            pressed={props.marksHidden}
+            onPressedChange={() => props.onMarks()}
             title={
               props.marksHidden
                 ? "Show marks: outline the selection on the page again"
@@ -230,11 +234,11 @@ export function Panel(props: PanelProps) {
           >
             {props.marksHidden ? <MarksHiddenIcon /> : <MarksIcon />}
             <span className="sr-only">Hide marks</span>
-          </button>
-          <button type="button" className="tool" onClick={props.onHide} title="Hide the panel">
+          </Toggle>
+          <Button look="tool" iconOnly onClick={props.onHide} title="Hide the panel">
             <PanelIcon />
             <span className="sr-only">Hide panel</span>
-          </button>
+          </Button>
         </div>
       </header>
       {/* Each region is always there and only its text changes, so a screen reader hears it. */}
@@ -503,8 +507,8 @@ function GroupRow({
   const unmounted = group.instances.filter((item) => !item.mounted);
   return (
     <li className={`group ${hue}${lit ? " lit" : ""}${inspectOnly ? " inspect-only" : ""}`}>
-      <details>
-        <summary
+      <Fold>
+        <FoldTrigger
           onMouseOver={() => point(group)}
           onMouseLeave={() => point(null)}
           onFocus={() => point(group)}
@@ -540,8 +544,9 @@ function GroupRow({
               ),
             )}
           </span>
-          <ChevronIcon />
-        </summary>
+          <FoldChevron />
+        </FoldTrigger>
+        <FoldPanel>
         {group.sites.length > 0 && (
           <div className="sites">
             <div className="sites-head">{group.sitesText}</div>
@@ -568,7 +573,8 @@ function GroupRow({
             ))}
           </ul>
         )}
-      </details>
+        </FoldPanel>
+      </Fold>
     </li>
   );
 }
@@ -641,9 +647,8 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
           <li key={JSON.stringify(item.target)} className="held-item">
             <div className="target">
               <span>{item.label}</span>
-              <button
-                type="button"
-                className="btn small"
+              <Button
+                size="small"
                 onClick={(event) => {
                   const button = event.currentTarget;
                   dropUndoably(debug, item.target, (count) => `Discarded ${plural(count, "held Override")}`);
@@ -651,7 +656,7 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
                 }}
               >
                 Discard
-              </button>
+              </Button>
             </div>
             <div className="muted">{item.why}</div>
             <HeldValues values={item.values} />
@@ -664,10 +669,10 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
 
 function BackButton({ onSelect }: Pick<Actions, "onSelect">) {
   return (
-    <button type="button" className="back" onClick={() => onSelect(null)} title="Back to every component on this page (Esc)">
+    <Button iconOnly className="back" onClick={() => onSelect(null)} title="Back to every component on this page (Esc)">
       <BackIcon />
       <span className="sr-only">All components</span>
-    </button>
+    </Button>
   );
 }
 
@@ -703,9 +708,8 @@ function dropUndoably(debug: LoupeDebug, target: ScopeTarget, text: (count: numb
 /** `discard` also drops the record of an Instance that isn't mounted, where `reset(id)` throws (PER-128). */
 function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; enabled: boolean }) {
   return (
-    <button
-      type="button"
-      className="btn small"
+    <Button
+      size="small"
       disabled={!enabled}
       onClick={(event) => {
         const button = event.currentTarget;
@@ -714,7 +718,7 @@ function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; 
       }}
     >
       Reset this Instance
-    </button>
+    </Button>
   );
 }
 
@@ -849,21 +853,20 @@ function Inspector({
           {(holdButton || resetInstance) && (
             <div className="actions">
               {holdButton && (
-                <button
-                  type="button"
-                  className={holdButton.held ? "btn small holding" : "btn small"}
-                  aria-pressed={holdButton.held}
+                <Toggle
+                  size="small"
+                  pressed={holdButton.held}
                   data-hold={holdButton.prop}
-                  onClick={() =>
+                  onPressedChange={(hold) =>
                     attempt(() =>
-                      holdButton.held
-                        ? debug.reset(holdButton.write.id, holdButton.write.prop, "instance")
-                        : debug.set(holdButton.write.id, holdButton.write.prop, true, "instance"),
+                      hold
+                        ? debug.set(holdButton.write.id, holdButton.write.prop, true, "instance")
+                        : debug.reset(holdButton.write.id, holdButton.write.prop, "instance"),
                     )
                   }
                 >
                   {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
-                </button>
+                </Toggle>
               )}
               {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
             </div>
@@ -949,8 +952,8 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
   const rows = shared ? items.map((item) => ({ ...item, reason: null })) : items;
   return (
     <div className="inspect">
-      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary>
+      <Fold open={open} onOpenChange={setOpen}>
+        <FoldTrigger>
           <span className="glyph" aria-hidden="true">
             {PROP_ICONS.inspect}
           </span>
@@ -959,8 +962,9 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
             {!open && items.length > 0 && <span className="muted"> · {items.map((item) => item.name).join(", ")}</span>}
           </span>
           {body.inspectOnlyMeta ? <span className="meta">{body.inspectOnlyMeta}</span> : <span />}
-          <ChevronIcon />
-        </summary>
+          <FoldChevron />
+        </FoldTrigger>
+        <FoldPanel>
         {shared?.reason && (
           <p className="why">
             <span className="tag reason" title={shared.reasonTitle ?? undefined}>
@@ -971,11 +975,12 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
         )}
         <div className="inspect-rows">{rows.length === 0 ? <div className="muted">{TEXT.none}</div> : rows.map(row)}</div>
         {body.injected && (
-          <details className="injected">
-            <summary>
-              <ChevronIcon />
+          <Fold className="injected">
+            <FoldTrigger>
+              <FoldChevron />
               {body.injected.summary}
-            </summary>
+            </FoldTrigger>
+            <FoldPanel>
             {body.injected.rows.map((injected) => (
               <div className="row" key={injected.name}>
                 <div className="line">
@@ -984,9 +989,11 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
                 </div>
               </div>
             ))}
-          </details>
+            </FoldPanel>
+          </Fold>
         )}
-      </details>
+        </FoldPanel>
+      </Fold>
     </div>
   );
 }
@@ -1013,8 +1020,7 @@ function NoGroup({ options, onScope }: { options: ScopeOption[]; onScope(scope: 
  */
 function WidenButton({ option, verb, onScope, goes = false }: { option: ScopeOption; verb: string; onScope(scope: Scope): void; goes?: boolean }) {
   return (
-    <button
-      type="button"
+    <Button
       className="widen"
       data-scope={option.scope}
       title={option.title ?? option.label}
@@ -1027,7 +1033,7 @@ function WidenButton({ option, verb, onScope, goes = false }: { option: ScopeOpt
       <WidenIcon />
       {/* What it can't change stays in the tooltip: "(1 server-rendered, inspect only)". */}
       {verb} {option.label.replace(/ \(.*\)$/, "")}
-    </button>
+    </Button>
   );
 }
 
@@ -1053,7 +1059,7 @@ function ScopeSection({
   // At a call site, widen to the page; at the page, narrow back to the call site.
   const other = options?.find((option) => option.scope === (scope === "group" ? "page" : "group") && option.enabled) ?? null;
   // Open while one is left out, as Figma keeps layers out of the properties until asked.
-  const [open, setOpen] = useState(members.members.some((member) => member.out));
+  const leftOut = members.members.some((member) => member.out);
   const toggle = (action: "include" | "exclude", id: string) =>
     attempt(() => (action === "include" ? debug.include(id, scope) : debug.exclude(id, scope)));
   const memberItem = (member: MembersView["members"][number]) => {
@@ -1082,7 +1088,7 @@ function ScopeSection({
   };
   const name = current ? current.label.replace(/ · \d+.*$/, "") : "Instances";
   return (
-    <>
+    <Fold defaultOpen={leftOut} className="scope-fold">
       <div className="scope" data-testid="members">
         <div className="scope-title">
           <div className="lead">
@@ -1109,9 +1115,8 @@ function ScopeSection({
         <div className="scope-actions">
           {other && <WidenButton option={other} verb={scope === "group" ? "Widen to" : "Narrow to"} onScope={onScope} />}
           {members.reset.enabled && (
-            <button
-              type="button"
-              className="btn small"
+            <Button
+              size="small"
               onClick={(event) => {
                 const button = event.currentTarget;
                 dropUndoably(debug, members.reset.target, resetText);
@@ -1120,15 +1125,16 @@ function ScopeSection({
             >
               <ResetIcon />
               Reset this scope
-            </button>
+            </Button>
           )}
-          <button type="button" className="count-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <FoldTrigger inline className="count-toggle">
             {plural(members.members.length, "Instance")}
-            <ChevronIcon />
-          </button>
+            <FoldChevron />
+          </FoldTrigger>
         </div>
       </div>
-      <div className="members" hidden={!open}>
+      <FoldPanel>
+      <div className="members">
         <p className="hint">{TEXT.untick}</p>
         {members.sites === null ? (
           <ul className="list">{members.members.map(memberItem)}</ul>
@@ -1181,7 +1187,8 @@ function ScopeSection({
           </ul>
         )}
       </div>
-    </>
+      </FoldPanel>
+    </Fold>
   );
 }
 
@@ -1238,9 +1245,8 @@ function Footer({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          className="btn reset-all"
+        <Button
+          className="reset-all"
           ref={resetAllButton}
           disabled={footer.resetAll.length === 0}
           onClick={() => {
@@ -1254,7 +1260,7 @@ function Footer({
         >
           <ResetIcon />
           Reset all
-        </button>
+        </Button>
         <span className="undo" role="status">
           {offer && (
             <>
@@ -1275,16 +1281,19 @@ function Footer({
         </span>
       </div>
       <div className="act">
-        <button
-          type="button"
+        {/* Pressed in dark, unmarked: the whole panel says it. */}
+        <Toggle
+          size="large"
+          iconOnly
+          marksPressed={false}
           className="theme"
-          aria-pressed={theme === "dark"}
-          onClick={onTheme}
+          pressed={theme === "dark"}
+          onPressedChange={() => onTheme()}
           title={theme === "dark" ? "Switch to light" : "Switch to dark"}
         >
           <ContrastIcon />
           <span className="sr-only">Dark theme</span>
-        </button>
+        </Toggle>
         <CopyFlow disabled={!footer.copyEnabled} />
       </div>
     </footer>

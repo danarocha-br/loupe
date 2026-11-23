@@ -301,6 +301,8 @@ export function Highlight({
             className={`${ring.kind === "ring" ? "ring" : `ring ${ring.kind}`}${steps ? " quiet" : ""}`}
             data-ring={ring.kind}
             style={outline(ring)}
+            // Marks on the page for the eye: the panel says what is selected and what a change reached.
+            aria-hidden="true"
           >
             {ring.label && (
               <span className={labelClass(ring)}>
@@ -315,6 +317,7 @@ export function Highlight({
           ref={tagRef}
           className="pick-tag"
           data-tag={tagged.id}
+          aria-hidden="true"
           style={tagPlace(outline(tagged), tagSize, { width: pageWidth() || window.innerWidth, height: window.innerHeight })}
         >
           {tagged.tag.name}
