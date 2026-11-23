@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { CopyIcon } from "./icons.js";
+import { Button } from "./ui/index.js";
 
 /** Said under the command when the clipboard refuses it: what failed, and what to do instead. */
 export const COPY_REFUSED = "Couldn’t reach the clipboard. Select the command and copy it.";
@@ -23,9 +24,8 @@ export function Command({ text, copy = text, prompt = true }: { text: string; co
           {prompt && <span aria-hidden="true">$ </span>}
           <span className="mono verbatim">{text}</span>
         </span>
-        <button
-          type="button"
-          className="btn"
+        <Button
+          className="copy"
           onClick={() =>
             // Inside the promise: on an insecure origin `navigator.clipboard` is undefined and throws.
             Promise.resolve()
@@ -38,7 +38,7 @@ export function Command({ text, copy = text, prompt = true }: { text: string; co
         >
           <CopyIcon size={12} />
           {copied === null ? "Copy" : copied ? "Copied" : "Copy failed"}
-        </button>
+        </Button>
       </div>
       {/* Always there and empty until a refusal, so a screen reader hears the sentence when it lands. */}
       <p className="muted command-refused" role="status">

@@ -10,7 +10,7 @@ import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
 import { ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
-import { Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [
@@ -128,15 +128,14 @@ export function FlagsCard() {
               switching projects.
             </span>
           </div>
-          <button
-            type="button"
-            className="btn clear"
+          <Button
+            className="clear"
             disabled={busy || Object.keys(current.overrides).length === 0}
             onClick={(event) => clearing(event.currentTarget, run({}, "all"))}
           >
             <ResetIcon />
             Clear flag previews
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -171,10 +170,10 @@ function FlagRow({
         <span className={previewing ? "dot small purple" : "dot small hollow"} />
         <span className="name">{definition.key}</span>
         {previewing && (
-          <button type="button" className="btn small reset" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>
+          <Button size="small" className="reset" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>
             <ResetIcon />
             Clear
-          </button>
+          </Button>
         )}
       </div>
       {definition.description && <div className="muted">{definition.description}</div>}

@@ -1,0 +1,44 @@
+/*
+ * Button (ADR 0003), and the look Toggle shares. Written against attributes: the look's
+ * own, `[data-button]`, `[data-look]`, `[data-size]` and `[data-icon-only]`, and the
+ * browser's `:disabled`. Values from the tokens. In the stylesheet's `primitives` layer.
+ */
+
+[data-button] {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; white-space: nowrap;
+  border-radius: var(--radius-pill); -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-hover) var(--ease-out), color var(--duration-hover) var(--ease-out), box-shadow var(--duration-hover) var(--ease-out);
+}
+[data-button]:disabled { cursor: default; opacity: 0.45; }
+
+/* Soft: the pill, `sunk`, 30px, 12px/500 (26px small, 40px large). */
+[data-button][data-look="soft"] { gap: 6px; height: 30px; padding: 0 12px; background: var(--sunk); color: var(--ink); font: var(--font-control); }
+[data-button][data-look="soft"][data-size="small"] { gap: 5px; height: 26px; padding: 0 11px; }
+/* Large steps its words up to 13px, at 500: the popovers' actions beside the primary. */
+[data-button][data-look="soft"][data-size="large"] { gap: 8px; height: 40px; padding: 0 16px; font: var(--font-action); font-weight: 500; }
+@media (hover: hover) { [data-button][data-look="soft"]:not(:disabled):hover { background: var(--sunk-hover); } }
+
+/* Primary: the dark one, 40px; hover brightens it in light and dims it in dark. */
+[data-button][data-look="primary"] {
+  gap: 8px; height: 40px; padding: 0 18px 0 16px; background: var(--primary); color: var(--on-primary);
+  font: var(--font-action); box-shadow: var(--primary-shadow);
+}
+@media (hover: hover) {
+  [data-button][data-look="primary"]:not(:disabled):hover { filter: brightness(1.3); }
+  :host([data-loupe-theme="dark"]) [data-button][data-look="primary"]:not(:disabled):hover { filter: brightness(0.92); }
+}
+
+/* Tool: the header's round icon, muted at rest; hover fills it `sunk` with a `primary` icon. */
+[data-button][data-look="tool"] { display: inline-grid; place-items: center; width: 30px; height: 30px; color: var(--muted); }
+@media (hover: hover) { [data-button][data-look="tool"]:not(:disabled):hover { background: var(--sunk); color: var(--primary); } }
+
+/* Icon only: round, its width its height. */
+[data-button][data-icon-only] { padding: 0; }
+[data-button][data-icon-only][data-size="small"] { width: 26px; }
+[data-button][data-icon-only][data-size="medium"] { width: 30px; }
+[data-button][data-icon-only][data-size="large"] { width: 40px; }
+
+/* Forced colours drop the fills: a pill keeps its edge in the system's button colour. */
+@media (forced-colors: active) {
+  [data-button][data-look="soft"], [data-button][data-look="primary"] { border: 1px solid ButtonText; }
+}

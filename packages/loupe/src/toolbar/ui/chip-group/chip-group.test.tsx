@@ -173,7 +173,9 @@ describe("ChipGroup's CSS", () => {
     const sheet = [...screen.shadow.querySelectorAll("style")].map((style) => style.textContent).join("");
     expect(sheet).toBe(STYLESHEET);
     expect(STYLESHEET.startsWith("@layer tokens, primitives, patterns;")).toBe(true);
-    expect(STYLESHEET).toContain(`@layer primitives {\n${CSS}`);
+    const at = STYLESHEET.indexOf(CSS);
+    expect(at).toBeGreaterThan(STYLESHEET.indexOf("@layer primitives {"));
+    expect(at).toBeLessThan(STYLESHEET.indexOf("@layer patterns"));
   });
 
   it("names states, not Loupe's classes or ARIA", () => {

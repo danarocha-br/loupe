@@ -177,6 +177,11 @@ typography:
     fontSize: "12px"
     fontWeight: 500
     lineHeight: "16px"
+  action:
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
+    fontSize: "13px"
+    fontWeight: 600
+    lineHeight: "17px"
   option:
     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
     fontSize: "12px"
@@ -506,7 +511,7 @@ Where the Paper boards draw lighter, the code keeps the contrast:
 - **Headline** (600, 17px/22px, -0.015em, balanced): the selected Instance's visible name, in full.
 - **Title** (500, 14px/18px, -0.01em): card titles, prop names, the scope's name and "Inspect only · 6".
 - **Body** (400, 13px/18px): the base text, a component's name (500, muted in the identity), list rows (500), text fields, the copy popover's fields. Explanatory paragraphs run 13px/19px in muted, and any 12px sentence that can wrap runs 12px/17px: nothing that wraps to three lines sits under a 1.4 line height.
-- **Control** (500, 12px/16px): buttons, Widen, the count toggle. Copy Proposal and the popovers' actions step up to 13px (600 for the primary). The footer's Undo is a 600 12px link, underlined at 3px.
+- **Control** (500, 12px/16px): buttons, Widen, the count toggle. **Action** (600, 13px/17px) is Control stepped up, for Copy Proposal and the primary button; the popovers' other actions step up to 13px at 500. The footer's Undo is a 600 12px link, underlined at 3px.
 - **Option** (400, 12px/16px): option chips; the chip that shows now at 500.
 - **Label** (500, 11px/14px) and **Meta** (400, 11px/14px, tabular, faint): field labels, the "Inside" label, and the counts beside card titles.
 - **Delta** (700, 9px/1, tabular): the number inside a delta. The 9px step is the delta's alone.

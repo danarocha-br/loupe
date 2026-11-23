@@ -73,23 +73,12 @@ export const CSS = `
 h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(--ink); }
 kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px; background: var(--kbd); }
 
-/* Controls: soft pills, the ink primary, the header's round tools */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px;
-  border-radius: 999px; background: var(--sunk); color: var(--ink); font: 500 ${size(12)}/1.3333 ${SANS}; white-space: nowrap;
-  transition: background-color 120ms ease-out;
-}
-.btn.small { height: 26px; padding: 0 11px; gap: 5px; }
-.btn.icon, .btn.round { width: 30px; padding: 0; }
-.btn.small.round { width: 26px; }
-@media (hover: hover) { .btn:not(:disabled):hover { background: var(--sunk-hover); } }
-.btn.primary { height: 40px; padding: 0 18px 0 16px; gap: 8px; background: var(--primary); color: var(--on-primary); font-size: ${size(13)}; font-weight: 600; box-shadow: var(--primary-shadow); }
-@media (hover: hover) { .btn.primary:not(:disabled):hover { background: var(--primary); filter: brightness(1.3); } }
-@media (hover: hover) { :host([data-loupe-theme="dark"]) .btn.primary:not(:disabled):hover { filter: brightness(0.92); } }
-.btn.holding { background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); }
+/* Controls: Button and Toggle (ui/button/, ui/toggle/). A view that sets a button's background restates its hover:
+   the views' rules come after the primitives' layer, so a background here would win over the layer's hover. */
 .link { font: 600 ${size(12)}/1.3333 ${SANS}; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; min-height: 24px; }
-.tool { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; color: var(--muted); transition: background-color 120ms ease-out, color 120ms ease-out, box-shadow 120ms ease-out; }
-@media (hover: hover) { .tool:not(:disabled):hover { background: var(--sunk); color: var(--primary); } }
+/* The select tools are ChipGroup's chips (bare), drawn as Button's tool look. */
+.select-tools .tool { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-pill); color: var(--muted); transition: background-color var(--duration-hover) var(--ease-out), color var(--duration-hover) var(--ease-out), box-shadow var(--duration-hover) var(--ease-out); }
+@media (hover: hover) { .select-tools .tool:hover { background: var(--sunk); color: var(--primary); } }
 
 /* The panel: a sheet in the column the page makes room for (dock.ts), white cards on it */
 .panel {
@@ -119,7 +108,6 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .select-tools { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--tools-wash); }
 .select-tools .tool[data-checked], .select-tools .tool[data-armed] { background: var(--card); color: var(--primary); box-shadow: var(--raised-shadow); }
 .tools .divider { flex: none; width: 1px; height: 16px; margin: 0 2px 0 11px; border-radius: 1px; background: var(--divider); }
-.tool[data-marks][aria-pressed="true"] { background: var(--sunk); color: var(--primary); }
 .status-region { flex: none; }
 .status-line { flex: none; margin: 6px 6px 0; padding: 8px 14px; border-radius: 14px; background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); font-size: ${size(12)}; line-height: 1.4167; }
 .status-line .dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; vertical-align: 0; }
@@ -172,7 +160,7 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .copy-popover input:focus { background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--focus-glow); }
 .copy-popover input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--alert); }
 .copy-popover .field-error { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-fg); }
-.copy-popover .btn.primary { width: 100%; }
+.copy-popover .submit { width: 100%; }
 .not-copied { display: flex; gap: 10px; }
 .not-copied .badge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); }
 .not-copied h3 { padding-top: 1px; font: 600 ${size(13)}/1.3846 ${SANS}; letter-spacing: 0; color: var(--warn-fg); }
@@ -185,8 +173,6 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .proposal-text::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 32px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--hover)); }
 .popover-actions { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
 .popover-actions.alone { grid-template-columns: minmax(0, 1fr); }
-.popover-actions .btn { height: 40px; font: 500 ${size(13)}/1.3077 ${SANS}; }
-.popover-actions .btn.primary { font-weight: 600; }
 .copy-toast { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 10px); z-index: 1; display: flex; align-items: flex-start; gap: 10px; min-height: 50px; padding: 8px 12px 9px; border-radius: 14px; background: var(--toast); color: var(--on-toast); box-shadow: inset 0 0 0 1px var(--toast-edge), var(--toast-shadow); animation: loupe-toast-in 180ms ease-out; }
 .copy-toast .badge { flex: none; margin-top: 5px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--copied-badge); color: var(--on-toast); }
 .copy-toast .what { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -195,8 +181,7 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .copy-toast .sub { font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--toast-muted); }
 @keyframes loupe-toast-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .copy-toast { animation: none; } .split { transition: none; } }
-.footer .theme { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--sunk); color: var(--primary); box-shadow: inset 0 0 0 1px var(--hairline); transition: background-color 120ms ease-out; }
-@media (hover: hover) { .footer .theme:hover { background: var(--sunk-hover); } }
+.footer .theme { color: var(--primary); box-shadow: inset 0 0 0 1px var(--hairline); }
 .footer .undo { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: ${size(12)}; line-height: 1.4167; color: var(--muted); }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -292,7 +277,7 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .identity { display: flex; flex-direction: column; padding: 10px 14px 14px 10px; }
 .identity:has(.inside) { padding-bottom: 0; }
 .identity > .body { padding: 6px 0 0 4px; }
-.back { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 999px; background: var(--ground); color: var(--ink); transition: background-color 120ms ease-out; }
+.back { width: 28px; height: 28px; background: var(--ground); }
 @media (hover: hover) { .back:hover { background: var(--sunk-hover); } }
 .title-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 28px; }
 .title-line .lead { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -363,7 +348,8 @@ fieldset.site .list > li { padding-left: 42px; }
 .notice-card li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--rule); font-size: ${size(13)}; }
 .notice-card li .mono { color: var(--muted); }
 .command { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--well); font: 400 ${size(12)}/1.3333 ${MONO}; color: var(--ink); }
-.command .btn { height: 28px; padding: 0 10px; background: var(--card); }
+.command .copy { height: 28px; padding: 0 10px; background: var(--card); }
+@media (hover: hover) { .command .copy:hover { background: var(--sunk-hover); } }
 .command-refused { font-size: ${size(12)}; line-height: 1.4167; }
 .command-refused:not(:empty) { margin-top: 6px; }
 .note-card { display: flex; flex-direction: row; gap: 10px; padding: 12px 14px; }
@@ -371,7 +357,8 @@ fieldset.site .list > li { padding-left: 42px; }
 .note-card .text { display: flex; flex-direction: column; gap: 4px; }
 .notice { padding: 10px 12px; border-radius: 12px; background: var(--well); font: 400 ${size(12)}/1.5 ${SANS}; }
 .notice code { font-family: ${MONO}; font-weight: 600; color: var(--ink); }
-.notice .btn { margin-top: 8px; background: var(--card); }
+.notice .reset { margin-top: 8px; background: var(--card); }
+@media (hover: hover) { .notice .reset:not(:disabled):hover { background: var(--sunk-hover); } }
 .warn { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); font: 400 ${size(12)}/1.4167 ${SANS}; }
 .warn .dot { width: 8px; height: 8px; margin-top: 5px; background: var(--warn-dot); }
 

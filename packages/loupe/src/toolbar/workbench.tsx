@@ -8,7 +8,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { Surface, type Theme } from "./surface/index.js";
-import { Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, Toggle } from "./ui/index.js";
 
 /** Whether a media feature the frame depends on is on in this browser right now. */
 function useMedia(query: string): boolean {
@@ -153,6 +153,76 @@ function FoldStates() {
   );
 }
 
+/** A glyph for the workbench's icon-only buttons: the tools draw their own. */
+const Glyph = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="7" />
+  </svg>
+);
+
+/** Button's looks and sizes, and Toggle pressed, unpressed and unmarked. */
+function ButtonStates() {
+  const [pressed, setPressed] = useState(false);
+  const [held, setHeld] = useState(true);
+  const [dark, setDark] = useState(false);
+  const [presses, setPresses] = useState(0);
+  return (
+    <div className="wb-states">
+      <Row title="Soft: small, medium, large; disabled">
+        <div className="wb-line">
+          <Button size="small" onClick={() => setPresses(presses + 1)}>
+            Discard
+          </Button>
+          <Button onClick={() => setPresses(presses + 1)}>
+            <Glyph />
+            Reset all
+          </Button>
+          <Button size="large" onClick={() => setPresses(presses + 1)}>
+            Select all
+          </Button>
+          <Button disabled>Reset all</Button>
+        </div>
+        <p className="wb-note" aria-live="polite">
+          Pressed {presses} times
+        </p>
+      </Row>
+      <Row title="Primary, and icon only">
+        <div className="wb-line">
+          <Button look="primary">
+            <Glyph />
+            Copy with these details
+          </Button>
+        </div>
+        <div className="wb-line">
+          <Button look="tool" iconOnly title="Hide the panel">
+            <Glyph />
+            <span className="sr-only">Hide panel</span>
+          </Button>
+          <Button size="small" iconOnly title="Reset">
+            <Glyph />
+            <span className="sr-only">Reset</span>
+          </Button>
+        </div>
+      </Row>
+      <Row title="Toggle: a tool, a soft pill, and one whose pressed shows elsewhere">
+        <div className="wb-line">
+          <Toggle look="tool" iconOnly pressed={pressed} onPressedChange={setPressed} title="Hide marks">
+            <Glyph />
+            <span className="sr-only">Hide marks</span>
+          </Toggle>
+          <Toggle size="small" pressed={held} onPressedChange={setHeld}>
+            {held ? "Holding open · Release" : "Hold open"}
+          </Toggle>
+          <Toggle size="large" iconOnly marksPressed={false} pressed={dark} onPressedChange={setDark} title="Dark theme">
+            <Glyph />
+            <span className="sr-only">Dark theme</span>
+          </Toggle>
+        </div>
+      </Row>
+    </div>
+  );
+}
+
 function Row({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -169,6 +239,7 @@ const FRAME_CSS = `
 .wb-row { display: flex; flex-direction: column; gap: 8px; }
 .wb-row h3 { font: var(--font-label); color: var(--muted); }
 .wb-note { font: var(--font-meta); color: var(--faint); }
+.wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
 .wb-card > h2 { margin-bottom: 12px; font: var(--font-title); color: var(--ink); }
 .wb-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; font: var(--font-title); color: var(--ink); }
@@ -197,6 +268,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <div className="wb-card">
             <h2>ChipGroup</h2>
             <ChipGroupStates />
+          </div>
+          <div className="wb-card">
+            <h2>Button and Toggle</h2>
+            <ButtonStates />
           </div>
           <div className="wb-card">
             <h2>Fold</h2>

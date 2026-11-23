@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, Toggle } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -216,12 +216,12 @@ export function Panel(props: PanelProps) {
             ))}
           </ChipGroup>
           <span className="divider" aria-hidden="true" />
-          <button
-            type="button"
-            className="tool"
+          <Toggle
+            look="tool"
+            iconOnly
             data-marks=""
-            aria-pressed={props.marksHidden}
-            onClick={props.onMarks}
+            pressed={props.marksHidden}
+            onPressedChange={() => props.onMarks()}
             title={
               props.marksHidden
                 ? "Show marks: outline the selection on the page again"
@@ -230,11 +230,11 @@ export function Panel(props: PanelProps) {
           >
             {props.marksHidden ? <MarksHiddenIcon /> : <MarksIcon />}
             <span className="sr-only">Hide marks</span>
-          </button>
-          <button type="button" className="tool" onClick={props.onHide} title="Hide the panel">
+          </Toggle>
+          <Button look="tool" iconOnly onClick={props.onHide} title="Hide the panel">
             <PanelIcon />
             <span className="sr-only">Hide panel</span>
-          </button>
+          </Button>
         </div>
       </header>
       {/* Each region is always there and only its text changes, so a screen reader hears it. */}
@@ -643,9 +643,8 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
           <li key={JSON.stringify(item.target)} className="held-item">
             <div className="target">
               <span>{item.label}</span>
-              <button
-                type="button"
-                className="btn small"
+              <Button
+                size="small"
                 onClick={(event) => {
                   const button = event.currentTarget;
                   dropUndoably(debug, item.target, (count) => `Discarded ${plural(count, "held Override")}`);
@@ -653,7 +652,7 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
                 }}
               >
                 Discard
-              </button>
+              </Button>
             </div>
             <div className="muted">{item.why}</div>
             <HeldValues values={item.values} />
@@ -666,10 +665,10 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
 
 function BackButton({ onSelect }: Pick<Actions, "onSelect">) {
   return (
-    <button type="button" className="back" onClick={() => onSelect(null)} title="Back to every component on this page (Esc)">
+    <Button iconOnly className="back" onClick={() => onSelect(null)} title="Back to every component on this page (Esc)">
       <BackIcon />
       <span className="sr-only">All components</span>
-    </button>
+    </Button>
   );
 }
 
@@ -705,9 +704,8 @@ function dropUndoably(debug: LoupeDebug, target: ScopeTarget, text: (count: numb
 /** `discard` also drops the record of an Instance that isn't mounted, where `reset(id)` throws (PER-128). */
 function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; enabled: boolean }) {
   return (
-    <button
-      type="button"
-      className="btn small"
+    <Button
+      size="small"
       disabled={!enabled}
       onClick={(event) => {
         const button = event.currentTarget;
@@ -716,7 +714,7 @@ function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; 
       }}
     >
       Reset this Instance
-    </button>
+    </Button>
   );
 }
 
@@ -851,21 +849,20 @@ function Inspector({
           {(holdButton || resetInstance) && (
             <div className="actions">
               {holdButton && (
-                <button
-                  type="button"
-                  className={holdButton.held ? "btn small holding" : "btn small"}
-                  aria-pressed={holdButton.held}
+                <Toggle
+                  size="small"
+                  pressed={holdButton.held}
                   data-hold={holdButton.prop}
-                  onClick={() =>
+                  onPressedChange={(hold) =>
                     attempt(() =>
-                      holdButton.held
-                        ? debug.reset(holdButton.write.id, holdButton.write.prop, "instance")
-                        : debug.set(holdButton.write.id, holdButton.write.prop, true, "instance"),
+                      hold
+                        ? debug.set(holdButton.write.id, holdButton.write.prop, true, "instance")
+                        : debug.reset(holdButton.write.id, holdButton.write.prop, "instance"),
                     )
                   }
                 >
                   {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
-                </button>
+                </Toggle>
               )}
               {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
             </div>
@@ -1115,9 +1112,8 @@ function ScopeSection({
         <div className="scope-actions">
           {other && <WidenButton option={other} verb={scope === "group" ? "Widen to" : "Narrow to"} onScope={onScope} />}
           {members.reset.enabled && (
-            <button
-              type="button"
-              className="btn small"
+            <Button
+              size="small"
               onClick={(event) => {
                 const button = event.currentTarget;
                 dropUndoably(debug, members.reset.target, resetText);
@@ -1126,7 +1122,7 @@ function ScopeSection({
             >
               <ResetIcon />
               Reset this scope
-            </button>
+            </Button>
           )}
           <FoldTrigger inline className="count-toggle">
             {plural(members.members.length, "Instance")}
@@ -1246,9 +1242,8 @@ function Footer({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          className="btn reset-all"
+        <Button
+          className="reset-all"
           ref={resetAllButton}
           disabled={footer.resetAll.length === 0}
           onClick={() => {
@@ -1262,7 +1257,7 @@ function Footer({
         >
           <ResetIcon />
           Reset all
-        </button>
+        </Button>
         <span className="undo" role="status">
           {offer && (
             <>
@@ -1283,16 +1278,19 @@ function Footer({
         </span>
       </div>
       <div className="act">
-        <button
-          type="button"
+        {/* Pressed in dark, unmarked: the whole panel says it. */}
+        <Toggle
+          size="large"
+          iconOnly
+          marksPressed={false}
           className="theme"
-          aria-pressed={theme === "dark"}
-          onClick={onTheme}
+          pressed={theme === "dark"}
+          onPressedChange={() => onTheme()}
           title={theme === "dark" ? "Switch to light" : "Switch to dark"}
         >
           <ContrastIcon />
           <span className="sr-only">Dark theme</span>
-        </button>
+        </Toggle>
         <CopyFlow disabled={!footer.copyEnabled} />
       </div>
     </footer>

@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
 import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./icons.js";
+import { Button } from "./ui/index.js";
 
 /** Every word the flow shows, beside the component that shows it. */
 export const COPY = {
@@ -289,10 +290,10 @@ function Details({ busy, onCopy, onClose }: { busy: boolean; onCopy(details: Cop
             }}
           />
         </label>
-        <button type="submit" className="btn primary" aria-disabled={busy || undefined}>
+        <Button type="submit" look="primary" className="submit" aria-disabled={busy || undefined}>
           <CopyIcon size={16} />
           {COPY.copyWith}
-        </button>
+        </Button>
       </form>
     </Popover>
   );
@@ -322,21 +323,20 @@ function NotCopied({ failure, busy, onRetry, onClose }: { failure: Failure; busy
       )}
       <div className={hasText ? "popover-actions" : "popover-actions alone"}>
         {hasText && (
-          <button
-            type="button"
-            className="btn"
+          <Button
+            size="large"
             onClick={() => {
               text.current?.focus();
               text.current?.select();
             }}
           >
             {COPY.selectAll}
-          </button>
+          </Button>
         )}
-        <button ref={retry} type="button" className="btn primary" aria-disabled={busy || undefined} onClick={onRetry}>
+        <Button ref={retry} look="primary" aria-disabled={busy || undefined} onClick={onRetry}>
           <ResetIcon />
           {COPY.retry}
-        </button>
+        </Button>
       </div>
     </Popover>
   );
