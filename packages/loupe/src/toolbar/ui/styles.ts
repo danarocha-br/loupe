@@ -4,9 +4,11 @@
 
 import BUTTON_CSS from "./button/button.css?inline";
 import CHIP_GROUP_CSS from "./chip-group/chip-group.css?inline";
+import FIELD_CSS from "./field/field.css?inline";
 import FOLD_CSS from "./fold/fold.css?inline";
+import POPOVER_CSS from "./popover/popover.css?inline";
 import SWITCH_CSS from "./switch/switch.css?inline";
 import TOGGLE_CSS from "./toggle/toggle.css?inline";
 
 /** Every primitive's CSS, in order. */
-export const PRIMITIVES_CSS: string = [BUTTON_CSS, TOGGLE_CSS, CHIP_GROUP_CSS, FOLD_CSS, SWITCH_CSS].join("\n");
+export const PRIMITIVES_CSS: string = [BUTTON_CSS, TOGGLE_CSS, CHIP_GROUP_CSS, FOLD_CSS, SWITCH_CSS, FIELD_CSS, POPOVER_CSS].join("\n");

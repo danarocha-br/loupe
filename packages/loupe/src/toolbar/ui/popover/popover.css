@@ -1,0 +1,27 @@
+/*
+ * Popover (ADR 0003). Written against its own parts, `[data-popover]`, `[data-caret]`
+ * and `[data-popover-caret]`, and UI SDK's `[data-side]`. Values from the tokens. In the
+ * stylesheet's `primitives` layer.
+ *
+ * UI SDK places it (`position: fixed`, `left`, `top`) in the top layer and gives it its
+ * anchor's size as `--anchor-width`. The browser's own `[popover]` rules would scroll,
+ * frame and fill it: each is undone here.
+ */
+
+[data-popover] {
+  box-sizing: border-box; width: calc(var(--anchor-width) - 2 * var(--space-inset)); max-width: none;
+  overflow: visible; padding: var(--space-gutter); border: 0;
+  border-radius: var(--radius-card); background: var(--card); color: inherit; box-shadow: var(--popover-shadow);
+}
+
+/* The caret, on its foot, pointing down at what opened it; on its head if it flipped below. */
+[data-popover-caret] { position: absolute; bottom: -11px; right: var(--space-hero); display: block; }
+[data-caret="center"] [data-popover-caret] { right: auto; left: calc(50% - var(--space-inset)); }
+[data-popover][data-side="bottom"] [data-popover-caret] { top: -11px; bottom: auto; transform: rotate(180deg); }
+[data-caret-fill] { fill: var(--card); }
+[data-caret-edge] { fill: none; stroke: var(--popover-edge); }
+
+/* Forced colours drop the shadow that edges it: the box keeps a border they draw. */
+@media (forced-colors: active) {
+  [data-popover] { border: 1px solid transparent; }
+}

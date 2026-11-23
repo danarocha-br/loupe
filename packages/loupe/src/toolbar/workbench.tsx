@@ -6,9 +6,9 @@
 // fixture app's `/workbench` page, which loads it in development only, as
 // `<LoupeMount />` loads the Toolbar; a host never imports it.
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Surface, type Theme } from "./surface/index.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, Switch, Toggle } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Field, Fold, FoldChevron, FoldPanel, FoldTrigger, Popover, PopoverPanel, Switch, Toggle } from "./ui/index.js";
 
 /** Whether a media feature the frame depends on is on in this browser right now. */
 function useMedia(query: string): boolean {
@@ -251,6 +251,80 @@ function SwitchStates() {
   );
 }
 
+const LONG_TEXT = Array.from({ length: 14 }, (_, line) => `${line + 1}. A line of a long read-only text, to select and copy by hand.`).join("\n");
+
+/** Field's looks: filled with its marker, error and hint; the outline that grows; the read-only well. */
+function FieldStates() {
+  const [title, setTitle] = useState("");
+  const [designer, setDesigner] = useState("");
+  const [text, setText] = useState("Save changes");
+  return (
+    <div className="wb-states">
+      <Row title="Filled: a label, an optional marker, a placeholder">
+        <Field label="Designer" optional="optional" placeholder="Who is asking for this?" value={designer} onValueChange={setDesigner} />
+      </Row>
+      <Row title="Filled, with an error until it has text, and a hint">
+        <Field
+          label="Title"
+          required
+          hint="It heads the text."
+          error={title.trim() === "" ? "Give it a title." : undefined}
+          value={title}
+          onValueChange={setTitle}
+        />
+      </Row>
+      <Row title="Outline: a hidden label, grows with its text">
+        <Field label="children" labelHidden look="outline" multiline autoResize rows={1} value={text} onValueChange={setText} />
+      </Row>
+      <Row title="Well: read-only, fades out at its foot">
+        <Field label="Long text" labelHidden look="well" multiline readOnly value={LONG_TEXT} />
+      </Row>
+    </div>
+  );
+}
+
+/** Popover's states: over a footer, its caret at its end or under its middle. */
+function PopoverStates() {
+  const [open, setOpen] = useState(false);
+  // Which button opened it, kept past closing: focus goes back there once it has closed.
+  const [caret, setCaret] = useState<"end" | "center">("end");
+  const footer = useRef<HTMLDivElement>(null);
+  const toggles = useRef<HTMLDivElement>(null);
+  const end = useRef<HTMLButtonElement>(null);
+  const center = useRef<HTMLButtonElement>(null);
+  const [name, setName] = useState("");
+  const toggle = (from: "end" | "center") => {
+    setOpen(!(open && caret === from));
+    setCaret(from);
+  };
+  return (
+    <div className="wb-states">
+      <Row title="Escape or a press outside closes it; focus goes back to what opened it">
+        <div ref={footer} className="wb-footer">
+          <div ref={toggles} className="wb-line">
+            <Button ref={center} aria-expanded={open && caret === "center"} aria-haspopup="dialog" onClick={() => toggle("center")}>
+              Caret in the middle
+            </Button>
+            <Button ref={end} aria-expanded={open && caret === "end"} aria-haspopup="dialog" onClick={() => toggle("end")}>
+              At the end
+            </Button>
+          </div>
+        </div>
+        <Popover open={open} onOpenChange={setOpen} inside={toggles}>
+          <PopoverPanel label="Details" anchor={footer} returnFocus={caret === "center" ? center : end} caret={caret}>
+            <div className="wb-states">
+              <Field label="Name" optional="optional" value={name} onValueChange={setName} />
+              <Button look="primary" onClick={() => setOpen(false)}>
+                Done
+              </Button>
+            </div>
+          </PopoverPanel>
+        </Popover>
+      </Row>
+    </div>
+  );
+}
+
 function Row({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -276,6 +350,7 @@ const FRAME_CSS = `
 .wb-fold-small { justify-content: flex-start; gap: 6px; min-height: 28px; font: var(--font-control); color: var(--muted); }
 .wb-fold-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: var(--font-label); color: var(--faint); }
 .wb-fold-line .wb-fold-row { font: var(--font-control); }
+.wb-footer { padding: 14px; border-radius: var(--radius-card); background: var(--card); box-shadow: var(--shadow); }
 .wb-fold-body { padding: 4px 0 4px 12px; font: var(--font-paragraph); color: var(--muted); }
 `;
 
@@ -309,6 +384,14 @@ function FrameView({ frame }: { frame: Frame }) {
           <div className="wb-card">
             <h2>Fold</h2>
             <FoldStates />
+          </div>
+          <div className="wb-card">
+            <h2>Field</h2>
+            <FieldStates />
+          </div>
+          <div className="wb-card">
+            <h2>Popover</h2>
+            <PopoverStates />
           </div>
         </div>
       </Surface>

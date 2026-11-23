@@ -142,34 +142,15 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .split[data-state="failed"] { background: var(--warn-bg); color: var(--warn-fg); box-shadow: inset 0 0 0 1px var(--warn-edge); }
 .split[data-state="failed"] .split-rule { background: var(--warn-rule); }
 .split[data-state="failed"] .split-more { background: var(--warn-wash); }
-/* Over the footer, pointing down at what opened it: the chevron, or the button a one-click copy came from. */
-.copy-popover { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 10px); z-index: 1; padding: 14px; border-radius: 18px; background: var(--card); box-shadow: var(--popover-shadow); }
-.copy-popover .caret { position: absolute; bottom: -11px; right: 16px; }
-.copy-popover[data-anchor="copy"] .caret { right: auto; left: calc(50% - 8px); }
-.copy-popover .caret .fill { fill: var(--card); }
-.copy-popover .caret .edge { fill: none; stroke: var(--popover-edge); }
-.copy-popover .details { display: flex; flex-direction: column; gap: 12px; }
-.copy-popover .field { display: flex; flex-direction: column; gap: 4px; }
-.copy-popover .field > label, .copy-popover .field > span:not(.field-error) { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
-.copy-popover .optional { color: var(--faint); }
-.copy-popover input { width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-field); background: var(--sunk); box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); font: var(--font-body); outline: none; }
-.copy-popover input::placeholder { color: var(--faint); }
-/* Focus is the ring and its glow; the transparent outline is what forced colours draw, which drop box-shadows. */
-.copy-popover input:focus { background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--focus-glow); outline: 2px solid transparent; outline-offset: 1px; }
-.copy-popover input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--alert); }
-.copy-popover .field-error { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-fg); }
+/* Copy Proposal's popovers (ui/popover): what each holds. Its fields are Field's (ui/field). */
+.copy-popover .details { display: flex; flex-direction: column; gap: var(--space-card); }
 .copy-popover .submit { width: 100%; }
-.not-copied { display: flex; gap: 10px; }
-.not-copied .badge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); }
+.not-copied { display: flex; gap: var(--space-row); }
+.not-copied .badge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-pill); background: var(--warn-bg); color: var(--warn-fg); }
 .not-copied h3 { padding-top: 1px; font: 600 ${size(13)}/1.3846 ${SANS}; letter-spacing: 0; color: var(--warn-fg); }
-.not-copied p { margin-top: 2px; font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-muted); }
-.proposal-text { position: relative; height: 130px; margin-top: 15px; overflow: hidden; border-radius: var(--radius-well); background: var(--hover); box-shadow: inset 0 0 0 1px var(--popover-edge); }
-.proposal-text textarea { display: block; width: 100%; height: 100%; padding: 10px; border: 0; resize: none; background: none; color: var(--ink); font: var(--font-proposal-text); white-space: pre-wrap; outline: none; scrollbar-width: thin; }
-.proposal-text textarea::selection { background: var(--text-select); }
-.proposal-text textarea:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: var(--radius-well); outline: 2px solid transparent; outline-offset: -2px; }
-/* The text runs on below the fold: it fades rather than stopping at a line. */
-.proposal-text::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 32px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--hover)); }
-.popover-actions { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
+.not-copied p { margin-top: 2px; font: var(--font-caption); color: var(--warn-muted); }
+.proposal-text { margin-top: 15px; }
+.popover-actions { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: var(--space-inset); margin-top: var(--space-gutter); }
 .popover-actions.alone { grid-template-columns: minmax(0, 1fr); }
 .copy-toast { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 10px); z-index: 1; display: flex; align-items: flex-start; gap: 10px; min-height: 50px; padding: 8px 12px 9px; border-radius: 14px; background: var(--toast); color: var(--on-toast); box-shadow: inset 0 0 0 1px var(--toast-edge), var(--toast-shadow); animation: loupe-toast-in 180ms ease-out; }
 .copy-toast .badge { flex: none; margin-top: 5px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--copied-badge); color: var(--on-toast); }
@@ -407,9 +388,8 @@ fieldset.site .list > li { padding-left: 42px; }
 @media (hover: hover) { .row .keeping:hover { text-decoration-color: currentColor; } }
 
 /* The options: ChipGroup (ui/chip-group/chip-group.css). */
-.row .text { width: 100%; min-height: 36px; padding: 8px 12px; resize: none; overflow: hidden; border: 1px solid var(--field-edge); border-radius: var(--radius-well); background: var(--card); color: var(--ink); font: var(--font-body); outline: none; }
-.row .text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-glow); outline: 2px solid transparent; outline-offset: 1px; }
-.row.overridden .text { border-color: var(--shown-edge); }
+/* A text prop: Field's outline look (ui/field), its edge salmon once the prop is changed here. */
+.row.overridden .text [data-field-control] { border-color: var(--shown-edge); }
 /* What the chips' marks mean, said once on a row of its own. */
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 34px; padding: 10px 14px 10px 42px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
@@ -538,11 +518,6 @@ fieldset.site .list > li { padding-left: 42px; }
 @keyframes loupe-mark-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ring[data-ring], .mark[data-mark], .ring[data-ring].quiet, .mark[data-mark].quiet { animation: none; transition: none; } }
 
-/* iOS Safari zooms the page into any field under 16px: on a touch screen they are 16px. */
-@media (pointer: coarse) {
-  .row .text, .copy-popover input { font-size: max(16px, ${size(16)}); line-height: 1.375; }
-}
-
 /* The page map: every component a tinted block where it sits, one hue each, fit into a dotted well; each row is its legend. */
 ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .map-sheet { position: relative; height: 108px; margin: 12px 14px 8px; border-radius: 12px; background-color: var(--hover); background-image: radial-gradient(circle at 6px 6px, var(--map-dot) 0.7px, transparent 1.2px); background-size: 12px 12px; box-shadow: inset 0 0 0 1px var(--hairline); overflow: hidden; container-type: size; }
@@ -574,7 +549,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .big-tool .h { margin: 2px 8px 0; font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--faint); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
-  .panel, .copy-popover, .section, .card, .footer, .header { border: 1px solid transparent; }
+  .panel, .section, .card, .footer, .header { border: 1px solid transparent; }
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }

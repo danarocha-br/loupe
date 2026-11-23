@@ -1,0 +1,71 @@
+/*
+ * Field (ADR 0003). Written against the field's own parts, `[data-field]`, its
+ * `[data-look]`, `[data-field-label]`, `[data-field-box]`, `[data-field-control]`,
+ * `[data-field-optional]`, `[data-field-hint]` and `[data-field-error]`, and UI SDK's
+ * `[data-invalid]`. Values from the tokens. In the stylesheet's `primitives` layer.
+ *
+ * Focus is a ring drawn with box-shadows, and a transparent outline beside it: forced
+ * colours drop box-shadows and draw the outline in the system's colour.
+ */
+
+[data-field] { display: flex; flex-direction: column; gap: var(--space-xs); }
+[data-field-label] { font: var(--font-label); color: var(--muted); }
+[data-field-optional] { color: var(--faint); }
+[data-field-hint] { margin: 0; font: var(--font-caption); color: var(--muted); }
+[data-field-error] { font: var(--font-caption); color: var(--warn-fg); }
+[data-field-control] { display: block; width: 100%; margin: 0; border: 0; color: var(--ink); outline: none; }
+[data-field-control]::placeholder { color: var(--faint); }
+
+/* Filled: a `sunk` box, 36px, on a hairline edge; focused, the card with the ring and its glow. */
+[data-look="filled"] [data-field-control] {
+  height: 36px; padding: 0 var(--space-card); border-radius: var(--radius-field);
+  background: var(--sunk); box-shadow: inset 0 0 0 1px var(--field-edge); font: var(--font-body);
+}
+[data-look="filled"] [data-field-control]:focus {
+  background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--focus-glow);
+  outline: 2px solid transparent; outline-offset: 1px;
+}
+[data-look="filled"][data-invalid] [data-field-control] { box-shadow: inset 0 0 0 1.5px var(--alert); }
+
+/* Outline: the card on a `field-edge` border, as tall as its text; focused, an `accent` border and the glow. */
+[data-look="outline"] [data-field-control] {
+  min-height: 36px; padding: var(--space-inset) var(--space-card); resize: none; overflow: hidden;
+  border: 1px solid var(--field-edge); border-radius: var(--radius-well); background: var(--card); font: var(--font-body);
+}
+[data-look="outline"] [data-field-control]:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-glow);
+  outline: 2px solid transparent; outline-offset: 1px;
+}
+[data-look="outline"][data-invalid] [data-field-control] { border-color: var(--alert); }
+
+/* Well: a fixed window on the `hover` fill, its text running on below the fold and fading out. */
+[data-look="well"] [data-field-box] {
+  position: relative; height: var(--field-well-height, 130px); overflow: hidden;
+  border-radius: var(--radius-well); background: var(--hover); box-shadow: inset 0 0 0 1px var(--popover-edge);
+}
+[data-look="well"] [data-field-box]::after {
+  content: ""; position: absolute; inset: auto 0 0 0; height: 32px; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--hover));
+}
+[data-look="well"] [data-field-control] {
+  height: 100%; padding: var(--space-row); resize: none; background: none;
+  font: var(--font-proposal-text); white-space: pre-wrap; scrollbar-width: thin;
+}
+[data-look="well"] [data-field-control]::selection { background: var(--text-select); }
+[data-look="well"] [data-field-control]:focus-visible {
+  box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: var(--radius-well);
+  outline: 2px solid transparent; outline-offset: -2px;
+}
+
+/* iOS Safari zooms the page into any field under 16px: on a touch screen a field you type in is 16px. */
+@media (pointer: coarse) {
+  [data-look="filled"] [data-field-control], [data-look="outline"] [data-field-control] {
+    font-size: max(16px, calc(var(--loupe-px) * 16)); line-height: 1.375;
+  }
+}
+
+/* Forced colours drop the fills and the box-shadow edges: the box keeps an edge, and the ring is the outline. */
+@media (forced-colors: active) {
+  [data-look="filled"] [data-field-control] { border: 1px solid CanvasText; }
+  [data-field-control]:focus, [data-field-control]:focus-visible { outline-color: Highlight; }
+}

@@ -187,6 +187,11 @@ typography:
     fontSize: "12px"
     fontWeight: 400
     lineHeight: "16px"
+  caption:
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: "17px"
   label:
     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
     fontSize: "11px"
@@ -576,7 +581,7 @@ On the page, a solid outline is the one Instance in hand and a dashed coral one 
 The toolbar is built in four layers (ADR 0003). Each imports only from the layers before it:
 
 1. **Tokens.** `src/toolbar/tokens.ts`, one typed module: colour by role and theme, the page's marks, the map's hues, type, space, radius, shadow and motion. It is declared on the host as custom properties (`--ink`, `--space-sheet`, `--radius-chip`, `--font-option`, …). The tests read the module, and `design-md.test.ts` holds this file's front matter to it.
-2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel), plain props for a single control (Button, Toggle, Switch). So far: ChipGroup, Fold, Button, Toggle and Switch.
+2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel, Popover and its panel), plain props for a single control (Button, Toggle, Switch, Field). So far: ChipGroup, Fold, Button, Toggle, Switch, Field and Popover.
 3. **Patterns.** PropRow, ScopeSection, SiteCard, CopySplit, Identity and the like: primitives composed, taking `panel-view` types. None has moved yet.
 4. **Views.** The panel, the list, the Inspector. They render only what `panelView()` decides, words included.
 
@@ -594,7 +599,7 @@ The views' rules (`styles.ts`) are not in a layer yet. They come after every lay
 
 **The surface.** `src/toolbar/surface/` owns the shadow root: the stylesheet, the theme, the reader's text size, `lang="en"`, and an error boundary, so a throw stops at Loupe and never reaches the host's layout. It has two adapters: the Toolbar's host on the body, and `<Surface>`, which draws any primitive in place. The tests (`surface/render.fixture.tsx`) and the fixture's `/workbench` page use the second. The workbench draws each primitive in light and dark, under forced colours, with reduced motion and at a larger text size.
 
-**Esc between layers.** UI SDK coordinates Esc among its own popups. Loupe's window-level Esc lives in `escape.ts`: picking, then Copy Proposal's popover, then the selection, each claiming it while it is up. Whatever none of them takes stays the app's.
+**Esc between layers.** UI SDK coordinates Esc among its own popups, Popover among them. Loupe's window-level Esc lives in `escape.ts`: picking, then Copy Proposal's popover, then the selection, each claiming it while it is up. The popover's claim only keeps the key from the selection: UI SDK, which hears it after the window's capture, closes the popover. Whatever none of them takes stays the app's.
 
 ## Components
 
@@ -675,7 +680,7 @@ A split button filling the footer beside the theme button (Paper, "Copy flow v2 
 - **Copied:** the split turns `copied-bg` green with a check, "Copied", for 2.5 seconds, and a toast stands over the footer for 4: a dark `toast` slab with 14px corners, a 24px teal badge with a check, "Copied “Button variant in MemberRowMenu”" (12px/600, the title cut with an ellipsis) and "Paste it into your coding agent" (11px, `toast-muted`). It rises in over 180ms. A status region that stays mounted says the same to a screen reader.
 - **Details:** the chevron opens a popover over the footer, 8px in from its sides and 10px above it, card-white with 18px corners, the popover shadow and a caret pointing down at the chevron. It holds **Title** (prefilled from the first change until the designer writes their own) and **Designer** *optional* ("Who is asking for this?"), 36px fields in `sunk` with a 1px `field-edge` ring and 10px corners; focus turns a field card-white with a 1.5px coral ring and the glow. Then "Copy with these details" as a full-width primary. Pressed without a title, the field takes a 1.5px alert ring and focus, and says "Give the Proposal a title: it heads the text your coding agent reads." under it in amber.
 - **Not copied:** a refused copy from the main half turns the split amber, "Not copied", and either way a popover says why: a 24px amber badge with "!", "Couldn’t copy automatically" (13px/600, `warn-fg`) and the reason in `warn-muted` ("The clipboard needs localhost or HTTPS. Your Proposal is below."). Then, when it was built, the Proposal's text in a 130px well (10px mono, fading out at its foot) with **Select all** and **Try again** (primary, focused). Its caret points at the half the copy came from.
-- **Closing:** Esc anywhere, a press outside it and its split, or the chevron again. Focus goes back to the half that opened it.
+- **Closing:** Esc anywhere, a press outside it and its split, focus leaving it, or the chevron again. Focus inside goes back to the half that opened it. Both popovers are the Popover primitive, their fields Field (`ui/`).
 
 ### Notices and status
 - **Status strip:** salmon with its ring, 14px corners, 12px text, `kbd` keys.

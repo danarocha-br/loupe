@@ -263,6 +263,8 @@ export const TYPE = {
   action: { family: "sans", weight: 600, size: 13, lineHeight: 17 },
   /** Option chips. */
   option: { family: "sans", weight: 400, size: 12, lineHeight: 16 },
+  /** Under a control: a field's hint or error, a refused copy's reason. */
+  caption: { family: "sans", weight: 400, size: 12, lineHeight: 17 },
   /** Field labels, the "Inside" label. */
   label: { family: "sans", weight: 500, size: 11, lineHeight: 14 },
   /** The counts beside card titles. */
