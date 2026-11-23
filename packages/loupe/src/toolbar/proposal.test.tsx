@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
@@ -12,7 +12,9 @@ import { memoryRequest, memorySource } from "./flags.fixture.js";
 import { setFlagSource } from "./flags-store.js";
 import Toolbar from "./index.js";
 import { copyProposal } from "./copy.js";
+import { OPEN_KEY } from "./launcher-place.js";
 import { collectProposal, collectProposalText, pageTheme, startTracking } from "./proposal.js";
+import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
 const project = vi.hoisted(() => ({
@@ -87,8 +89,15 @@ const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot a
 const footerButton = (text: string) =>
   [...shadow().querySelectorAll<HTMLButtonElement>(".footer button")].find((button) => button.textContent === text);
 
+// The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
+beforeAll(async () => {
+  await loadPanel();
+});
+
 beforeEach(async () => {
   resetLoupe();
+  // These read the open panel: it was left open in this browser.
+  localStorage.setItem(OPEN_KEY, "open");
   project.read = knownProject;
   container = document.createElement("div");
   document.body.append(container);

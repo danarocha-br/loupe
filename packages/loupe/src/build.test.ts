@@ -35,15 +35,24 @@ function relativeImports(code: string): string[] {
   return [...found];
 }
 
-/** Every `dist` file reachable from `entry`, following relative imports. */
-function closure(entry: string): Set<string> {
+/** The relative specifiers a built module imports statically: what loads with it. */
+function staticImports(code: string): string[] {
+  const found = new Set<string>();
+  for (const match of code.matchAll(/(?:\bfrom\s*|^\s*import\s*)["'](\.{1,2}\/[^"']+)["']/gm)) {
+    found.add(match[1]!);
+  }
+  return [...found];
+}
+
+/** Every `dist` file reachable from `entry`, following relative imports (static ones only, if `only` says so). */
+function closure(entry: string, only: (code: string) => string[] = relativeImports): Set<string> {
   const seen = new Set<string>();
   const queue = [entry];
   while (queue.length > 0) {
     const file = queue.pop()!;
     if (seen.has(file)) continue;
     seen.add(file);
-    for (const specifier of relativeImports(read(file))) {
+    for (const specifier of only(read(file))) {
       const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier));
       expect(existsSync(path.join(dist, target)), `${file} imports ${specifier}, missing from dist`).toBe(true);
       queue.push(target);
@@ -118,6 +127,21 @@ describe("dist", () => {
     }
   });
 
+  // The collapsed pill costs the page little (2026-11-23): the open panel is a chunk of
+  // its own, which the host's bundler splits off at `start.js`'s dynamic import.
+  it("loads the open panel only through a dynamic import, never with the pill", () => {
+    const pill = closure("toolbar/index.js", staticImports);
+    for (const panel of ["toolbar/open.js", "toolbar/panel.js", "toolbar/highlight.js", "toolbar/proposal.js", "proposal/text.js"]) {
+      expect(pill, panel).not.toContain(panel);
+    }
+    // The primitives and UI SDK are the panel's: the pill adopts the stylesheet's strings alone (ui/styles.js).
+    for (const primitive of ["toolbar/ui/index.js", "toolbar/ui/chip-group/chip-group.js"]) expect(pill, primitive).not.toContain(primitive);
+    expect(pill).toContain("toolbar/ui/chip-group/chip-group.css.js");
+    for (const file of pill) expect(read(file), file).not.toMatch(/from\s*"@ui-sdk\//);
+    expect(read("toolbar/start.js")).toMatch(/\bimport\(\s*"\.\/open\.js"\s*\)/);
+    expect(closure("toolbar/index.js")).toContain("toolbar/panel.js");
+  });
+
   // Invariant 3: the host's production bundler folds the condition to the null stub (PER-127).
   it("leaves process.env.NODE_ENV around the toolbar's dynamic import in mount.js", () => {
     const mount = read("mount.js");
@@ -164,6 +188,7 @@ describe("dist", () => {
     expect(compiled("toolbar/launcher.js")).toBe(true);
     // ToolbarOpen and usePicker: compiled, a hover leaves the Panel alone (hover-render.test.tsx).
     expect(compiled("toolbar/index.js")).toBe(true);
+    expect(compiled("toolbar/open.js")).toBe(true);
     expect(compiled("toolbar/picker.js")).toBe(true);
     expect(compiled("toolbar/ui/chip-group/chip-group.js")).toBe(true);
     for (const file of jsFiles().filter((file) => file.startsWith("runtime/") || file === "mount.js")) {

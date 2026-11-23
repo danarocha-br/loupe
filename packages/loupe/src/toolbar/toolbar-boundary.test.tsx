@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// The Toolbar's error boundary (surface/): a throw while it renders stops at Loupe,
-// and the host's layout keeps rendering. `<LoupeMount />` has Suspense only.
+// The Toolbar's error boundary (surface/): a throw anywhere in it stops at Loupe, and
+// the host's layout keeps rendering. `<LoupeMount />` has Suspense only, and the open
+// panel has a boundary of its own (index.tsx `PanelBoundary`); this is the pill's.
 
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -8,11 +9,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { devMount } from "../mount.js";
 import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
+import { OPEN_KEY } from "./launcher-place.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
-vi.mock("./panel.js", () => ({
-  Panel() {
-    throw new Error("the panel broke");
+vi.mock("./launcher.js", () => ({
+  Launcher() {
+    throw new Error("the pill broke");
   },
 }));
 
@@ -25,6 +27,8 @@ afterEach(() => {
 
 it("stops a throw in the Toolbar at Loupe: the host's page goes on rendering", async () => {
   resetLoupe();
+  // Collapsed: the pill is what renders, and throws.
+  localStorage.setItem(OPEN_KEY, "closed");
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
   const LoupeMount = devMount(Toolbar);
   const container = document.createElement("div");

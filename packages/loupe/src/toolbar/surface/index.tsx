@@ -10,7 +10,7 @@
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { CSS as VIEWS_CSS, GROUND_CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "../styles.js";
-import { PRIMITIVES_CSS } from "../ui/index.js";
+import { PRIMITIVES_CSS } from "../ui/styles.js";
 
 export type Theme = "light" | "dark";
 

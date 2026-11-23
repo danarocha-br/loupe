@@ -5,11 +5,13 @@
 
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { devMount } from "../mount.js";
 import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
+import { OPEN_KEY } from "./launcher-place.js";
 import { Page } from "./members.fixture.js";
+import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
 const renders = vi.hoisted(() => ({ Panel: 0, Highlight: 0 }));
@@ -42,8 +44,14 @@ vi.mock("./highlight.js", async (importOriginal) => {
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 
+// The open panel's module, loaded first, so the panel opens in the mount.
+beforeAll(async () => {
+  await loadPanel();
+});
+
 beforeEach(() => {
   resetLoupe();
+  localStorage.setItem(OPEN_KEY, "open");
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

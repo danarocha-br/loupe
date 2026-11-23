@@ -7,27 +7,28 @@
 // nothing of it covers the product but the outlines and the revision marks. It
 // reaches the page only through `<LoupeMount />`'s development-only dynamic import,
 // so a production build never holds this module.
+//
+// This module is the collapsed pill's (2026-11-23): the shadow root, the theme, the
+// column and whether the panel is open. The open panel is a module of its own
+// (`open.tsx`), loaded through `lazy()`, so the host's bundler splits it off and a
+// page with Loupe collapsed doesn't load it until it is opened, or preloaded on idle.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import type { LayerStatus } from "../layer-status.js";
-import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
-import { useDeselect } from "./deselect.js";
-import { type Column, columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.js";
-import { Highlight } from "./highlight.js";
-import { useInstanceMeta } from "./instance-meta.js";
+import { columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.js";
 import { Launcher } from "./launcher.js";
-import { useLayerStatus } from "./notices.js";
-import { usePageVersion } from "./page.js";
-import { Panel } from "./panel.js";
-import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
-import { type SelectMode, usePicker } from "./picker.js";
-import { startToolbar } from "./start.js";
-import { SurfaceBoundary, type Theme, useTheme, useToolbarSurface } from "./surface/index.js";
+import { OPEN_KEY } from "./launcher-place.js";
+import type { SelectMode } from "./picker.js";
+import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
+import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
 
 export type { Theme } from "./surface/index.js";
 
+/**
+ * The surface (surface/) holds the shadow root, its stylesheet, theme, text size and
+ * language, and a boundary: a throw anywhere in the Toolbar stops at Loupe.
+ */
 export default function Toolbar() {
   return (
     <SurfaceBoundary>
@@ -43,6 +44,48 @@ function ToolbarSurface() {
   return createPortal(<ToolbarBody host={root.host as HTMLElement} />, root);
 }
 
+/** Open or closed, as it was left in this browser: closed on a first visit. */
+function storedOpen(): boolean {
+  try {
+    return localStorage.getItem(OPEN_KEY) === "open";
+  } catch {
+    return false;
+  }
+}
+
+function keepOpen(open: boolean) {
+  try {
+    localStorage.setItem(OPEN_KEY, open ? "open" : "closed");
+  } catch {
+    // Not remembered: the next page load starts closed.
+  }
+}
+
+/**
+ * The open panel, when it opens before its module has loaded: a Suspense boundary's
+ * fallback is nothing. A new one each time, since `lazy()` keeps a failed load: the
+ * next open tries the module again (`loadPanel()` forgets a failure too).
+ */
+const lazyToolbarOpen = () => lazy(() => loadPanel().then((panel) => ({ default: panel.ToolbarOpen })));
+
+/**
+ * Keeps a failure of the panel's inside Loupe: its module not loading (the dev server
+ * restarting, a chunk gone stale), or the panel throwing as it renders. The host's page
+ * never sees it; Loupe folds back to its pill, and the next click tries again.
+ */
+class PanelBoundary extends Component<{ onFail(error: unknown): void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    this.props.onFail(error);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 /** The drawer's close and the handle's tuck (styles.ts `.panel.closing`, `.launcher.leaving`). */
 const CLOSE_MS = 220;
 const TUCK_MS = 160;
@@ -52,6 +95,9 @@ function animates(): boolean {
   return typeof matchMedia === "function";
 }
 
+/** With the pointer over the pill, or focus on it: it is about to be opened. */
+const preload = () => void loadPanel().catch(() => {});
+
 function ToolbarBody({ host }: { host: HTMLElement }) {
   const [selected, setSelected] = useState<string | null>(null);
   // The header's select tool (2026-11-20): one Instance, or every Instance from its
@@ -60,7 +106,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // Select multiple, widened to every Instance of the component on the page. A new selection starts at its call site again.
   const [widened, setWidened] = useState(false);
   const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(() => !storedOpen());
   // A handle and its drawer: opening tucks the pill into its side while the panel slides
   // out of its own; closing slides the panel back out of the window, and once it has gone
   // the page takes its column back and the pill slides out of its side again.
@@ -79,6 +125,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     focusSwap.current = focusIsHere();
     // Before the panel renders: the page map measures the page as it will be beside it.
     reserveColumn(columnWidthFor(window.innerWidth));
+    keepOpen(true);
     setHidden(false);
     if (!animates()) return;
     setTucking(true);
@@ -88,6 +135,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const hide = () => {
     if (closing) return;
     focusSwap.current = focusIsHere();
+    keepOpen(false);
     if (!animates()) {
       releaseColumn();
       setHidden(true);
@@ -126,10 +174,31 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // pressed, so a keyboard isn't dropped on the page (review 2026-11-20).
   const focusSwap = useRef(false);
   useEffect(() => {
+    if (!hidden || !focusSwap.current) return;
+    focusSwap.current = false;
+    host.shadowRoot?.querySelector<HTMLElement>(".launcher")?.focus();
+  }, [hidden, host]);
+  // To the heading once the panel is there: on the click itself, or once its module has loaded.
+  const shown = useCallback(() => {
     if (!focusSwap.current) return;
     focusSwap.current = false;
-    host.shadowRoot?.querySelector<HTMLElement>(hidden ? ".launcher" : "h2.name")?.focus();
-  }, [hidden, host]);
+    host.shadowRoot?.querySelector<HTMLElement>("h2.name")?.focus();
+  }, [host]);
+  // While collapsed, the panel's module loads when the page is idle, so opening doesn't wait for it.
+  useEffect(() => (hidden ? preloadPanelWhenIdle() : undefined), [hidden]);
+  // Loaded already, it renders in the click; else through `lazy()`. Chosen as it opens, so it never remounts while open.
+  const ToolbarOpen = useMemo(() => (hidden ? null : (loadedPanel()?.ToolbarOpen ?? lazyToolbarOpen())), [hidden]);
+  // The panel failed to load or to render: the page gets its column back and the pill
+  // comes back, with focus if the panel had it. Open stays kept: a reload tries again.
+  const failed = (error: unknown) => {
+    console.warn("[loupe] The panel couldn't open; click the Loupe pill to try again.", error);
+    focusSwap.current ||= focusIsHere();
+    clearTimeout(tuckTimer.current);
+    releaseColumn();
+    setTucking(false);
+    setClosing(false);
+    setHidden(true);
+  };
   const focusIsHere = () => (host.shadowRoot?.activeElement ?? null) !== null;
   const select = (id: string | null, next?: SelectMode) => {
     setSelected(id);
@@ -142,138 +211,29 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   };
   return (
     <>
-      {(hidden || tucking) && <Launcher leaving={!hidden} onOpen={open} />}
-      {!hidden && (
-        <ToolbarOpen
-          host={host}
-          column={column}
-          selected={selected}
-          onSelect={select}
-          mode={mode}
-          scope={scope}
-          onScope={changeScope}
-          marksHidden={marksHidden}
-          onMarks={() => setMarksHidden((was) => !was)}
-          onHide={hide}
-          closing={closing}
-          theme={theme}
-          onTheme={toggleTheme}
-        />
+      {(hidden || tucking) && <Launcher leaving={!hidden} onOpen={open} onPreload={preload} />}
+      {ToolbarOpen && (
+        <PanelBoundary onFail={failed}>
+          <Suspense fallback={null}>
+            <ToolbarOpen
+              host={host}
+              column={column}
+              selected={selected}
+              onSelect={select}
+              mode={mode}
+              scope={scope}
+              onScope={changeScope}
+              marksHidden={marksHidden}
+              onMarks={() => setMarksHidden((was) => !was)}
+              onHide={hide}
+              closing={closing}
+              theme={theme}
+              onTheme={toggleTheme}
+              onShown={shown}
+            />
+          </Suspense>
+        </PanelBoundary>
       )}
-    </>
-  );
-}
-
-/**
- * What the panel shows, from `panelView()`. "Appears on interaction" remembers components
- * across page versions: `panelView()` takes what it returned last time and returns the
- * next, kept in a ref read while rendering. That is why this is a hook of its own: React
- * Compiler skips a function that reads a ref in render, and the skip stays here rather
- * than taking `ToolbarOpen` with it, whose memoised `<Panel>` keeps a hover from
- * re-rendering the whole Panel (ADR 0003).
- */
-function usePanelView(debug: LoupeDebug, layer: LayerStatus | null, selected: string | null, scope: Scope, version: number): PanelView {
-  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
-  // `version` is the trigger: it moves whenever the registry or the page changes.
-  const view = useMemo(() => panelView({ debug, layer, selected, scope, seen: seen.current }), [debug, layer, selected, scope, version]);
-  seen.current = view.seen;
-  return view;
-}
-
-/** Everything that watches the page, mounted only while the panel is open. */
-function ToolbarOpen({
-  host,
-  column,
-  selected,
-  onSelect,
-  mode,
-  scope,
-  onScope,
-  marksHidden,
-  onMarks,
-  onHide,
-  closing,
-  theme,
-  onTheme,
-}: {
-  host: Element;
-  column: Column;
-  selected: string | null;
-  onSelect(id: string | null, mode?: SelectMode): void;
-  mode: SelectMode;
-  scope: Scope;
-  onScope(scope: Scope): void;
-  marksHidden: boolean;
-  onMarks(): void;
-  onHide(): void;
-  closing: boolean;
-  theme: Theme;
-  onTheme(): void;
-}) {
-  // An inline function: React Compiler skips a component whose useMemo takes a reference.
-  const debug = useMemo(() => debugOf(), []);
-  const version = usePageVersion(host);
-  const layer = useLayerStatus(version);
-  const view = usePanelView(debug, layer, selected, scope, version);
-  useInstanceMeta(view.metaAnchor);
-  const [hovered, setHovered] = useState<string[]>([]);
-  // A row's hover can repeat as the pointer crosses its children: the same Instances change nothing.
-  const hover = useCallback(
-    (ids: string[]) => setHovered((previous) => (previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids)),
-    [],
-  );
-  const picker = usePicker(debug, host, (id) => {
-    onSelect(id);
-    setHovered([]);
-  });
-  // A select tool sets the scope at once, for the selection there is, and arms picking
-  // for the next one; pressed again while picking, it stops.
-  const tool = (next: SelectMode) => {
-    if (picker.picking && next === mode) {
-      picker.stop();
-      return;
-    }
-    onScope(next === "one" ? "instance" : "group");
-    if (!picker.picking) picker.start();
-  };
-  // Esc, or a click on the page outside what is selected, goes back to the list.
-  const selection = useMemo(
-    () => (selected === null ? [] : [selected, ...(view.outline.members ?? []).map((member) => member.id)]),
-    [selected, view.outline.members],
-  );
-  useDeselect({ debug, host, ids: selection, active: selected !== null && !picker.picking, onDeselect: () => onSelect(null) });
-
-  return (
-    <>
-      <Highlight
-        debug={debug}
-        version={version}
-        selected={selected}
-        selectedLabel={view.outline.label}
-        hovered={hovered}
-        members={view.outline.members}
-        marks={view.marks}
-        pick={picker.picking ? { hovered: picker.hovered, mode } : null}
-        marksHidden={marksHidden}
-      />
-      <Panel
-        debug={debug}
-        view={view}
-        layer={layer}
-        column={column}
-        mode={mode}
-        picking={picker.picking}
-        onTool={tool}
-        onSelect={onSelect}
-        onScope={onScope}
-        onHover={hover}
-        marksHidden={marksHidden}
-        onMarks={onMarks}
-        onHide={onHide}
-        closing={closing}
-        theme={theme}
-        onTheme={onTheme}
-      />
     </>
   );
 }

@@ -5,9 +5,6 @@
 // (`panel-view/`, `runtime/`, the views), so it can become a package by moving it;
 // nothing outside it imports UI SDK. `src/toolbar/ui/layers.test.ts` holds both.
 
-import { CHIP_GROUP_CSS } from "./chip-group/chip-group.js";
-
 export { Chip, ChipGroup, type ChipGroupProps, type ChipProps } from "./chip-group/chip-group.js";
-
-/** Every primitive's CSS, in order: the stylesheet's `primitives` layer. */
-export const PRIMITIVES_CSS: string = [CHIP_GROUP_CSS].join("\n");
+// The CSS is `./styles.js`'s, apart, so the collapsed pill loads none of the components.
+export { PRIMITIVES_CSS } from "./styles.js";

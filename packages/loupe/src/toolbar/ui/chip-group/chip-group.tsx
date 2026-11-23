@@ -5,8 +5,6 @@
 import { Radio, RadioGroup } from "@ui-sdk/react/radio";
 import { createContext, type KeyboardEvent, type MouseEvent, type ReactNode, useContext } from "react";
 
-export { default as CHIP_GROUP_CSS } from "./chip-group.css?inline";
-
 type DataAttributes = { [name: `data-${string}`]: string | undefined };
 
 export type ChipGroupProps = {
