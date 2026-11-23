@@ -7,7 +7,7 @@
 // put back as it was when it closes. The Proposal's viewport is the width the
 // page is laid out at, so it reads `pageWidth()`.
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 /** The panel's width, and from `WIDE` on a little more. */
 const WIDTH = 360;
@@ -39,7 +39,46 @@ export function columnFor(viewport: number): Column {
   return { width, docked: viewport >= width * ROOM };
 }
 
-/** Reserves the column while `open`; returns the panel's width and whether it is docked. */
+/** Puts the root's right margin back as it was; null while nothing is reserved. */
+let restore: (() => void) | null = null;
+
+/**
+ * Takes `width` px of the page for the panel's column, now: called from the click that
+ * opens the panel, before it renders, so nothing measures the page at its full width.
+ * Idempotent; a second call with another width (the viewport crossed `WIDE`) just resizes it.
+ */
+export function reserveColumn(width: number): void {
+  if (typeof document === "undefined" || width === 0) return;
+  const root = document.documentElement;
+  if (restore === null) {
+    const before = root.style.getPropertyValue("margin-right");
+    const priority = root.style.getPropertyPriority("margin-right");
+    restore = () => {
+      if (before === "") root.style.removeProperty("margin-right");
+      else root.style.setProperty("margin-right", before, priority);
+    };
+  }
+  root.style.setProperty("margin-right", `${width}px`);
+  reserved = width;
+}
+
+/** Gives the column back, now: called in the same callback that unmounts the panel. */
+export function releaseColumn(): void {
+  restore?.();
+  restore = null;
+  reserved = 0;
+}
+
+/** The column a viewport this wide gives the panel: 0 where the panel overlays it. */
+export function columnWidthFor(viewport: number): number {
+  const column = columnFor(viewport);
+  return column.docked ? column.width : 0;
+}
+
+/**
+ * Reserves the column while `open`; returns the panel's width and whether it is docked.
+ * In a layout effect, so the page has its new width before the frame is painted.
+ */
 export function useColumn(open: boolean): Column {
   const [viewport, setViewport] = useState(() => (typeof window === "undefined" ? 0 : window.innerWidth));
   useEffect(() => {
@@ -49,18 +88,10 @@ export function useColumn(open: boolean): Column {
   }, []);
   const column = columnFor(viewport);
   const margin = open && column.docked ? column.width : 0;
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (margin === 0) return;
-    const root = document.documentElement;
-    const before = root.style.getPropertyValue("margin-right");
-    const priority = root.style.getPropertyPriority("margin-right");
-    root.style.setProperty("margin-right", `${margin}px`);
-    reserved = margin;
-    return () => {
-      reserved = 0;
-      if (before === "") root.style.removeProperty("margin-right");
-      else root.style.setProperty("margin-right", before, priority);
-    };
+    reserveColumn(margin);
+    return releaseColumn;
   }, [margin]);
   return column;
 }

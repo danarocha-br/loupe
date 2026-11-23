@@ -10,7 +10,7 @@ import type { Scope, Source } from "../../runtime/store.js";
 import { appValue, formatCurrent } from "../format.js";
 import type { Reads } from "./reads.js";
 import { type Counted, isSuspended, keepingOwn, type ScopeLabels, type ScopeView, valueCounts } from "./scopes.js";
-import type { Control, PropItem, Write } from "./types.js";
+import type { Control, PropGlyph, PropItem, Write } from "./types.js";
 import { countsText, EXPLAIN, heldNotice, keepingText, NOT_SET, REASON_TITLES, RESET, RESET_TO, sameOnAll, sourceText, THE_APP, THIS_CALL_SITE, valueText } from "./words.js";
 
 /** A mounted, browser-rendered, adapted Instance while Overrides are on: what its rows can edit. */
@@ -24,10 +24,24 @@ export type Editing = {
   keyAt: Partial<Record<Scope, number | null>>;
 };
 
+/** A prop's glyph, by what it does: its size, its look, an off state, focus, label text, a state, or anything else. */
+function glyphOf(row: PropRow): PropGlyph {
+  const name = row.name.toLowerCase();
+  if (name.endsWith("size")) return "size";
+  if (/variant|tone|intent|appearance|colou?r|theme|kind/.test(name)) return "variant";
+  if (name.includes("focus")) return "focus";
+  if (/disabled|hidden|readonly/.test(name)) return "off";
+  if (row.text === true || name === "children") return "text";
+  const options = row.options ?? [];
+  if (row.state === true || (options.length === 2 && options.includes(true) && options.includes(false))) return "state";
+  return "other";
+}
+
 /** What every row says the same way at any scope. */
 function common(row: PropRow, overridden: boolean) {
   return {
     name: row.name,
+    glyph: glyphOf(row),
     label: row.label,
     codeName: row.label === row.name ? null : row.name,
     dot: row.editable ? (overridden ? "on" : "off") : null,

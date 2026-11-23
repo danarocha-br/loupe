@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { columnFor, pageWidth, reservedWidth, useColumn } from "./dock.js";
+import { columnFor, columnWidthFor, pageWidth, releaseColumn, reserveColumn, reservedWidth, useColumn } from "./dock.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,5 +40,27 @@ describe("the panel's column", () => {
     expect(document.documentElement.style.marginRight).toBe("8px");
     expect(reservedWidth()).toBe(0);
     act(() => root.unmount());
+  });
+
+  it("is taken and given back at once, from the click that opens and the callback that unmounts (2026-11-22)", () => {
+    document.documentElement.style.setProperty("margin-right", "12px");
+    reserveColumn(360);
+    expect(document.documentElement.style.marginRight).toBe("360px");
+    expect(reservedWidth()).toBe(360);
+    reserveColumn(400);
+    expect(document.documentElement.style.marginRight).toBe("400px");
+    expect(reservedWidth()).toBe(400);
+    releaseColumn();
+    expect(document.documentElement.style.marginRight).toBe("12px");
+    expect(reservedWidth()).toBe(0);
+  });
+
+  it("gives no column where the panel overlays the page", () => {
+    expect(columnWidthFor(1280)).toBe(360);
+    expect(columnWidthFor(1600)).toBe(400);
+    expect(columnWidthFor(700)).toBe(0);
+    reserveColumn(columnWidthFor(700));
+    expect(document.documentElement.style.marginRight).toBe("");
+    expect(reservedWidth()).toBe(0);
   });
 });

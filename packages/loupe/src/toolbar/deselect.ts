@@ -67,7 +67,8 @@ export function useDeselect({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (inTextField(event.composedPath()[0])) return;
-      if (host.shadowRoot?.querySelector("dialog[open]")) return;
+      // Copy Proposal's popover closes on this Esc (copy-flow.tsx), and nothing else does.
+      if (host.shadowRoot?.querySelector(".copy-popover")) return;
       if (appOverlayOpen()) return;
       latest.current.onDeselect();
     };

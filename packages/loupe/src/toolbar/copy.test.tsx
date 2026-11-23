@@ -10,7 +10,8 @@ import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
-import { TITLE_MISSING } from "./copy-dialog.js";
+import { BLOCKED } from "./copy.js";
+import { TITLE_MISSING } from "./copy-flow.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -66,10 +67,17 @@ async function until(done: () => boolean, tries = 100): Promise<void> {
   expect(done()).toBe(true);
 }
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-const dialog = () => shadow().querySelector<HTMLDialogElement>("dialog");
+/** The popover over the footer: the details to copy with, or why a copy failed. */
+const popover = () => shadow().querySelector<HTMLElement>(".copy-popover");
+const toast = () => shadow().querySelector<HTMLElement>(".copy-toast");
+/** What a screen reader hears: the status region the flow keeps mounted. */
+const announced = () => shadow().querySelector("[data-testid=copy-status]")?.textContent ?? "";
 const button = (text: string, scope: ParentNode = shadow()) =>
   [...scope.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent === text);
-const field = <T extends HTMLInputElement | HTMLTextAreaElement>(selector: string) => dialog()?.querySelector<T>(selector) as T;
+const field = <T extends HTMLInputElement | HTMLTextAreaElement>(selector: string) => popover()?.querySelector<T>(selector) as T;
+/** The split button's two halves: Copy Proposal, and the chevron that opens the details. */
+const copy = () => shadow().querySelector<HTMLButtonElement>("[data-copy]") as HTMLButtonElement;
+const more = () => shadow().querySelector<HTMLButtonElement>("[data-copy-details]") as HTMLButtonElement;
 
 /** Types into a controlled field the way React hears it. */
 function type(element: HTMLInputElement | HTMLTextAreaElement, value: string): void {
@@ -89,10 +97,16 @@ function copiedProposal(): Proposal {
   return proposal;
 }
 
-async function openDialog(): Promise<void> {
-  act(() => shadow().querySelector<HTMLButtonElement>("[data-copy]")?.click());
-  // Open once the preview has counted: the counts' live region is there from the start, empty.
-  await until(() => (dialog()?.querySelector(".counts")?.textContent ?? "") !== "");
+/** Opens the details popover, once its title is prefilled from the suggestion. */
+async function openDetails(): Promise<void> {
+  act(() => more().click());
+  await until(() => (field<HTMLInputElement>('input[name="title"]')?.value ?? "") !== "");
+}
+
+/** A change, so there is something to copy. */
+async function change(): Promise<void> {
+  act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+  await settle();
 }
 
 beforeEach(async () => {
@@ -127,36 +141,60 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("the Copy Proposal dialog", () => {
-  it("opens from the footer, prefilled with a title, and counts what the text will hold", async () => {
-    expect(button("Copy Proposal")?.disabled).toBe(true);
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)", () => {
+  it("copies in one click under the suggested title, then says so on the button and in a toast", async () => {
+    expect(copy().disabled).toBe(true);
+    expect(more().disabled).toBe(true);
+    await change();
+    act(() => copy().click());
+    await until(() => copies.length === 1);
     await settle();
-    await openDialog();
 
-    expect(dialog()?.open).toBe(true);
-    expect(dialog()?.getAttribute("aria-labelledby")).toBe("loupe-copy-title");
-    // Only the sections scroll: Cancel and Copy stay in view at any height or zoom (layout review 2026-11-20).
-    expect(dialog()?.querySelector(".body .sec")).not.toBeNull();
-    expect(dialog()?.querySelector(".body .actions")).toBeNull();
-    expect(dialog()?.querySelector("form > .actions")).not.toBeNull();
-    expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Button variant in MemberRow");
-    expect(dialog()?.querySelector(".counts")?.textContent).toBe("1 change · 0 held for review");
-    expect([...(dialog()?.querySelectorAll("[data-entry]") ?? [])].map((entry) => entry.querySelector("span")?.textContent)).toEqual([
-      "1variant on 1st of 1 <Button> in MemberRow, every Instance",
-    ]);
-    // The delta names itself "Change 1": no second "Change" in the field's name.
-    expect(dialog()?.querySelector("[data-entry] .key")?.getAttribute("aria-label")).toBe("Change 1");
-    // The alert region is there, empty, until something fails.
-    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe("");
+    expect(copiedProposal().title).toBe("Button variant in MemberRow");
+    expect(copyForm().title).toBeNull();
+    expect(copy().textContent).toBe("Copied");
+    expect(shadow().querySelector(".split")?.getAttribute("data-state")).toBe("copied");
+    expect(toast()?.textContent).toBe("Copied “Button variant in MemberRow”Paste it into your coding agent");
+    // The region was there, empty, before the copy: what lands in it is announced.
+    expect(announced()).toBe("Copied “Button variant in MemberRow”. Paste it into your coding agent.");
+    expect(popover()).toBeNull();
   });
 
-  it("holds Copy back while the title is empty, and says so under the field", async () => {
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
+  it("opens the details from the chevron, prefilled and focused, and copies with them", async () => {
+    await change();
+    const records = registry().store.records();
+    await openDetails();
+    expect(more().getAttribute("aria-expanded")).toBe("true");
+    expect(popover()?.getAttribute("role")).toBe("dialog");
+    const title = field<HTMLInputElement>('input[name="title"]');
+    expect(title.value).toBe("Button variant in MemberRow");
+    expect(shadow().activeElement).toBe(title);
+    expect(field<HTMLInputElement>('input[name="designer"]').placeholder).toBe("Who is asking for this?");
+
+    type(title, "Calmer rows");
+    type(field('input[name="designer"]'), "Dana");
+    act(() => button("Copy with these details")?.click());
+    await until(() => copies.length === 1);
     await settle();
-    await openDialog();
-    expect(dialog()?.querySelector("h2")?.textContent).toBe("Copy Proposal");
-    const submit = button("Copy", dialog() as HTMLDialogElement);
+
+    const text = copies[0] ?? "";
+    expect(text.startsWith("# Calmer rows\norbix-ai@abcdef1 · by Dana\n")).toBe(true);
+    expect(text).toContain("`pnpm -C apps/app exec loupe locate` with this whole Proposal");
+    expect(copiedProposal()).toMatchObject({ formatVersion: 2, title: "Calmer rows", designer: "Dana" });
+    expect(popover()).toBeNull();
+    expect(toast()?.textContent).toContain("Copied “Calmer rows”");
+    // Copying clears nothing, and the next copy starts from what was typed.
+    expect(registry().store.records()).toEqual(records);
+    expect(shadow().activeElement).toBe(more());
+    await openDetails();
+    expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Calmer rows");
+    expect(field<HTMLInputElement>('input[name="designer"]').value).toBe("Dana");
+  });
+
+  it("holds the details' copy back while the title is empty, and says so under the field", async () => {
+    await change();
+    await openDetails();
+    const submit = button("Copy with these details");
     const title = field<HTMLInputElement>('input[name="title"]');
     type(title, "   ");
     // Never disabled with no reason given (review 2026-11-20): pressed, it says what is missing.
@@ -164,93 +202,115 @@ describe("the Copy Proposal dialog", () => {
     act(() => submit?.click());
     await settle();
     expect(copies).toEqual([]);
-    expect(dialog()?.open).toBe(true);
+    expect(popover()).not.toBeNull();
     expect(title.getAttribute("aria-invalid")).toBe("true");
-    expect(dialog()?.querySelector(`#${title.getAttribute("aria-describedby")}`)?.textContent).toBe(TITLE_MISSING);
+    expect(popover()?.querySelector(`#${title.getAttribute("aria-describedby")}`)?.textContent).toBe(TITLE_MISSING);
     expect(shadow().activeElement).toBe(title);
     type(title, "Calmer rows");
     expect(title.hasAttribute("aria-invalid")).toBe(false);
-    expect(dialog()?.querySelector(".field-error")).toBeNull();
+    expect(popover()?.querySelector(".field-error")).toBeNull();
   });
 
-  it("copies one text with the rules, the title, designer and notes, and clears nothing", async () => {
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    const records = registry().store.records();
-    await openDialog();
-    type(field('input[name="title"]'), "Calmer rows");
-    type(field('input[name="designer"]'), "Dana");
-    type(field('[data-entry="c1"] textarea'), "Ghost reads as disabled on the dark theme.");
-    // As in a browser: while a modal dialog is open, nothing outside it takes focus.
-    const focus = HTMLElement.prototype.focus;
-    vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (this: HTMLElement) {
-      if (dialog()?.open && !dialog()?.contains(this)) return;
-      focus.call(this);
-    });
-    act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
-    await until(() => dialog() === null);
-
-    expect(copies).toHaveLength(1);
-    const text = copies[0] ?? "";
-    expect(text.startsWith("# Calmer rows\norbix-ai@abcdef1 · by Dana\n")).toBe(true);
-    expect(text).toContain("`pnpm -C apps/app exec loupe locate` with this whole Proposal");
-    expect(text).toContain('Note: "Ghost reads as disabled on the dark theme."');
-    const proposal = copiedProposal();
-    expect(proposal).toMatchObject({ formatVersion: 2, title: "Calmer rows", designer: "Dana" });
-    const [route] = proposal.routes;
-    expect(route?.changes[0]).toMatchObject({ action: "apply", note: "Ghost reads as disabled on the dark theme." });
-
-    expect(dialog()).toBeNull();
-    expect(button("Copied")).toBeDefined();
-    // Focus goes back to what opened the dialog.
-    expect(shadow().activeElement).toBe(shadow().querySelector("[data-copy]"));
-    expect(registry().store.records()).toEqual(records);
-
-    // The next copy starts from what was typed.
-    await settle();
-    await openDialog();
-    expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Calmer rows");
-    expect(field<HTMLInputElement>('input[name="designer"]').value).toBe("Dana");
-    expect(field<HTMLTextAreaElement>('[data-entry="c1"] textarea').value).toBe("Ghost reads as disabled on the dark theme.");
-  });
-
-  it("closes on Cancel and on Escape, copying nothing", async () => {
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    await openDialog();
-    act(() => button("Cancel", dialog() as HTMLDialogElement)?.click());
-    expect(dialog()).toBeNull();
-    await openDialog();
+  it("closes the details on a press outside, leaving focus where the press put it", async () => {
+    await change();
+    await openDetails();
     act(() => {
-      field('input[name="title"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
     });
-    expect(dialog()).toBeNull();
+    expect(popover()).toBeNull();
+    expect(shadow().activeElement).toBeNull();
+    // A press on the split button is the chevron's own: it doesn't count as outside.
+    await openDetails();
+    act(() => {
+      more().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
+    });
+    expect(popover()).not.toBeNull();
+  });
+
+  it("says why, with no text to copy, when the Proposal itself couldn't be built", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const proposal = await import("./proposal.js");
+    vi.spyOn(proposal, "collectProposal").mockRejectedValue(new Error("The project server didn’t answer."));
+    await change();
+    act(() => copy().click());
+    await until(() => popover() !== null);
+    expect(popover()?.querySelector('[role="alert"]')?.textContent).toBe("The project server didn’t answer.");
+    expect(popover()?.querySelector("textarea")).toBeNull();
+    expect(button("Select all")).toBeUndefined();
+    expect(button("Try again")).toBeDefined();
+  });
+
+  it("closes the details on Escape and on the chevron again, copying nothing", async () => {
+    await change();
+    await openDetails();
+    act(() => {
+      // Composed, as a browser's key events are: it reaches the window the popover listens on.
+      field('input[name="title"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
+    });
+    expect(popover()).toBeNull();
+    expect(shadow().activeElement).toBe(more());
+    await openDetails();
+    act(() => more().click());
+    expect(popover()).toBeNull();
+    expect(more().getAttribute("aria-expanded")).toBe("false");
     expect(copies).toEqual([]);
   });
 
-  it("copies under the suggested title and keeps following it while the designer leaves it alone", async () => {
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    await openDialog();
-    act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
-    await until(() => dialog() === null);
-    expect(copiedProposal().title).toBe("Button variant in MemberRow");
-    expect(copyForm().title).toBeNull();
-  });
-
-  it("keeps the dialog open and says why when the browser refuses the clipboard, with the text in the console", async () => {
+  it("says Not copied when the browser refuses the clipboard, shows the text, and tries again", async () => {
+    let refuse = true;
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: { writeText: async () => Promise.reject(new Error("Write permission denied.")) },
+      value: { writeText: async (text: string) => (refuse ? Promise.reject(new Error("Write permission denied.")) : void copies.push(text)) },
     });
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
-    await settle();
-    await openDialog();
-    act(() => button("Copy", dialog() as HTMLDialogElement)?.click());
-    await until(() => (dialog()?.querySelector('[role="alert"]')?.textContent ?? "") !== "");
-    expect(dialog()?.querySelector('[role="alert"]')?.textContent).toBe("Write permission denied. The Proposal is in the console.");
+    await change();
+    act(() => copy().click());
+    await until(() => popover() !== null && popover()?.querySelector("textarea")?.value !== "");
+
+    expect(copy().textContent).toBe("Not copied");
+    expect(shadow().querySelector(".split")?.getAttribute("data-state")).toBe("failed");
+    // From the button, the caret points at the button; from the details, at the chevron.
+    expect(popover()?.getAttribute("data-anchor")).toBe("copy");
+    expect(popover()?.querySelector("h3")?.textContent).toBe("Couldn’t copy automatically");
+    expect(popover()?.querySelector('[role="alert"]')?.textContent).toBe("Write permission denied. Your Proposal is below.");
+    const text = popover()?.querySelector("textarea") as HTMLTextAreaElement;
+    expect(text.readOnly).toBe(true);
+    expect(text.value.startsWith("# Button variant in MemberRow\n")).toBe(true);
     expect(String(info.mock.calls[0]?.[0])).toMatch(/^\[loupe\] Proposal:\n\n# Button variant in MemberRow\n/);
+
+    // Escape closes the popover alone: whatever is selected stays selected.
+    act(() => (button("Try again") as HTMLButtonElement).focus());
+    act(() => {
+      (button("Try again") as HTMLButtonElement).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
+    });
+    expect(popover()).toBeNull();
+    act(() => copy().click());
+    await until(() => popover() !== null && popover()?.querySelector("textarea")?.value !== "");
+    act(() => button("Select all")?.click());
+    const again = popover()?.querySelector("textarea") as HTMLTextAreaElement;
+    expect([again.selectionStart, again.selectionEnd]).toEqual([0, again.value.length]);
+
+    refuse = false;
+    act(() => button("Try again")?.click());
+    await until(() => copies.length === 1);
+    await settle();
+    expect(popover()).toBeNull();
+    expect(copy().textContent).toBe("Copied");
+  });
+
+  it("names the secure origin when the page has no clipboard at all, pointing at the chevron from the details", async () => {
+    Reflect.deleteProperty(navigator, "clipboard");
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await change();
+    await openDetails();
+    act(() => button("Copy with these details")?.click());
+    await until(() => popover()?.querySelector("h3") !== null && popover()?.querySelector("h3") !== undefined);
+
+    expect(popover()?.getAttribute("data-anchor")).toBe("details");
+    expect(popover()?.querySelector('[role="alert"]')?.textContent).toBe(`${BLOCKED} Your Proposal is below.`);
+    // A failed copy from the details leaves the button as it was: the popover says what happened.
+    expect(copy().textContent).toBe("Copy Proposal");
   });
 });

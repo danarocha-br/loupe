@@ -29,7 +29,7 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     ["light", LIGHT],
     ["dark", DARK],
   ])("keeps faint text at 4.5:1 on every surface it sits on, %s", (_, theme) => {
-    for (const surface of ["card", "hover", "sheet", "sunk"]) {
+    for (const surface of ["card", "hover", "well", "sunk"]) {
       expect(contrast(theme.faint as string, theme[surface] as string), surface).toBeGreaterThanOrEqual(4.5);
     }
   });
@@ -39,7 +39,9 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     ["dark", DARK],
   ])("draws what is found by its outline at 3:1, %s", (_, theme) => {
     expect(contrast(theme["field-edge"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
-    expect(contrast(theme["control-off"] as string, theme["switch-off"] as string)).toBeGreaterThanOrEqual(3);
+    // A switch is its edge and its filled half, with the card showing through the hole: both states at 3:1 on the card.
+    expect(contrast(theme["switch-off"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
+    expect(contrast(theme["switch-on"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
   });
 
   it("names its tokens by role, never by hue, and gives every one a dark value", () => {
@@ -51,9 +53,9 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     // Read the source, where the page's values still show as `${PAGE.…}`: the built string can't tell them apart.
     const source = readFileSync(new URL("./styles.ts", import.meta.url), "utf8");
     const rules = source.slice(source.indexOf("export const CSS = `")).split("\n");
-    // Shadows are surfaces' depth, not colour roles; the backdrop keeps a stand-in for engines where it can't inherit.
+    // Shadows are surfaces' depth, not colour roles.
     const literal = /#[0-9A-Fa-f]{6}\b|rgba?\(/;
-    const offenders = rules.filter((line) => literal.test(line) && !/shadow:/.test(line) && !line.includes("var(--backdrop, rgba("));
+    const offenders = rules.filter((line) => literal.test(line) && !/shadow:/.test(line));
     expect(offenders).toEqual([]);
   });
 });

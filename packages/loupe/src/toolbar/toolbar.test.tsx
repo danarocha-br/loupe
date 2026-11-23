@@ -648,6 +648,15 @@ describe("leaving a selection, and hiding the marks", () => {
     await keyEscape(textField());
     expect(selectedId()).toBe(ANA);
 
+    // Copy Proposal's popover closes on its own Esc, wherever its focus is.
+    await clickInPanel(pill("variant", '"default"'));
+    await clickInPanel(shadow().querySelector("[data-copy-details]") as HTMLButtonElement);
+    const copyButton = [...shadow().querySelectorAll<HTMLButtonElement>(".copy-popover button")].at(-1) as HTMLButtonElement;
+    act(() => copyButton.focus());
+    await keyEscape(copyButton);
+    expect(shadow().querySelector(".copy-popover")).toBeNull();
+    expect(selectedId()).toBe(ANA);
+
     await escape();
     expect(selectedId()).toBeNull();
   });
@@ -736,7 +745,6 @@ describe("a change landing on the page", () => {
   };
   const quiet = () => [...shadow().querySelectorAll<HTMLElement>(".ring, .mark")].map((outline) => outline.classList.contains("quiet"));
   const changeRow = () => shadow().querySelector<HTMLButtonElement>(".keylist button") as HTMLButtonElement;
-  const footerKey = () => shadow().querySelector<HTMLButtonElement>(".footer-keys button") as HTMLButtonElement;
   const leave = async (element: Element) => {
     act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
     await settle();
@@ -755,18 +763,6 @@ describe("a change landing on the page", () => {
     expect(quiet()).toEqual([false, false, false, false]);
     await linger();
     expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
-    expect(quiet()).toEqual([true, true, true, true]);
-
-    // Pointing at the change in the footer outlines what it reaches again, while pointed.
-    await hover(footerKey());
-    expect(quiet()).toEqual([false, false, false, false]);
-    await leave(footerKey());
-    expect(quiet()).toEqual([true, true, true, true]);
-    act(() => footerKey().focus());
-    await settle();
-    expect(quiet()).toEqual([false, false, false, false]);
-    act(() => footerKey().blur());
-    await settle();
     expect(quiet()).toEqual([true, true, true, true]);
 
     // Another value lands again, under the same number.
@@ -925,7 +921,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     const back = panelButton("All components");
     focusIn(back);
     await clickInPanel(back);
-    expect(panelText()).toContain("Nothing selected");
+    expect(panelText()).toContain("What do you want to change?");
     expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
   });
 
@@ -966,7 +962,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     await mount();
     focusIn(panelButton("Hide panel"));
     await clickInPanel(panelButton("Hide panel"));
-    const tab = shadow().querySelector<HTMLButtonElement>(".show-tab") as HTMLButtonElement;
+    const tab = shadow().querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
     expect(tab.getAttribute("aria-label")).toBe("Show Loupe");
     expect(shadow().activeElement).toBe(tab);
     await clickInPanel(tab);
@@ -1005,5 +1001,50 @@ describe("LoupeMount", () => {
     // The bundler folds the condition; the import has to be inside it to be dropped with it.
     expect(source).toMatch(/process\.env\.NODE_ENV === "development"\s*\?\s*devMount\(lazy\(\(\) => import\("\.\/toolbar\/index\.js"\)\)\)/);
     expect(source.match(/import\(/g)).toHaveLength(1);
+  });
+});
+
+describe("On this page: the page map over its rows", () => {
+  beforeEach(() => {
+    // jsdom lays nothing out: every Instance a box, so the map has something to draw.
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
+  });
+
+  const section = () => shadow().querySelector(".on-page") as HTMLElement;
+  const blocks = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-sheet .blk")];
+  const buttonBlocks = () => blocks().filter((block) => block.getAttribute("aria-label") === "Inspect this Button");
+  const groupRow = (component: string) =>
+    [...shadow().querySelectorAll<HTMLElement>("li.group")].find((item) => item.querySelector(".cname")?.textContent === component) as HTMLElement;
+
+  it("is one section: its counts in the head, the map, then the rows as the map's legend", async () => {
+    await mount();
+    expect(shadow().querySelectorAll(".map-sheet")).toHaveLength(1);
+    expect(section().querySelector(".map-sheet")).not.toBeNull();
+    expect(section().querySelector(".head")?.textContent).toMatch(/^On this page\d+ components · \d+ Instances$/);
+    expect(shadow().querySelector(".map-legend")).toBeNull();
+    expect(buttonBlocks()).toHaveLength(5);
+    const hue = buttonBlocks()[0]?.classList[1] as string;
+    expect(hue).toMatch(/^hue-\d$/);
+    expect(groupRow("Button").classList.contains(hue)).toBe(true);
+  });
+
+  it("lights a component's blocks and its row from either one, and outlines it on the page", async () => {
+    await mount();
+    await hover(buttonBlocks()[0] as HTMLButtonElement);
+    expect(shadow().querySelector(".map-sheet")?.hasAttribute("data-lit")).toBe(true);
+    expect(blocks().filter((item) => item.classList.contains("lit"))).toHaveLength(5);
+    expect(groupRow("Button").classList.contains("lit")).toBe(true);
+    expect(ringKinds().length).toBeGreaterThan(0);
+
+    await hover(groupRow("Dialog").querySelector("summary") as HTMLElement);
+    expect(groupRow("Button").classList.contains("lit")).toBe(false);
+    expect(buttonBlocks().some((item) => item.classList.contains("lit"))).toBe(false);
+  });
+
+  it("inspects the Instance a block stands for", async () => {
+    await mount();
+    await clickInPanel(buttonBlocks()[0] as HTMLButtonElement);
+    expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).not.toBeNull();
+    expect(shadow().querySelector(".map-sheet")).toBeNull();
   });
 });

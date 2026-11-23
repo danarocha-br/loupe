@@ -9,7 +9,7 @@ import { inScope, PRECEDENCE, reachOf, recordsFor, type Scope, type ScopeTarget,
 import { formatCurrent } from "../format.js";
 import type { AppValue, Reads } from "./reads.js";
 import type { Member, MemberItem, MembersView, SiteItem } from "./types.js";
-import { groupName, keyOf, leftOutChip, PAGE_LABEL, previewedText, scopeLabel, siteLabel, TAGS, THIS_INSTANCE } from "./words.js";
+import { groupName, keyOf, leftOutChip, moreOnPage, PAGE_LABEL, previewedText, REACHES, scopeLabel, siteLabel, TAGS, THIS_INSTANCE } from "./words.js";
 
 /** What each scope is called: "This instance", "All in MemberRowMenu", "All on page". Null: no group. */
 export type ScopeLabels = Record<Scope, string | null>;
@@ -159,6 +159,8 @@ export function membersView(
   selected: string,
   rows: readonly InstanceRow[],
   name: (id: string) => string | null = () => null,
+  /** The component's Instances the page scope reaches; the scope's own size when unknown. */
+  pageSize: number = view.members.length + view.server.length,
 ): MembersView {
   const { scope } = view;
   if (scope === "instance") throw new Error("[loupe] This instance has no members to list.");
@@ -193,9 +195,13 @@ export function membersView(
       };
     });
   }
+  const included = members.filter((member) => !member.out).length;
+  // Server-rendered ones are counted but never changed: the page beyond the scope starts after them.
+  const reached = members.length + view.server.length;
   return {
     scope,
-    countText: previewedText(members.filter((member) => !member.out).length, members.length),
+    countText: previewedText(included, members.length),
+    reach: { lead: REACHES, included, total: members.length, page: Math.max(pageSize, reached), moreText: moreOnPage(pageSize - reached) },
     suspended: isSuspended(view),
     members,
     sites,

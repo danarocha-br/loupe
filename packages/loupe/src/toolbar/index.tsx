@@ -9,14 +9,14 @@
 // so a production build never holds this module.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { debugOf } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
 import { useDeselect } from "./deselect.js";
-import { type Column, useColumn } from "./dock.js";
+import { type Column, columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.js";
 import { Highlight } from "./highlight.js";
-import { PanelIcon } from "./icons.js";
 import { useInstanceMeta } from "./instance-meta.js";
+import { Launcher } from "./launcher.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
@@ -129,6 +129,15 @@ function useTheme(host: HTMLElement): [Theme, () => void] {
   return [theme, toggle];
 }
 
+/** The drawer's close and the handle's tuck (styles.ts `.panel.closing`, `.launcher.leaving`). */
+const CLOSE_MS = 220;
+const TUCK_MS = 160;
+
+/** Whether the page can play the open and close: none in a test's DOM, where they would only wait. */
+function animates(): boolean {
+  return typeof matchMedia === "function";
+}
+
 function ToolbarBody({ host }: { host: HTMLElement }) {
   const [selected, setSelected] = useState<string | null>(null);
   // The header's select tool (2026-11-20): one Instance, or every Instance from its
@@ -138,6 +147,62 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const [widened, setWidened] = useState(false);
   const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
   const [hidden, setHidden] = useState(false);
+  // A handle and its drawer: opening tucks the pill into its side while the panel slides
+  // out of its own; closing slides the panel back out of the window, and once it has gone
+  // the page takes its column back and the pill slides out of its side again.
+  const [closing, setClosing] = useState(false);
+  const [tucking, setTucking] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const tuckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(closeTimer.current);
+      clearTimeout(tuckTimer.current);
+    },
+    [],
+  );
+  const open = () => {
+    focusSwap.current = focusIsHere();
+    // Before the panel renders: the page map measures the page as it will be beside it.
+    reserveColumn(columnWidthFor(window.innerWidth));
+    setHidden(false);
+    if (!animates()) return;
+    setTucking(true);
+    clearTimeout(tuckTimer.current);
+    tuckTimer.current = setTimeout(() => setTucking(false), TUCK_MS);
+  };
+  const hide = () => {
+    if (closing) return;
+    focusSwap.current = focusIsHere();
+    if (!animates()) {
+      releaseColumn();
+      setHidden(true);
+      return;
+    }
+    // Mid-open, the panel's slide turns round from where it is (a transition, not a timeline).
+    setClosing(true);
+    const panel = host.shadowRoot?.querySelector<HTMLElement>(".panel") ?? null;
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      panel?.removeEventListener("transitionend", onEnd);
+      clearTimeout(closeTimer.current);
+      // In the same task as the unmount: the page widens in the frame the panel goes.
+      releaseColumn();
+      flushSync(() => {
+        setClosing(false);
+        setHidden(true);
+      });
+    };
+    // Ends on the slide's own end (the fade's, under reduced motion), not on a clock.
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target === panel && (event.propertyName === "translate" || event.propertyName === "opacity")) finish();
+    };
+    panel?.addEventListener("transitionend", onEnd);
+    // In case the end never comes (a hidden tab, a theme switch cancelling transitions).
+    closeTimer.current = setTimeout(finish, CLOSE_MS + 80);
+  };
   // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
   // the page, so a change can be judged as it will ship. Kept for the page load.
   const [marksHidden, setMarksHidden] = useState(false);
@@ -149,7 +214,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   useEffect(() => {
     if (!focusSwap.current) return;
     focusSwap.current = false;
-    host.shadowRoot?.querySelector<HTMLElement>(hidden ? ".show-tab" : "h2.name")?.focus();
+    host.shadowRoot?.querySelector<HTMLElement>(hidden ? ".launcher" : "h2.name")?.focus();
   }, [hidden, host]);
   const focusIsHere = () => (host.shadowRoot?.activeElement ?? null) !== null;
   const select = (id: string | null, next?: SelectMode) => {
@@ -161,41 +226,27 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     setMode(next === "instance" ? "one" : "many");
     setWidened(next === "page");
   };
-  if (hidden) {
-    return (
-      <button
-        type="button"
-        className="show-tab"
-        aria-label="Show Loupe"
-        onClick={() => {
-          focusSwap.current = focusIsHere();
-          setHidden(false);
-        }}
-        title="Show the Loupe panel"
-      >
-        <PanelIcon />
-        Loupe
-      </button>
-    );
-  }
   return (
-    <ToolbarOpen
-      host={host}
-      column={column}
-      selected={selected}
-      onSelect={select}
-      mode={mode}
-      scope={scope}
-      onScope={changeScope}
-      marksHidden={marksHidden}
-      onMarks={() => setMarksHidden((was) => !was)}
-      onHide={() => {
-        focusSwap.current = focusIsHere();
-        setHidden(true);
-      }}
-      theme={theme}
-      onTheme={toggleTheme}
-    />
+    <>
+      {(hidden || tucking) && <Launcher leaving={!hidden} onOpen={open} />}
+      {!hidden && (
+        <ToolbarOpen
+          host={host}
+          column={column}
+          selected={selected}
+          onSelect={select}
+          mode={mode}
+          scope={scope}
+          onScope={changeScope}
+          marksHidden={marksHidden}
+          onMarks={() => setMarksHidden((was) => !was)}
+          onHide={hide}
+          closing={closing}
+          theme={theme}
+          onTheme={toggleTheme}
+        />
+      )}
+    </>
   );
 }
 
@@ -211,6 +262,7 @@ function ToolbarOpen({
   marksHidden,
   onMarks,
   onHide,
+  closing,
   theme,
   onTheme,
 }: {
@@ -224,6 +276,7 @@ function ToolbarOpen({
   marksHidden: boolean;
   onMarks(): void;
   onHide(): void;
+  closing: boolean;
   theme: Theme;
   onTheme(): void;
 }) {
@@ -294,6 +347,7 @@ function ToolbarOpen({
         marksHidden={marksHidden}
         onMarks={onMarks}
         onHide={onHide}
+        closing={closing}
         theme={theme}
         onTheme={onTheme}
       />

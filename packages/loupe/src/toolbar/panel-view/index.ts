@@ -9,7 +9,7 @@ import { changeItems, listBody, stateItems } from "./list.js";
 import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
 import type { PanelInput, PanelView } from "./types.js";
-import { footerCount, headerReport, OVERRIDES_OFF_TITLE, overridesOffBanner } from "./words.js";
+import { changesWord, footerCount, headerReport, heldChip, OVERRIDES_OFF_TITLE, overridesOffBanner, pageName } from "./words.js";
 
 export type * from "./types.js";
 export { inspectOnlyTitle, isolate, LEGEND, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
@@ -47,7 +47,7 @@ export function panelView(input: PanelInput): PanelView {
     },
     instanceCount: page.instanceCount,
     marks: keys.marks,
-    header: { route: page.route, report: headerReport(page.route, changes.length, states.length) },
+    header: { route: page.route, page: pageName(page.route), report: headerReport(page.route, changes.length, states.length) },
     banner: page.status.overrides ? null : { title: OVERRIDES_OFF_TITLE, body: overridesOffBanner(page.status.reason) },
     footer: {
       countText: footerCount(changes.length, states.length),
@@ -56,8 +56,8 @@ export function panelView(input: PanelInput): PanelView {
       // `discard` takes a record's target, so it also drops a record whose Instance
       // isn't mounted, where `reset(id)` throws (PER-128).
       resetAll: page.overrideCount > 0 && page.status.overrides ? page.records.map((record) => record.target) : [],
-      keys: changes,
-      states,
+      changes: { count: changes.length, word: changesWord(changes.length) },
+      states: { chip: heldChip(states.length), title: states.map((state) => `${state.detail} · ${state.where}`).join("\n") },
     },
     body: selected === null ? listBody(page, reads, keys) : inspectorBody(selected, row, page, reads, { scope, scoped }, keys),
   };

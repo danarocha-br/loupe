@@ -367,7 +367,7 @@
       "switch-off": {
         "role": "status",
         "displayName": "Switch Off",
-        "canonical": "#EBE7E0",
+        "canonical": "#938B7F",
         "tonalRamp": [
           "#0C0B09",
           "#272521",
@@ -802,7 +802,7 @@
       "switch-off-dark": {
         "role": "status",
         "displayName": "Switch Off (dark)",
-        "canonical": "#353B39",
+        "canonical": "#6A726F",
         "tonalRamp": [
           "#090C0B",
           "#222625",
@@ -1100,7 +1100,7 @@
       {
         "name": "switch",
         "value": "180ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-        "purpose": "A switch's thumb sliding 18px; its track colour over 160ms ease-out."
+        "purpose": "A switch's filled half sliding across and turning its corners over 180ms; its colour over 160ms ease-out."
       },
       {
         "name": "state",

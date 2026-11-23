@@ -112,6 +112,7 @@ export function inspectorBody(
     component: inspection.component,
     name: reads.name(id),
     where: whereText(inspection.component, site),
+    source: sourceParts(site ? callSiteText(site, inspection.anchor).text : whereText(inspection.component, site), inspection.component),
     keys: keys.marks.find((mark) => mark.id === id)?.keys ?? [],
     hold,
     verdict,
@@ -119,7 +120,7 @@ export function inspectorBody(
     chips: row ? scopeChips(page.records, row, labels) : [],
     crumbs: reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor })),
     editing: editing ? { resetInstanceEnabled: recorded, scopes: row ? scopeOptions(page, row, scoping.scope) : null } : null,
-    members: scoped ? membersView(scoped, id, page.rows, reads.name) : null,
+    members: scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined) : null,
     note,
     coverage: {
       editable,
@@ -145,6 +146,19 @@ export function inspectorBody(
         ? { summary: injectedSummary(injected.length), rows: injected.map(([name, value]) => ({ name, value: formatCurrent(value) })) }
         : null,
   };
+}
+
+/** Where it is written, without the component the title line names, its line set apart: "member-row-menu.tsx" and ":37". */
+function sourceParts(text: string, component: string): { file: string; line: string } {
+  const place = text.startsWith(`${component} · `) ? text.slice(component.length + 3) : text;
+  const at = place.search(/:\d/);
+  return at === -1 ? { file: place, line: "" } : { file: place.slice(0, at), line: place.slice(at) };
+}
+
+/** How many Instances the page scope reaches from this one: what a call site's "more on this page" counts from. */
+function pageSize(page: Page, row: InstanceRow): number | undefined {
+  const view = scopeView(page.rows, page.records, row, "page");
+  return view ? view.members.length + view.server.length : undefined;
 }
 
 /** APPLY TO: this instance, every Instance from this call site, every Instance on this page, each with its size. */
