@@ -9,7 +9,7 @@
 /* A tool pressed is filled `sunk` with a `primary` icon (Hide marks). */
 [data-toggle][data-look="tool"][data-pressed]:not([data-unmarked]) { background: var(--sunk); color: var(--primary); }
 
-/* Forced colours drop the fills: pressed is the system's highlight. */
+/* Forced colours drop the fills: pressed is the system's highlight. As specific as the looks' pressed rules, and later, so it wins. */
 @media (forced-colors: active) {
-  [data-toggle][data-pressed]:not([data-unmarked]) { forced-color-adjust: none; background: Highlight; color: HighlightText; border-color: Highlight; }
+  [data-toggle][data-look][data-pressed]:not([data-unmarked]) { forced-color-adjust: none; background: Highlight; color: HighlightText; border-color: Highlight; }
 }

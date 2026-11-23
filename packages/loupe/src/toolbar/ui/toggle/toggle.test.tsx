@@ -101,6 +101,18 @@ describe("Toggle's CSS", () => {
     expect(at).toBeLessThan(STYLESHEET.indexOf("@layer patterns"));
   });
 
+  it("draws pressed in Highlight under forced colours, over the looks' pressed fills", () => {
+    // jsdom has no cascade: weigh the selectors. Same layer, so the later rule wins a tie.
+    const weight = (selector: string) => (selector.match(/\[/g) ?? []).length;
+    const body = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+    const forced = body.slice(body.indexOf("@media (forced-colors: active)"));
+    const pressedLooks = [...body.slice(0, body.indexOf("@media")).matchAll(/^(\[data-toggle\][^{]*)\{/gm)].map((match) => (match[1] as string).trim());
+    const forcedRule = forced.match(/(\[data-toggle\][^{]*)\{/)?.[1]?.trim() ?? "";
+    expect(pressedLooks.length).toBe(2);
+    for (const look of pressedLooks) expect(weight(forcedRule), `${forcedRule} vs ${look}`).toBeGreaterThanOrEqual(weight(look));
+    expect(forced).toContain("background: Highlight");
+  });
+
   it("names states, not Loupe's classes or ARIA", () => {
     expect(CSS).not.toMatch(/(^|[\s>+~,(])\.[a-z]/im);
     expect(CSS.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/aria-/);
