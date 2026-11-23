@@ -83,8 +83,21 @@ const hover = async (element: Element) => {
 const pageButton = (text: string) => [...container.querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
 const panelButton = (text: string) =>
   [...shadow().querySelectorAll("button")].find((button) => button.textContent === text) as HTMLButtonElement;
-const select = async (id: string) =>
-  clickInPanel(instanceButtons().find((button) => button.dataset.instance === id) as HTMLButtonElement);
+const instanceButton = (id: string) => instanceButtons().find((button) => button.dataset.instance === id) as HTMLButtonElement;
+/** Picks an Instance from the list as a designer does: its component's row opened first, then its dot. */
+const select = async (id: string) => {
+  const trigger = instanceButton(id).closest("[data-fold]")?.querySelector<HTMLButtonElement>(":scope > [data-fold-trigger]");
+  if (trigger?.getAttribute("aria-expanded") === "false") {
+    await clickInPanel(trigger);
+    // Focus moves on to the dot, as it does when a designer reaches for it: the row stops outlining.
+    act(() => trigger.blur());
+    await settle();
+  }
+  const button = instanceButton(id);
+  // Reachable: not inside a fold that is still closed.
+  expect(button.closest("[hidden]")).toBeNull();
+  await clickInPanel(button);
+};
 const backToList = async () => clickInPanel(panelButton("All components"));
 const row = (prop: string) => shadow().querySelector<HTMLElement>(`[data-prop=${prop}]`) as HTMLElement;
 const inRow = (prop: string, text: string) =>

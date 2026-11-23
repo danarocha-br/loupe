@@ -218,6 +218,10 @@ function ButtonStates() {
             <span className="sr-only">Dark theme</span>
           </Toggle>
         </div>
+        {/* Unmarked: in the panel the theme itself shows it's pressed; here this line does. */}
+        <p className="wb-note" aria-live="polite">
+          Dark theme {dark ? "pressed" : "not pressed"}: the button draws no mark
+        </p>
       </Row>
     </div>
   );

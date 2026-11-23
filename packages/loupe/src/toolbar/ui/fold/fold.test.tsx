@@ -173,6 +173,8 @@ describe("Fold's CSS", () => {
       expect(selector, selector).not.toMatch(/aria-/);
     }
     expect(CSS).toContain("[data-open]");
+    // A browser without `until-found` hides a closed panel by `display: none`: nothing may undo it.
+    expect(CSS.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/\[data-fold-panel\][^{]*\{[^}]*display/);
     expect(CSS).toContain("var(--duration-fold)");
     expect(CSS).not.toMatch(/\d+ms/);
   });
