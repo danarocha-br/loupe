@@ -1,0 +1,33 @@
+/*
+ * Tag (ADR 0003): a pill of words, written against `[data-tag-look]`. (`data-tag` is the
+ * page's pick tag's.) Values from the tokens. In the stylesheet's `primitives` layer.
+ */
+
+/*
+ * Every tag is a pill with a 1px transparent outline inside its edge: invisible here,
+ * drawn by forced colours, which drop the fill, so the pill keeps its shape. The looks
+ * that draw an edge colour or dash that same outline.
+ */
+[data-tag-look] {
+  display: inline-flex; align-items: center; gap: var(--space-xs); flex: none; padding: var(--space-hairline) var(--space-inset);
+  border-radius: var(--radius-pill); outline: 1px solid transparent; outline-offset: -1px;
+  background: var(--sunk); color: var(--muted); font: var(--font-tag); white-space: nowrap;
+}
+
+/* Why, quoted: mono, tracked, with more in its title. */
+[data-tag-look="reason"] { font: var(--font-tag-mono); letter-spacing: var(--tracking-tag-mono); cursor: help; }
+
+/* Chosen: 16px, in the accent's wash. */
+[data-tag-look="picked"] { height: 16px; padding-block: 0; background: var(--accent-wash); color: var(--accent-text); font: var(--font-chip); }
+
+/* Out of date: amber. */
+[data-tag-look="amber"] { background: var(--warn-bg); color: var(--warn-fg); }
+
+/* Held aside: no fill, a pencil ring. */
+[data-tag-look="ring"] { background: none; outline-color: var(--held); }
+
+/* Not there now: no fill, dashed. */
+[data-tag-look="dashed"] { background: none; outline-style: dashed; outline-color: var(--rule-strong); }
+
+/* Nothing written: dashed in ink, its word in ink. */
+[data-tag-look="empty"] { background: none; outline-style: dashed; outline-color: var(--ink); color: var(--ink); }

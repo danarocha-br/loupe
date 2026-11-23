@@ -1,0 +1,19 @@
+/*
+ * Dot (ADR 0003): a small round mark, written against `[data-dot]` (its tone) and
+ * `[data-small]`. Values from the tokens. In the stylesheet's `primitives` layer.
+ */
+
+[data-dot] { display: inline-block; flex: none; vertical-align: middle; box-sizing: border-box; width: 8px; height: 8px; border-radius: var(--radius-pill); }
+[data-dot][data-small] { width: 6px; height: 6px; }
+
+[data-dot="alert"] { background: var(--alert); }
+[data-dot="amber"] { background: var(--warn-dot); }
+[data-dot="lilac"] { background: var(--revision-line); }
+/* Drawn with a border, not an inset shadow, so forced colours keep it. */
+[data-dot="hollow"] { border: 1.5px solid var(--rule-strong); }
+[data-dot="ring"] { width: 10px; height: 10px; border: 1.5px solid var(--held); }
+
+/* Forced colours drop the fills: a filled dot is CanvasText; the rings keep their borders, which forced colours draw. */
+@media (forced-colors: active) {
+  [data-dot="alert"], [data-dot="amber"], [data-dot="lilac"] { forced-color-adjust: none; background: CanvasText; }
+}

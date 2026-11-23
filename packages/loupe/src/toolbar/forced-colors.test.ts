@@ -35,3 +35,56 @@ describe("focus under forced colours", () => {
     expect(all.find((rule) => rule.selector === ".hero .hero-title:focus")?.body).toMatch(/outline: 2px solid transparent/);
   });
 });
+
+/** The rules inside the stylesheet's `@media (forced-colors: active)` blocks. */
+function forcedRules(css: string): { selector: string; body: string }[] {
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const found: { selector: string; body: string }[] = [];
+  for (let at = plain.indexOf("@media (forced-colors: active)"); at !== -1; at = plain.indexOf("@media (forced-colors: active)", at + 1)) {
+    // The block runs to the brace that closes the one after the query.
+    let depth = 0;
+    let end = plain.indexOf("{", at);
+    for (let i = end; i < plain.length; i++) {
+      if (plain[i] === "{") depth++;
+      if (plain[i] === "}" && --depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    found.push(...rules(plain.slice(plain.indexOf("{", at) + 1, end)));
+  }
+  return found;
+}
+
+describe("marks under forced colours (Dot, Tag, Kbd, Delta)", () => {
+  // Forced colours drop backgrounds and box-shadows and redraw borders, outlines, text, fill and stroke in system colours.
+  const all = rules(CSS);
+  const forced = forcedRules(CSS);
+  const of = (attribute: string) => all.filter((rule) => rule.selector.includes(attribute));
+
+  it("draws a filled dot in CanvasText, and a hollow or ringed one with a border they keep", () => {
+    for (const tone of ["alert", "amber", "lilac"]) {
+      const rule = forced.find((r) => r.selector.split(",").some((s) => s.trim() === `[data-dot="${tone}"]`));
+      expect(rule?.body, tone).toMatch(/forced-color-adjust: none;[^}]*background: CanvasText/);
+    }
+    for (const tone of ["hollow", "ring"]) expect(all.find((rule) => rule.selector === `[data-dot="${tone}"]`)?.body, tone).toMatch(/border: [\d.]+px solid/);
+    expect(of("[data-dot").filter((rule) => /box-shadow/.test(rule.body))).toEqual([]);
+  });
+
+  it("keeps a tag's pill and a key's box: an outline, which forced colours draw once the fill goes", () => {
+    for (const element of ["[data-tag-look]", "[data-kbd]"]) {
+      expect(all.find((rule) => rule.selector === element)?.body, element).toMatch(/outline: 1px solid transparent/);
+      expect(of(element).filter((rule) => /box-shadow/.test(rule.body)), element).toEqual([]);
+    }
+  });
+
+  it("draws a delta's triangle and number in system colours", () => {
+    expect(forced.find((rule) => rule.selector === "[data-delta] path")?.body).toMatch(/fill: Canvas;[^}]*stroke: CanvasText/);
+    expect(forced.find((rule) => rule.selector === "[data-delta-n]")?.body).toMatch(/color: CanvasText/);
+  });
+
+  it("leaves none of the views' old dot, tag, key or delta classes behind", () => {
+    const old = all.filter((rule) => /(^|[\s,])(\.dot|\.tag|\.key|\.delta|kbd)\b(?![-\w])/.test(rule.selector));
+    expect(old.map((rule) => rule.selector)).toEqual([]);
+  });
+});

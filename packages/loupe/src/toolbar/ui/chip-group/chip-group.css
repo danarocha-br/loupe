@@ -33,7 +33,7 @@
 /* A long value wraps in its chip rather than losing its end: it is what the designer picks between. */
 [data-look="chips"] [data-part="label"] { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 [data-look="chips"] [data-chip][data-tagged]:not([data-checked]) { box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); }
-[data-look="chips"] [data-part="tag"] { flex: none; font: var(--font-annotation); letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+[data-look="chips"] [data-part="tag"] { flex: none; font: var(--font-annotation); letter-spacing: var(--tracking-annotation); text-transform: uppercase; color: var(--faint); }
 [data-look="chips"] [data-chip][data-dotted]::after {
   content: ""; flex: none; order: 2; width: 4px; height: 4px; border-radius: 2px; background: var(--faint);
 }

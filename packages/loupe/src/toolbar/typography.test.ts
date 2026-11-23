@@ -13,7 +13,7 @@ describe("the toolbar's type (typography review 2026-11-20)", () => {
 
   it("keeps mono for evidence and tabular figures for counted numbers", () => {
     const mono = steps.filter(([, style]) => style.family === "mono").map(([role]) => role);
-    expect(mono.sort()).toEqual(["annotation", "mono", "monoSmall", "proposalText"]);
+    expect(mono.sort()).toEqual(["annotation", "chip", "key", "mono", "monoSmall", "proposalText", "tagMono"]);
     const tabular = steps.filter(([, style]) => "tabular" in style && style.tabular).map(([role]) => role);
     expect(tabular.sort()).toEqual(["delta", "figure", "meta"]);
   });
@@ -32,6 +32,19 @@ describe("the toolbar's type (typography review 2026-11-20)", () => {
       if (role === "hero" || role === "fieldTouch") continue;
       expect(CSS.includes(`font: ${font(style)}`) || CSS.includes(`font: var(--${property})`), role).toBe(true);
     }
+  });
+
+  it("declares each tracked step's tracking once, for a primitive's CSS to read", () => {
+    const tracked = steps.filter(([, style]) => "tracking" in style);
+    expect(tracked.length).toBeGreaterThan(0);
+    for (const [role, style] of tracked) {
+      const name = `tracking-${role.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`;
+      expect(TYPE_PROPERTIES[name], role).toBe((style as { tracking: string }).tracking);
+      expect(CSS, role).toContain(`--${name}: ${(style as { tracking: string }).tracking};`);
+    }
+    // The primitives read it: a literal `letter-spacing: 0.02em` in their CSS would drift from the token.
+    expect(CSS).toContain("letter-spacing: var(--tracking-tag-mono)");
+    expect(CSS).toContain("letter-spacing: var(--tracking-annotation)");
   });
 
   it("writes every font size in a rule through the reader-scaled unit, never a bare px", () => {

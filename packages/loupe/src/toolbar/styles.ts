@@ -71,7 +71,6 @@ export const CSS = `
 .label { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
 .body { font: 400 ${size(13)}/1.4615 ${SANS}; color: var(--muted); margin: 0; }
 h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(--ink); }
-kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px; background: var(--kbd); }
 
 /* Controls: Button and Toggle (ui/button/, ui/toggle/). A view that sets a button's background restates its hover:
    the views' rules come after the primitives' layer, so a background here would win over the layer's hover. */
@@ -107,7 +106,6 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .tools .divider { flex: none; width: 1px; height: 16px; margin: 0 2px 0 11px; border-radius: 1px; background: var(--divider); }
 .status-region { flex: none; }
 .status-line { flex: none; margin: 6px 6px 0; padding: 8px 14px; border-radius: 14px; background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); font-size: ${size(12)}; line-height: 1.4167; }
-.status-line .dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; vertical-align: 0; }
 .middle {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; padding: 6px;
   scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent;
@@ -122,7 +120,6 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .footer .count .n { font: 600 ${size(20)}/1.2 ${SANS}; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
 .footer .count .word { font: 500 ${size(13)}/1.3846 ${SANS}; color: var(--muted); white-space: nowrap; }
 .footer .held-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; margin-left: 4px; padding: 0 8px 0 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); font: 500 ${size(10)}/1.4 ${MONO}; white-space: nowrap; }
-.footer .held-chip .dot { width: 6px; height: 6px; background: var(--warn-dot); }
 .footer .reset-all { height: 24px; padding: 0 8px 0 6px; gap: 5px; color: var(--muted); }
 .footer .act { display: flex; align-items: center; gap: 8px; }
 /* Copy Proposal (Copy flow v2 · A): a split button, its main half copying in one click, its chevron opening the details */
@@ -217,35 +214,13 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .section.list-card { gap: 4px; padding: 12px 0 6px; overflow: hidden; }
 .section.list-card > .head { padding: 0 14px 4px; }
 
-/* Dots: the Override count's, notices amber and alert, held for review in pencil */
-.dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
-.dot.small { width: 6px; height: 6px; }
-.dot.alert { background: var(--alert); }
-.dot.purple { background: var(--revision-line); }
-.dot.amber { background: var(--warn-dot); }
-.dot.hollow { box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
-.dot.ring { width: 10px; height: 10px; border: 1.5px solid var(--held); }
-
-/* Revision deltas: a change's number, as on the page and in the Proposal */
-.key { position: relative; display: inline-block; flex: none; width: 22px; height: 20px; }
-.key .delta { width: 22px; height: 20px; }
-.key .n { position: absolute; inset: 0; display: grid; place-items: end center; padding-bottom: 2.5px; font: 700 ${size(9)}/1 ${SANS}; color: var(--revision-text); font-variant-numeric: tabular-nums; }
+/* Revision deltas (ui/delta/): a change's numbers, side by side */
 .keys { display: inline-flex; gap: 2px; flex: none; }
-.delta { display: block; overflow: visible; }
-.delta path { fill: var(--card); stroke: var(--revision-line); stroke-width: 1.25; }
-.delta.dashed path { stroke-dasharray: 2.2 1.6; }
 
 /* Words for state: a chip for the verdict, tags only on the exceptions */
 .status { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 16px; padding: 0 7px 0 6px; border-radius: 999px; background: var(--sunk); font: 500 ${size(10)}/1.4 ${MONO}; color: var(--muted); white-space: nowrap; }
 .status.supported { background: var(--ok-bg); color: var(--ok-fg); }
 .status.stale { background: var(--warn-bg); color: var(--warn-fg); }
-.tag { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 1px 8px; border-radius: 999px; background: var(--sunk); font: 400 ${size(11)}/1.4545 ${SANS}; color: var(--muted); white-space: nowrap; }
-.tag.reason { font: 400 ${size(10)}/1.6 ${MONO}; letter-spacing: 0.02em; cursor: help; }
-.tag.stale { background: var(--warn-bg); color: var(--warn-fg); }
-.tag.held { background: none; box-shadow: inset 0 0 0 1px var(--held); }
-.tag.dashed { background: none; outline: 1px dashed var(--rule-strong); outline-offset: -1px; }
-.tag.empty { background: none; outline: 1px dashed var(--ink); outline-offset: -1px; color: var(--ink); }
-.tag.picked { height: 16px; padding: 0 8px; background: var(--accent-wash); color: var(--accent-text); font: 500 ${size(10)}/1.4 ${MONO}; }
 .default { font: 400 ${size(12)}/1.3333 ${SANS}; color: var(--muted); }
 
 /* The Inspector: one card of rows, hairlines between them (Paper, "Inspector as property rows") */
@@ -340,7 +315,7 @@ fieldset.site .list > li { padding-left: 42px; }
 .notice .reset { margin-top: 8px; background: var(--card); }
 @media (hover: hover) { .notice .reset:not(:disabled):hover { background: var(--sunk-hover); } }
 .warn { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); font: 400 ${size(12)}/1.4167 ${SANS}; }
-.warn .dot { width: 8px; height: 8px; margin-top: 5px; background: var(--warn-dot); }
+.warn [data-dot] { margin-top: 5px; }
 
 /* The change list: each change by its delta */
 .section.changes { gap: 6px; padding: 12px 0 6px; overflow: hidden; }
@@ -351,7 +326,7 @@ fieldset.site .list > li { padding-left: 42px; }
   width: 100%; padding: 8px 14px; border-top: 1px solid var(--rule); text-align: left;
 }
 @media (hover: hover) { .keylist button:not(:disabled):hover { background: var(--hover); } }
-.keylist .key { grid-area: key; align-self: start; margin-top: 0; }
+.keylist [data-delta] { grid-area: key; align-self: start; margin-top: 0; }
 .keylist .what { grid-area: what; font: 400 ${size(12)}/1.5 ${MONO}; overflow-wrap: anywhere; }
 .keylist .where { grid-area: where; min-width: 0; overflow-wrap: break-word; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
 
@@ -367,7 +342,7 @@ fieldset.site .list > li { padding-left: 42px; }
 /* The head and the lines that qualify it sit tight; the control sits apart. */
 .row .head-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .row .line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-height: 20px; flex-shrink: 0; }
-.row .key { margin: -1px -2px -1px -3px; }
+.row [data-delta] { margin: -1px -2px -1px -3px; }
 .row .name { flex: none; display: flex; align-items: baseline; gap: 6px; max-width: 100%; font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; }
 .row .name .mono { font-size: ${size(11)}; color: var(--faint); letter-spacing: 0; }
 .row .value { flex: 1; min-width: 0; text-align: right; font: 400 ${size(11)}/1.2727 ${MONO}; color: var(--muted); overflow-wrap: anywhere; }
@@ -556,6 +531,6 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .legend i { forced-color-adjust: none; background: CanvasText; }
   .members input[type="checkbox"]:checked { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
   .members input[type="checkbox"]:checked::after { border-color: HighlightText; }
-  .dot:not(.hollow):not(.ring):not(.none), .meter i.in { forced-color-adjust: none; background: CanvasText; }
+  .meter i.in { forced-color-adjust: none; background: CanvasText; }
 }
 `;

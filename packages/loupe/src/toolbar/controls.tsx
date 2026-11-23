@@ -12,10 +12,10 @@
 import { Fragment, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
-import { Delta, LockIcon, ResetIcon } from "./icons.js";
+import { LockIcon, ResetIcon } from "./icons.js";
 import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { Button, Chip, ChipGroup, Field, Switch } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Delta, Field, Switch, Tag } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -38,13 +38,8 @@ function ValueView({ value }: { value: ValueText }) {
 
 /** One change's revision delta, with the number the page's cloud and the Proposal's change id show. */
 export function Key({ n }: { n: number }) {
-  return (
-    // Read as "Change 1", not a bare "1": the number means nothing without what it numbers.
-    <span className="key" role="img" aria-label={`Change ${n}`} title={`Change ${n} in the Proposal`}>
-      <Delta />
-      <span className="n">{n}</span>
-    </span>
-  );
+  // Read as "Change 1", not a bare "1": the number means nothing without what it numbers.
+  return <Delta n={n} label={`Change ${n}`} title={`Change ${n} in the Proposal`} />;
 }
 
 /**
@@ -67,11 +62,7 @@ export function Breakable({ text }: { text: string }) {
 
 /** A held State prop's mark: an empty dashed delta, since the Proposal shows it as a state, not a numbered change. */
 export function HeldKey() {
-  return (
-    <span className="key held" title="Held by your Override: shown as a state in the Proposal">
-      <Delta dashed />
-    </span>
-  );
+  return <Delta title="Held by your Override: shown as a state in the Proposal" />;
 }
 
 /** Before the name: the change's delta, an empty dashed one for a held State prop, or nothing. */
@@ -100,9 +91,9 @@ function bare(label: string): string {
 /** Label text left empty: the row says so, as the field shows nothing. */
 function EmptyTag() {
   return (
-    <span className="tag empty" data-testid="empty">
+    <Tag look="empty" data-testid="empty">
       {TEXT.empty}
-    </span>
+    </Tag>
   );
 }
 
@@ -161,7 +152,7 @@ export function PropRowView({
           </span>
           {/* Label text left empty sits beside the name at This instance, and after the counts at a scope. */}
           {item.empty && item.counts === null && <EmptyTag />}
-          {item.state && <span className="tag">{TEXT.state}</span>}
+          {item.state && <Tag>{TEXT.state}</Tag>}
           {!item.change && shown && item.value && (
             <span className="value">
               <ValueView value={item.value} />
@@ -174,9 +165,9 @@ export function PropRowView({
           )}
           {item.empty && item.counts !== null && <EmptyTag />}
           {item.reason && (
-            <span className="tag reason" title={item.reasonTitle ?? undefined}>
+            <Tag look="reason" title={item.reasonTitle ?? undefined}>
               {item.reason}
-            </span>
+            </Tag>
           )}
           {reset && !reset.inNotice && !toggle && resetButton}
           {/* The switch shows true or false itself; no word repeats it. */}
