@@ -1,14 +1,13 @@
 // The collapsed Toolbar (2026-11-22): a dark pill with Loupe's L, in place of the
 // "Show Loupe" tab. A click opens the panel: the pill tucks into its side as the panel
 // slides out of its own, a handle and its drawer. Dragged, it stays rigid and exactly
-// under the pointer; within reach of a side, a faint copy shows where it would dock, as
-// a window shows where it will snap (`launcher-place.ts`). In the last few px to a side,
-// the pill and the window's edge run together like two drops of ink (2026-11-23, after
-// the designer's "gooey effect" reference): a liquid neck that fills in as they close and
-// holds it docked, a few px off its side, and stretches and snaps when it is pulled away.
-// Let go or flicked within reach of a side, it travels into that place; anywhere else it
-// stays free. The arrow keys dock it on the side they
-// point at, so it moves without a pointer too.
+// under the pointer (`launcher-place.ts`). In the last few px to a side, the pill and
+// the window's edge run together like two drops of ink (2026-11-23, after the designer's
+// "gooey effect" reference): a liquid neck that fills in as they close. It is only there
+// while the pill is gluing: dragged near a side, landing on it, or peeled off it. Parked,
+// the neck lets go and the pill sits clean, a few px off its side. Let go or flicked
+// within reach of a side, it travels into that place; anywhere else it stays free. The
+// arrow keys dock it on the side they point at, so it moves without a pointer too.
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import {
@@ -134,14 +133,11 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
 
   // Held, it is exactly where the pointer puts it (only kept on the window); let go, where its place is.
   const centre = held ? onWindow(held.x, held.y, viewport) : centreOf(place, viewport);
-  // Where it would dock if let go now: the docked place on the side in reach. Once out of
-  // reach, or let go, the preview fades where it last was rather than jumping away.
-  const shown = held?.edge ? { edge: held.edge, at: centreOf(glue(held.edge, along(held.edge, held.x, held.y), viewport), viewport) } : null;
-  const lastGhost = useRef(shown);
-  if (shown) lastGhost.current = shown;
-  const ghost = lastGhost.current;
-  // How far the pill shows from each side: the edge's body for that side sits that far out.
-  const gaps = Object.fromEntries(EDGES.map((edge) => [edge, Math.max(0, gapTo(edge, centre.x, centre.y, viewport))])) as Record<Edge, number>;
+  // How far the pill shows from each side: the edge's body for that side sits that far out,
+  // while it is held or travelling. Parked, the edge's bodies draw back out of reach, so the
+  // neck lets go once it has landed (styles.ts times it).
+  const gluing = held !== null || settling;
+  const gaps = Object.fromEntries(EDGES.map((edge) => [edge, Math.max(0, gapTo(edge, centre.x, centre.y, viewport)) + (gluing ? 0 : PARKED_GAP)])) as Record<Edge, number>;
 
   const down = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || leaving) return;
@@ -172,10 +168,10 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
     const now = performance.now();
     current.samples = [...current.samples.filter((sample) => now - sample.t < 100), { t: now, x: event.clientX, y: event.clientY }];
     current.moved = true;
-    // Nothing travels while held: it is where the pointer puts it, rigid, its preview showing where it would dock.
+    // Nothing travels while held: it is where the pointer puts it, rigid.
     hold(holdAt(current.fromX + dx, current.fromY + dy, viewport));
   };
-  /** Let go: within reach of a side, into its preview there; flicked, as far as it would coast; else where it is. */
+  /** Let go: within reach of a side, docked there; flicked, as far as it would coast; else where it is. */
   const drop = (current: Drag) => {
     const last = latest.current;
     if (last) {
@@ -184,7 +180,7 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
       const dt = first && end && end.t - first.t >= 16 ? end.t - first.t : 0;
       const vx = dt > 0 && first && end ? (end.x - first.x) / dt : 0;
       const vy = dt > 0 && first && end ? (end.y - first.y) / dt : 0;
-      // A preview showing is a promise: let go there, it lands in it, however fast it was moving.
+      // Let go in reach of a side, it docks there, however fast it was moving.
       const flicked = last.edge === null && Math.hypot(vx, vy) > FLICK;
       const x = last.x + (flicked ? vx * COAST_MS : 0);
       const y = last.y + (flicked ? vy * COAST_MS : 0);
@@ -223,13 +219,6 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
   const classes = ["launcher", held && "dragging", settling && "settling", leaving && "leaving"].filter(Boolean).join(" ");
   return (
     <>
-      {/* Under the pill, mounted while it is, so it can fade out as well as in. */}
-      <span
-        className={shown ? "dock-ghost shown" : "dock-ghost"}
-        data-edge={ghost?.edge}
-        aria-hidden="true"
-        style={ghost ? { translate: `${round(ghost.at.x - BODY.width / 2)}px ${round(ghost.at.y - BODY.height / 2)}px` } : undefined}
-      />
       <button
         type="button"
         className={classes}
@@ -267,6 +256,8 @@ const round = (n: number) => Math.round(n * 10) / 10;
 const GOO_PAD = 32;
 /** The edge's body sits this far past the window's edge, so nothing of it shows along the edge alone. */
 const WALL_OFF = 2;
+/** Parked, the edge's bodies draw back this much further than the pill's gap, past where they can join it. */
+const PARKED_GAP = 24;
 const GOO_W = BODY.width + GOO_PAD * 2;
 const GOO_H = BODY.height + GOO_PAD * 2;
 
@@ -285,7 +276,7 @@ const WALLS: Record<Edge, { x: number; y: number; axis: "x" | "y"; sign: 1 | -1 
  * shapes themselves are laid over the result, so the pill stays a crisp stadium and only
  * the neck is liquid. Each side's body is placed by the pill's real gap to that side, so it
  * stays put on the window's edge, even while the pill travels: both move by `translate` on
- * the same curve.
+ * the same curve. Parked, they are drawn back by `PARKED_GAP`, so nothing joins.
  */
 function Goo({ gaps }: { gaps: Record<Edge, number> }) {
   return (

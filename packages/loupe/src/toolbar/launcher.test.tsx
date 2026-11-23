@@ -27,7 +27,6 @@ afterEach(() => {
 });
 
 const pill = () => container.querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
-const ghost = () => container.querySelector<HTMLElement>(".dock-ghost") as HTMLElement;
 
 const fire = (type: string, at: { clientX: number; clientY: number }) =>
   act(() => {
@@ -94,20 +93,13 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     expect(pill().style.translate).toBe(`${x - 10}px ${y - 10}px`);
   });
 
-  it("shows where it would dock while held in reach of a side, and nothing while held mid-page", () => {
-    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
-    expect(ghost().classList.contains("shown")).toBe(false);
-    // The pointer puts the body 30px off the bottom: in reach.
-    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 16 - 30 - 6 });
-    expect(pill().dataset.edge).toBe("free");
-    expect(ghost().classList.contains("shown")).toBe(true);
-    expect(ghost().dataset.edge).toBe("bottom");
-    // Back out of reach: the preview goes.
-    fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
-    expect(ghost().classList.contains("shown")).toBe(false);
+  it("draws no copy of itself while held: nothing but the pill, and the edge's goo", () => {
+    pressAndMove(window.innerWidth / 2, window.innerHeight - 16 - 30 - 6);
+    expect(container.querySelector(".dock-ghost")).toBeNull();
+    expect(container.querySelectorAll(".launcher").length).toBe(1);
   });
 
-  it("docks into the preview when let go in reach", () => {
+  it("docks on the side it is let go in reach of", () => {
     pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     const pointerY = window.innerHeight - 16 - 30 - 6;
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: pointerY });
@@ -115,7 +107,6 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     expect(pill().dataset.edge).toBe("bottom");
     expect(pill().classList.contains("dragging")).toBe(false);
     expect(pill().classList.contains("settling")).toBe(true);
-    expect(ghost().classList.contains("shown")).toBe(false);
   });
 
   it("carries on as far as a flick would coast, and docks on the side that takes it there", () => {
@@ -135,17 +126,16 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     }
   });
 
-  it("lands in the preview it shows when let go, however fast it was moving", () => {
+  it("docks on the side it is let go in reach of, however fast it was moving", () => {
     const now = vi.spyOn(performance, "now").mockReturnValue(1000);
     try {
       pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
       now.mockReturnValue(1200);
       fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
       now.mockReturnValue(1250);
-      // 300px sideways in 50ms, ending 30px off the bottom: the bottom's preview is showing.
+      // 300px sideways in 50ms, ending 30px off the bottom: in reach of it.
       const pointerY = window.innerHeight - 16 - 30 - 6;
       fire("pointermove", { clientX: window.innerWidth / 2 - 300, clientY: pointerY });
-      expect(ghost().dataset.edge).toBe("bottom");
       fire("pointerup", { clientX: window.innerWidth / 2 - 300, clientY: pointerY });
       expect(pill().dataset.edge).toBe("bottom");
     } finally {
@@ -155,9 +145,9 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
 
   it("draws a body for each side of the window as far out as the pill's gap to it, so the two run together only close to (2026-11-23)", () => {
     const wall = (index: number) => pill().querySelectorAll<SVGRectElement>(".goo .wall")[index] as SVGRectElement;
-    // Docked on the right, 6px off it: the right side's body (EDGES order: left, right, top, bottom) is that close, so they join.
-    expect(wall(1).style.translate).toBe("6px 0px");
-    // Held mid-page: every side's body is the pill's whole gap away.
+    // Parked on the right, 6px off it: the right side's body (EDGES order: left, right, top, bottom) is drawn back 24px more, so no neck.
+    expect(wall(1).style.translate).toBe("30px 0px");
+    // Held: every side's body is the pill's real gap away, so they join once it is close.
     pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     const [x] = pill().style.translate.split(" ").map(Number.parseFloat);
     expect(wall(1).style.translate).toBe(`${window.innerWidth - (x as number) - 44}px 0px`);

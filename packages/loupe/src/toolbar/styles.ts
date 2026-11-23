@@ -392,8 +392,8 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Collapsed (launcher.tsx): a flat dark pill with the L, free, or docked a few px off a side and
-   held to it by a liquid neck. Its body is drawn in .goo, where it runs together with the window's edge. */
+/* Collapsed (launcher.tsx): a flat dark pill with the L, free, or docked a few px off a side. Its body
+   is drawn in .goo, where it runs together with the window's edge while it glues, and lets go once parked. */
 .launcher {
   position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; width: 44px; height: 32px; padding: 0; border-radius: 16px; background: none; color: var(--on-band);
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-edge);
@@ -405,15 +405,14 @@ button:disabled { cursor: default; opacity: 0.45; }
 @media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover .goo rect { fill: var(--band-hover); } }
 /* Travelling, each side's body moves by the opposite of the pill's travel on the same curve, so it holds still on the window's edge. */
 .launcher.settling .goo .wall { transition: fill 120ms ease-out, translate 260ms cubic-bezier(0.23, 1, 0.32, 1); }
+/* Landed: the edge draws back, a beat after, so the neck stretches and snaps and the pill sits clean. Held, they follow at once. */
+.launcher:not(.settling):not(.dragging) .goo .wall { transition: fill 120ms ease-out, translate 280ms cubic-bezier(0.23, 1, 0.32, 1) 60ms; }
 .launcher .mark { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
 .launcher .glyph { display: block; }
 .launcher.dragging { cursor: grabbing; }
 /* After a drop, a dock or a key: it travels to its place, quick out and a soft landing. */
 .launcher.settling { transition: translate 260ms cubic-bezier(0.23, 1, 0.32, 1), transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out; }
 .launcher:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Where the held pill would dock if let go now: the pill, faint, at its docked place a few px off the side. */
-.dock-ghost { position: fixed; left: 0; top: 0; z-index: 2147483646; width: 44px; height: 32px; border-radius: 16px; background: var(--band); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
-.dock-ghost.shown { opacity: 0.16; }
 /* The handle: as the panel opens it tucks into its side (free, it settles away), and as the
    panel closes it slides back out of its side; docked 6px off the side, it travels that much further. A transform, apart from the translate that places it. */
 .launcher.leaving { pointer-events: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 120ms ease-out; }
@@ -431,7 +430,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 }
 @media (prefers-reduced-motion: reduce) {
   .launcher, .launcher.settling, .launcher.leaving { transition: opacity 150ms ease-out; }
-  .launcher.settling .goo .wall { transition: none; }
+  .launcher.settling .goo .wall, .launcher:not(.settling):not(.dragging) .goo .wall { transition: none; }
   .launcher.leaving[data-edge] { transform: none; opacity: 0; }
   @starting-style { .launcher[data-edge] { transform: none; opacity: 0; } }
 }
@@ -815,7 +814,6 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
-  .dock-ghost { forced-color-adjust: none; background: ButtonText; }
   .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
   .pills .is-default::after, .legend i { forced-color-adjust: none; background: CanvasText; }
