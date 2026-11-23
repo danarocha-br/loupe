@@ -10,7 +10,7 @@
 // `build.test.ts`'s, on what the build emits. Loupe's page state is on `globalThis` (`slot.ts`), so
 // the fresh modules and this file's share it.
 
-import { act, type ComponentType, type ReactElement } from "react";
+import { act, type ComponentType, type ReactElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoupeDebug } from "../runtime/debug.js";
@@ -66,15 +66,22 @@ afterEach(() => {
 /** Lets the lazy Toolbar, its effects and its once-a-frame refresh settle. */
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 
-async function mount() {
-  act(() =>
-    root.render(
-      <>
-        <Page onRowClick={() => {}} />
-        <LoupeMount />
-      </>,
-    ),
+/** Takes the page's Instances off it, or puts them back, as a route change would. */
+let showPage: (shown: boolean) => void = () => {};
+
+function Harness() {
+  const [shown, setShown] = useState(true);
+  showPage = setShown;
+  return (
+    <>
+      {shown && <Page onRowClick={() => {}} />}
+      <LoupeMount />
+    </>
   );
+}
+
+async function mount() {
+  act(() => root.render(<Harness />));
   await settle();
   await settle();
 }
@@ -165,6 +172,101 @@ describe("the collapsed pill", () => {
   });
 });
 
+describe("changes made through __loupe with the panel closed", () => {
+  type Change = { id: string; scope: string; onScreenAtExport: boolean; props: { current?: unknown; proposed?: unknown }[] };
+  const proposal = () =>
+    (debugOf() as unknown as { proposal(): Promise<{ routes: { changes: Change[] }[] }> }).proposal().then((made) => made.routes.flatMap((route) => route.changes));
+  const buttons = () => debugOf().list("Button").map((row) => row.id);
+
+  it("keeps an edited Instance as last seen when it unmounts before the panel's module has loaded", async () => {
+    await mount();
+    const [ana] = buttons();
+    act(() => {
+      debugOf().set(ana as string, "variant", "outline");
+      // In the same task: nothing async has run since the change.
+      showPage(false);
+    });
+    await settle();
+    const [change] = await proposal();
+    expect(change).toMatchObject({ scope: "instance", onScreenAtExport: false, props: [{ current: "ghost", proposed: "outline" }] });
+  });
+
+  it("numbers changes made in one batch in the order they were made, the module cold or loaded", async () => {
+    for (const preload of [false, true]) {
+      resetLoupe();
+      await reload();
+      if (preload) await start.loadPanel();
+      const [ana, , , , menu] = buttons();
+      act(() => {
+        debugOf().set(ana as string, "variant", "outline", "group");
+        debugOf().set(menu as string, "variant", "outline");
+      });
+      await settle();
+      const changes = await proposal();
+      expect(changes.map((change) => [change.id, change.scope]), preload ? "preloaded" : "cold").toEqual([
+        ["c1", "call-site"],
+        ["c2", "instance"],
+      ]);
+    }
+  });
+});
+
+describe("a panel that can't load", () => {
+  /** The panel's module fails to load, as when its chunk is gone or the dev server restarts. */
+  const breakPanel = () => {
+    vi.doMock("./open.js", () => {
+      throw new Error("chunk gone");
+    });
+  };
+  /** An error the host's page would see: React reports one that no boundary caught here. */
+  const uncaught: unknown[] = [];
+  const onError = (event: ErrorEvent) => {
+    uncaught.push(event.error);
+    event.preventDefault();
+  };
+  beforeEach(() => {
+    uncaught.length = 0;
+    window.addEventListener("error", onError);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    window.removeEventListener("error", onError);
+    vi.doUnmock("./open.js");
+    vi.restoreAllMocks();
+  });
+
+  it("folds back to the pill on a click, gives the page its column back, and loads on the next click", async () => {
+    breakPanel();
+    await mount();
+    act(() => pill()?.focus());
+    await click(pill() as HTMLButtonElement);
+    await until(() => pill() !== null);
+    expect(panel()).toBeNull();
+    expect(document.documentElement.style.marginRight).toBe("");
+    expect(shadow().activeElement).toBe(pill());
+    expect(uncaught).toEqual([]);
+    expect(console.warn).toHaveBeenCalled();
+
+    vi.doUnmock("./open.js");
+    await click(pill() as HTMLButtonElement);
+    await until(() => panel() !== null);
+    expect(uncaught).toEqual([]);
+  });
+
+  it("shows the pill when a panel left open can't load on a fresh page load", async () => {
+    breakPanel();
+    localStorage.setItem(OPEN_KEY, "open");
+    await mount();
+    await until(() => pill() !== null);
+    expect(panel()).toBeNull();
+    expect(document.documentElement.style.marginRight).toBe("");
+    expect(uncaught).toEqual([]);
+    // Still kept open: the next page load tries again.
+    expect(localStorage.getItem(OPEN_KEY)).toBe("open");
+  });
+});
+
 describe("open or closed, kept in this browser", () => {
   it("opens on a reload once it was left open, and stays closed once it was hidden", async () => {
     await mount();
@@ -184,6 +286,18 @@ describe("open or closed, kept in this browser", () => {
     await reload();
     expect(panel()).toBeNull();
     expect(pill()).not.toBeNull();
+  });
+
+  it("opens a panel left open on a fresh page load, the page making room while its module loads", async () => {
+    localStorage.setItem(OPEN_KEY, "open");
+    act(() => root.render(<Harness />));
+    // Before the module has loaded: the column is already the panel's.
+    await act(async () => {});
+    expect(loaded()).toBe(false);
+    expect(document.documentElement.style.marginRight).not.toBe("");
+    await until(() => panel() !== null);
+    expect(pill()).toBeNull();
+    expect(trackersStarted()).toBe(true);
   });
 
   it("starts closed when storage can't be read", async () => {

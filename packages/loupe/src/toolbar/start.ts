@@ -5,10 +5,13 @@
 //   __loupe.proposal(options?)      the Proposal JSON (`proposal.ts`)
 //   __loupe.proposalText(options?)  its Copy Proposal text, not copied (`text.ts`)
 //
-// Both load the open panel's module (`open.tsx`) to answer, as the panel does. The
-// trackers the Proposal reads start on the panel's first open (`startTrackers()`),
-// or here, as soon as the store holds a record: one set through `__loupe` with the
-// panel closed is then known on the route it was set on, as if it were open.
+// Both load the open panel's module (`open.tsx`) to answer, as the panel does. What
+// the Proposal reads from the page as it goes, the tracker (`tracker.ts`) and the
+// change numbering (`numbers.ts`), is light and stays here: it starts on the panel's
+// first open, or as soon as the store holds a record, in the same task as the change
+// that made it. A record set through `__loupe` with the panel closed is then known on
+// its route, with the Instance it was set on, and in the order it was made, however
+// soon that Instance unmounts and whether or not the panel's module has loaded.
 //
 // Starting again changes nothing: the trackers are one per page, and the methods
 // load the same module. `resetLoupe()` takes both away, and the next mount starts
@@ -16,14 +19,24 @@
 // answers once it has run.
 
 import { debugOf } from "../runtime/debug.js";
-import { currentRoute, registry } from "../runtime/registry.js";
-import type { ScopeTarget } from "../runtime/store.js";
+import { registry } from "../runtime/registry.js";
+import { pageNumbering } from "./numbers.js";
 import type { ProposalOptions } from "./proposal.js";
+import { startTracking } from "./tracker.js";
+
+/**
+ * Starts what the Proposal reads from the page: the tracker and the change numbering.
+ * Once per page: starting again changes nothing, and `resetLoupe()` stops both.
+ */
+export function startTrackers(): void {
+  // From the first change on, not from the first copy: a record set on another route,
+  // or an Instance that has since unmounted, is only known if seen.
+  startTracking();
+  // So changes number in the order they are made, even several made at once.
+  pageNumbering();
+}
 
 type PanelModule = typeof import("./open.js");
-
-/** The change that started the trackers, and the route it was made on. */
-export type FirstChange = { target: ScopeTarget; route: string };
 
 let loading: Promise<PanelModule> | null = null;
 let loaded: PanelModule | null = null;
@@ -64,20 +77,18 @@ export function startToolbar(): () => void {
     proposalText: (options?: ProposalOptions) => loadPanel().then((panel) => panel.collectProposalText(options)),
   });
   const { store } = registry();
-  const startTrackers = (first?: FirstChange) => void loadPanel().then((panel) => panel.startTrackers(first), () => {});
   if (store.records().length > 0) {
     startTrackers();
     return () => {};
   }
-  // From the first change, not from the first copy: a record set on another route,
-  // or an Instance that has since unmounted, is only known if seen.
   let watching = true;
-  const unsubscribe = store.subscribe((target) => {
+  const unsubscribe = store.subscribe(() => {
     if (!watching) return;
     watching = false;
     unsubscribe();
-    // The trackers load after this change: it keeps the route it was made on.
-    startTrackers(target.scope === "page" ? undefined : { target, route: currentRoute() });
+    // In the store's own notice of the first change: the tracker and the numbering take
+    // it as made now, on this route, and see every change after it as it is made.
+    startTrackers();
   });
   return () => {
     watching = false;

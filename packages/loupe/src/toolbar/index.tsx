@@ -13,7 +13,7 @@
 // (`open.tsx`), loaded through `lazy()`, so the host's bundler splits it off and a
 // page with Loupe collapsed doesn't load it until it is opened, or preloaded on idle.
 
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Component, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import type { Scope } from "../runtime/store.js";
 import { columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.js";
@@ -144,8 +144,30 @@ function keepOpen(open: boolean) {
   }
 }
 
-/** The open panel, the first time it opens before its module has loaded: a Suspense boundary's fallback is nothing. */
-const LazyToolbarOpen = lazy(() => loadPanel().then((panel) => ({ default: panel.ToolbarOpen })));
+/**
+ * The open panel, when it opens before its module has loaded: a Suspense boundary's
+ * fallback is nothing. A new one each time, since `lazy()` keeps a failed load: the
+ * next open tries the module again (`loadPanel()` forgets a failure too).
+ */
+const lazyToolbarOpen = () => lazy(() => loadPanel().then((panel) => ({ default: panel.ToolbarOpen })));
+
+/**
+ * Keeps a failure of the panel's inside Loupe: its module not loading (the dev server
+ * restarting, a chunk gone stale), or the panel throwing as it renders. The host's page
+ * never sees it; Loupe folds back to its pill, and the next click tries again.
+ */
+class PanelBoundary extends Component<{ onFail(error: unknown): void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    this.props.onFail(error);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 /** The drawer's close and the handle's tuck (styles.ts `.panel.closing`, `.launcher.leaving`). */
 const CLOSE_MS = 220;
@@ -248,7 +270,18 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // While collapsed, the panel's module loads when the page is idle, so opening doesn't wait for it.
   useEffect(() => (hidden ? preloadPanelWhenIdle() : undefined), [hidden]);
   // Loaded already, it renders in the click; else through `lazy()`. Chosen as it opens, so it never remounts while open.
-  const ToolbarOpen = useMemo(() => (hidden ? null : (loadedPanel()?.ToolbarOpen ?? LazyToolbarOpen)), [hidden]);
+  const ToolbarOpen = useMemo(() => (hidden ? null : (loadedPanel()?.ToolbarOpen ?? lazyToolbarOpen())), [hidden]);
+  // The panel failed to load or to render: the page gets its column back and the pill
+  // comes back, with focus if the panel had it. Open stays kept: a reload tries again.
+  const failed = (error: unknown) => {
+    console.warn("[loupe] The panel couldn't open; click the Loupe pill to try again.", error);
+    focusSwap.current ||= focusIsHere();
+    clearTimeout(tuckTimer.current);
+    releaseColumn();
+    setTucking(false);
+    setClosing(false);
+    setHidden(true);
+  };
   const focusIsHere = () => (host.shadowRoot?.activeElement ?? null) !== null;
   const select = (id: string | null, next?: SelectMode) => {
     setSelected(id);
@@ -263,24 +296,26 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     <>
       {(hidden || tucking) && <Launcher leaving={!hidden} onOpen={open} onPreload={preload} />}
       {ToolbarOpen && (
-        <Suspense fallback={null}>
-          <ToolbarOpen
-            host={host}
-            column={column}
-            selected={selected}
-            onSelect={select}
-            mode={mode}
-            scope={scope}
-            onScope={changeScope}
-            marksHidden={marksHidden}
-            onMarks={() => setMarksHidden((was) => !was)}
-            onHide={hide}
-            closing={closing}
-            theme={theme}
-            onTheme={toggleTheme}
-            onShown={shown}
-          />
-        </Suspense>
+        <PanelBoundary onFail={failed}>
+          <Suspense fallback={null}>
+            <ToolbarOpen
+              host={host}
+              column={column}
+              selected={selected}
+              onSelect={select}
+              mode={mode}
+              scope={scope}
+              onScope={changeScope}
+              marksHidden={marksHidden}
+              onMarks={() => setMarksHidden((was) => !was)}
+              onHide={hide}
+              closing={closing}
+              theme={theme}
+              onTheme={toggleTheme}
+              onShown={shown}
+            />
+          </Suspense>
+        </PanelBoundary>
       )}
     </>
   );

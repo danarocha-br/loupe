@@ -122,7 +122,7 @@ describe("dist", () => {
   // its own, which the host's bundler splits off at `start.js`'s dynamic import.
   it("loads the open panel only through a dynamic import, never with the pill", () => {
     const pill = closure("toolbar/index.js", staticImports);
-    for (const panel of ["toolbar/open.js", "toolbar/panel.js", "toolbar/highlight.js", "toolbar/proposal.js", "toolbar/numbers.js"]) {
+    for (const panel of ["toolbar/open.js", "toolbar/panel.js", "toolbar/highlight.js", "toolbar/proposal.js", "proposal/text.js"]) {
       expect(pill, panel).not.toContain(panel);
     }
     expect(read("toolbar/start.js")).toMatch(/\bimport\(\s*"\.\/open\.js"\s*\)/);

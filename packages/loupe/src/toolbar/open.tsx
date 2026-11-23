@@ -6,13 +6,11 @@
 // it in a chunk of its own and the collapsed pill never loads it: it loads on the first
 // open, or earlier, on idle or with the pointer over the pill, so opening doesn't wait.
 //
-// The trackers the Proposal reads (`proposal.ts`, `numbers.ts`) start here too, on the
-// first open, or on the first change made through `__loupe` with the panel closed.
+// The trackers the Proposal reads (`tracker.ts`, `numbers.ts`) start on the first open
+// here, unless the first change made through `__loupe` started them already (`start.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { setOnKey } from "../proposal/build.js";
 import { debugOf } from "../runtime/debug.js";
-import { registry } from "../runtime/registry.js";
 import type { Scope } from "../runtime/store.js";
 import { useDeselect } from "./deselect.js";
 import type { Column } from "./dock.js";
@@ -20,30 +18,13 @@ import { Highlight } from "./highlight.js";
 import type { Theme } from "./index.js";
 import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
-import { pageNumbering } from "./numbers.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
 import { panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
-import { startTracking } from "./proposal.js";
-import type { FirstChange } from "./start.js";
+import { startTrackers } from "./start.js";
 
 export { collectProposal, collectProposalText } from "./proposal.js";
-
-/**
- * Starts what the Proposal reads from the page: the tracker (what each Instance last
- * showed, and the route each record was set on) and the change numbering. Once per
- * page: starting again changes nothing, and `resetLoupe()` stops both.
- */
-export function startTrackers(first?: FirstChange): void {
-  const tracker = startTracking();
-  // Made before the trackers loaded (`start.ts`): set on the route it was made on, if it is still there.
-  if (first && registry().store.records().some((record) => setOnKey(record.target) === setOnKey(first.target))) {
-    tracker.setOn[setOnKey(first.target)] ??= first.route;
-  }
-  // So changes number in the order they are made, even several made at once.
-  pageNumbering();
-}
 
 export type ToolbarOpenProps = {
   host: Element;
@@ -80,7 +61,7 @@ export function ToolbarOpen({
   onTheme,
   onShown,
 }: ToolbarOpenProps) {
-  useEffect(() => startTrackers(), []);
+  useEffect(startTrackers, []);
   // After the panel's own effects: its heading is there to take focus.
   useEffect(onShown, [onShown]);
   const debug = useMemo(debugOf, []);
