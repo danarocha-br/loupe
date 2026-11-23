@@ -10,7 +10,7 @@ import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
 import { ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [
@@ -75,7 +75,7 @@ export function FlagsCard() {
         // One line until it's opened: the fix is an engineer's, and the list comes first.
         <Fold className="off">
           <FoldTrigger>
-            <span className="dot amber small" />
+            <Dot tone="amber" small />
             Flag previews are off
             <span className="muted"> · why</span>
             <FoldChevron />
@@ -117,7 +117,7 @@ export function FlagsCard() {
             ))}
           {current.error && (
             <div className="warn">
-              <span className="dot" />
+              <Dot tone="amber" />
               {current.error}
             </div>
           )}
@@ -167,7 +167,7 @@ function FlagRow({
   return (
     <div className={previewing ? "row flag overridden" : "row flag"} data-flag={definition.key}>
       <div className="line">
-        <span className={previewing ? "dot small purple" : "dot small hollow"} />
+        <Dot tone={previewing ? "lilac" : "hollow"} small />
         <span className="name">{definition.key}</span>
         {previewing && (
           <Button size="small" className="reset" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>

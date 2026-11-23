@@ -13,7 +13,7 @@ describe("the toolbar's type (typography review 2026-11-20)", () => {
 
   it("keeps mono for evidence and tabular figures for counted numbers", () => {
     const mono = steps.filter(([, style]) => style.family === "mono").map(([role]) => role);
-    expect(mono.sort()).toEqual(["annotation", "mono", "monoSmall", "proposalText"]);
+    expect(mono.sort()).toEqual(["annotation", "chip", "key", "mono", "monoSmall", "proposalText", "tagMono"]);
     const tabular = steps.filter(([, style]) => "tabular" in style && style.tabular).map(([role]) => role);
     expect(tabular.sort()).toEqual(["delta", "figure", "meta"]);
   });

@@ -1,0 +1,10 @@
+/*
+ * Kbd (ADR 0003): a key in running text, written against `[data-kbd]`. Values from the
+ * tokens. In the stylesheet's `primitives` layer.
+ */
+
+/* A key: mono at 500, on the `kbd` wash, a key's corners. The transparent outline is what forced colours draw once they drop the wash. */
+[data-kbd] {
+  padding: var(--space-hairline) 5px; border-radius: var(--radius-checkbox); outline: 1px solid transparent; outline-offset: -1px;
+  background: var(--kbd); font: var(--font-key); white-space: nowrap;
+}

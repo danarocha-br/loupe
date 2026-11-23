@@ -269,11 +269,19 @@ export const TYPE = {
   label: { family: "sans", weight: 500, size: 11, lineHeight: 14 },
   /** The counts beside card titles. */
   meta: { family: "sans", weight: 400, size: 11, lineHeight: 14, tabular: true },
+  /** A tag's words: "State prop", "On the server", "Not visible now". */
+  tag: { family: "sans", weight: 400, size: 11, lineHeight: 16 },
   /** The number inside a delta; the 9px step is the delta's alone. */
   delta: { family: "sans", weight: 700, size: 9, lineHeight: 9, tabular: true },
   /** Call sites, change lines, values: what an engineer would paste. */
   mono: { family: "mono", weight: 400, size: 12, lineHeight: 18 },
   monoSmall: { family: "mono", weight: 400, size: 11, lineHeight: 16 },
+  /** A key on the keyboard: Esc, Alt. */
+  key: { family: "mono", weight: 500, size: 11, lineHeight: 14 },
+  /** A tag that quotes why, in mono: "set by the library". */
+  tagMono: { family: "mono", weight: 400, size: 10, lineHeight: 16, tracking: "0.02em" },
+  /** The status chip, the held chip, the "picked" tag: 10px mono at 500, not recased. */
+  chip: { family: "mono", weight: 500, size: 10, lineHeight: 14 },
   /** The page after the wordmark, the "app" tag on a chip. */
   annotation: { family: "mono", weight: 400, size: 10, lineHeight: 14, tracking: "0.04em", uppercase: true },
   /** A text field on a touch screen: 16px or more, so the browser doesn't zoom in on focus. */
