@@ -73,8 +73,25 @@ export type Registry = {
   instances: Map<string, MountedInstance>;
   /** Unmounted Instances an Instance-scope record still names, by id; pruned as records go. */
   departed: Map<string, LastSeen>;
-  /** Called after an Instance mounts, unmounts or commits, an Override changes, or the status drops. */
+  /**
+   * Called after an Instance mounts, unmounts or commits, an Override changes, or
+   * the status drops: the Toolbar's page signal, only while its panel is open.
+   */
   listeners: Set<() => void>;
+  /** Called as an Instance mounts (true) or unmounts (false), with the Instance: the Proposal tracker. */
+  mountListeners: Set<(instance: MountedInstance, mounted: boolean) => void>;
+  /**
+   * Moves with every change `listeners` hear of, heard or not, and with every
+   * change to the page's DOM a watcher reports (`pageChanged`). A walk of the page
+   * stays good while it stands (`debug.ts`).
+   */
+  version: number;
+  /** How many watchers report the page's DOM changes now (`watchPage`). With none, nothing does. */
+  watchers: number;
+  /** Mounted Instances per base id: whether one is duplicated, without looking at every other. */
+  bases: Map<string, number>;
+  /** The base id each mounted Instance registered under. */
+  baseOf: WeakMap<MountedInstance, string>;
   /**
    * Prop metadata from `meta/` for Instances with no Adapter, by call-site file and
    * imported name (PER-180). Filled by the Toolbar; empty until it loads any.
@@ -94,6 +111,11 @@ function createRegistry(): Registry {
     instances: new Map(),
     departed: new Map(),
     listeners: new Set(),
+    mountListeners: new Set(),
+    version: 0,
+    watchers: 0,
+    bases: new Map(),
+    baseOf: new WeakMap(),
     instanceMeta: new Map(),
   };
   // Rerenders the Instances a store change can touch, and forgets departed ones no record names.
@@ -122,8 +144,48 @@ export function onRegistryChange(listener: () => void): () => void {
   };
 }
 
+/**
+ * Subscribes to Instances mounting and unmounting only, not to their commits:
+ * cheap enough to hold for the page's life. Called synchronously, from a commit.
+ */
+export function onMountChange(listener: (instance: MountedInstance, mounted: boolean) => void): () => void {
+  const { mountListeners } = registry();
+  mountListeners.add(listener);
+  return () => {
+    mountListeners.delete(listener);
+  };
+}
+
+/**
+ * Moves the version and tells whoever listens. Every Adapter calls it on every
+ * commit, so with no listener (the Toolbar collapsed) it does nothing else.
+ */
 export function emitChange(): void {
-  for (const listener of registry().listeners) listener();
+  const value = registry();
+  value.version++;
+  if (value.listeners.size === 0) return;
+  for (const listener of value.listeners) listener();
+}
+
+/** A change to the page's DOM, from a watcher: a walk of the page from before it is stale. */
+export function pageChanged(): void {
+  registry().version++;
+}
+
+/**
+ * Says the page's DOM is watched, and every change to it reported through
+ * `pageChanged`, until the returned call. While none is, a walk of the page is
+ * good for the task it was made in only.
+ */
+export function watchPage(): () => void {
+  const value = registry();
+  value.watchers++;
+  let watching = true;
+  return () => {
+    if (!watching) return;
+    watching = false;
+    value.watchers--;
+  };
 }
 
 /** The page's route, as a page-scope Override keys it: the pathname. */
@@ -222,18 +284,24 @@ function recordedIds(store: OverrideStore): Set<string> {
  * is suspended.
  */
 export function register(baseId: string, entry: Omit<MountedInstance, "id" | "renders" | "route">): MountedInstance {
-  const { instances, departed, store } = registry();
+  const value = registry();
+  const { instances, departed, store, bases, baseOf } = value;
   const id = uniqueId(baseId, instances);
   const instance: MountedInstance = { ...entry, id, renders: 1, route: currentRoute() };
   instances.set(id, instance);
+  baseOf.set(instance, baseId);
   departed.delete(id);
-  // Also when this one took the free base id while a `~n` is still mounted.
-  const duplicated = [...instances.keys()].some((other) => other !== id && sharesBase(other, baseId));
-  if (duplicated) store.suspendAmbiguous((named) => sharesBase(named, baseId));
+  // Also when this one took the free base id while a `~n` is still mounted. Counted
+  // per base, not found by looking at every mounted Instance: mounting n is then O(n).
+  const sharing = (bases.get(baseId) ?? 0) + 1;
+  bases.set(baseId, sharing);
+  if (sharing > 1) store.suspendAmbiguous((named) => sharesBase(named, baseId));
+  for (const listener of value.mountListeners) listener(instance, true);
   emitChange();
   observe(instance);
   return instance;
 }
+
 
 /**
  * What a committed render writes to a mounted Instance: the fiber and hint it
@@ -255,9 +323,16 @@ function observe(instance: MountedInstance): void {
 }
 
 export function unregister(instance: MountedInstance): void {
-  const { instances, departed, store } = registry();
+  const value = registry();
+  const { instances, departed, store, bases, baseOf } = value;
   if (instances.get(instance.id) !== instance) return;
   instances.delete(instance.id);
+  const base = baseOf.get(instance);
+  if (base !== undefined) {
+    const left = (bases.get(base) ?? 1) - 1;
+    if (left > 0) bases.set(base, left);
+    else bases.delete(base);
+  }
   // Kept only while a record holds it: the Toolbar lists nothing else that isn't mounted.
   if (recordedIds(store).has(instance.id)) {
     departed.set(instance.id, {
@@ -268,6 +343,7 @@ export function unregister(instance: MountedInstance): void {
       current: instance.live().current,
     });
   }
+  for (const listener of value.mountListeners) listener(instance, false);
   emitChange();
 }
 

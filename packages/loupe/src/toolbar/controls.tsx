@@ -9,12 +9,13 @@
 // The row comes decided from `panelView()` (PER-214); this file draws it, makes the
 // write its data names, and keeps the Text field's unsent text while it has focus.
 
-import { Fragment, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
 import { Delta, LockIcon, ResetIcon } from "./icons.js";
 import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
+import { Chip, ChipGroup } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -259,23 +260,6 @@ function SwitchView({ control, label, debug }: { control: Options & { on: boolea
   );
 }
 
-/** Arrow keys move through a table of options and choose as they go, as a radio group does; Home and End jump. */
-const STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-
-function moveIn(event: KeyboardEvent<HTMLDivElement>) {
-  const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
-  const at = buttons.indexOf((event.target as HTMLElement).closest("button") as HTMLButtonElement);
-  if (at === -1 || buttons.length === 0) return;
-  const step = STEPS[event.key];
-  const next =
-    event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : step === undefined ? null : (at + step + buttons.length) % buttons.length;
-  if (next === null) return;
-  event.preventDefault();
-  const target = buttons[next];
-  target?.focus();
-  target?.click();
-}
-
 /**
  * A closed set of options as chips: the value that shows now in salmon, the app's
  * own value ringed and tagged under an Override, the design system's default with a
@@ -293,40 +277,38 @@ function ControlView({ control, label, app, debug }: { control: Control; label: 
   const { write } = control;
   const set = (next: unknown) => attempt(() => debug.set(write.id, write.prop, next, write.scope));
   if (control.kind === "options") {
-    // One stop for the whole table: the chosen option, or the first while none is.
-    const pressed = control.options.findIndex((option) => option.pressed);
-    const stop = pressed === -1 ? 0 : pressed;
+    // Chips take string values: each option by its type and value, which tells `1` from `"1"`.
+    const keyOf = (value: unknown) => `${typeof value}:${String(value)}`;
+    const checked = control.options.find((option) => option.pressed);
     return (
-      <div className="pills" role="radiogroup" aria-label={label} onKeyDown={moveIn}>
-        {control.options.map((option, index) => {
+      <ChipGroup
+        label={label}
+        value={checked ? keyOf(checked.value) : null}
+        onChoose={(key) => {
+          const option = control.options.find((candidate) => keyOf(candidate.value) === key);
+          if (option) set(option.value);
+        }}
+      >
+        {control.options.map((option) => {
           const isApp = option.label === app && !option.pressed;
-          const marks = [isApp && "app", option.isDefault && "is-default"].filter(Boolean).join(" ");
           const notes = [isApp && "the app’s value", option.isDefault && "the design system’s default"].filter(Boolean).join("; ");
           return (
-            <button
-              key={`${typeof option.value}:${option.value}`}
-              type="button"
-              role="radio"
-              aria-checked={option.pressed}
-              tabIndex={index === stop ? 0 : -1}
-              className={marks || undefined}
+            <Chip
+              key={keyOf(option.value)}
+              value={keyOf(option.value)}
+              tag={isApp ? "app" : undefined}
+              dot={option.isDefault}
+              count={option.count}
+              description={notes || undefined}
               // The exact value and its marks for a pointer; the cell wraps the value in full.
               title={notes ? `${option.label}: ${notes}` : option.label}
               data-option={option.label}
-              onClick={() => set(option.value)}
             >
-              <span className="opt">{bare(option.label)}</span>
-              {isApp && (
-                <span className="app-tag" aria-hidden="true">
-                  app
-                </span>
-              )}
-              {option.count !== null && <span className="count">{option.count}</span>}
-              {notes && <span className="sr-only">, {notes}</span>}
-            </button>
+              {bare(option.label)}
+            </Chip>
           );
         })}
-      </div>
+      </ChipGroup>
     );
   }
   return <TextField label={label} value={control.value} set={set} />;

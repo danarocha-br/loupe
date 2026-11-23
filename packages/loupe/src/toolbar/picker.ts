@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
+import { useEscape } from "./escape.js";
 import { scopeView } from "./panel-view/scopes.js";
 import type { Member } from "./panel-view/types.js";
 import { PICK_INSPECT_ONLY, pickCount } from "./panel-view/words.js";
@@ -58,7 +59,8 @@ const SWALLOWED = ["pointerdown", "mousedown", "pointerup", "mouseup", "click", 
 
 export function usePicker(debug: LoupeDebug, host: Element, onPicked: (id: string) => void): Picker {
   const [picking, setPicking] = useState(false);
-  const hovered = useMemo(hoveredStore, []);
+  // An inline function: React Compiler skips a hook whose useMemo takes a reference.
+  const hovered = useMemo(() => hoveredStore(), []);
   const picked = useRef(onPicked);
   useEffect(() => {
     picked.current = onPicked;
@@ -109,15 +111,9 @@ export function usePicker(debug: LoupeDebug, host: Element, onPicked: (id: strin
       picked.current(id);
       stop();
     };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      stop();
-    };
     window.addEventListener("pointermove", onMove, true);
     window.addEventListener("pointerout", onOut, true);
     for (const type of SWALLOWED) window.addEventListener(type, swallow, true);
-    window.addEventListener("keydown", onKey, true);
     const cursor = document.documentElement.style.cursor;
     document.documentElement.style.cursor = "crosshair";
     return () => {
@@ -125,10 +121,15 @@ export function usePicker(debug: LoupeDebug, host: Element, onPicked: (id: strin
       window.removeEventListener("pointermove", onMove, true);
       window.removeEventListener("pointerout", onOut, true);
       for (const type of SWALLOWED) window.removeEventListener(type, swallow, true);
-      window.removeEventListener("keydown", onKey, true);
       document.documentElement.style.cursor = cursor;
     };
   }, [picking, debug, host, hovered, stop]);
+
+  // Esc ends picking, and stops there: the app never hears it (escape.ts).
+  useEscape("picking", picking, (event) => {
+    event.stopPropagation();
+    stop();
+  });
 
   return { picking, hovered, start: () => setPicking(true), stop };
 }

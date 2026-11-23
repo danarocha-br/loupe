@@ -6,6 +6,7 @@
 
 import { useEffect, useRef } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
+import { useEscape } from "./escape.js";
 
 /** What the app opens over its page and closes on Esc itself: while one is open, Esc is the app's. */
 const APP_OVERLAYS = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], dialog[open]';
@@ -37,8 +38,9 @@ function appOverlayOpen(): boolean {
  * at a group or page scope, every Instance it reaches), while `active`: something
  * is selected and no select tool is armed (picking has its own Esc and clicks).
  *
- * Esc is left to the app while it has a menu or dialog open, to a text field
- * with focus, and to the panel's own dialog. Only a pointer click counts: one
+ * Esc is left to the app while it has a menu or dialog open, and to a text field
+ * with focus; Loupe's own layers above the selection, picking and Copy Proposal's
+ * popover, take it first (escape.ts). Only a pointer click counts: one
  * from the keyboard (Enter on an app's button) or from a script has no
  * `detail`. Nothing in the panel counts.
  */
@@ -61,28 +63,25 @@ export function useDeselect({
     latest.current = { ids, onDeselect };
   });
 
+  useEscape("selection", active, (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+    if (inTextField(event.composedPath()[0])) return false;
+    if (appOverlayOpen()) return false;
+    latest.current.onDeselect();
+  });
+
   useEffect(() => {
     if (!active) return;
     const fromToolbar = (event: Event) => event.composedPath().includes(host);
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      if (inTextField(event.composedPath()[0])) return;
-      // Copy Proposal's popover closes on this Esc (copy-flow.tsx), and nothing else does.
-      if (host.shadowRoot?.querySelector(".copy-popover")) return;
-      if (appOverlayOpen()) return;
-      latest.current.onDeselect();
-    };
     const onClick = (event: MouseEvent) => {
       if (event.detail === 0 || event.button !== 0 || fromToolbar(event)) return;
       const nodes = new Set<EventTarget>(latest.current.ids.flatMap((id) => debug.nodes(id)));
       if (event.composedPath().some((target) => nodes.has(target))) return;
       latest.current.onDeselect();
     };
-    // Capture, so an app's handler that stops the event doesn't hide it; neither ever prevents or stops it.
-    window.addEventListener("keydown", onKey, true);
+    // Capture, so an app's handler that stops the event doesn't hide it; it never prevents or stops it.
     window.addEventListener("click", onClick, { capture: true, passive: true });
     return () => {
-      window.removeEventListener("keydown", onKey, true);
       window.removeEventListener("click", onClick, { capture: true });
     };
   }, [active, debug, host]);

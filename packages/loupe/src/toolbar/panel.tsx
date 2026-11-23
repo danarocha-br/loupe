@@ -22,6 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
+import { Chip, ChipGroup } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -198,22 +199,22 @@ export function Panel(props: PanelProps) {
           )}
         </div>
         <div className="tools">
-          <div className="select-tools" role="group" aria-label="Select">
+          {/* The mode, as a radio group: armed is the page's state, said by the status strip below. */}
+          <ChipGroup look="bare" className="select-tools" label="Select" value={props.mode} onChoose={(mode) => props.onTool(mode as SelectMode)}>
             {SELECT_TOOLS.map((tool) => (
-              <button
+              <Chip
                 key={tool.mode}
-                type="button"
-                className={props.picking && props.mode === tool.mode ? "tool armed" : "tool"}
+                value={tool.mode}
+                className="tool"
                 data-scope={tool.scope}
-                aria-pressed={props.mode === tool.mode}
-                onClick={() => props.onTool(tool.mode)}
+                data-armed={props.picking && props.mode === tool.mode ? "" : undefined}
                 title={tool.title}
               >
                 {tool.icon}
                 <span className="sr-only">{tool.label}</span>
-              </button>
+              </Chip>
             ))}
-          </div>
+          </ChipGroup>
           <span className="divider" aria-hidden="true" />
           <button
             type="button"
@@ -391,22 +392,21 @@ function ComponentList({
           {TEXT.startTitle}
         </h2>
         <p className="body">{TEXT.startBody}</p>
-        <div className="hero-tools" role="group" aria-label="Start selecting">
+        <ChipGroup look="bare" className="hero-tools" label="Start selecting" value={mode} onChoose={(next) => onTool(next as SelectMode)}>
           {SELECT_TOOLS.map((tool) => (
-            <button
+            <Chip
               key={tool.mode}
-              type="button"
-              className={picking && mode === tool.mode ? "big-tool armed" : "big-tool"}
-              aria-pressed={picking && mode === tool.mode}
-              onClick={() => onTool(tool.mode)}
+              value={tool.mode}
+              className="big-tool"
+              data-armed={picking && mode === tool.mode ? "" : undefined}
               title={tool.title}
             >
               <ToolPreview mode={tool.mode} />
               <span className="t">{tool.label}</span>
               <span className="h">{tool.hint}</span>
-            </button>
+            </Chip>
           ))}
-        </div>
+        </ChipGroup>
       </div>
       {notices}
       {body.notGenerated && <NotGeneratedNotice names={body.notGenerated.names} command={body.notGenerated.command} />}

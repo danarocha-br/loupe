@@ -2,8 +2,9 @@
 // picker's plain outlines in place of the revision clouds, so the page reads clean).
 // The selected Instance gets a solid outline, tagged with its component and size
 // ("Button · 32 × 32"); at a group or page scope every other Instance it reaches is
-// dashed, and one left out is dashed grey (PER-134). The nodes are found once per
-// change; only their boxes are re-read each frame, as menus and dialogs animate.
+// dashed, and one left out is dashed grey (PER-134). The boxes are read again when
+// the page signal says one may have moved (`page-signal.ts`): a scroll, a resize, a
+// new version, and every frame of a menu's or a dialog's animation, never on a still page.
 //
 // A change lands, then steps back: when a value changes, every Instance it reaches
 // is outlined for a moment (`LINGER`), and then its outline fades, the selection's
@@ -24,6 +25,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { pageWidth } from "./dock.js";
 import type { Member } from "./panel-view/index.js";
+import { inView, type PageSignal } from "./page-signal.js";
 import { type Hovered, NOT_PICKING, type PickPreview, pickPreview, type SelectMode, useHovered } from "./picker.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
@@ -34,7 +36,7 @@ import { HOST_ATTRIBUTE } from "./styles.js";
  */
 type Kind = "ring" | "member" | "out" | "hover" | "pick";
 type Tag = Pick<PickPreview, "name" | "detail">;
-type Target = { id: string; nodes: Element[]; label: string | null; kind: Kind; tag: Tag | null };
+type Target = { id: string; label: string | null; kind: Kind; tag: Tag | null };
 type Box = { top: number; left: number; width: number; height: number };
 type Ring = Box & { key: string; id: string; label: string | null; kind: Kind; tag: Tag | null };
 /** An Instance a change reaches, where it shows. */
@@ -86,45 +88,6 @@ export function tagPlace(ring: Box, tag: { width: number; height: number }, page
   }
   const left = Math.max(TAG_EDGE, Math.min(ring.left, page.width - TAG_EDGE - tag.width));
   return { top, left };
-}
-
-/** A box with less area than this draws nothing worth outlining: a focus guard, an empty span, a zero-height div. */
-const TINY_AREA = 16;
-/** A box covering this much of the viewport is a backdrop or a portal's root, not the Instance. */
-const BACKDROP = 0.9;
-
-type NodeBox = Box & { node: Element };
-
-/** The boxes worth outlining among an Instance's nodes, largest first. */
-function boxesOf(nodes: readonly Element[]): NodeBox[] {
-  const viewport = window.innerWidth * window.innerHeight;
-  return nodes
-    .map((node) => ({ node, rect: node.getBoundingClientRect() }))
-    .filter(({ rect }) => rect.width * rect.height >= TINY_AREA && (viewport === 0 || rect.width * rect.height < viewport * BACKDROP))
-    .map(({ node, rect: { top, left, width, height } }) => ({ node, top, left, width, height }))
-    .sort((a, b) => b.width * b.height - a.width * a.height);
-}
-
-/**
- * Whether the Instance shows at its box's centre: an open menu or dialog of the
- * app's, or the panel, can cover it, and an outline drawn over the cover would
- * mark the wrong thing. A transparent layer, such as a menu's click-away
- * backdrop, covers nothing. Where nothing can be hit-tested (a test's DOM), it shows.
- */
-function inView(box: NodeBox): boolean {
-  if (typeof document.elementsFromPoint !== "function") return true;
-  for (const hit of document.elementsFromPoint(box.left + box.width / 2, box.top + box.height / 2)) {
-    if (box.node.contains(hit) || hit.contains(box.node)) return true;
-    if (hit.hasAttribute(HOST_ATTRIBUTE) || covers(hit)) return false;
-  }
-  return true;
-}
-
-/** Whether an element paints over what is under it: a background, or an image or video. */
-function covers(element: Element): boolean {
-  if (element.localName === "img" || element.localName === "video" || element.localName === "canvas") return true;
-  const color = getComputedStyle(element).backgroundColor;
-  return color !== "" && color !== "transparent" && !/rgba\(.*,\s*0\)$/.test(color);
 }
 
 const sameBoxes = <T extends { key: string; top: number; left: number }>(a: T[], b: T[]) =>
@@ -180,6 +143,7 @@ function useLanded(marks: readonly { id: string; stamp: string }[], selection: r
 
 export function Highlight({
   debug,
+  signal,
   version,
   selected,
   selectedLabel,
@@ -190,6 +154,8 @@ export function Highlight({
   marksHidden = false,
 }: {
   debug: LoupeDebug;
+  /** The page signal: boxes by id, and when to read them again. */
+  signal: PageSignal;
   version: number;
   selected: string | null;
   selectedLabel: string | null;
@@ -222,13 +188,7 @@ export function Highlight({
   useLayoutEffect(() => {
     const hoveredIds = hoveredKey.split("\n").filter((id) => id !== "");
     const scoped = membersKey === null ? null : membersKey.split("\n").filter((entry) => entry !== "");
-    const target = (id: string, kind: Kind, label: string | null, tag: Tag | null = null): Target => ({
-      id,
-      nodes: debug.nodes(id),
-      label,
-      kind,
-      tag,
-    });
+    const target = (id: string, kind: Kind, label: string | null, tag: Tag | null = null): Target => ({ id, label, kind, tag });
     const reached = (id: string, out: boolean): Kind => (out ? "out" : id === selected ? "ring" : "member");
     let targets: Target[];
     if (preview !== null) {
@@ -264,19 +224,18 @@ export function Highlight({
       .map((entry) => {
         const at = entry.lastIndexOf("=");
         const id = entry.slice(0, at);
-        return { id, text: entry.slice(at + 1).split(",").join(" "), nodes: debug.nodes(id) };
+        return { id, text: entry.slice(at + 1).split(",").join(" ") };
       });
     if (targets.length === 0 && keyed.length === 0) {
       setRings([]);
       setPins([]);
       return;
     }
-    let frame = 0;
     const measure = () => {
       const next = targets.flatMap((one, index): Ring[] => {
-        const boxes = boxesOf(one.nodes);
+        const boxes = signal.boxes(one.id);
         // The selection's outline isn't drawn over an app's menu or dialog that covers it.
-        if (one.kind !== "pick" && one.kind !== "hover" && boxes[0] && !inView(boxes[0])) return [];
+        if (one.kind !== "pick" && one.kind !== "hover" && boxes[0] && !inView(boxes[0], HOST_ATTRIBUTE)) return [];
         // The label goes on the largest box, the one a designer reads as the Instance.
         return boxes.map(({ node: _node, ...box }, nth) => ({
           ...box,
@@ -288,8 +247,8 @@ export function Highlight({
         }));
       });
       const nextPins = keyed.flatMap((one): Mark[] => {
-        const [box] = boxesOf(one.nodes);
-        if (!box || !inView(box)) return [];
+        const [box] = signal.boxes(one.id);
+        if (!box || !inView(box, HOST_ATTRIBUTE)) return [];
         const { node: _node, ...rest } = box;
         return [{ ...rest, key: one.id, id: one.id, text: one.text }];
       });
@@ -301,11 +260,10 @@ export function Highlight({
           : next,
       );
       setPins((previous) => (sameBoxes(previous, nextPins) && previous.every((pin, i) => pin.text === nextPins[i]?.text) ? previous : nextPins));
-      frame = requestAnimationFrame(measure);
     };
     measure();
-    return () => cancelAnimationFrame(frame);
-  }, [debug, selected, selectedLabel, hoveredKey, membersKey, marksKey, version, preview, marksHidden]);
+    return signal.onLayout(measure);
+  }, [signal, selected, selectedLabel, hoveredKey, membersKey, marksKey, version, preview, marksHidden]);
 
   // The pick tag is placed from its own size, read once its text has rendered.
   const tagRef = useRef<HTMLDivElement>(null);

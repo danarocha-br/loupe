@@ -1,0 +1,52 @@
+/*
+ * ChipGroup (ADR 0003). Written against state attributes: UI SDK's `[data-checked]`
+ * and `[data-disabled]` on each radio, and the chip's own marks, `[data-tagged]` and
+ * `[data-dotted]`. Values come from the host's tokens (tokens.ts), never literals
+ * that have a token. In the stylesheet's `primitives` layer (surface/).
+ */
+
+[data-chip-group] { display: flex; flex-wrap: wrap; gap: var(--space-sheet); }
+
+[data-chip]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+[data-chip] [data-part="description"] {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Bare: the caller's class draws the chip, and its content lays out as the chip's own children. */
+[data-look="bare"] [data-part="label"] { display: contents; }
+
+/* The option chips: what shows now (checked) in salmon with its count, a tagged value ringed, a dotted one dotted. */
+[data-look="chips"] [data-chip] {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-width: 0; min-height: 26px; padding: var(--space-xs) var(--space-row);
+  border: 0; border-radius: var(--radius-chip); background: var(--sunk); box-shadow: inset 0 0 0 1px var(--hairline);
+  color: var(--muted); font: var(--font-option); text-align: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--duration-hover) var(--ease-out), color var(--duration-hover) var(--ease-out);
+}
+@media (hover: hover) {
+  [data-look="chips"] [data-chip]:not([data-checked]):not([data-disabled]):hover { background: var(--sunk-hover); color: var(--ink); }
+}
+[data-look="chips"] [data-chip][data-checked] { background: var(--shown); color: var(--on-shown); font-weight: 500; box-shadow: inset 0 0 0 1px var(--shown-edge); }
+[data-look="chips"] [data-chip][data-disabled] { cursor: default; opacity: 0.45; }
+/* A long value wraps in its chip rather than losing its end: it is what the designer picks between. */
+[data-look="chips"] [data-part="label"] { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-look="chips"] [data-chip][data-tagged]:not([data-checked]) { box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); }
+[data-look="chips"] [data-part="tag"] { flex: none; font: var(--font-annotation); letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+[data-look="chips"] [data-chip][data-dotted]::after {
+  content: ""; flex: none; order: 2; width: 4px; height: 4px; border-radius: 2px; background: var(--faint);
+}
+[data-look="chips"] [data-part="count"] { flex: none; order: 3; font: var(--font-annotation); font-variant-numeric: tabular-nums; color: var(--faint); }
+[data-look="chips"] [data-chip][data-checked] [data-part="count"] { color: inherit; }
+
+/* Forced colours drop backgrounds and box-shadows: the checked chip, the ring and the dot in system colours. */
+@media (forced-colors: active) {
+  [data-look="chips"] [data-chip] { border: 1px solid ButtonText; }
+  [data-look="chips"] [data-chip][data-checked] { forced-color-adjust: none; background: Highlight; color: HighlightText; border-color: Highlight; }
+  [data-look="chips"] [data-chip][data-tagged]:not([data-checked]) { outline: 1px dashed CanvasText; outline-offset: -4px; }
+  [data-look="chips"] [data-chip][data-dotted]::after { forced-color-adjust: none; background: CanvasText; }
+  [data-look="chips"] [data-chip][data-checked][data-dotted]::after { background: HighlightText; }
+  /* Focus wins over the tagged ring's dashes. */
+  [data-look="chips"] [data-chip][data-chip]:focus-visible { outline: 2px solid Highlight; outline-offset: 1px; }
+}
