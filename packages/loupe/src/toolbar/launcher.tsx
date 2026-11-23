@@ -4,10 +4,10 @@
 // under the pointer; within reach of a side, a faint copy shows where it would dock, as
 // a window shows where it will snap (`launcher-place.ts`). In the last few px to a side,
 // the pill and the window's edge run together like two drops of ink (2026-11-23, after
-// the designer's "gooey effect" reference): a short liquid bridge that thickens as they
-// close, holds it docked, and stretches and snaps when it is pulled away. Let go or
-// flicked within reach of a side, it travels into that place and its corners on that
-// side square off; anywhere else it stays free. The arrow keys dock it on the side they
+// the designer's "gooey effect" reference): a liquid neck that fills in as they close and
+// holds it docked, a few px off its side, and stretches and snaps when it is pulled away.
+// Let go or flicked within reach of a side, it travels into that place; anywhere else it
+// stays free. The arrow keys dock it on the side they
 // point at, so it moves without a pointer too.
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
@@ -263,8 +263,8 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-/** Room around the pill for its blur to spread into, and for the edge's bridge to form in. */
-const GOO_PAD = 28;
+/** Room around the pill for its blur to spread into (3 blurs), and for the edge's neck to form in. */
+const GOO_PAD = 32;
 /** The edge's body sits this far past the window's edge, so nothing of it shows along the edge alone. */
 const WALL_OFF = 2;
 const GOO_W = BODY.width + GOO_PAD * 2;
@@ -280,27 +280,29 @@ const WALLS: Record<Edge, { x: number; y: number; axis: "x" | "y"; sign: 1 | -1 
 
 /**
  * The pill's body, drawn with a body for each side of the window, through a blur and an alpha
- * threshold: apart they are their own shapes; within about 9px they run together into one, a
- * bridge that fills in as they close and snaps as they part, as two drops of ink do.
- * Each side's body is placed by the pill's real gap to that side, so it stays put on the
- * window's edge, even while the pill travels: both move by `translate` on the same curve.
- * The heels square the pill's corners on the side it is docked to (styles.ts).
+ * threshold: apart they are their own shapes; within about 10px they run together into one, a
+ * neck that fills in as they close and snaps as they part, as two drops of ink do. The
+ * shapes themselves are laid over the result, so the pill stays a crisp stadium and only
+ * the neck is liquid. Each side's body is placed by the pill's real gap to that side, so it
+ * stays put on the window's edge, even while the pill travels: both move by `translate` on
+ * the same curve.
  */
 function Goo({ gaps }: { gaps: Record<Edge, number> }) {
   return (
     <svg className="goo" width={GOO_W} height={GOO_H} viewBox={`0 0 ${GOO_W} ${GOO_H}`} aria-hidden="true" focusable="false">
       <defs>
         <filter id="loupe-goo" x="0" y="0" width={GOO_W} height={GOO_H} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
-          <feGaussianBlur stdDeviation="6" />
-          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" />
+          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+          {/* Cut sharply at half: a straight edge stays where it is drawn, the neck's edge is crisp, and only gaps narrower than ~1 blur fill in. */}
+          <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 90 -44.5" result="goo" />
+          <feMerge>
+            <feMergeNode in="goo" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
         </filter>
       </defs>
       <g filter="url(#loupe-goo)">
         <rect className="body" x={GOO_PAD} y={GOO_PAD} width={BODY.width} height={BODY.height} rx={BODY.height / 2} />
-        <rect className="heel" data-side="right" x={GOO_PAD + BODY.width / 2} y={GOO_PAD} width={BODY.width / 2} height={BODY.height} />
-        <rect className="heel" data-side="left" x={GOO_PAD} y={GOO_PAD} width={BODY.width / 2} height={BODY.height} />
-        <rect className="heel" data-side="bottom" x={GOO_PAD} y={GOO_PAD + BODY.height / 2} width={BODY.width} height={BODY.height / 2} />
-        <rect className="heel" data-side="top" x={GOO_PAD} y={GOO_PAD} width={BODY.width} height={BODY.height / 2} />
         {EDGES.map((edge) => {
           const wall = WALLS[edge];
           const by = round(wall.sign * gaps[edge]);

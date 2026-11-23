@@ -1,8 +1,8 @@
 // Where the collapsed Toolbar sits (2026-11-22): a small dark pill with Loupe's L that
 // can be dragged anywhere on the window. It stays rigid under the pointer: within reach
 // of a side, a faint copy of it shows where it would dock, and let go there it travels
-// into that place, flush, its corners on that side square. Dropped anywhere else, or
-// flicked short of a side, it stays free.
+// into that place, a few px off the side, where a liquid neck holds it to the window's
+// edge (launcher.tsx, Goo). Dropped anywhere else, or flicked short of a side, it stays free.
 //
 // Pure geometry, so it can be tested without a layout: a place is kept in fractions
 // of the viewport, so it holds across a resize, and laid out in px for the viewport there is.
@@ -20,8 +20,10 @@ export const BODY = { width: 44, height: 32 } as const;
 export const REACH = 56;
 /** How far a free pill, or a glued one's ends, keep from the window's edges and corners. */
 export const MARGIN = 8;
-/** The concave fillets a docked pill flares into its side with, outside its box (styles.ts). */
+/** How wide the liquid neck that holds a docked pill spreads along its side, past the pill's ends (launcher.tsx, Goo). */
 export const FLARE = 8;
+/** A docked pill floats this far off its side, so the neck that holds it to the edge shows. */
+export const DOCK_GAP = 6;
 
 /** Where it starts: on the right side, low, where the "Show Loupe" tab used to sit. */
 export const DEFAULT_PLACE: Place = { edge: "right", at: 0.85 };
@@ -112,13 +114,13 @@ export function centreOf(place: Place, viewport: Viewport): { x: number; y: numb
   const along = clamp(place.at * (horizontal(place.edge) ? viewport.width : viewport.height), min, max);
   switch (place.edge) {
     case "top":
-      return { x: along, y: depth / 2 };
+      return { x: along, y: DOCK_GAP + depth / 2 };
     case "bottom":
-      return { x: along, y: viewport.height - depth / 2 };
+      return { x: along, y: viewport.height - DOCK_GAP - depth / 2 };
     case "left":
-      return { x: depth / 2, y: along };
+      return { x: DOCK_GAP + depth / 2, y: along };
     case "right":
-      return { x: viewport.width - depth / 2, y: along };
+      return { x: viewport.width - DOCK_GAP - depth / 2, y: along };
   }
 }
 

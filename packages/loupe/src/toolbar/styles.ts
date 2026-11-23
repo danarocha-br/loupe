@@ -392,30 +392,17 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
 .footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Collapsed (launcher.tsx): a flat dark pill with the L, free or docked flush on a side. Its
-   body is drawn in .goo, where it runs together with the window's edge in the last few px. */
+/* Collapsed (launcher.tsx): a flat dark pill with the L, free, or docked a few px off a side and
+   held to it by a liquid neck. Its body is drawn in .goo, where it runs together with the window's edge. */
 .launcher {
   position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; width: 44px; height: 32px; padding: 0; border-radius: 16px; background: none; color: var(--on-band);
   touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-edge);
   transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out;
 }
-/* The focus outline follows the docked shape: square on the side it is docked to. */
-.launcher[data-edge="right"], .dock-ghost[data-edge="right"] { border-radius: 16px 0 0 16px; }
-.launcher[data-edge="left"], .dock-ghost[data-edge="left"] { border-radius: 0 16px 16px 0; }
-.launcher[data-edge="top"], .dock-ghost[data-edge="top"] { border-radius: 0 0 16px 16px; }
-.launcher[data-edge="bottom"], .dock-ghost[data-edge="bottom"] { border-radius: 16px 16px 0 0; }
 /* The body and a body for each side of the window, through one blur and threshold (launcher.tsx, Goo). */
-.launcher .goo { position: absolute; left: -28px; top: -28px; display: block; overflow: visible; pointer-events: none; }
+.launcher .goo { position: absolute; left: -32px; top: -32px; display: block; overflow: visible; pointer-events: none; }
 .launcher .goo rect { fill: var(--band); transition: fill 120ms ease-out; }
 @media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover .goo rect { fill: var(--band-hover); } }
-/* The heel on the docked side fills that half square, so its corners there square off as it lands; picked up, they round at once. */
-.launcher .heel { transform-box: fill-box; scale: 0 1; transition: scale 80ms ease-out; }
-.launcher .heel[data-side="right"] { transform-origin: 100% 50%; }
-.launcher .heel[data-side="left"] { transform-origin: 0 50%; }
-.launcher .heel[data-side="top"] { transform-origin: 50% 0; scale: 1 0; }
-.launcher .heel[data-side="bottom"] { transform-origin: 50% 100%; scale: 1 0; }
-.launcher[data-edge="right"] .heel[data-side="right"], .launcher[data-edge="left"] .heel[data-side="left"],
-.launcher[data-edge="top"] .heel[data-side="top"], .launcher[data-edge="bottom"] .heel[data-side="bottom"] { scale: 1; transition: scale 260ms cubic-bezier(0.23, 1, 0.32, 1); }
 /* Travelling, each side's body moves by the opposite of the pill's travel on the same curve, so it holds still on the window's edge. */
 .launcher.settling .goo .wall { transition: fill 120ms ease-out, translate 260ms cubic-bezier(0.23, 1, 0.32, 1); }
 .launcher .mark { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
@@ -424,37 +411,27 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* After a drop, a dock or a key: it travels to its place, quick out and a soft landing. */
 .launcher.settling { transition: translate 260ms cubic-bezier(0.23, 1, 0.32, 1), transform 240ms cubic-bezier(0.23, 1, 0.32, 1), opacity 160ms ease-out; }
 .launcher:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Where the held pill would dock if let go now: the docked shape, faint, flush on its side,
-   with the two 8px fillets the edge's goo gives it docked. The mask uses alpha only, so its black is not a colour. */
+/* Where the held pill would dock if let go now: the pill, faint, at its docked place a few px off the side. */
 .dock-ghost { position: fixed; left: 0; top: 0; z-index: 2147483646; width: 44px; height: 32px; border-radius: 16px; background: var(--band); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
 .dock-ghost.shown { opacity: 0.16; }
-.dock-ghost[data-edge]::before, .dock-ghost[data-edge]::after { content: ""; position: absolute; width: 8px; height: 8px; background-color: inherit; }
-.dock-ghost[data-edge="right"]::before { left: 36px; top: -8px; mask: radial-gradient(circle at 0 0, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="right"]::after { left: 36px; top: 32px; mask: radial-gradient(circle at 0 100%, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="left"]::before { left: 0; top: -8px; mask: radial-gradient(circle at 100% 0, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="left"]::after { left: 0; top: 32px; mask: radial-gradient(circle at 100% 100%, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="top"]::before { left: -8px; top: 0; mask: radial-gradient(circle at 0 100%, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="top"]::after { left: 44px; top: 0; mask: radial-gradient(circle at 100% 100%, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="bottom"]::before { left: -8px; top: 24px; mask: radial-gradient(circle at 0 0, transparent 7.5px, black 8px); }
-.dock-ghost[data-edge="bottom"]::after { left: 44px; top: 24px; mask: radial-gradient(circle at 100% 0, transparent 7.5px, black 8px); }
 /* The handle: as the panel opens it tucks into its side (free, it settles away), and as the
-   panel closes it slides back out of its side. A transform, apart from the translate that places it. */
+   panel closes it slides back out of its side; docked 6px off the side, it travels that much further. A transform, apart from the translate that places it. */
 .launcher.leaving { pointer-events: none; transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), opacity 120ms ease-out; }
-.launcher.leaving[data-edge="right"] { transform: translateX(100%); }
-.launcher.leaving[data-edge="left"] { transform: translateX(-100%); }
-.launcher.leaving[data-edge="top"] { transform: translateY(-100%); }
-.launcher.leaving[data-edge="bottom"] { transform: translateY(100%); }
+.launcher.leaving[data-edge="right"] { transform: translateX(calc(100% + 6px)); }
+.launcher.leaving[data-edge="left"] { transform: translateX(calc(-100% - 6px)); }
+.launcher.leaving[data-edge="top"] { transform: translateY(calc(-100% - 6px)); }
+.launcher.leaving[data-edge="bottom"] { transform: translateY(calc(100% + 6px)); }
 .launcher.leaving[data-edge="free"] { transform: scale(0.9); opacity: 0; }
 @starting-style {
-  .launcher[data-edge="right"] { transform: translateX(100%); }
-  .launcher[data-edge="left"] { transform: translateX(-100%); }
-  .launcher[data-edge="top"] { transform: translateY(-100%); }
-  .launcher[data-edge="bottom"] { transform: translateY(100%); }
+  .launcher[data-edge="right"] { transform: translateX(calc(100% + 6px)); }
+  .launcher[data-edge="left"] { transform: translateX(calc(-100% - 6px)); }
+  .launcher[data-edge="top"] { transform: translateY(calc(-100% - 6px)); }
+  .launcher[data-edge="bottom"] { transform: translateY(calc(100% + 6px)); }
   .launcher[data-edge="free"] { transform: scale(0.9); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .launcher, .launcher.settling, .launcher.leaving { transition: opacity 150ms ease-out; }
-  .launcher .heel, .launcher[data-edge] .heel[data-side], .launcher.settling .goo .wall { transition: none; }
+  .launcher.settling .goo .wall { transition: none; }
   .launcher.leaving[data-edge] { transform: none; opacity: 0; }
   @starting-style { .launcher[data-edge] { transform: none; opacity: 0; } }
 }
@@ -672,7 +649,7 @@ fieldset.site .list > li { padding-left: 42px; }
 .switch-track { position: relative; flex: none; width: 42px; height: 22px; overflow: hidden; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--switch-off); }
 .switch-track .thumb { position: absolute; inset: 0 auto 0 0; width: 50%; border-radius: 11px 0 0 11px; background: var(--switch-off); transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 180ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 160ms ease-out; }
 .switch-track .thumb::after { content: ""; position: absolute; inset: 0; width: 16px; height: 16px; margin: auto; border-radius: 50%; background: var(--card); }
-.switch-track[aria-checked="true"] .thumb { transform: translateX(100%); border-radius: 0 11px 11px 0; background: var(--switch-on); }
+.switch-track[aria-checked="true"] .thumb { transform: translateX(calc(100% + 6px)); border-radius: 0 11px 11px 0; background: var(--switch-on); }
 /* Under reduced motion the thumb and the chevrons still move to their place, without travelling there. */
 @media (prefers-reduced-motion: reduce) {
   .switch-track, .switch-track .thumb, .inspect summary .icon, .group summary > .icon, .scope .count-toggle .icon, .flags .off summary .icon { transition: none; }

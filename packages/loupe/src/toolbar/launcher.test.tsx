@@ -80,7 +80,8 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
       pill().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
     });
     expect(pill().dataset.edge).toBe("left");
-    expect(pill().style.translate.startsWith("0px ")).toBe(true);
+    // Docked, it floats a few px off the side, held to it by the neck.
+    expect(pill().style.translate.startsWith("6px ")).toBe(true);
   });
 
   it("stays rigid and exactly under the pointer while held, with no lean", () => {
@@ -154,8 +155,8 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
 
   it("draws a body for each side of the window as far out as the pill's gap to it, so the two run together only close to (2026-11-23)", () => {
     const wall = (index: number) => pill().querySelectorAll<SVGRectElement>(".goo .wall")[index] as SVGRectElement;
-    // Docked on the right: the right side's body (EDGES order: left, right, top, bottom) touches it.
-    expect(wall(1).style.translate).toBe("0px 0px");
+    // Docked on the right, 6px off it: the right side's body (EDGES order: left, right, top, bottom) is that close, so they join.
+    expect(wall(1).style.translate).toBe("6px 0px");
     // Held mid-page: every side's body is the pill's whole gap away.
     pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     const [x] = pill().style.translate.split(" ").map(Number.parseFloat);
