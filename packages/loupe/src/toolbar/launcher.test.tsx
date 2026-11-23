@@ -94,21 +94,16 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
   });
 
   it("shows where it would dock while held in reach of a side, and nothing while held mid-page", () => {
-    const seam = () => container.querySelector(".dock-seam") as HTMLElement;
     pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
     expect(ghost().classList.contains("shown")).toBe(false);
-    expect(seam().classList.contains("shown")).toBe(false);
     // The pointer puts the body 30px off the bottom: in reach.
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight - 16 - 30 - 6 });
     expect(pill().dataset.edge).toBe("free");
     expect(ghost().classList.contains("shown")).toBe(true);
     expect(ghost().dataset.edge).toBe("bottom");
-    // And the edge lights a seam where the pill will meet it.
-    expect(seam().classList.contains("shown")).toBe(true);
     // Back out of reach: the preview goes.
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
     expect(ghost().classList.contains("shown")).toBe(false);
-    expect(seam().classList.contains("shown")).toBe(false);
   });
 
   it("docks into the preview when let go in reach", () => {
@@ -155,6 +150,19 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     } finally {
       now.mockRestore();
     }
+  });
+
+  it("draws a body for each side of the window as far out as the pill's gap to it, so the two run together only close to (2026-11-23)", () => {
+    const wall = (index: number) => pill().querySelectorAll<SVGRectElement>(".goo .wall")[index] as SVGRectElement;
+    // Docked on the right: the right side's body (EDGES order: left, right, top, bottom) touches it.
+    expect(wall(1).style.translate).toBe("0px 0px");
+    // Held mid-page: every side's body is the pill's whole gap away.
+    pressAndMove(window.innerWidth / 2, window.innerHeight / 2);
+    const [x] = pill().style.translate.split(" ").map(Number.parseFloat);
+    expect(wall(1).style.translate).toBe(`${window.innerWidth - (x as number) - 44}px 0px`);
+    expect(wall(0).style.translate).toBe(`${-(x as number)}px 0px`);
+    // The L stays outside the blur, crisp.
+    expect(pill().querySelector(".goo .mark")).toBeNull();
   });
 
   it("is placed by translate, so its travel stays off layout", () => {

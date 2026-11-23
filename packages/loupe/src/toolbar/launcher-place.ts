@@ -81,7 +81,7 @@ export function gapTo(edge: Edge, x: number, y: number, viewport: Viewport): num
   }
 }
 
-const EDGES: readonly Edge[] = ["left", "right", "top", "bottom"];
+export const EDGES: readonly Edge[] = ["left", "right", "top", "bottom"];
 
 /** The side the body is closest to, and how close. */
 export function nearestEdge(x: number, y: number, viewport: Viewport): { edge: Edge; gap: number } {
@@ -102,25 +102,6 @@ export function glue(edge: Edge, along: number, viewport: Viewport): Place {
 export function bodyRect(place: Place, viewport: Viewport): Rect {
   const centre = centreOf(place, viewport);
   return { left: centre.x - BODY.width / 2, top: centre.y - BODY.height / 2, width: BODY.width, height: BODY.height };
-}
-
-/** How far the seam on the edge runs past the pill's side, each way, and how thick it is. */
-const SEAM_RUN = 24;
-const SEAM = 2;
-
-/** The seam a held pill lights on `edge`, centred on its docked centre `at`: a thin box on the window's edge. */
-export function seamRect(edge: Edge, at: { x: number; y: number }, viewport: Viewport): Rect {
-  const length = sizeOn(edge).length + SEAM_RUN * 2;
-  switch (edge) {
-    case "left":
-      return { left: 0, top: at.y - length / 2, width: SEAM, height: length };
-    case "right":
-      return { left: viewport.width - SEAM, top: at.y - length / 2, width: SEAM, height: length };
-    case "top":
-      return { left: at.x - length / 2, top: 0, width: length, height: SEAM };
-    case "bottom":
-      return { left: at.x - length / 2, top: viewport.height - SEAM, width: length, height: SEAM };
-  }
 }
 
 /** The body's centre in px, wherever the place puts it. */

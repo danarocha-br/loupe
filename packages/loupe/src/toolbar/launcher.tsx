@@ -2,10 +2,13 @@
 // "Show Loupe" tab. A click opens the panel: the pill tucks into its side as the panel
 // slides out of its own, a handle and its drawer. Dragged, it stays rigid and exactly
 // under the pointer; within reach of a side, a faint copy shows where it would dock, as
-// a window shows where it will snap (`launcher-place.ts`). Let go or flicked within
-// reach of a side, it travels into that place and its corners on that side square off;
-// anywhere else it stays free. The arrow keys dock it on the side they point at, so it
-// moves without a pointer too.
+// a window shows where it will snap (`launcher-place.ts`). In the last few px to a side,
+// the pill and the window's edge run together like two drops of ink (2026-11-23, after
+// the designer's "gooey effect" reference): a short liquid bridge that thickens as they
+// close, holds it docked, and stretches and snaps when it is pulled away. Let go or
+// flicked within reach of a side, it travels into that place and its corners on that
+// side square off; anywhere else it stays free. The arrow keys dock it on the side they
+// point at, so it moves without a pointer too.
 
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import {
@@ -13,7 +16,9 @@ import {
   BODY,
   bodyRect,
   centreOf,
+  EDGES,
   type Edge,
+  gapTo,
   glue,
   nearestEdge,
   type Place,
@@ -22,7 +27,6 @@ import {
   REACH,
   readPlace,
   type Rect,
-  seamRect,
   type Viewport,
 } from "./launcher-place.js";
 
@@ -136,6 +140,8 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
   const lastGhost = useRef(shown);
   if (shown) lastGhost.current = shown;
   const ghost = lastGhost.current;
+  // How far the pill shows from each side: the edge's body for that side sits that far out.
+  const gaps = Object.fromEntries(EDGES.map((edge) => [edge, Math.max(0, gapTo(edge, centre.x, centre.y, viewport))])) as Record<Edge, number>;
 
   const down = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || leaving) return;
@@ -224,8 +230,6 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
         aria-hidden="true"
         style={ghost ? { translate: `${round(ghost.at.x - BODY.width / 2)}px ${round(ghost.at.y - BODY.height / 2)}px` } : undefined}
       />
-      {/* The edge's side of the join: a short seam where the pill will meet it. */}
-      <span className={shown ? "dock-seam shown" : "dock-seam"} aria-hidden="true" style={ghost ? seamStyle(seamRect(ghost.edge, ghost.at, viewport)) : undefined} />
       <button
         type="button"
         className={classes}
@@ -248,6 +252,7 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
           onOpen();
         }}
       >
+        <Goo gaps={gaps} />
         <span className="mark">
           <LoupeL />
         </span>
@@ -258,4 +263,60 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-const seamStyle = (rect: Rect) => ({ translate: `${round(rect.left)}px ${round(rect.top)}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+/** Room around the pill for its blur to spread into, and for the edge's bridge to form in. */
+const GOO_PAD = 28;
+/** The edge's body sits this far past the window's edge, so nothing of it shows along the edge alone. */
+const WALL_OFF = 2;
+const GOO_W = BODY.width + GOO_PAD * 2;
+const GOO_H = BODY.height + GOO_PAD * 2;
+
+/** Where each side's body sits, relative to a pill touching that side: it moves out by the pill's gap to it. */
+const WALLS: Record<Edge, { x: number; y: number; axis: "x" | "y"; sign: 1 | -1 }> = {
+  right: { x: GOO_PAD + BODY.width + WALL_OFF, y: 0, axis: "x", sign: 1 },
+  left: { x: GOO_PAD - WALL_OFF - GOO_W, y: 0, axis: "x", sign: -1 },
+  bottom: { x: 0, y: GOO_PAD + BODY.height + WALL_OFF, axis: "y", sign: 1 },
+  top: { x: 0, y: GOO_PAD - WALL_OFF - GOO_H, axis: "y", sign: -1 },
+};
+
+/**
+ * The pill's body, drawn with a body for each side of the window, through a blur and an alpha
+ * threshold: apart they are their own shapes; within about 9px they run together into one, a
+ * bridge that fills in as they close and snaps as they part, as two drops of ink do.
+ * Each side's body is placed by the pill's real gap to that side, so it stays put on the
+ * window's edge, even while the pill travels: both move by `translate` on the same curve.
+ * The heels square the pill's corners on the side it is docked to (styles.ts).
+ */
+function Goo({ gaps }: { gaps: Record<Edge, number> }) {
+  return (
+    <svg className="goo" width={GOO_W} height={GOO_H} viewBox={`0 0 ${GOO_W} ${GOO_H}`} aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="loupe-goo" x="0" y="0" width={GOO_W} height={GOO_H} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+          <feGaussianBlur stdDeviation="6" />
+          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" />
+        </filter>
+      </defs>
+      <g filter="url(#loupe-goo)">
+        <rect className="body" x={GOO_PAD} y={GOO_PAD} width={BODY.width} height={BODY.height} rx={BODY.height / 2} />
+        <rect className="heel" data-side="right" x={GOO_PAD + BODY.width / 2} y={GOO_PAD} width={BODY.width / 2} height={BODY.height} />
+        <rect className="heel" data-side="left" x={GOO_PAD} y={GOO_PAD} width={BODY.width / 2} height={BODY.height} />
+        <rect className="heel" data-side="bottom" x={GOO_PAD} y={GOO_PAD + BODY.height / 2} width={BODY.width} height={BODY.height / 2} />
+        <rect className="heel" data-side="top" x={GOO_PAD} y={GOO_PAD} width={BODY.width} height={BODY.height / 2} />
+        {EDGES.map((edge) => {
+          const wall = WALLS[edge];
+          const by = round(wall.sign * gaps[edge]);
+          return (
+            <rect
+              key={edge}
+              className="wall"
+              x={wall.x}
+              y={wall.y}
+              width={GOO_W}
+              height={GOO_H}
+              style={{ translate: wall.axis === "x" ? `${by}px 0px` : `0px ${by}px` }}
+            />
+          );
+        })}
+      </g>
+    </svg>
+  );
+}
