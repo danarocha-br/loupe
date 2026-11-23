@@ -1,9 +1,37 @@
 import { describe, expect, it } from "vitest";
 import { isolate, reachText } from "./panel-view/words.js";
 import { CSS } from "./styles.js";
+import { FONT, font, leading, TYPE, type TypeRole } from "./tokens.js";
+
+const steps = Object.entries(TYPE) as [TypeRole, (typeof TYPE)[TypeRole]][];
 
 describe("the toolbar's type (typography review 2026-11-20)", () => {
-  it("writes every font size through the reader-scaled unit, never a bare px", () => {
+  it("writes every step through the reader-scaled unit", () => {
+    expect(font(TYPE.control)).toBe(`500 calc(var(--loupe-px) * 12)/1.3333 ${FONT.sans}`);
+    for (const [role, style] of steps) expect(font(style), role).toMatch(/^\d{3} calc\(var\(--loupe-px\) \* \d+\)\/[\d.]+ /);
+  });
+
+  it("keeps mono for evidence and tabular figures for counted numbers", () => {
+    const mono = steps.filter(([, style]) => style.family === "mono").map(([role]) => role);
+    expect(mono.sort()).toEqual(["annotation", "mono", "monoSmall", "proposalText"]);
+    const tabular = steps.filter(([, style]) => "tabular" in style && style.tabular).map(([role]) => role);
+    expect(tabular.sort()).toEqual(["delta", "figure", "meta"]);
+  });
+
+  it("gives the 9px step to the delta alone, and wraps a paragraph on at least 1.4", () => {
+    expect(steps.filter(([, style]) => style.size === 9).map(([role]) => role)).toEqual(["delta"]);
+    expect(leading(TYPE.paragraph)).toBeGreaterThanOrEqual(1.4);
+  });
+
+  it("matches what the stylesheet writes for each step it sets as a shorthand", () => {
+    // Hero and a touch field set size and line height apart, not as `font:`.
+    for (const [role, style] of steps) {
+      if (role === "hero" || role === "fieldTouch") continue;
+      expect(CSS, role).toContain(`font: ${font(style)}`);
+    }
+  });
+
+  it("writes every font size in a rule through the reader-scaled unit, never a bare px", () => {
     // `font: 500 12px/…` or `font-size: 12px` would ignore a reader's larger default text.
     expect(CSS).not.toMatch(/font: \d{3} \d+(\.\d+)?px/);
     expect(CSS).not.toMatch(/font-size: \d+(\.\d+)?px/);
