@@ -155,9 +155,10 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .copy-popover .field { display: flex; flex-direction: column; gap: 4px; }
 .copy-popover .field > label, .copy-popover .field > span:not(.field-error) { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
 .copy-popover .optional { color: var(--faint); }
-.copy-popover input { width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); font: 400 ${size(13)}/1.3846 ${SANS}; outline: none; }
+.copy-popover input { width: 100%; height: 36px; padding: 0 12px; border: 0; border-radius: var(--radius-field); background: var(--sunk); box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); font: var(--font-body); outline: none; }
 .copy-popover input::placeholder { color: var(--faint); }
-.copy-popover input:focus { background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--focus-glow); }
+/* Focus is the ring and its glow; the transparent outline is what forced colours draw, which drop box-shadows. */
+.copy-popover input:focus { background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent), 0 0 0 3px var(--focus-glow); outline: 2px solid transparent; outline-offset: 1px; }
 .copy-popover input[aria-invalid="true"] { box-shadow: inset 0 0 0 1.5px var(--alert); }
 .copy-popover .field-error { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-fg); }
 .copy-popover .submit { width: 100%; }
@@ -165,10 +166,10 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .not-copied .badge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); }
 .not-copied h3 { padding-top: 1px; font: 600 ${size(13)}/1.3846 ${SANS}; letter-spacing: 0; color: var(--warn-fg); }
 .not-copied p { margin-top: 2px; font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--warn-muted); }
-.proposal-text { position: relative; height: 130px; margin-top: 15px; overflow: hidden; border-radius: 12px; background: var(--hover); box-shadow: inset 0 0 0 1px var(--popover-edge); }
-.proposal-text textarea { display: block; width: 100%; height: 100%; padding: 10px; border: 0; resize: none; background: none; color: var(--ink); font: 400 ${size(10)}/1.5 ${MONO}; white-space: pre-wrap; outline: none; scrollbar-width: thin; }
+.proposal-text { position: relative; height: 130px; margin-top: 15px; overflow: hidden; border-radius: var(--radius-well); background: var(--hover); box-shadow: inset 0 0 0 1px var(--popover-edge); }
+.proposal-text textarea { display: block; width: 100%; height: 100%; padding: 10px; border: 0; resize: none; background: none; color: var(--ink); font: var(--font-proposal-text); white-space: pre-wrap; outline: none; scrollbar-width: thin; }
 .proposal-text textarea::selection { background: var(--text-select); }
-.proposal-text textarea:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 12px; }
+.proposal-text textarea:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: var(--radius-well); outline: 2px solid transparent; outline-offset: -2px; }
 /* The text runs on below the fold: it fades rather than stopping at a line. */
 .proposal-text::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 32px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--hover)); }
 .popover-actions { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
@@ -408,8 +409,8 @@ fieldset.site .list > li { padding-left: 42px; }
 @media (hover: hover) { .row .keeping:hover { text-decoration-color: currentColor; } }
 
 /* The options: ChipGroup (ui/chip-group/chip-group.css). */
-.row .text { width: 100%; min-height: 36px; padding: 8px 12px; resize: none; overflow: hidden; border: 1px solid var(--field-edge); border-radius: 12px; background: var(--card); color: var(--ink); font: 400 ${size(13)}/1.3846 ${SANS}; outline: none; }
-.row .text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-glow); }
+.row .text { width: 100%; min-height: 36px; padding: 8px 12px; resize: none; overflow: hidden; border: 1px solid var(--field-edge); border-radius: var(--radius-well); background: var(--card); color: var(--ink); font: var(--font-body); outline: none; }
+.row .text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-glow); outline: 2px solid transparent; outline-offset: 1px; }
 .row.overridden .text { border-color: var(--shown-edge); }
 /* What the chips' marks mean, said once on a row of its own. */
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 34px; padding: 10px 14px 10px 42px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }

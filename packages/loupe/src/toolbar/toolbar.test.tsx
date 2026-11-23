@@ -563,6 +563,9 @@ describe("hovering the page while a select tool is armed", () => {
     expect(ringKinds()).toEqual(["pick"]);
     expect(tag()?.textContent).toBe("Button");
     expect(tag()?.dataset.tag).toBe(CAIO);
+    // Marks on the page are for the eye: the panel and its status strip say what they show.
+    expect(tag()?.getAttribute("aria-hidden")).toBe("true");
+    expect([...shadow().querySelectorAll(".ring")].map((ring) => ring.getAttribute("aria-hidden"))).toEqual(["true"]);
 
     // Onto another one, then onto the panel: nothing on the page is hovered there.
     await pointTo(pageButton("Menu"));
