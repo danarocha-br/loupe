@@ -5,6 +5,7 @@
 // (`panel-view/`, `runtime/`, the views), so it can become a package by moving it;
 // nothing outside it imports UI SDK. `src/toolbar/ui/layers.test.ts` holds both.
 
+export { type Announce, type AnnounceOptions, Announcer, type Politeness, useAnnounce, useAnnounceChange } from "./announcer/announcer.js";
 export { Button, type ButtonLook, type ButtonProps, type ButtonSize, lookAttributes } from "./button/button.js";
 export { Chip, ChipGroup, type ChipGroupProps, type ChipProps } from "./chip-group/chip-group.js";
 export { Field, type FieldLook, type FieldProps } from "./field/field.js";

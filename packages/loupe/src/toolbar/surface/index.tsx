@@ -5,11 +5,14 @@
 // - `<Surface>`, a host in place, for a test or the workbench page to draw any primitive
 //   inside a real shadow root, under the same stylesheet.
 // Whatever renders in a surface does so inside `SurfaceBoundary`: a throw takes the
-// surface down, never the host's layout.
+// surface down, never the host's layout. And beside the `Announcer`'s two live regions,
+// mounted with the surface, before anything in it has something to say.
 
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { CSS as VIEWS_CSS, GROUND_CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "../styles.js";
+// The announcer's own module, not `ui/index.js`: the collapsed pill loads no primitive's component.
+import { Announcer } from "../ui/announcer/announcer.js";
 import { PRIMITIVES_CSS } from "../ui/styles.js";
 
 export type Theme = "light" | "dark";
@@ -132,7 +135,13 @@ export function Surface({
   const style: CSSProperties | undefined = textSize ? { fontSize: `${textSize}px` } : undefined;
   return (
     <div ref={attach} {...{ [SURFACE_ATTRIBUTE]: "", [THEME_ATTRIBUTE]: theme }} aria-label={label} role={label ? "group" : undefined} style={style}>
-      {shadow && createPortal(<SurfaceBoundary>{children}</SurfaceBoundary>, shadow)}
+      {shadow &&
+        createPortal(
+          <SurfaceBoundary>
+            <Announcer>{children}</Announcer>
+          </SurfaceBoundary>,
+          shadow,
+        )}
     </div>
   );
 }
