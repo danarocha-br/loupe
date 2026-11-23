@@ -1,15 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { CSS } from "./styles.js";
+import { COLOR, SHADOW } from "./tokens.js";
 
-/** The tokens one theme block declares, read back from the stylesheet the host gets. */
-function tokens(selector: string): Record<string, string> {
-  const start = CSS.indexOf(`${selector} {`);
-  const block = CSS.slice(start, CSS.indexOf("}", start));
-  return Object.fromEntries([...block.matchAll(/--([a-z-]+): ([^;]+);/g)].map((match) => [match[1], (match[2] ?? "").trim()]));
-}
-const LIGHT = tokens(":host");
-const DARK = tokens(':host([data-loupe-theme="dark"])');
+const LIGHT = COLOR.light;
+const DARK = COLOR.dark;
 
 /** WCAG 2 contrast of two opaque hex colours. */
 function contrast(a: string, b: string): number {
@@ -29,8 +23,8 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     ["light", LIGHT],
     ["dark", DARK],
   ])("keeps faint text at 4.5:1 on every surface it sits on, %s", (_, theme) => {
-    for (const surface of ["card", "hover", "well", "sunk"]) {
-      expect(contrast(theme.faint as string, theme[surface] as string), surface).toBeGreaterThanOrEqual(4.5);
+    for (const surface of ["card", "hover", "well", "sunk"] as const) {
+      expect(contrast(theme.faint, theme[surface]), surface).toBeGreaterThanOrEqual(4.5);
     }
   });
 
@@ -38,15 +32,18 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     ["light", LIGHT],
     ["dark", DARK],
   ])("draws what is found by its outline at 3:1, %s", (_, theme) => {
-    expect(contrast(theme["field-edge"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
+    expect(contrast(theme["field-edge"], theme.card)).toBeGreaterThanOrEqual(3);
     // A switch is its edge and its filled half, with the card showing through the hole: both states at 3:1 on the card.
-    expect(contrast(theme["switch-off"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
-    expect(contrast(theme["switch-on"] as string, theme.card as string)).toBeGreaterThanOrEqual(3);
+    expect(contrast(theme["switch-off"], theme.card)).toBeGreaterThanOrEqual(3);
+    expect(contrast(theme["switch-on"], theme.card)).toBeGreaterThanOrEqual(3);
   });
 
   it("names its tokens by role, never by hue, and gives every one a dark value", () => {
-    for (const name of Object.keys(LIGHT)) expect(name).not.toMatch(/lilac|amber|pencil|violet|purple|teal|green|orange/);
-    expect(Object.keys(DARK).sort()).toEqual(Object.keys(LIGHT).filter((name) => name !== "loupe-px").sort());
+    for (const name of [...Object.keys(LIGHT), ...Object.keys(SHADOW.light)]) {
+      expect(name).not.toMatch(/lilac|amber|pencil|violet|purple|teal|green|orange/);
+    }
+    expect(Object.keys(DARK).sort()).toEqual(Object.keys(LIGHT).sort());
+    expect(Object.keys(SHADOW.dark).sort()).toEqual(Object.keys(SHADOW.light).sort());
   });
 
   it("writes no colour literal in a rule: tokens for the panel, named page values for the marks", () => {

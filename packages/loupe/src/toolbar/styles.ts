@@ -7,9 +7,11 @@
 // mark the selection and, for a moment, what a change reached.
 // It lives in the Toolbar's shadow root, so the app's CSS
 // can't reach it and none of it reaches the app. Every colour is a token on the host,
-// light by default and dark under `data-loupe-theme="dark"`, set from the OS
+// generated from tokens.ts, light by default and dark under `data-loupe-theme="dark"`, set from the OS
 // preference or the footer's toggle. System faces only: a shadow root can't load a
 // web font.
+
+import { FONT, hostDeclarations, MAP_HUES, PAGE, size } from "./tokens.js";
 
 export const HOST_ATTRIBUTE = "data-loupe-toolbar";
 
@@ -22,221 +24,17 @@ export const THEME_KEY = "loupe:theme";
 /** On the host for the one frame a theme switch lands in: every transition is off. */
 export const SWITCHING_ATTRIBUTE = "data-loupe-switching";
 
-type Tokens = Record<string, string>;
-
-
-const LIGHT: Tokens = {
-  well: "#F7F7F5",
-  card: "#FFFFFF",
-  sunk: "#F5F5F3",
-  "sunk-hover": "#ECECE9",
-  hover: "#F7F7F5",
-  ink: "#0A0A0A",
-  "on-ink": "#FFFFFF",
-  muted: "#5E5E5E",
-  faint: "#6E6E6E",
-  "icon-faint": "#8A8A8A",
-  "line-faint": "#A0A0A0",
-  "tree-ink": "#4A4A4A",
-  rule: "#EEEEEC",
-  ground: "#F0F0EE",
-  "rule-strong": "#CFCBC4",
-  tree: "#D2CFC9",
-  edge: "rgba(27, 34, 32, 0.07)",
-  hairline: "rgba(27, 34, 32, 0.06)",
-  divider: "rgba(27, 34, 32, 0.1)",
-  band: "#1B2220",
-  "on-band": "#F0F0F0",
-  shown: "#FCD1BF",
-  "on-shown": "#0A0A0A",
-  "shown-edge": "#FFA8A2",
-  accent: "#FE4437",
-  "accent-text": "#B3261B",
-  "accent-wash": "rgba(254, 68, 55, 0.1)",
-  link: "#014886",
-  "link-wash": "rgba(1, 72, 134, 0.06)",
-  "link-edge": "rgba(1, 72, 134, 0.16)",
-  "revision-line": "#8276CF",
-  "revision-text": "#4F43B8",
-  "ok-bg": "rgba(0, 180, 81, 0.2)",
-  "ok-fg": "#01563F",
-  "switch-off": "#938B7F",
-  "switch-on": "#27917E",
-  primary: "#1B2220",
-  "on-primary": "#FFFFFF",
-  held: "#8E959C",
-  alert: "#C2570C",
-  "warn-fg": "#7A4B00",
-  "warn-bg": "#FFF3DC",
-  "warn-dot": "#C98A12",
-  select: "rgba(254, 68, 55, 0.2)",
-  kbd: "rgba(10, 10, 10, 0.08)",
-  "focus-glow": "rgba(254, 68, 55, 0.18)",
-  "field-edge": "#8F8A83",
-  "tools-wash": "#EFEFEC",
-  "map-dot": "rgba(27, 34, 32, 0.16)",
-  "on-check": "#FFFFFF",
-  shadow: "0 0 0 1px rgba(27, 34, 32, 0.05), 0 1px 2px rgba(27, 34, 32, 0.06), 0 4px 12px rgba(27, 34, 32, 0.04)",
-  "tile-shadow": "inset 0 0 0 1px rgba(27, 34, 32, 0.08), 0 1px 2px rgba(27, 34, 32, 0.05)",
-  "site-shadow": "0 0 0 1px rgba(27, 34, 32, 0.06), 0 1px 2px rgba(27, 34, 32, 0.05)",
-  "raised-shadow": "0 0 0 1px rgba(27, 34, 32, 0.06), 0 1px 2px rgba(27, 34, 32, 0.14)",
-  "primary-shadow": "inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(27, 34, 32, 0.25)",
-  "copied-bg": "#DFF7E4",
-  "copied-fg": "#14532D",
-  "copied-edge": "rgba(20, 83, 45, 0.12)",
-  "copied-rule": "rgba(20, 83, 45, 0.18)",
-  "warn-edge": "rgba(201, 138, 18, 0.35)",
-  "warn-rule": "rgba(122, 75, 0, 0.2)",
-  "warn-wash": "rgba(122, 75, 0, 0.1)",
-  "warn-muted": "#8A6A2A",
-  "on-primary-rule": "rgba(255, 255, 255, 0.18)",
-  "on-primary-wash": "rgba(255, 255, 255, 0.14)",
-  toast: "#1B2220",
-  "copied-badge": "#27917E",
-  "on-toast": "#FFFFFF",
-  "toast-muted": "#A3AAA7",
-  "toast-edge": "rgba(255, 255, 255, 0.06)",
-  "popover-edge": "rgba(27, 34, 32, 0.08)",
-  "text-select": "rgba(1, 72, 134, 0.12)",
-  "popover-shadow": "0 0 0 1px rgba(27, 34, 32, 0.08), 0 16px 40px rgba(27, 34, 32, 0.18), 0 2px 6px rgba(27, 34, 32, 0.08)",
-  "toast-shadow": "0 8px 24px rgba(27, 34, 32, 0.28)",
-  "overlay-shadow": "0 12px 36px rgba(27, 34, 32, 0.22), 0 2px 6px rgba(27, 34, 32, 0.1)",
-  /** The collapsed pill is flat, as the reference draws it: in light, no edge at all. */
-  "launcher-edge": "none",
-  "band-hover": "#2E3835",
-};
-
-const DARK: Tokens = {
-  well: "#1F2423",
-  card: "#181C1B",
-  sunk: "#242928",
-  "sunk-hover": "#2E3432",
-  hover: "#1F2423",
-  ink: "#ECEDEA",
-  "on-ink": "#0E1110",
-  muted: "#A4AAA7",
-  faint: "#8B918E",
-  "icon-faint": "#7F8683",
-  "line-faint": "#6E7572",
-  "tree-ink": "#C4C9C6",
-  rule: "#2C3230",
-  ground: "#0E1110",
-  "rule-strong": "#4A514E",
-  tree: "#3E4543",
-  edge: "rgba(255, 255, 255, 0.06)",
-  hairline: "rgba(255, 255, 255, 0.07)",
-  divider: "rgba(255, 255, 255, 0.12)",
-  band: "#29322F",
-  "on-band": "#F0F0F0",
-  shown: "#5A2A20",
-  "on-shown": "#FFE6DD",
-  "shown-edge": "#8C3F31",
-  accent: "#FF6A5C",
-  "accent-text": "#FF9A8F",
-  "accent-wash": "rgba(255, 106, 92, 0.14)",
-  link: "#8DC2F5",
-  "link-wash": "rgba(141, 194, 245, 0.08)",
-  "link-edge": "rgba(141, 194, 245, 0.24)",
-  "revision-line": "#A99FF2",
-  "revision-text": "#BDB5FF",
-  "ok-bg": "#143A25",
-  "ok-fg": "#93E2AC",
-  "switch-off": "#6A726F",
-  "switch-on": "#2FA58F",
-  primary: "#F6F3EF",
-  "on-primary": "#1B2220",
-  held: "#6B737C",
-  alert: "#F0904A",
-  "warn-fg": "#E5B567",
-  "warn-bg": "#2A2109",
-  "warn-dot": "#D9963B",
-  select: "rgba(255, 106, 92, 0.3)",
-  kbd: "rgba(255, 255, 255, 0.14)",
-  "focus-glow": "rgba(255, 106, 92, 0.3)",
-  "field-edge": "#646C69",
-  "tools-wash": "#242928",
-  "map-dot": "rgba(255, 255, 255, 0.14)",
-  "on-check": "#0E1110",
-  shadow: "0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.25)",
-  "tile-shadow": "inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3)",
-  "site-shadow": "0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.3)",
-  "raised-shadow": "0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.4)",
-  "primary-shadow": "inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 1px 2px rgba(0, 0, 0, 0.4)",
-  "copied-bg": "#143A25",
-  "copied-fg": "#93E2AC",
-  "copied-edge": "rgba(147, 226, 172, 0.16)",
-  "copied-rule": "rgba(147, 226, 172, 0.24)",
-  "warn-edge": "rgba(217, 150, 59, 0.4)",
-  "warn-rule": "rgba(229, 181, 103, 0.24)",
-  "warn-wash": "rgba(229, 181, 103, 0.12)",
-  "warn-muted": "#C9A56A",
-  "on-primary-rule": "rgba(27, 34, 32, 0.18)",
-  "on-primary-wash": "rgba(27, 34, 32, 0.08)",
-  toast: "#2E3432",
-  "copied-badge": "#2FA58F",
-  "on-toast": "#F6F3EF",
-  "toast-muted": "#A3AAA7",
-  "toast-edge": "rgba(255, 255, 255, 0.08)",
-  "popover-edge": "rgba(255, 255, 255, 0.1)",
-  "text-select": "rgba(141, 194, 245, 0.24)",
-  "popover-shadow": "0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)",
-  "toast-shadow": "0 8px 24px rgba(0, 0, 0, 0.5)",
-  "overlay-shadow": "0 12px 36px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3)",
-  /** In dark, a hairline keeps the flat pill apart from a dark page. A filter, so it follows the outline, fillets and all. */
-  "launcher-edge": "drop-shadow(0 0 0.5px rgba(255, 255, 255, 0.35))",
-  "band-hover": "#35403C",
-};
-
-const declare = (tokens: Tokens) =>
-  Object.entries(tokens)
-    .map(([name, value]) => `--${name}: ${value};`)
-    .join(" ");
-
-const SANS = `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
-const MONO = `ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace`;
+const { sans: SANS, mono: MONO } = FONT;
 
 /** On the host once the text-size unit is registered (index.tsx): sizes then follow the reader's default. */
 export const SCALE_ATTRIBUTE = "data-loupe-scale";
 
-/**
- * A font size from the type scale, written in px at the browser's default 16px text.
- * `rem` would read the app's root size, so the unit is the host's own `medium` (the
- * reader's default) over 16: `--loupe-px` is registered as a <length>, so it resolves
- * once on the host and nested sizes never compound (typography review 2026-11-20).
- * Unregistered (an older browser, jsdom), it stays 1px and every size is as written.
- */
-const size = (px: number) => `calc(var(--loupe-px) * ${px})`;
-
-/** The page's marks don't follow the panel's theme: they sit on the app, in its light. */
-const PAGE = {
-  /** The Instances a selection reaches besides the one picked: dashed. */
-  line: "#FE9992",
-  /** The one picked, solid, and its size tag. */
-  ink: "#FE4437",
-  fill: "rgba(254, 68, 55, 0.12)",
-  band: "#1B2220",
-  /** Not applied: a left-out or hovered Instance's grey dashes. */
-  hover: "#6F7472",
-  /** Text on `ink` (the size tag) and on `band` (the pick tag), and the pick tag's detail. */
-  onInk: "#FFFFFF",
-  onBand: "#F0F0F0",
-  onBandMuted: "rgba(240, 240, 240, 0.62)",
-  /** The white keyline that lifts the selection's outline off any page. */
-  halo: "rgba(255, 255, 255, 0.85)",
-};
-
-/**
- * The page map's hues, one per component in the list's order (page-map.tsx): categories,
- * not roles, so they are named values like the page's marks, the same in either theme.
- */
-const MAP_HUES = ["#D2577A", "#3D7FD9", "#7A9A2E", "#A05ED1", "#8276CF", "#27917E", "#D08A16"] as const;
-
 export const CSS = `
 /* Left to right in any app: \`all\` leaves direction alone, so an RTL page would half-mirror the panel. App text keeps dir="auto". */
-:host { all: initial; direction: ltr; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; --loupe-px: 1px; ${declare(LIGHT)} color-scheme: light; }
+:host { all: initial; direction: ltr; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; --loupe-px: 1px; ${hostDeclarations("light")} color-scheme: light; }
 /* The reader's default text size, over 16: \`all: initial\` left the host at \`medium\`. */
 :host([data-loupe-scale]) { --loupe-px: calc(1em / 16); }
-:host([data-loupe-theme="dark"]) { ${declare(DARK)} color-scheme: dark; }
+:host([data-loupe-theme="dark"]) { ${hostDeclarations("dark")} color-scheme: dark; }
 * { box-sizing: border-box; }
 ::selection { background: var(--select); }
 :host([data-loupe-switching]) * { transition: none !important; }
