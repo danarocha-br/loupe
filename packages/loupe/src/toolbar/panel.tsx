@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Tag, type TagLook, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
+import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Row, RowLine, RowName, RowValue, Tag, type TagLook, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -288,15 +288,15 @@ function useCoveredDialog(column: Column): boolean {
 /** The React self-check failed (PER-184: said here once, not again on the Instance). */
 function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) {
   return (
-    <div className="section notice-card banner">
-      <div className="head">
+    <Card className="notice-card banner">
+      <CardHead>
         <div className="title">
           <Dot tone="alert" />
           {banner.title}
         </div>
-      </div>
+      </CardHead>
       <p className="body">{banner.body}</p>
-    </div>
+    </Card>
   );
 }
 
@@ -373,7 +373,7 @@ function ComponentList({
   };
   return (
     <>
-      <div className="section hero">
+      <Card className="hero">
         {/* `name` with the other views' headings: focus finds each view's by `h2.name`. */}
         <h2 className="name hero-title" tabIndex={-1} ref={heading}>
           {TEXT.startTitle}
@@ -394,15 +394,15 @@ function ComponentList({
             </Chip>
           ))}
         </ChipGroup>
-      </div>
+      </Card>
       {notices}
       {body.notGenerated && <NotGeneratedNotice names={body.notGenerated.names} command={body.notGenerated.command} />}
       {body.changes.length > 0 && (
-        <div className="section changes">
-          <div className="head">
+        <Card look="list">
+          <CardHead>
             <h3>Changes</h3>
             <span className="meta">numbered as in the Proposal</span>
-          </div>
+          </CardHead>
           <ol className="keylist" aria-label="Changes">
             {body.changes.map((change) => (
               <li key={change.n}>
@@ -422,27 +422,27 @@ function ComponentList({
               </li>
             ))}
           </ol>
-        </div>
+        </Card>
       )}
       <HeldForReviewCard debug={debug} items={body.suspended} meta={body.suspendedMeta} />
-      <div className="section on-page">
-        <div className="head">
+      <Card look="list" className="on-page">
+        <CardHead>
           <h3>On this page</h3>
           <span className="meta">{body.summary}</span>
-        </div>
+        </CardHead>
         <PageMap debug={debug} groups={body.groups} lit={lit} onPoint={point} onSelect={onSelect} />
         <ul className="list" aria-label="Components on this page">
           {body.groups.map((group, index) => (
             <GroupRow key={group.component} group={group} hue={hueOf(index)} lit={lit === group.component} point={point} onSelect={onSelect} onHover={onHover} />
           ))}
         </ul>
-      </div>
+      </Card>
       {body.interaction.length > 0 && (
-        <div className="section list-card">
-          <div className="head">
+        <Card look="list">
+          <CardHead>
             <h3>Appears on interaction</h3>
             <span className="meta">Not on screen yet</span>
-          </div>
+          </CardHead>
           <ul className="list interaction">
             {body.interaction.map((component) => (
               <li key={component}>
@@ -451,7 +451,7 @@ function ComponentList({
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
       <FlagsCard />
     </>
@@ -617,14 +617,14 @@ function SiteCard({ site, onSelect, onHover }: Pick<Actions, "onSelect" | "onHov
 function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: ListBody["suspended"]; meta: string }) {
   if (items.length === 0) return null;
   return (
-    <div className="section list-card" data-testid="held-for-review">
-      <div className="head">
+    <Card look="list" data-testid="held-for-review">
+      <CardHead>
         <div className="title">
           <Dot tone="ring" />
           <h3>Held for review</h3>
         </div>
         <span className="meta">{meta}</span>
-      </div>
+      </CardHead>
       <ul className="list held-list">
         {items.map((item) => (
           <li key={JSON.stringify(item.target)} className="held-item">
@@ -646,7 +646,7 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 }
 
@@ -742,7 +742,7 @@ function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; 
 function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & { body: GoneBody; notices: ReactNode }) {
   return (
     <>
-      <div className="section identity">
+      <Card className="identity">
         <div className="title-line">
           <BackButton onSelect={onSelect} />
           {body.component && <span className="status">{TEXT.notOnPage}</span>}
@@ -767,7 +767,7 @@ function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & {
             <ResetInstance debug={debug} id={body.id} enabled />
           </div>
         )}
-      </div>
+      </Card>
       {notices}
     </>
   );
@@ -805,19 +805,14 @@ function Inspector({
   const chips = body.members ? [] : body.chips;
   // The marks' legend: a row of its own under the options, when any of them marks a default.
   const legend = cards.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
-  const row = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={onSelect} onHover={onHover} />;
-  const propRow = (item: PropItem, toggle: boolean) => (
-    <div key={item.name} className={`prop${toggle ? " switch-row" : ""}${item.overridden ? " overridden" : ""}`}>
-      <span className="glyph" aria-hidden="true">
-        {PROP_ICONS[item.glyph]}
-      </span>
-      {row(item)}
-    </div>
+  const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={onSelect} onHover={onHover} />;
+  const propRow = (item: PropItem) => (
+    <PropRowView key={item.name} item={item} glyph={PROP_ICONS[item.glyph]} debug={debug} onSelect={onSelect} onHover={onHover} />
   );
   return (
     <>
       {notices}
-      <div className="section inspector">
+      <Card look="divided">
         <div className="identity">
           <div className="title-line">
             <div className="lead">
@@ -903,13 +898,12 @@ function Inspector({
           )}
         </div>
         {body.note && (
-          <div className="note-card" role="note">
-            <InfoIcon />
+          <Row glyph={<InfoIcon />} role="note" className="note">
             <div className="text">
               <h3>{body.note.title}</h3>
               <p className="body">{body.note.body}</p>
             </div>
-          </div>
+          </Row>
         )}
         {body.members && (
           <ScopeSection
@@ -921,11 +915,11 @@ function Inspector({
             onHover={onHover}
           />
         )}
-        {cards.map((item) => propRow(item, false))}
+        {cards.map(propRow)}
         {legend && <Legend app={cards.some((card) => card.change !== null && card.counts === null)} />}
-        {switches.map((item) => propRow(item, true))}
+        {switches.map(propRow)}
         <InspectOnly key={body.id} body={body} row={row} />
-      </div>
+      </Card>
     </>
   );
 }
@@ -996,12 +990,12 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
             </FoldTrigger>
             <FoldPanel>
             {body.injected.rows.map((injected) => (
-              <div className="row" key={injected.name}>
-                <div className="line">
-                  <span className="name">{injected.name}</span>
-                  <span className="value">{injected.value}</span>
-                </div>
-              </div>
+              <Row look="pair" key={injected.name}>
+                <RowLine>
+                  <RowName>{injected.name}</RowName>
+                  <RowValue>{injected.value}</RowValue>
+                </RowLine>
+              </Row>
             ))}
             </FoldPanel>
           </Fold>

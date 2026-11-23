@@ -9,13 +9,13 @@
 // The row comes decided from `panelView()` (PER-214); this file draws it, makes the
 // write its data names, and keeps the Text field's unsent text while it has focus.
 
-import { Fragment, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
 import { LockIcon, ResetIcon } from "./icons.js";
 import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { Button, Chip, ChipGroup, Delta, Field, Switch, Tag, useAnnounceChange } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Delta, Field, Row, RowAction, RowLine, type RowLook, RowName, RowValue, Switch, Tag, useAnnounceChange } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -99,11 +99,17 @@ function EmptyTag() {
 
 export function PropRowView({
   item,
+  look = "inset",
+  glyph,
   debug,
   onSelect,
   onHover,
 }: {
   item: PropItem;
+  /** `inset` in the Inspector's card; `pair` under Inspect only, name and value side by side. */
+  look?: RowLook;
+  /** What the prop does, in the row's glyph column. */
+  glyph?: ReactNode;
   debug: LoupeDebug;
   onSelect(id: string, mode?: SelectMode): void;
   onHover(ids: string[]): void;
@@ -121,7 +127,7 @@ export function PropRowView({
       onClick={(event) => {
         // Reset goes once there is nothing to reset: focus moves to the row's own control, not out of the panel.
         const control = event.currentTarget
-          .closest(".row")
+          .closest("[data-row]")
           ?.querySelector<HTMLElement>('[role="radio"][tabindex="0"], [role="switch"], textarea');
         attempt(() => debug.reset(reset.write.id, reset.write.prop, reset.write.scope));
         control?.focus();
@@ -139,47 +145,38 @@ export function PropRowView({
   // Where a value comes from matters once it comes from a wider scope than the one in view:
   // at This instance, a group or page Override's; at a scope, the card is that scope already.
   const wider = item.source !== null && item.counts === null && item.source !== sourceText(THIS_INSTANCE);
-  const classes = ["row", item.overridden && "overridden", toggle && "switch"].filter(Boolean).join(" ");
   return (
-    <div className={classes} data-prop={item.name}>
+    <Row look={look} glyph={glyph} className={item.overridden ? "overridden" : undefined} data-prop={item.name}>
       <div className="head-group">
-        <div className="line">
+        <RowLine>
           {item.dot && <KeySlot item={item} />}
           {/* The label and its code name together in the tooltip; the name itself wraps between its words. */}
-          <span className="name" title={item.codeName ? `${item.label} (${item.codeName})` : item.label}>
-            <span>
-              <Breakable text={item.label} />
-            </span>
-            {item.codeName && <span className="mono"> {item.codeName}</span>}
-          </span>
+          <RowName code={item.codeName ?? undefined} title={item.codeName ? `${item.label} (${item.codeName})` : item.label}>
+            <Breakable text={item.label} />
+          </RowName>
           {/* Label text left empty sits beside the name at This instance, and after the counts at a scope. */}
           {item.empty && item.counts === null && <EmptyTag />}
           {item.state && <Tag>{TEXT.state}</Tag>}
           {!item.change && shown && item.value && (
-            <span className="value">
+            <RowValue>
               <ValueView value={item.value} />
-            </span>
+            </RowValue>
           )}
-          {item.counts !== null && (!toggle || mixed) && (
-            <span className="value counts" data-testid="counts">
-              {item.counts}
-            </span>
-          )}
+          {item.counts !== null && (!toggle || mixed) && <RowValue data-testid="counts">{item.counts}</RowValue>}
           {item.empty && item.counts !== null && <EmptyTag />}
           {item.reason && (
             <Tag look="reason" title={item.reasonTitle ?? undefined}>
               {item.reason}
             </Tag>
           )}
-          {reset && !reset.inNotice && !toggle && resetButton}
           {/* The switch shows true or false itself; no word repeats it. */}
-          {toggle && (
-            <span className="toggle">
+          {((reset && !reset.inNotice) || toggle) && (
+            <RowAction>
               {reset && !reset.inNotice && resetButton}
-              <SwitchView control={toggle} label={item.label} debug={debug} />
-            </span>
+              {toggle && <SwitchView control={toggle} label={item.label} debug={debug} />}
+            </RowAction>
           )}
-        </div>
+        </RowLine>
         {item.change && (
           <div className="change" data-testid="change">
             <span className="from">{item.change.from}</span>
@@ -232,7 +229,7 @@ export function PropRowView({
           {keeping.text}
         </button>
       )}
-    </div>
+    </Row>
   );
 }
 

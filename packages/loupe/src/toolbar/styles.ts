@@ -207,12 +207,8 @@ h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(-
 }
 
 /* Cards on the sheet */
-/* Every card: text 14px from its left edge, 12px above and 14px below. */
-.section, .card { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
-.head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.head .title { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 500; }
-.section.list-card { gap: 4px; padding: 12px 0 6px; overflow: hidden; }
-.section.list-card > .head { padding: 0 14px 4px; }
+/* Card (ui/card/): every card's surface and its looks. A title that leads with a dot: */
+[data-card-head] .title { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; font-weight: 500; }
 
 /* Revision deltas (ui/delta/): a change's numbers, side by side */
 .keys { display: inline-flex; gap: 2px; flex: none; }
@@ -222,10 +218,6 @@ h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(-
 .status.supported { background: var(--ok-bg); color: var(--ok-fg); }
 .status.stale { background: var(--warn-bg); color: var(--warn-fg); }
 .default { font: 400 ${size(12)}/1.3333 ${SANS}; color: var(--muted); }
-
-/* The Inspector: one card of rows, hairlines between them (Paper, "Inspector as property rows") */
-.inspector { gap: 0; padding: 0; overflow: hidden; }
-.inspector > * + * { border-top: 1px solid var(--rule); }
 
 /* The identity: back, component and route, the verdict; the name; where it is written; what it is inside */
 .identity { display: flex; flex-direction: column; padding: 10px 14px 14px 10px; }
@@ -297,19 +289,15 @@ fieldset.site .list > li { padding-left: 42px; }
 .reset-scope { align-self: flex-start; margin: 6px 0 0 14px; }
 
 /* Notices: the Product layer's, Overrides off, and an Instance's note */
-.notice-card { gap: 8px; }
-.notice-card .title { font-size: ${size(13)}; line-height: 1.3846; }
-.notice-card ul { list-style: none; margin: 0; padding: 0; }
-.notice-card li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--rule); font-size: ${size(13)}; }
-.notice-card li .mono { color: var(--muted); }
+.notice-card { gap: var(--space-inset); }
+.notice-rows { list-style: none; margin: 0; padding: 0; }
 .command { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--well); font: 400 ${size(12)}/1.3333 ${MONO}; color: var(--ink); }
 .command .copy { height: 28px; padding: 0 10px; background: var(--card); }
 @media (hover: hover) { .command .copy:hover { background: var(--sunk-hover); } }
 .command-refused { font-size: ${size(12)}; line-height: 1.4167; }
 .command-refused:not(:empty) { margin-top: 6px; }
-.note-card { display: flex; flex-direction: row; gap: 10px; padding: 12px 14px; }
-.note-card .icon { margin-top: 2px; color: var(--muted); }
-.note-card .text { display: flex; flex-direction: column; gap: 4px; }
+/* An Instance's note: a Row (ui/row/) with the info glyph, its title over its paragraph. */
+.note .text { display: flex; flex-direction: column; gap: var(--space-xs); }
 .notice { padding: 10px 12px; border-radius: 12px; background: var(--well); font: 400 ${size(12)}/1.5 ${SANS}; }
 .notice code { font-family: ${MONO}; font-weight: 600; color: var(--ink); }
 .notice .reset { margin-top: 8px; background: var(--card); }
@@ -318,8 +306,6 @@ fieldset.site .list > li { padding-left: 42px; }
 .warn [data-dot] { margin-top: 5px; }
 
 /* The change list: each change by its delta */
-.section.changes { gap: 6px; padding: 12px 0 6px; overflow: hidden; }
-.section.changes > .head { padding: 0 14px 4px; }
 .keylist { list-style: none; margin: 0; padding: 0; }
 .keylist button {
   display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "key what" "key where"; column-gap: 10px;
@@ -330,41 +316,24 @@ fieldset.site .list > li { padding-left: 42px; }
 .keylist .what { grid-area: what; font: 400 ${size(12)}/1.5 ${MONO}; overflow-wrap: anywhere; }
 .keylist .where { grid-area: where; min-width: 0; overflow-wrap: break-word; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
 
-/* A property row: its glyph, its name and what qualifies it, then its chips under the name */
-/* Each row sits under a 1px hairline: 14px of padding puts its glyph 15px down, as Paper draws it. */
-.prop { position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: 8px; padding: 14px 14px 13px; }
-.prop > .glyph { grid-row: 1 / span 9; padding-top: 0; color: var(--ink); }
-.prop > .row { grid-column: 2; }
-.prop.switch-row { padding-bottom: 14px; }
-.prop.switch-row > .glyph { padding-top: 1px; }
-.prop.switch-row .row.switch .line { min-height: 22px; }
-.row { display: flex; flex-direction: column; gap: 13px; }
+/* A property row (a Row, ui/row/): what qualifies its name, then its chips under the name */
 /* The head and the lines that qualify it sit tight; the control sits apart. */
-.row .head-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.row .line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-height: 20px; flex-shrink: 0; }
-.row [data-delta] { margin: -1px -2px -1px -3px; }
-.row .name { flex: none; display: flex; align-items: baseline; gap: 6px; max-width: 100%; font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; }
-.row .name .mono { font-size: ${size(11)}; color: var(--faint); letter-spacing: 0; }
-.row .value { flex: 1; min-width: 0; text-align: right; font: 400 ${size(11)}/1.2727 ${MONO}; color: var(--muted); overflow-wrap: anywhere; }
-.row .value .muted, .row .value .default { font: inherit; }
-/* Counts quote values, so they are never recased: "outline" 1 · "ghost" 3. */
-.row .value.counts { font: 400 ${size(11)}/1.2727 ${MONO}; letter-spacing: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
-.row .reset { margin-left: auto; }
-.row .value ~ .reset { margin-left: 0; }
-.row .change { font: 400 ${size(11)}/1.4545 ${MONO}; color: var(--muted); overflow-wrap: anywhere; }
-.row .change .arrow { color: var(--faint); font-family: ${SANS}; }
-.row .change .to { color: var(--ink); font-weight: 600; }
-.row .change .from-scope { font-family: ${SANS}; color: var(--muted); }
-.row .current { font: 400 ${size(12)}/1.3333 ${MONO}; color: var(--ink); }
-.row .current .meta { font-family: ${SANS}; margin-right: 4px; }
-.row .explain { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--muted); }
-.row .refusal { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: ${size(12)}; line-height: 1.4167; }
-.row .keeping { align-self: flex-start; min-height: 24px; font: 500 ${size(12)}/1.3333 ${SANS}; color: var(--link); text-decoration: underline; text-decoration-color: var(--link-edge); text-underline-offset: 3px; }
-@media (hover: hover) { .row .keeping:hover { text-decoration-color: currentColor; } }
+[data-prop] .head-group { display: flex; flex-direction: column; gap: var(--space-hair); min-width: 0; }
+[data-row-value] .muted, [data-row-value] .default { font: inherit; }
+[data-prop] .change { font: 400 ${size(11)}/1.4545 ${MONO}; color: var(--muted); overflow-wrap: anywhere; }
+[data-prop] .change .arrow { color: var(--faint); font-family: ${SANS}; }
+[data-prop] .change .to { color: var(--ink); font-weight: 600; }
+[data-prop] .change .from-scope { font-family: ${SANS}; color: var(--muted); }
+[data-prop] .current { font: 400 ${size(12)}/1.3333 ${MONO}; color: var(--ink); }
+[data-prop] .current .meta { font-family: ${SANS}; margin-right: 4px; }
+[data-prop] .explain { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--muted); }
+[data-prop] .refusal { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: ${size(12)}; line-height: 1.4167; }
+[data-prop] .keeping { align-self: flex-start; min-height: 24px; font: 500 ${size(12)}/1.3333 ${SANS}; color: var(--link); text-decoration: underline; text-decoration-color: var(--link-edge); text-underline-offset: 3px; }
+@media (hover: hover) { [data-prop] .keeping:hover { text-decoration-color: currentColor; } }
 
 /* The options: ChipGroup (ui/chip-group/chip-group.css). */
 /* A text prop: Field's outline look (ui/field), its edge salmon once the prop is changed here. */
-.row.overridden .text [data-field-control] { border-color: var(--shown-edge); }
+[data-prop].overridden .text [data-field-control] { border-color: var(--shown-edge); }
 /* What the chips' marks mean, said once on a row of its own. */
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 34px; padding: 10px 14px 10px 42px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
@@ -373,10 +342,6 @@ fieldset.site .list > li { padding-left: 42px; }
 .legend .app { box-shadow: inset 0 0 0 1px var(--field-edge); }
 .legend .is-default { width: 4px; height: 4px; margin: 0 2px 0 4px; border-radius: 2px; background: var(--faint); }
 
-/* True or false: a row with its switch at the right edge */
-.row.switch .line { min-height: 20px; flex-wrap: nowrap; }
-.row.switch .name { min-width: 0; flex: 0 1 auto; }
-.toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
 /* Inspect only: the props this Instance shows but can't change here, folded to one row */
 .inspect { overflow: hidden; }
 .inspect > [data-fold] > [data-fold-trigger] { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto 16px; align-items: center; column-gap: 8px; min-height: 44px; padding: 12px 14px; }
@@ -387,19 +352,13 @@ fieldset.site .list > li { padding-left: 42px; }
 .inspect .summary-text .muted { font-size: ${size(12)}; letter-spacing: 0; }
 .inspect .why { padding: 0 14px 8px 42px; font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--muted); }
 .inspect-rows { display: flex; flex-direction: column; padding: 0 14px 8px 42px; }
-.inspect .row { gap: 2px; padding: 6px 0; border-top: 1px solid var(--rule); }
-.inspect .row .line { display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr) auto; align-items: baseline; min-height: 24px; gap: 8px; }
-.inspect .row .name { min-width: 0; font: 400 ${size(12)}/1.5 ${MONO}; letter-spacing: 0; color: var(--muted); overflow-wrap: normal; word-break: normal; }
-.inspect .row .name .mono { display: none; }
-.inspect .row .value { text-align: left; color: var(--ink); font-size: ${size(12)}; }
 .inspect .injected { padding: 0 14px 12px 42px; }
 .inspect .injected > [data-fold-trigger] { display: flex; align-items: center; gap: 6px; min-height: 28px; color: var(--muted); font-size: ${size(12)}; }
 
 /* On this page (Rows option B): the page map over its usage rows, most used first */
 .list { list-style: none; margin: 0; padding: 0; }
-.on-page { gap: 0; padding: 14px 0 0; overflow: hidden; }
-.on-page > .head { align-items: center; padding: 0 14px; }
-.on-page > .head h3 { font: 500 ${size(14)}/1.2857 ${SANS}; }
+.on-page { gap: 0; padding-bottom: 0; }
+.on-page > [data-card-head] { align-items: center; padding-bottom: 0; }
 .on-page .list { padding-bottom: 0; }
 .group { position: relative; }
 .group [data-fold-trigger] {
@@ -457,10 +416,6 @@ fieldset.site .list > li { padding-left: 42px; }
 .held-item .muted { font-size: ${size(12)}; line-height: 1.4167; }
 
 /* Feature flags */
-.flags { gap: 10px; }
-.flag { gap: 8px; padding: 10px 0; border-top: 1px solid var(--rule); }
-.flag .line { min-height: 28px; }
-.flag .name { font: 500 ${size(12)}/1.3333 ${MONO}; }
 .flag [data-chip-group] { flex-wrap: nowrap; }
 .flag [data-chip] { flex: 1; }
 .flag .foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
@@ -504,7 +459,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .group.lit [data-fold-trigger] { background: var(--hover); }
 
 /* The list's start (guided start): what to change, and the two select tools as tiles that show what each does */
-.hero { gap: 0; padding: 16px 14px 14px; }
+.hero { gap: 0; padding-top: var(--space-hero); }
 .hero .hero-title { font-size: ${size(20)}; line-height: 1.3; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); text-wrap: balance; }
 /* Focus lands on the heading when the list opens: no ring, but an outline forced colours draw. */
 .hero .hero-title:focus { outline: 2px solid transparent; }
@@ -524,7 +479,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .big-tool .h { margin: 2px 8px 0; font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--faint); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
-  .panel, .section, .card, .footer, .header { border: 1px solid transparent; }
+  .panel, .footer, .header { border: 1px solid transparent; }
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }

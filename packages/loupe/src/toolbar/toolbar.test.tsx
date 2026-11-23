@@ -928,7 +928,7 @@ describe("the Text row (PER-137)", () => {
   it("is a single-line field that grows, applies live, and may be left empty", async () => {
     await mount();
     await select(BIA);
-    expect(row("children").querySelector(".name")?.textContent).toBe("Text children");
+    expect(row("children").querySelector("[data-row-name]")?.textContent).toBe("Text children");
     const field = textField();
     // It grows to its text: the height follows the content.
     Object.defineProperty(field, "scrollHeight", { configurable: true, get: () => 42 });
@@ -1156,7 +1156,7 @@ describe("On this page: the page map over its rows", () => {
     await mount();
     expect(shadow().querySelectorAll(".map-sheet")).toHaveLength(1);
     expect(section().querySelector(".map-sheet")).not.toBeNull();
-    expect(section().querySelector(".head")?.textContent).toMatch(/^On this page\d+ components · \d+ Instances$/);
+    expect(within(section()).getByRole("heading", { level: 3 }).parentElement?.textContent).toMatch(/^On this page\d+ components · \d+ Instances$/);
     expect(shadow().querySelector(".map-legend")).toBeNull();
     expect(buttonBlocks()).toHaveLength(5);
     const hue = buttonBlocks()[0]?.classList[1] as string;
