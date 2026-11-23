@@ -62,20 +62,60 @@ const HUES = 7;
 export const hueOf = (index: number) => `hue-${index % HUES}`;
 
 /**
+ * Where the arrow keys go from the block `from`, among `order` (the blocks as a page
+ * reads, top to bottom and left to right): Right and Down to the next, Left and Up to
+ * the one before, Home and End to the ends. Nothing past an end, so a key that can't go
+ * anywhere stays put. A key the map doesn't use, or one held with a modifier (Alt and
+ * Left is the browser's Back), is null.
+ */
+export function stepFrom(order: readonly string[], from: string, event: Pick<KeyboardEvent, "key" | "altKey" | "ctrlKey" | "metaKey" | "shiftKey">): string | null {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return null;
+  const at = order.indexOf(from);
+  switch (event.key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      return order[Math.min(order.length - 1, at + 1)] ?? null;
+    case "ArrowLeft":
+    case "ArrowUp":
+      return order[Math.max(0, at - 1)] ?? null;
+    case "Home":
+      return order[0] ?? null;
+    case "End":
+      return order.at(-1) ?? null;
+    default:
+      return null;
+  }
+}
+
+/**
  * Every component on screen as a tinted block where it sits, fit into a dotted well over
  * the rows of "On this page": the rows are its legend. Point to find, click to inspect. Nothing is drawn
  * while nothing has a box (an Instance that isn't mounted, or a page with no layout).
+ *
+ * The blocks are one Tab stop (a roving tabindex), not one each: the list below is
+ * what Tab goes through, and the map is a shortcut into it. The arrow keys move between
+ * blocks in the order a page reads, Home and End to the ends, and a block takes focus
+ * with the same effect as the pointer on it: its component's row lights and the page outlines it.
+ * Each block is named for the Instance it stands for, so a screen reader tells five Buttons apart.
  */
 export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
   const signal = useContext(PageSignalContext);
   const mounted = groups.flatMap((group) => group.instances.filter((item) => item.mounted).map((item) => item.id));
   const measured = useSettledBoxes(signal, debug, mounted);
+  // The block Tab lands on: the one last focused, or the first while that one is gone.
+  const [current, setCurrent] = useState<string | null>(null);
+  const nodes = useRef(new Map<string, HTMLButtonElement>());
   const blocks = groups
-    .flatMap((group, index) =>
-      group.instances
-        .filter((item) => item.mounted)
-        .map((item) => ({ id: item.id, group, hue: hueOf(index), box: measured.get(item.id) ?? null })),
-    )
+    .flatMap((group, index) => {
+      const here = group.instances.filter((item) => item.mounted);
+      return here.map((item, nth) => ({
+        id: item.id,
+        group,
+        hue: hueOf(index),
+        box: measured.get(item.id) ?? null,
+        name: `Inspect ${group.component} ${nth + 1} of ${here.length}, ${item.name ?? item.label}`,
+      }));
+    })
     .filter((b): b is typeof b & { box: Box } => b.box !== null);
   if (blocks.length === 0) return null;
   const boxes = blocks.map((b) => b.box);
@@ -83,23 +123,39 @@ export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
   const minTop = Math.max(0, Math.min(...boxes.map((b) => b.top)));
   const W = Math.max(...boxes.map((b) => b.left + b.width)) + minLeft;
   const H = Math.max(...boxes.map((b) => b.top + b.height)) + minTop;
+  const order = [...blocks].sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left).map((b) => b.id);
+  const stop = current !== null && order.includes(current) ? current : order[0];
   // The largest first, so a small block inside a large one stays on top to be pointed at.
   blocks.sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
   return (
-    <div className="map-sheet" data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
+    <div className="map-sheet" role="toolbar" aria-label="Page map" data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
       {/* The page's shape, fit into the well: blocks sit at their place in it. */}
       <div className="fit" style={{ "--ratio": W / H } as CSSProperties}>
         {blocks.map((b) => (
           <button
             key={`${b.group.component}:${b.id}`}
             type="button"
+            ref={(node) => {
+              if (node) nodes.current.set(b.id, node);
+              else nodes.current.delete(b.id);
+            }}
             className={`blk ${b.hue}${lit === b.group.component ? " lit" : ""}`}
             style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
             title={`${b.group.component} ${b.group.count}`}
-            aria-label={`Inspect this ${b.group.component}`}
+            aria-label={b.name}
+            tabIndex={b.id === stop ? 0 : -1}
             onMouseOver={() => onPoint(b.group)}
-            onFocus={() => onPoint(b.group)}
+            onFocus={() => {
+              setCurrent(b.id);
+              onPoint(b.group);
+            }}
             onBlur={() => onPoint(null)}
+            onKeyDown={(event) => {
+              const to = stepFrom(order, b.id, event.nativeEvent);
+              if (to === null) return;
+              event.preventDefault();
+              nodes.current.get(to)?.focus();
+            }}
             onClick={() => onSelect(b.id)}
           />
         ))}
