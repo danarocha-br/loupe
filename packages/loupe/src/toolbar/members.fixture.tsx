@@ -83,10 +83,13 @@ export function Page({
   onRowClick = () => {},
   confirmTotal = 3,
   twice = false,
+  loose = false,
 }: {
   onRowClick?: (member: string) => void;
   confirmTotal?: number;
   twice?: boolean;
+  /** A Button the loader anchored no call site to, so Select multiple has no group for it. */
+  loose?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -104,6 +107,7 @@ export function Page({
       <Button {...(site(2, ["onClick"]) as object)} onClick={() => setOpen(!open)}>
         Menu
       </Button>
+      {loose && <Button>Solto</Button>}
       {open && <MenuItem {...({ [ANCHOR_ATTRIBUTE]: members("MenuItem", 1) } as object)}>Remover</MenuItem>}
       <button type="button" onClick={() => setConfirming(true)}>
         Abrir

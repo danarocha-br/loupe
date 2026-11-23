@@ -45,7 +45,7 @@ afterEach(() => {
 /** Lets the lazy Toolbar, its effects and its once-a-frame refresh settle. */
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 
-async function mount(onRowClick: (member: string) => void = () => {}, page: { confirmTotal?: number } = {}) {
+async function mount(onRowClick: (member: string) => void = () => {}, page: { confirmTotal?: number; loose?: boolean } = {}) {
   act(() =>
     root.render(
       <>
@@ -922,6 +922,42 @@ describe("keyboard focus (review 2026-11-20)", () => {
     focusIn(back);
     await clickInPanel(back);
     expect(panelText()).toContain("What do you want to change?");
+    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+  });
+
+  it("moves focus to the Gone view's heading when the selected Instance unmounts under it", async () => {
+    await mount();
+    act(() => pageButton("Abrir").click());
+    await settle();
+    await select(CONFIRM);
+    focusIn(pill("variant", '"default"'));
+    expect(shadow().activeElement).toBe(pill("variant", '"default"'));
+    act(() => pageButton("Fechar").click());
+    await settle();
+    expect(panelText()).toContain("Not on the page now");
+    // Still in the shadow root, not dropped to the page's <body>.
+    expect(document.activeElement).toBe(document.querySelector(`[${HOST_ATTRIBUTE}]`));
+    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    // And back to the Inspector's heading when it mounts again.
+    focusIn(panelButton("All components"));
+    act(() => pageButton("Abrir").click());
+    await settle();
+    expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(CONFIRM);
+    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+  });
+
+  it("moves focus to the heading when Widen widens an Instance with no call site, and takes its button away", async () => {
+    await mount(() => {}, { loose: true });
+    const anchored = [members("Button", 1), MENU, CONFIRM];
+    const loose = loupe.list("Button").find((instance) => !anchored.includes(instance.anchor))?.id as string;
+    await select(loose);
+    await clickInPanel(scopeButton("group"));
+    await escape();
+    const widen = shadow().querySelector<HTMLButtonElement>("button.widen[data-scope=page]") as HTMLButtonElement;
+    expect(widen.textContent).toContain("Widen to");
+    focusIn(widen);
+    await clickInPanel(widen);
+    expect(shadow().querySelector("button.widen")).toBeNull();
     expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
   });
 
