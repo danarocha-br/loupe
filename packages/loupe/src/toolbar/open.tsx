@@ -10,17 +10,18 @@
 // here, unless the first change made through `__loupe` started them already (`start.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { debugOf } from "../runtime/debug.js";
+import type { LayerStatus } from "../layer-status.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
 import { useDeselect } from "./deselect.js";
 import type { Column } from "./dock.js";
 import { Highlight } from "./highlight.js";
-import type { Theme } from "./index.js";
+import type { Theme } from "./surface/index.js";
 import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
 import { createPageSignal, PageSignalContext, usePageVersion } from "./page-signal.js";
 import { Panel } from "./panel.js";
-import { panelView, type SeenComponents } from "./panel-view/index.js";
+import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startTrackers } from "./start.js";
 
@@ -44,6 +45,22 @@ export type ToolbarOpenProps = {
   onShown(): void;
 };
 
+/**
+ * What the panel shows, from `panelView()`. "Appears on interaction" remembers components
+ * across page versions: `panelView()` takes what it returned last time and returns the
+ * next, kept in a ref read while rendering. That is why this is a hook of its own: React
+ * Compiler skips a function that reads a ref in render, and the skip stays here rather
+ * than taking `ToolbarOpen` with it, whose memoised `<Panel>` keeps a hover from
+ * re-rendering the whole Panel (ADR 0003, `hover-render.test.tsx`).
+ */
+function usePanelView(debug: LoupeDebug, layer: LayerStatus | null, selected: string | null, scope: Scope, version: number): PanelView {
+  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
+  // `version` is the trigger: it moves whenever the registry or the page changes.
+  const view = useMemo(() => panelView({ debug, layer, selected, scope, seen: seen.current }), [debug, layer, selected, scope, version]);
+  seen.current = view.seen;
+  return view;
+}
+
 /** Everything that watches the page, mounted only while the panel is open. */
 export function ToolbarOpen({
   host,
@@ -64,20 +81,13 @@ export function ToolbarOpen({
   useEffect(startTrackers, []);
   // After the panel's own effects: its heading is there to take focus.
   useEffect(onShown, [onShown]);
-  const debug = useMemo(debugOf, []);
+  // An inline function: React Compiler skips a component whose useMemo takes a reference.
+  const debug = useMemo(() => debugOf(), []);
   // Awake while the panel is open: collapsed, the Toolbar watches nothing on the page.
   const signal = useMemo(() => createPageSignal({ doc: document, debug: () => debug, host: () => host }), [debug, host]);
   const version = usePageVersion(signal);
   const layer = useLayerStatus(version);
-  // "Appears on interaction" remembers components across page versions: `panelView()`
-  // takes what it returned last time and returns the next.
-  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
-  // `version` is the trigger: it moves whenever the registry or the page changes.
-  const view = useMemo(
-    () => panelView({ debug, layer, selected, scope, seen: seen.current }),
-    [debug, layer, selected, scope, version],
-  );
-  seen.current = view.seen;
+  const view = usePanelView(debug, layer, selected, scope, version);
   useInstanceMeta(view.metaAnchor);
   const [hovered, setHovered] = useState<string[]>([]);
   // A row's hover can repeat as the pointer crosses its children: the same Instances change nothing.

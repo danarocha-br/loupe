@@ -29,7 +29,12 @@ const { sans: SANS, mono: MONO } = FONT;
 /** On the host once the text-size unit is registered (index.tsx): sizes then follow the reader's default. */
 export const SCALE_ATTRIBUTE = "data-loupe-scale";
 
-export const CSS = `
+/**
+ * The ground every layer stands on, the stylesheet's \`tokens\` layer (surface/): the host's
+ * custom properties from tokens.ts, and the elements' defaults. In a layer below the
+ * primitives, so a reset here (\`button { padding: 0 }\`) never undoes a primitive's rule.
+ */
+export const GROUND_CSS = `
 /* Left to right in any app: \`all\` leaves direction alone, so an RTL page would half-mirror the panel. App text keeps dir="auto". */
 :host { all: initial; direction: ltr; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; --loupe-px: 1px; ${hostDeclarations("light")} color-scheme: light; }
 /* The reader's default text size, over 16: \`all: initial\` left the host at \`medium\`. */
@@ -38,8 +43,21 @@ export const CSS = `
 * { box-sizing: border-box; }
 ::selection { background: var(--select); }
 :host([data-loupe-switching]) * { transition: none !important; }
-.icon { display: block; flex: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+p { margin: 0; }
+h2, h3 { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; -webkit-tap-highlight-color: transparent; }
+summary { -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; opacity: 0.45; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+`;
+
+/**
+ * The views' rules. Not in a layer yet: unlayered, they come after every layer (surface/),
+ * so a view can still adjust a primitive while its rules move into patterns and primitives.
+ */
+export const CSS = `
+.icon { display: block; flex: none; }
 
 /* Text */
 .panel {
@@ -53,16 +71,10 @@ export const CSS = `
 .meta { font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .label { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
 .body { font: 400 ${size(13)}/1.4615 ${SANS}; color: var(--muted); margin: 0; }
-p { margin: 0; }
-h2, h3 { margin: 0; }
 h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(--ink); }
 kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px; background: var(--kbd); }
 
 /* Controls: soft pills, the ink primary, the header's round tools */
-button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; -webkit-tap-highlight-color: transparent; }
-summary { -webkit-tap-highlight-color: transparent; }
-button:disabled { cursor: default; opacity: 0.45; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px;
   border-radius: 999px; background: var(--sunk); color: var(--ink); font: 500 ${size(12)}/1.3333 ${SANS}; white-space: nowrap;
@@ -106,7 +118,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 .header .report { padding-top: 4px; }
 .tools { flex: none; display: flex; align-items: center; gap: 2px; }
 .select-tools { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--tools-wash); }
-.select-tools .tool[aria-pressed="true"], .select-tools .tool.armed { background: var(--card); color: var(--primary); box-shadow: var(--raised-shadow); }
+.select-tools .tool[data-checked], .select-tools .tool[data-armed] { background: var(--card); color: var(--primary); box-shadow: var(--raised-shadow); }
 .tools .divider { flex: none; width: 1px; height: 16px; margin: 0 2px 0 11px; border-radius: 1px; background: var(--divider); }
 .tool[data-marks][aria-pressed="true"] { background: var(--sunk); color: var(--primary); }
 .status-region { flex: none; }
@@ -411,23 +423,7 @@ fieldset.site .list > li { padding-left: 42px; }
 .row .keeping { align-self: flex-start; min-height: 24px; font: 500 ${size(12)}/1.3333 ${SANS}; color: var(--link); text-decoration: underline; text-decoration-color: var(--link-edge); text-underline-offset: 3px; }
 @media (hover: hover) { .row .keeping:hover { text-decoration-color: currentColor; } }
 
-/* The options: chips that wrap; what shows now in salmon with its count, the app's value ringed, the default dotted */
-.pills { display: flex; flex-wrap: wrap; gap: 6px; }
-.pills button {
-  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 26px; padding: 4px 10px;
-  border-radius: 8px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--hairline); color: var(--muted); font: 400 ${size(12)}/1.3333 ${SANS}; text-align: center;
-  transition: background-color 120ms ease-out, color 120ms ease-out;
-}
-@media (hover: hover) { .pills button:not([aria-pressed="true"]):not([aria-checked="true"]):not(:disabled):hover { background: var(--sunk-hover); color: var(--ink); } }
-.pills button[aria-pressed="true"], .pills button[aria-checked="true"] { background: var(--shown); color: var(--on-shown); font-weight: 500; box-shadow: inset 0 0 0 1px var(--shown-edge); }
-.pills button:focus-visible { outline-offset: 1px; }
-/* A long value wraps in its chip rather than losing its end: it is what the designer picks between. */
-.pills .opt { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pills .app { box-shadow: inset 0 0 0 1px var(--field-edge); color: var(--ink); }
-.pills .app-tag { flex: none; font: 500 ${size(10)}/1.4 ${MONO}; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
-.pills .is-default::after { content: ""; flex: none; order: 2; width: 4px; height: 4px; border-radius: 2px; background: var(--faint); }
-.pills .count { flex: none; order: 3; font: 500 ${size(10)}/1.4 ${MONO}; font-variant-numeric: tabular-nums; color: var(--faint); }
-.pills button[aria-pressed="true"] .count, .pills button[aria-checked="true"] .count { color: inherit; }
+/* The options: ChipGroup (ui/chip-group/chip-group.css). */
 .row .text { width: 100%; min-height: 36px; padding: 8px 12px; resize: none; overflow: hidden; border: 1px solid var(--field-edge); border-radius: 12px; background: var(--card); color: var(--ink); font: 400 ${size(13)}/1.3846 ${SANS}; outline: none; }
 .row .text:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-glow); }
 .row.overridden .text { border-color: var(--shown-edge); }
@@ -542,8 +538,8 @@ fieldset.site .list > li { padding-left: 42px; }
 .flag { gap: 8px; padding: 10px 0; border-top: 1px solid var(--rule); }
 .flag .line { min-height: 28px; }
 .flag .name { font: 500 ${size(12)}/1.3333 ${MONO}; }
-.flag .pills { flex-wrap: nowrap; }
-.flag .pills button { flex: 1; }
+.flag [data-chip-group] { flex-wrap: nowrap; }
+.flag [data-chip] { flex: 1; }
 .flag .foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
 .flag .state { margin-left: auto; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--muted); white-space: nowrap; padding-bottom: 6px; }
 .flag.overridden .state { color: var(--ink); }
@@ -598,7 +594,8 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 .hero-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .big-tool { display: flex; flex-direction: column; align-items: stretch; padding: 4px 4px 12px; border-radius: 14px; background: var(--card); color: var(--ink); text-align: left; box-shadow: var(--tile-shadow); transition: box-shadow 120ms ease-out; }
 @media (hover: hover) { .big-tool:hover { box-shadow: var(--raised-shadow); } }
-.big-tool.armed { box-shadow: inset 0 0 0 1.5px var(--accent), var(--raised-shadow); }
+.big-tool[data-checked] { box-shadow: inset 0 0 0 1px var(--field-edge), var(--tile-shadow); }
+.big-tool[data-armed] { box-shadow: inset 0 0 0 1.5px var(--accent), var(--raised-shadow); }
 .big-tool .preview { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; height: 56px; border-radius: 10px; background: var(--sunk); overflow: hidden; }
 .big-tool .preview .chip { position: relative; width: 28px; height: 16px; border-radius: 5px; background: var(--card); box-shadow: 0 0 0 1px var(--divider), 0 1px 1px var(--hairline); }
 .big-tool .preview .chip.ringed::after, .big-tool .preview .chip.dashed::after { content: ""; position: absolute; inset: -3px; border: 1.5px solid var(--accent); border-radius: 8px; }
@@ -613,9 +610,7 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
-  .pills button[aria-pressed="true"], .pills button[aria-checked="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
-  .pills .app { outline: 1px dashed CanvasText; outline-offset: -4px; }
-  .pills .is-default::after, .legend i { forced-color-adjust: none; background: CanvasText; }
+  .legend i { forced-color-adjust: none; background: CanvasText; }
   .switch-track { forced-color-adjust: none; background: Canvas; box-shadow: inset 0 0 0 1.5px ButtonText; }
   .switch-track .thumb { forced-color-adjust: none; background: ButtonText; }
   .switch-track .thumb::after { forced-color-adjust: none; background: Canvas; }

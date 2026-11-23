@@ -10,6 +10,7 @@ import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
 import { ChevronIcon, ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
+import { Chip, ChipGroup } from "./ui/index.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [
@@ -158,7 +159,9 @@ function FlagRow({
   const previewing = Object.hasOwn(overrides, definition.key);
   const value = overrides[definition.key];
   const options = definition.options ?? (undeclared ? [] : ON_OFF);
-  const shown = options.find((option) => sameFlagValue(option.value, value));
+  // Chips take string values: each option by its place in the list.
+  const checked = previewing ? options.findIndex((option) => sameFlagValue(option.value, value)) : -1;
+  const shown = options[checked];
   return (
     <div className={previewing ? "row flag overridden" : "row flag"} data-flag={definition.key}>
       <div className="line">
@@ -175,19 +178,22 @@ function FlagRow({
       {!definition.options && !undeclared && <div className="muted">No options declared: offered as on and off.</div>}
       <div className="foot">
         {options.length > 0 && (
-          <div className="pills" role="group" aria-label={definition.key}>
-            {options.map((option) => (
-              <button
-                key={JSON.stringify(option.value)}
-                type="button"
-                aria-pressed={previewing && sameFlagValue(option.value, value)}
-                aria-busy={busy || undefined}
-                onClick={() => onPreview(option.value)}
-              >
+          // One of a flag's options, or none while the app decides: a radio group with nothing checked.
+          <ChipGroup
+            label={definition.key}
+            value={checked === -1 ? null : String(checked)}
+            busy={busy}
+            onChoose={(index) => {
+              const option = options[Number(index)];
+              if (option) onPreview(option.value);
+            }}
+          >
+            {options.map((option, index) => (
+              <Chip key={JSON.stringify(option.value)} value={String(index)}>
                 {option.label ?? formatCurrent(option.value)}
-              </button>
+              </Chip>
             ))}
-          </div>
+          </ChipGroup>
         )}
         <div className="state">
           {previewing ? `Previewing ${shown?.label ?? formatCurrent(value)}` : "App decides"}

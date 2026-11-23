@@ -377,10 +377,21 @@ const declare = (properties: Record<string, string>) =>
 const prefixed = (prefix: string, scale: Record<string, number | string>, unit = "") =>
   Object.fromEntries(Object.entries(scale).map(([name, value]) => [`${prefix}-${name}`, `${value}${unit}`]));
 
+/** `monoSmall` → `mono-small`: a role's name as a custom property writes it. */
+const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+
+/**
+ * Each type step as a `font` shorthand, `--font-<role>`, for the primitives' real CSS
+ * files (ADR 0003), which can't call `font()`. Tracking, case and figures stay with the rule.
+ */
+export const TYPE_PROPERTIES: Record<string, string> = Object.fromEntries(
+  Object.entries(TYPE).map(([role, style]) => [`font-${kebab(role)}`, font(style)]),
+);
+
 /**
  * The host's custom properties for one theme: its colours and shadows. The light block
  * also carries the scales that don't change with the theme (`--space-*`, `--radius-*`,
- * `--duration-*`, `--ease-*`): the dark block only overrides the themed ones.
+ * `--duration-*`, `--ease-*`, `--font-*`): the dark block only overrides the themed ones.
  */
 export function hostDeclarations(theme: Theme): string {
   const themed = declare({ ...COLOR[theme], ...SHADOW[theme] });
@@ -390,6 +401,7 @@ export function hostDeclarations(theme: Theme): string {
     ...prefixed("radius", RADIUS, "px"),
     ...prefixed("duration", DURATION, "ms"),
     ...prefixed("ease", EASE),
+    ...TYPE_PROPERTIES,
   });
   return `${themed} ${scales}`;
 }

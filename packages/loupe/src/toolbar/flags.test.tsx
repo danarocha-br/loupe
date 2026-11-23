@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { within } from "@testing-library/dom";
 import { decryptOverrides as sdkDecryptOverrides } from "flags";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -253,17 +254,17 @@ describe("the Feature flags card", () => {
       { timeout: 2000, interval: 10 },
     );
   /**
-   * Waits until the card is loaded and no write is in flight. A write marks every pill
-   * busy (they stay enabled, so focus stays on them), and a click made before it ends is
-   * dropped: that is how a fixed number of ticks failed on CI.
+   * Waits until the card is loaded and no write is in flight. A write marks every flag's
+   * options busy (they stay enabled, so focus stays on them), and a click made before it
+   * ends is dropped: that is how a fixed number of ticks failed on CI.
    */
   const idle = () =>
     until(() => {
-      const pills = container.querySelectorAll(".pills button");
-      if (pills.length === 0 || container.querySelector('.pills button[aria-busy="true"]')) throw new Error("card busy");
+      const groups = within(container).queryAllByRole("radiogroup");
+      if (groups.length === 0 || groups.some((group) => group.getAttribute("aria-busy") === "true")) throw new Error("card busy");
     });
-  const pill = (flag: string, text: string) =>
-    [...container.querySelectorAll(`[data-flag="${flag}"] .pills button`)].find((b) => b.textContent === text) as HTMLButtonElement;
+  /** A flag's option: a radio in the flag's group, none checked while the app decides. */
+  const pill = (flag: string, text: string) => within(within(container).getByRole("radiogroup", { name: flag })).getByRole("radio", { name: text });
   const button = (text: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === text) as HTMLButtonElement;
 
   it("previews a flag, records it for the Proposal, and clearing gives the app its value back", async () => {
@@ -272,14 +273,15 @@ describe("the Feature flags card", () => {
     await idle();
 
     expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toContain("App decides");
-    // Declared without options: offered as on and off.
-    expect(pill("showBetaFeature", "On")).toBeTruthy();
+    // Declared without options: offered as on and off, neither checked while the app decides.
+    expect(pill("showBetaFeature", "On").getAttribute("aria-checked")).toBe("false");
+    expect(pill("showBetaFeature", "Off").getAttribute("aria-checked")).toBe("false");
     expect(await previewedFlags()).toEqual([]);
 
     act(() => pill("showBetaFeature", "On").click());
     await idle();
     await expect(overridesIn(request)).resolves.toEqual({ showBetaFeature: true });
-    expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
+    expect(pill("showBetaFeature", "On").getAttribute("aria-checked")).toBe("true");
     expect(container.querySelector('[data-flag="showBetaFeature"]')?.textContent).toMatch(/Previewing on/i);
 
     act(() => pill("plan", "Pro").click());
@@ -306,7 +308,7 @@ describe("the Feature flags card", () => {
     act(() => root.render(<FlagsCard />));
     await idle();
 
-    expect(pill("showBetaFeature", "On").getAttribute("aria-pressed")).toBe("true");
+    expect(pill("showBetaFeature", "On").getAttribute("aria-checked")).toBe("true");
     expect(container.querySelector('[data-flag="retired"]')?.textContent).toContain("Not declared");
     expect((await previewedFlags()).map((flag) => flag.key)).toEqual(["retired", "showBetaFeature"]);
   });
@@ -335,7 +337,7 @@ describe("the Feature flags card", () => {
     await act(async () => void (await previewedFlags()));
 
     expect(container.textContent).not.toContain("Flag previews are off");
-    expect(pill("plan", "Pro").getAttribute("aria-pressed")).toBe("true");
+    expect(pill("plan", "Pro").getAttribute("aria-checked")).toBe("true");
   });
 
   it("explains why previews are unavailable", async () => {

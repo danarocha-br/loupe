@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isolate, reachText } from "./panel-view/words.js";
-import { CSS } from "./styles.js";
-import { FONT, font, leading, TYPE, type TypeRole } from "./tokens.js";
+import { STYLESHEET as CSS } from "./surface/index.js";
+import { FONT, font, leading, TYPE, TYPE_PROPERTIES, type TypeRole } from "./tokens.js";
 
 const steps = Object.entries(TYPE) as [TypeRole, (typeof TYPE)[TypeRole]][];
 
@@ -24,10 +24,13 @@ describe("the toolbar's type (typography review 2026-11-20)", () => {
   });
 
   it("matches what the stylesheet writes for each step it sets as a shorthand", () => {
-    // Hero and a touch field set size and line height apart, not as `font:`.
+    // Hero and a touch field set size and line height apart, not as `font:`. A primitive's
+    // real CSS file reads the step's custom property, which the host declares from the module.
     for (const [role, style] of steps) {
+      const property = Object.keys(TYPE_PROPERTIES).find((name) => TYPE_PROPERTIES[name] === font(style));
+      expect(CSS, role).toContain(`--${property}: ${font(style)};`);
       if (role === "hero" || role === "fieldTouch") continue;
-      expect(CSS, role).toContain(`font: ${font(style)}`);
+      expect(CSS.includes(`font: ${font(style)}`) || CSS.includes(`font: var(--${property})`), role).toBe(true);
     }
   });
 

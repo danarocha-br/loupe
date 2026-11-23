@@ -4,6 +4,8 @@
 // `__loupe` call its data names. What the panel shows is `panel-view.test.tsx`'s,
 // asked of `panelView()` directly.
 
+import { within } from "@testing-library/dom";
+import { userEvent } from "@testing-library/user-event";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +102,16 @@ const type = async (field: HTMLTextAreaElement, text: string) => {
   await settle();
 };
 const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
+/** The panel, for Testing Library's role queries. */
+const screen = () => within(shadow() as unknown as HTMLElement);
+/** A header select tool: a radio in the "Select" group, checked for the mode. */
+const selectTool = (name: "Select one" | "Select multiple") =>
+  within(screen().getByRole("radiogroup", { name: "Select" })).getByRole("radio", { name });
+/** A start tile: the same two modes, a radio group at the list's start. */
+const startTile = (name: "Select one" | "Select multiple") =>
+  within(screen().getByRole("radiogroup", { name: "Start selecting" })).getByRole("radio", { name: new RegExp(`^${name}`) });
+/** Whether a select tool is armed: a state of the page, said by the status strip, not by the button. */
+const armed = () => screen().getAllByRole("status").some((status) => /Esc cancels/.test(status.textContent ?? ""));
 /** Ends picking, which a select tool arms, so the page's own clicks go through again. */
 const escape = async () => {
   act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
@@ -143,9 +155,8 @@ describe("the Toolbar", () => {
   it("picks the right one of four repeated row Instances by clicking the page, without the page reacting", async () => {
     const clicked: string[] = [];
     await mount((member) => clicked.push(member));
-    const pick = [...shadow().querySelectorAll("button")].find((button) => button.textContent === "Select one") as HTMLButtonElement;
-    await clickInPanel(pick);
-    expect(pick.classList.contains("armed")).toBe(true);
+    await clickInPanel(selectTool("Select one"));
+    expect(armed()).toBe(true);
 
     act(() => {
       pageButton("caio").dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
@@ -154,25 +165,41 @@ describe("the Toolbar", () => {
     await settle();
     expect(clicked).toEqual([]);
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe("app/members.tsx › Members › Button[1]#caio");
-    expect(pick.classList.contains("armed")).toBe(false);
+    expect(armed()).toBe(false);
 
     // Picking is off again: the page's own clicks go through.
     act(() => pageButton("dani").click());
     expect(clicked).toEqual(["dani"]);
   });
 
+  it("arms a select tool from a start tile: the mode is checked in both groups, armed is said by the status strip", async () => {
+    await mount();
+    expect(startTile("Select one").getAttribute("aria-checked")).toBe("true");
+    expect(armed()).toBe(false);
+    await clickInPanel(startTile("Select multiple"));
+    expect(armed()).toBe(true);
+    expect(startTile("Select multiple").getAttribute("aria-checked")).toBe("true");
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
+    // Nothing says armed on the button: `aria-pressed` is gone from both groups.
+    expect(shadow().querySelector(".hero-tools [aria-pressed], .select-tools [aria-pressed]")).toBeNull();
+    // The checked tool pressed again while armed stops picking.
+    await clickInPanel(selectTool("Select multiple"));
+    expect(armed()).toBe(false);
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
+  });
+
   it("lets Esc and Hide end picking, after which the page's clicks go through", async () => {
     const clicked: string[] = [];
     await mount((member) => clicked.push(member));
     const button = (text: string) => [...shadow().querySelectorAll("button")].find((b) => b.textContent === text) as HTMLButtonElement;
-    await clickInPanel(button("Select one"));
+    await clickInPanel(selectTool("Select one"));
     act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
     await settle();
-    expect(button("Select one").classList.contains("armed")).toBe(false);
+    expect(armed()).toBe(false);
     act(() => pageButton("ana").click());
     expect(clicked).toEqual(["ana"]);
 
-    await clickInPanel(button("Select one"));
+    await clickInPanel(selectTool("Select one"));
     await clickInPanel(button("Hide panel"));
     act(() => pageButton("bia").click());
     expect(clicked).toEqual(["ana", "bia"]);
@@ -267,7 +294,7 @@ describe("the Toolbar", () => {
 
     // The selection card's Instances, and a page scope's call sites.
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await escape();
     await fromPage(member(ANA).closest("li") as HTMLElement);
     expect(ringKinds()).toEqual(["member"]);
@@ -293,18 +320,25 @@ describe("the Toolbar", () => {
 });
 
 describe("controls at This instance", () => {
-  it("moves through a table of options with the arrow keys, one Tab stop for the table (critique 2026-11-20)", async () => {
+  it("moves through a table of options with the arrow keys and chooses with Space, one Tab stop for the table (critique 2026-11-20)", async () => {
+    // The keys themselves are ChipGroup's (chip-group.test.tsx); this is the row's wiring:
+    // moving writes nothing (ADR 0003, manual activation), choosing writes the Override.
+    const user = userEvent.setup({ document });
     await mount();
     await select(BIA);
-    const radios = () => [...row("variant").querySelectorAll<HTMLButtonElement>("[role=radio]")];
-    expect(row("variant").querySelector("[role=radiogroup]")).not.toBeNull();
+    const group = within(row("variant")).getByRole("radiogroup");
+    const radios = () => within(group).getAllByRole("radio");
     // One stop: the chosen option, the app's ghost.
-    expect(radios().filter((radio) => radio.tabIndex === 0).map((radio) => radio.dataset.option)).toEqual(['"ghost"']);
-    const at = radios().findIndex((radio) => radio.dataset.option === '"ghost"');
-    const next = radios()[(at + 1) % radios().length] as HTMLButtonElement;
-    act(() => {
-      radios()[at]?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, composed: true }));
-    });
+    const ghost = within(group).getByRole("radio", { checked: true });
+    expect(ghost.dataset.option).toBe('"ghost"');
+    expect(radios().filter((radio) => radio.tabIndex === 0)).toEqual([ghost]);
+    const next = radios()[(radios().indexOf(ghost) + 1) % radios().length] as HTMLElement;
+    ghost.focus();
+    await user.keyboard("{ArrowRight}");
+    await settle();
+    expect(shadow().activeElement).toBe(next);
+    expect(loupe.props(BIA).overrides).toEqual({});
+    await user.keyboard(" ");
     await settle();
     expect(next.getAttribute("aria-checked")).toBe("true");
     expect(loupe.props(BIA).overrides).toEqual({ variant: JSON.parse(next.dataset.option as string) });
@@ -411,8 +445,8 @@ describe("group and page scopes", () => {
     await mount();
     await select(BIA);
     expect(ringKinds()).toEqual(["ring"]);
-    await clickInPanel(scopeButton("group"));
-    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    await clickInPanel(selectTool("Select multiple"));
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     // The selected one solid, the others from its call site dashed.
     expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
 
@@ -428,14 +462,14 @@ describe("group and page scopes", () => {
     // The select tool is kept: the next selection opens at its call site too.
     await backToList();
     await select(ANA);
-    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     expect(member(BIA).checked).toBe(true);
   });
 
   it("leaves one Instance out with its box, rings it dashed, and resetting the group keeps an Instance Override", async () => {
     await mount();
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await clickInPanel(pill("variant", '"default"'));
     await clickInPanel(member(BIA));
     expect(member(BIA).checked).toBe(false);
@@ -448,11 +482,11 @@ describe("group and page scopes", () => {
     // Ana gets her own value on top of the group's, with Select one.
     await backToList();
     await select(ANA);
-    await clickInPanel(scopeButton("instance"));
+    await clickInPanel(selectTool("Select one"));
     await clickInPanel(pill("variant", '"ghost"'));
     expect(inRow("variant", "Reset to group value")).toBeTruthy();
 
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await clickInPanel(panelButton("Reset this scope"));
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "instance", id: ANA }]);
     expect(variants()).toEqual(["ghost", "ghost", "ghost", "ghost"]);
@@ -466,14 +500,14 @@ describe("group and page scopes", () => {
       loupe.set(ANA, "children", "Ana");
     });
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     act(() => {
       loupe.set(BIA, "children", "Membro", "group");
     });
     await settle();
     await clickInPanel(row("children").querySelector(".keeping") as HTMLButtonElement);
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(ANA);
-    expect(scopeButton("instance").getAttribute("aria-pressed")).toBe("true");
+    expect(selectTool("Select one").getAttribute("aria-checked")).toBe("true");
   });
 
   it("keeps Select multiple when a scoped Instance comes back after unmounting", async () => {
@@ -482,21 +516,21 @@ describe("group and page scopes", () => {
     await settle();
     const item = loupe.list("MenuItem")[0]?.id as string;
     await select(item);
-    await clickInPanel(scopeButton("group"));
-    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    await clickInPanel(selectTool("Select multiple"));
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     await escape();
     act(() => pageButton("Menu").click());
     await settle();
     act(() => pageButton("Menu").click());
     await settle();
-    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     expect(shadow().querySelector("[data-testid=members]")).not.toBeNull();
   });
 
   it("widens Select multiple to the page, and leaves a whole call site out of it in one click", async () => {
     await mount();
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await clickInPanel(scopeButton("page"));
     expect(ringKinds()).toHaveLength(5);
     await clickInPanel(shadow().querySelector(`input[data-site="${MENU}"]`) as HTMLInputElement);
@@ -524,7 +558,7 @@ describe("hovering the page while a select tool is armed", () => {
     await mount();
     await select(BIA);
     expect(ringKinds()).toEqual(["ring"]);
-    await clickInPanel(panelButton("Select one"));
+    await clickInPanel(selectTool("Select one"));
 
     await pointTo(pageButton("caio"));
     expect(ringKinds()).toEqual(["pick"]);
@@ -534,7 +568,7 @@ describe("hovering the page while a select tool is armed", () => {
     // Onto another one, then onto the panel: nothing on the page is hovered there.
     await pointTo(pageButton("Menu"));
     expect(tag()?.dataset.tag).toBe(MENU);
-    await pointTo(panelButton("Select one"));
+    await pointTo(selectTool("Select one"));
     expect(ringKinds()).toEqual(["ring"]);
     expect(tag()).toBeNull();
 
@@ -551,7 +585,7 @@ describe("hovering the page while a select tool is armed", () => {
 
   it("in Select multiple, outlines every Instance a click would select and counts them on the tag", async () => {
     await mount();
-    await clickInPanel(panelButton("Select multiple"));
+    await clickInPanel(selectTool("Select multiple"));
 
     await pointTo(pageButton("caio"));
     expect(ringKinds()).toEqual(["pick", "pick", "pick", "pick"]);
@@ -571,7 +605,7 @@ describe("hovering the page while a select tool is armed", () => {
     // The click selects what was outlined.
     act(() => pageButton("caio").click());
     await settle();
-    expect(scopeButton("group").getAttribute("aria-pressed")).toBe("true");
+    expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     expect(ringKinds()).toEqual(["member", "member", "ring", "member"]);
     expect(tag()).toBeNull();
   });
@@ -579,12 +613,12 @@ describe("hovering the page while a select tool is armed", () => {
   it("dashes an Instance left out of the call site's group, as the click will", async () => {
     await mount();
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await clickInPanel(pill("variant", '"default"'));
     await clickInPanel(member(BIA));
     await backToList();
     // Re-scoping armed Select multiple, and it stays armed.
-    expect(panelButton("Select multiple").classList.contains("armed")).toBe(true);
+    expect(armed()).toBe(true);
 
     await pointTo(pageButton("ana"));
     expect(ringKinds()).toEqual(["pick", "out", "pick", "pick"]);
@@ -595,7 +629,7 @@ describe("hovering the page while a select tool is armed", () => {
     await mount();
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
     await settle();
-    await clickInPanel(panelButton("Select multiple"));
+    await clickInPanel(selectTool("Select multiple"));
 
     await pointTo(pageButton("caio"));
     expect(ringKinds()).toEqual(["pick"]);
@@ -641,9 +675,9 @@ describe("leaving a selection, and hiding the marks", () => {
     await mount();
     await select(ANA);
     // Armed, Esc stops picking and keeps the selection; the next Esc deselects.
-    await clickInPanel(panelButton("Select one"));
+    await clickInPanel(selectTool("Select one"));
     await escape();
-    expect(panelButton("Select one").classList.contains("armed")).toBe(false);
+    expect(armed()).toBe(false);
     expect(selectedId()).toBe(ANA);
 
     // The app's dialog closes on its own Esc.
@@ -691,7 +725,7 @@ describe("leaving a selection, and hiding the marks", () => {
     expect(selectedId()).toBe(BIA);
 
     // With Select multiple, every Instance from the call site is selected; another one isn't.
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await escape();
     await press(pageButton("dani"));
     expect(selectedId()).toBe(BIA);
@@ -706,7 +740,7 @@ describe("leaving a selection, and hiding the marks", () => {
       loupe.set(MENU, "variant", "default");
     });
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await escape();
     expect(ringKinds()).toEqual(["member", "ring", "member", "member"]);
     expect(changeOutlines()).toBe(1);
@@ -724,7 +758,7 @@ describe("leaving a selection, and hiding the marks", () => {
     act(() => member(ANA).closest("li")?.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
     await settle();
     expect(ringKinds()).toEqual([]);
-    await clickInPanel(panelButton("Select one"));
+    await clickInPanel(selectTool("Select one"));
     act(() => pageButton("caio").dispatchEvent(new MouseEvent("pointermove", { bubbles: true, composed: true })));
     await settle();
     expect(ringKinds()).toEqual(["pick"]);
@@ -762,7 +796,7 @@ describe("a change landing on the page", () => {
   it("outlines what a change reaches as it lands, then fades the outlines, the selection's too", async () => {
     await mount();
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await escape();
     // Nothing has changed yet: the selection stays outlined.
     await linger();
@@ -784,7 +818,7 @@ describe("a change landing on the page", () => {
   it("with nothing selected, outlines a change's Instances while its row is pointed at, and on selecting one", async () => {
     await mount();
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await escape();
     await clickInPanel(pill("variant", '"default"'));
     await backToList();
@@ -873,7 +907,7 @@ describe("the Text row (PER-137)", () => {
   it("is changed for a whole call site, and reset", async () => {
     await mount();
     await select(BIA);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     const field = textField();
     await type(field, "Membro");
     expect(textField()).toBe(field);
@@ -960,7 +994,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     const anchored = [members("Button", 1), MENU, CONFIRM];
     const loose = loupe.list("Button").find((instance) => !anchored.includes(instance.anchor))?.id as string;
     await select(loose);
-    await clickInPanel(scopeButton("group"));
+    await clickInPanel(selectTool("Select multiple"));
     await escape();
     const widen = shadow().querySelector<HTMLButtonElement>("button.widen[data-scope=page]") as HTMLButtonElement;
     expect(widen.textContent).toContain("Widen to");
@@ -1019,7 +1053,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     expect(shadow().querySelector(".status-region")?.getAttribute("role")).toBe("status");
     expect(shadow().querySelector(".status-region")?.textContent).toBe("");
     expect(shadow().querySelector(".footer .undo")?.getAttribute("role")).toBe("status");
-    await clickInPanel(panelButton("Select one"));
+    await clickInPanel(selectTool("Select one"));
     expect(shadow().querySelector(".status-region")?.textContent).toContain("Click an Instance on the page");
   });
 });
