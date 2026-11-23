@@ -127,6 +127,9 @@ export function centreOf(place: Place, viewport: Viewport): { x: number; y: numb
 /** Where the pill was left is kept in this browser, as the theme is. */
 export const PLACE_KEY = "loupe:launcher";
 
+/** And whether the panel was left open ("open") or closed ("closed"): closed on a first visit. */
+export const OPEN_KEY = "loupe:open";
+
 /** A stored place, if it is one; anything else (another version, a hand edit) falls back to the default. */
 export function readPlace(stored: string | null): Place {
   if (stored === null) return DEFAULT_PLACE;

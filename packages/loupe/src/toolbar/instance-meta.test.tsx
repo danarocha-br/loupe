@@ -3,12 +3,14 @@
 // inspector shows one, and never while the panel is hidden (PER-180).
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
+import { OPEN_KEY } from "./launcher-place.js";
+import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
 const readInstanceMeta = vi.fn();
@@ -32,8 +34,15 @@ let container: HTMLDivElement;
 let root: Root;
 const doc = document as unknown as Record<string, unknown>;
 
+// The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
+beforeAll(async () => {
+  await loadPanel();
+});
+
 beforeEach(() => {
   resetLoupe();
+  // These read the open panel: it was left open in this browser.
+  localStorage.setItem(OPEN_KEY, "open");
   readInstanceMeta.mockReset();
   readInstanceMeta.mockResolvedValue([
     {

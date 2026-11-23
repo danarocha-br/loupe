@@ -103,7 +103,7 @@ export function pillRect(): Rect {
   return bodyRect(storedPlace(), viewportNow());
 }
 
-export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?: boolean }) {
+export function Launcher({ onOpen, onPreload, leaving = false }: { onOpen(): void; onPreload?(): void; leaving?: boolean }) {
   const viewport = useViewport();
   const [place, setPlace] = useState<Place>(storedPlace);
   const [held, setHeld] = useState<Held | null>(null);
@@ -228,6 +228,9 @@ export function Launcher({ onOpen, leaving = false }: { onOpen(): void; leaving?
         aria-label="Show Loupe"
         title="Show Loupe · drag it anywhere, or to a side to keep it there"
         tabIndex={leaving ? -1 : undefined}
+        // About to be opened: the panel's module starts loading, so the click doesn't wait for it.
+        onPointerEnter={onPreload}
+        onFocus={onPreload}
         onPointerDown={down}
         onPointerMove={move}
         onPointerUp={up}
