@@ -1,47 +1,51 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useContext, useEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
+import { boxesOf, PageSignalContext, type PageSignal } from "./page-signal.js";
 import type { GroupItem } from "./panel-view/types.js";
 
 type Box = { left: number; top: number; width: number; height: number };
 
-/** Re-reads the page's boxes as it resizes or scrolls. */
-function useRemeasure() {
-  const [, set] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const bump = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => set((n) => n + 1));
-    };
-    bump();
-    const late = setTimeout(bump, 400);
-    addEventListener("resize", bump);
-    addEventListener("scroll", bump, true);
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(bump);
-    ro?.observe(document.body);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(late);
-      removeEventListener("resize", bump);
-      removeEventListener("scroll", bump, true);
-      ro?.disconnect();
-    };
-  }, []);
+/** How long the page has to stay still before the map reads its boxes again. */
+const SETTLE_MS = 120;
+/** The first read again, once the column has opened beside the page. */
+const OPENED_MS = 400;
+
+/** Each mounted Instance's largest box worth drawing, as the page outlines it. */
+function readBoxes(signal: PageSignal | null, debug: LoupeDebug, ids: readonly string[]): ReadonlyMap<string, Box> {
+  const boxes = new Map<string, Box>();
+  for (const id of ids) {
+    const [best] = signal ? signal.boxes(id) : boxesOf(debug.nodes(id));
+    if (best) boxes.set(id, { left: best.left, top: best.top, width: best.width, height: best.height });
+  }
+  return boxes;
 }
 
-/** An Instance's largest box worth drawing, as the page outlines it. */
-function bestNode(debug: LoupeDebug, ids: readonly string[]): { node: Element; box: Box } | null {
-  const viewport = innerWidth * innerHeight;
-  let best: { node: Element; box: Box } | null = null;
-  for (const id of ids) {
-    for (const node of debug.nodes(id)) {
-      const r = node.getBoundingClientRect();
-      const area = r.width * r.height;
-      if (area < 16 || area >= viewport * 0.9) continue;
-      if (!best || area > best.box.width * best.box.height) best = { node, box: { left: r.left, top: r.top, width: r.width, height: r.height } };
-    }
-  }
-  return best;
+/**
+ * The boxes the map draws: read when it opens, and again once the page has stayed
+ * still for a moment after the Instances change or the page signal says a box may
+ * have moved (a resize, a scroll, an animation). The map is an overview: it
+ * doesn't follow a menu's animation frame by frame, nor read every box on every
+ * version of the page. They are state, not read in render: React Compiler keeps
+ * what a render computed until an input changes, and a box moving isn't one.
+ */
+function useSettledBoxes(signal: PageSignal | null, debug: LoupeDebug, ids: readonly string[]): ReadonlyMap<string, Box> {
+  const key = ids.join("\n");
+  const [boxes, setBoxes] = useState(() => readBoxes(signal, debug, ids));
+  const opened = useRef(false);
+  useEffect(() => {
+    const read = () => setBoxes(readBoxes(signal, debug, key === "" ? [] : key.split("\n")));
+    let timer = setTimeout(read, opened.current ? SETTLE_MS : OPENED_MS);
+    opened.current = true;
+    const stop = signal?.onLayout(() => {
+      clearTimeout(timer);
+      timer = setTimeout(read, SETTLE_MS);
+    });
+    return () => {
+      clearTimeout(timer);
+      stop?.();
+    };
+  }, [signal, debug, key]);
+  return boxes;
 }
 
 type Props = {
@@ -63,12 +67,14 @@ export const hueOf = (index: number) => `hue-${index % HUES}`;
  * while nothing has a box (an Instance that isn't mounted, or a page with no layout).
  */
 export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
-  useRemeasure();
+  const signal = useContext(PageSignalContext);
+  const mounted = groups.flatMap((group) => group.instances.filter((item) => item.mounted).map((item) => item.id));
+  const measured = useSettledBoxes(signal, debug, mounted);
   const blocks = groups
     .flatMap((group, index) =>
       group.instances
         .filter((item) => item.mounted)
-        .map((item) => ({ id: item.id, group, hue: hueOf(index), box: bestNode(debug, [item.id])?.box ?? null })),
+        .map((item) => ({ id: item.id, group, hue: hueOf(index), box: measured.get(item.id) ?? null })),
     )
     .filter((b): b is typeof b & { box: Box } => b.box !== null);
   if (blocks.length === 0) return null;
