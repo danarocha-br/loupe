@@ -26,7 +26,7 @@ function Counter({ initial = 0 }: { initial?: number }) {
   const [count, setCount] = useState(initial);
   const [offer, setOffer] = useState({});
   useAnnounceChange(count === 0 ? "" : `${count} changes`);
-  useAnnounceChange("Reset 1 Override", { key: offer, politeness: "assertive" });
+  useAnnounceChange("Reset 1 Override", { key: offer });
   return (
     <>
       <p>{count} changes</p>
@@ -120,9 +120,14 @@ describe("Announcer", () => {
     act(() => screen.getByRole("button", { name: "Offer again" }).click());
     wait(WRITE_AFTER_MS);
     await Promise.resolve();
+    act(() => screen.getByRole("button", { name: "Add" }).click());
+    wait(WRITE_AFTER_MS);
+    act(() => screen.getByRole("button", { name: "Add" }).click());
+    wait(WRITE_AFTER_MS);
+    await Promise.resolve();
     // Cleared to nothing says nothing; the same offer made twice is said twice.
-    expect(heard.polite).toEqual(["4 changes"]);
-    expect(heard.assertive).toEqual(["Reset 1 Override", "Reset 1 Override"]);
+    expect(heard.polite).toEqual(["4 changes", "Reset 1 Override", "Reset 1 Override", "1 changes", "2 changes"]);
+    expect(heard.assertive).toEqual([]);
   });
 
   it("says nothing, and throws nothing, drawn outside a surface", () => {

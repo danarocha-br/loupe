@@ -10,7 +10,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
 import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./icons.js";
-import { Button, Field, Popover, PopoverPanel, useAnnounce } from "./ui/index.js";
+import { Button, Field, focusField, Popover, PopoverPanel, useAnnounce } from "./ui/index.js";
 
 /** Every word the flow shows, beside the component that shows it. */
 export const COPY = {
@@ -214,6 +214,12 @@ function Details({ titleField, busy, onCopy }: { titleField: RefObject<HTMLInput
   const [title, setTitle] = useState(form.title ?? "");
   const [designer, setDesigner] = useState(form.designer);
   const [missing, setMissing] = useState(false);
+  // Each refused submit from outside the field asks for focus once the error is rendered
+  // and describes the field, so focus landing there reads it (Devin's review of #78).
+  const [titleFocusRequests, setTitleFocusRequests] = useState(0);
+  useEffect(() => {
+    if (titleFocusRequests > 0) focusField(titleField.current);
+  }, [titleFocusRequests, titleField]);
   useEffect(() => {
     let live = true;
     // Prefilled from the first change until the designer writes their own.
@@ -236,11 +242,12 @@ function Details({ titleField, busy, onCopy }: { titleField: RefObject<HTMLInput
         event.preventDefault();
         if (title.trim() === "") {
           setMissing(true);
-          // Focus moving to the field reads its error with it. Already there (Enter in the
-          // field), nothing moves, so the error is said: once either way (field.md).
+          // Focus moving to the field reads its error with it, once the error is there (the
+          // effect above). Already there (Enter in the field), nothing moves, so the error
+          // is said: once either way (field.md).
           const field = titleField.current;
           if (field && (field.getRootNode() as ShadowRoot | Document).activeElement === field) announce(TITLE_MISSING, { politeness: "assertive" });
-          else field?.focus();
+          else setTitleFocusRequests((asked) => asked + 1);
           return;
         }
         onCopy({ title, designer });

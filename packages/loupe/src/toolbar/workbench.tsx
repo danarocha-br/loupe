@@ -21,6 +21,7 @@ import {
   PopoverPanel,
   Switch,
   Toggle,
+  type Politeness,
   useAnnounce,
 } from "./ui/index.js";
 
@@ -122,7 +123,7 @@ const COPIED = "Copied “Calmer rows”. Paste it into your coding agent.";
 function AnnouncerStates() {
   const announce = useAnnounce();
   const [said, setSaid] = useState<string>("—");
-  const say = (text: string, politeness: "polite" | "assertive" = "polite") => {
+  const say = (text: string, politeness: Politeness = "polite") => {
     announce(text, { politeness });
     setSaid(`${politeness}: ${text}`);
   };

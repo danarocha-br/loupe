@@ -420,7 +420,14 @@ describe("the Inspector", () => {
     click("Fechar");
     expect(prop(inspector(view(DIALOG)), "open")).toMatchObject({
       current: { text: "false" },
-      held: { before: "Your Override holds this at", value: "true", middle: "; the app tried to set", tried: "false", after: "." },
+      held: {
+        before: "Your Override holds this at",
+        value: "true",
+        middle: "; the app tried to set",
+        tried: "false",
+        after: ".",
+        text: "Your Override holds this at true; the app tried to set false.",
+      },
       // Its Reset sits in the notice.
       reset: { label: "Reset", inNotice: true },
     });

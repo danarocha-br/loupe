@@ -8,7 +8,7 @@
 export { type Announce, type AnnounceOptions, Announcer, type Politeness, useAnnounce, useAnnounceChange } from "./announcer/announcer.js";
 export { Button, type ButtonLook, type ButtonProps, type ButtonSize, lookAttributes } from "./button/button.js";
 export { Chip, ChipGroup, type ChipGroupProps, type ChipProps } from "./chip-group/chip-group.js";
-export { Field, type FieldLook, type FieldProps } from "./field/field.js";
+export { Field, type FieldLook, type FieldProps, focusField } from "./field/field.js";
 export { Fold, FoldChevron, FoldPanel, type FoldPanelProps, type FoldProps, FoldTrigger, type FoldTriggerProps } from "./fold/fold.js";
 export { Popover, type PopoverCaret, PopoverPanel, type PopoverPanelProps, type PopoverProps } from "./popover/popover.js";
 export { Switch, type SwitchProps } from "./switch/switch.js";

@@ -5,6 +5,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FlagsCard } from "./flags.js";
+import { cleanup, renderInSurface } from "./surface/render.fixture.js";
+import { listen } from "./ui/announcer/announcer.fixture.js";
 import { decryptJwe } from "./flags-crypto.js";
 import { type FlagRequest, type FlagsResult, readPreview, writePreview } from "./flags-preview.js";
 import { flagsView, loadFlags, previewedFlags, setFlagSource } from "./flags-store.js";
@@ -338,6 +340,27 @@ describe("the Feature flags card", () => {
 
     expect(container.textContent).not.toContain("Flag previews are off");
     expect(pill("plan", "Pro").getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("says a refused write through the announcer, once each time, and shows it on the card", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Reads work; every write is refused, as a server gone away refuses it.
+    const loaded = memorySource(memoryRequest(declared));
+    setFlagSource({ ...loaded, write: () => Promise.reject(new Error("The flags endpoint went away.")) });
+    const screen = renderInSurface(<FlagsCard />);
+    const heard = listen(screen.shadow);
+    const radio = (flag: string, text: string) => within(screen.getByRole("radiogroup", { name: flag })).getByRole("radio", { name: text });
+    await until(() => radio("plan", "Pro"));
+    act(() => radio("plan", "Pro").click());
+    await until(() => expect(heard.assertive).toHaveLength(1));
+    const said = heard.assertive[0] as string;
+    expect(said).toContain("The flags endpoint went away.");
+    // Shown on the card, apart from the announcer's own region.
+    expect(screen.getByText(said, { ignore: "[role=alert], script, style" })).toBeDefined();
+    act(() => radio("plan", "Starter").click());
+    await until(() => expect(heard.assertive).toEqual([said, said]));
+    expect(heard.polite).toEqual([]);
+    cleanup();
   });
 
   it("explains why previews are unavailable", async () => {

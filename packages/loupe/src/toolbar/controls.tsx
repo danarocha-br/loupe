@@ -119,8 +119,7 @@ export function PropRowView({
 }) {
   const { reset } = item;
   // The app pushing back on a held value is news while the row is in view: said as it lands.
-  const { held } = item;
-  useAnnounceChange(held ? `${held.before} ${held.value}${held.middle} ${held.tried}${held.after}` : "");
+  useAnnounceChange(item.held?.text ?? "");
   const toggle = switchOf(item.control);
   const resetButton = reset && (
     <Button

@@ -276,6 +276,21 @@ describe("the Toolbar", () => {
     expect(await saidTimes("2 changes")).toBe(1);
   });
 
+  it("says a change made while the Undo offer is up, after Reset all has said its offer", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+      loupe.set(BIA, "variant", "default");
+    });
+    await settle();
+    await clickInPanel(panelButton("Reset all"));
+    expect(await saidTimes("Reset 2 Overrides")).toBe(1);
+    // The offer is still up as the next change lands: the count says it.
+    act(() => loupe.set(ANA, "variant", "outline"));
+    expect(await saidTimes("1 change")).toBe(1);
+    expect(heard.polite).not.toContain("0 changes");
+  });
+
   it("outlines every Instance a change reaches, a few pixels out, numbered in the panel", async () => {
     await mount();
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);

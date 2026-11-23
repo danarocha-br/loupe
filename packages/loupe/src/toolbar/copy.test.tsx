@@ -261,6 +261,29 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(heard.polite).not.toContain(TITLE_MISSING);
   });
 
+  it("moves focus to an empty title only once its error describes it, from the button the first time", async () => {
+    await change();
+    await openDetails();
+    const title = field("Title");
+    type(title, "");
+    const submit = button("Copy with these details") as HTMLButtonElement;
+    // What a screen reader reads as focus lands: the field's description at that moment.
+    let readOnFocus: string | null = null;
+    title.addEventListener("focus", () => {
+      const ids = title.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+      readOnFocus = ids.map((id) => shadow().getElementById(id)?.textContent ?? "").join(" ");
+    });
+    act(() => submit.focus());
+    act(() => submit.click());
+    await settle();
+    await settle();
+    expect(shadow().activeElement).toBe(title);
+    expect(title.getAttribute("aria-invalid")).toBe("true");
+    expect(readOnFocus).toBe(TITLE_MISSING);
+    // Focus moved and read it: the announcer says nothing more.
+    expect(heard.assertive).toEqual([]);
+  });
+
   it("leaves a press on the split button to the split: the chevron's own, or another copy", async () => {
     // A press anywhere else closes the popover: ui/popover's tests.
     await change();

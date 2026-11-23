@@ -18,6 +18,7 @@ A text control with its label, an optional hint and marker, and its error: Copy 
 - `look`: `filled` (the default), `outline` or `well`.
 - `value` and `onValueChange(value)`: the caller keeps the value. UI SDK shows what was typed until the caller's next render, so a caller that refuses a value renders again to put it back.
 - `multiline`: a `textarea` instead of an `input`. With it, `autoResize` grows it with its text (`field-sizing: content` where the browser has it, measured where not).
+- `focusField(control)`: focuses the control once its error, if it has one, describes it (see ARIA).
 - `ref`, `name`, `required`, `readOnly`, `placeholder`, `rows`, `spellCheck`, `onKeyDown`, `onBlur` and the other native props pass to the control. `className` goes on the field around the label and the control.
 
 ## States
@@ -39,7 +40,7 @@ A view rule may still adjust the control (`.row.overridden .text [data-field-con
 
 - A native `input` or `textarea` (`textbox`), named by its label through `aria-labelledby`, beside a native `<label for>`. Pressing the label focuses it.
 - The hint and any error describe it through `aria-describedby`; while there is an error, `aria-invalid="true"`.
-- **Field announces nothing.** Its error is a description (UI SDK's `FieldDescription`), not UI SDK's `FieldError`, which writes its error into a live region it adds to the host's `document.body`, outside Loupe's shadow root (`announcer.md`). Whoever sets the error moves focus to the control, which reads the error with it, or, when focus is in the control already (Enter pressed in it), announces the error through the surface's announcer, assertively: either way it is said once. Copy Proposal's Title does both.
+- **Field announces nothing.** Its error is a description (UI SDK's `FieldDescription`), not UI SDK's `FieldError`, which writes its error into a live region it adds to the host's `document.body`, outside Loupe's shadow root (`announcer.md`). Whoever sets the error moves focus to the control, which reads the error with it, or, when focus is in the control already (Enter pressed in it), announces the error through the surface's announcer, assertively: either way it is said once. Copy Proposal's Title does both. Move focus with `focusField(control)`, not `control.focus()`: UI SDK links a new error to the control a render after the error appears, and `focusField` waits for that link (at most 250ms) so the error is read as focus lands.
 - Typing, selection and the browser's editing keys are the element's own. **Enter** in a multiline field adds a line unless the caller stops it (a text prop is one line). **Escape** is not its.
 
 ## Tests

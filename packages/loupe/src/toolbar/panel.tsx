@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle, useAnnounceChange } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -64,7 +64,7 @@ import {
 import { appLang } from "./app-lang.js";
 import { hueOf, PageMap } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
-import { keepUndoWhile, offerUndo, recordsKey, takeUndo, useUndoOffer } from "./undo.js";
+import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndoOffer } from "./undo.js";
 
 type PanelProps = {
   debug: LoupeDebug;
@@ -165,28 +165,17 @@ export function Panel(props: PanelProps) {
     if (middle.current) middle.current.scrollTop = 0;
     if (focusWasHere.current) heading.current?.focus();
   }, [opened, body.kind]);
-  const status = props.picking ? (
-      <>
-        {props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected"} ·{" "}
-        <kbd>Esc</kbd> cancels
-      </>
-    ) : covered ? (
-      <>
-        A dialog on the page runs under the panel · hold <kbd>Alt</kbd> to see through
-      </>
-    ) : props.marksHidden ? (
-      <>Outlines are hidden on the page</>
-    ) : null;
-  // The strip is for the eye; the announcer says it, in the strip's words, as it changes.
-  useAnnounceChange(
-    props.picking
-      ? `${props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected"} · Esc cancels`
-      : covered
-        ? "A dialog on the page runs under the panel · hold Alt to see through"
-        : props.marksHidden
-          ? "Outlines are hidden on the page"
-          : "",
-  );
+  // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer
+  // as they change. A key is a `{ key }` part.
+  const strip: StripPart[] | null = props.picking
+    ? [props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected", " · ", { key: "Esc" }, " cancels"]
+    : covered
+      ? ["A dialog on the page runs under the panel · hold ", { key: "Alt" }, " to see through"]
+      : props.marksHidden
+        ? ["Outlines are hidden on the page"]
+        : null;
+  useAnnounceChange(strip ? strip.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
+  const status = strip?.map((part, index) => (typeof part === "string" ? part : <kbd key={index}>{part.key}</kbd>));
   return (
     <section
       className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
@@ -677,6 +666,39 @@ function BackButton({ onSelect }: Pick<Actions, "onSelect">) {
 function focusHeading(from: HTMLElement) {
   const root = from.getRootNode();
   if (root instanceof ShadowRoot) root.querySelector<HTMLElement>("h2.name")?.focus();
+}
+
+/** A piece of the status strip: its words, or a key drawn in `kbd`. */
+type StripPart = string | { key: string };
+
+/**
+ * How long after an undo offer is made the count's next change still counts as the
+ * offer's own: the count reaches the view a commit or two after the offer.
+ */
+const OFFER_COUNT_MS = 500;
+
+/**
+ * The footer's announcements: each undo offer as it is made, and the count as it
+ * changes, except the one change that comes with an offer (Reset all says "Reset 2
+ * Overrides", not "0 changes" too). A change made while an offer is still up is said,
+ * and so is the count Undo puts back.
+ */
+function useFooterAnnouncements(offer: UndoOffer | null, count: string): void {
+  const announce = useAnnounce();
+  const last = useRef({ offer, count, offerCountUntil: 0 });
+  useEffect(() => {
+    const seen = last.current;
+    if (offer !== seen.offer) {
+      seen.offer = offer;
+      if (offer) announce(offer.text);
+      seen.offerCountUntil = offer ? performance.now() + OFFER_COUNT_MS : 0;
+    }
+    if (count !== seen.count) {
+      seen.count = count;
+      if (performance.now() < seen.offerCountUntil) seen.offerCountUntil = 0;
+      else announce(count);
+    }
+  });
 }
 
 /** "Reset 2 Overrides": what the footer's undo offer says a reset dropped. */
@@ -1197,11 +1219,7 @@ function Footer({
   onTheme,
 }: Pick<Actions, "debug"> & Pick<PanelProps, "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
-  // Each offer as it is made, and the count as it changes, unless an offer is up: the
-  // offer says what the change was (Reset all), and Undo's count is said once the
-  // restored records reach the view.
-  useAnnounceChange(offer?.text ?? "", { key: offer });
-  useAnnounceChange(offer ? "" : footer.countText, { key: footer.countText });
+  useFooterAnnouncements(offer, footer.countText);
   // The offer stays until the Overrides move on from what the drop left (undo.ts).
   useEffect(() => {
     if (offer !== null) keepUndoWhile(recordsKey(debug));

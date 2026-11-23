@@ -32,8 +32,8 @@ export const WRITE_AFTER_MS = 100;
  */
 export const CLEAR_AFTER_MS = 7000;
 
-/** On the regions' wrapper: how the stylesheet hides them. */
-export const ANNOUNCER_ATTRIBUTE = "data-announcer";
+/** On the regions' wrapper: how `announcer.css` hides them. */
+const ANNOUNCER_ATTRIBUTE = "data-announcer";
 
 /** Outside a surface (a unit test of a view drawn bare) there is no one to hear: nothing happens. */
 const AnnounceContext = createContext<Announce>(() => {});

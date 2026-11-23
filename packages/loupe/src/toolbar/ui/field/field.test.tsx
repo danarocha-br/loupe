@@ -4,12 +4,12 @@
 // asks the caller for each new value; a line, or a box of lines, or a read-only well.
 
 import { userEvent } from "@testing-library/user-event";
-import { act, createRef, useState } from "react";
+import { act, createRef, useEffect, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STYLESHEET } from "../../surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { listen } from "../announcer/announcer.fixture.js";
-import { Field, type FieldProps } from "./field.js";
+import { Field, type FieldProps, focusField } from "./field.js";
 import CSS from "./field.css?inline";
 
 afterEach(cleanup);
@@ -103,6 +103,28 @@ describe("Field", () => {
     expect(document.body.querySelectorAll("[aria-live], [data-ui-sdk-announcer]")).toHaveLength(0);
     expect(heard.polite).toEqual([]);
     expect(heard.assertive).toEqual([]);
+  });
+
+  it("focuses a control with focusField only once its new error describes it", async () => {
+    // The caller's pattern: set the error, and focus the field in the effect that follows.
+    function Refusing({ refused }: { refused: boolean }) {
+      const input = useRef<HTMLInputElement>(null);
+      useEffect(() => {
+        if (refused) focusField(input.current);
+      }, [refused]);
+      return <Field ref={input} label="Title" value="" required error={refused ? "Give it a title." : undefined} />;
+    }
+    const screen = renderInSurface(<Refusing refused={false} />);
+    const box = screen.getByRole("textbox", { name: "Title" });
+    let read: string | null = null;
+    box.addEventListener("focus", () => {
+      const ids = box.getAttribute("aria-describedby")?.split(/\s+/) ?? [];
+      read = ids.map((id) => screen.shadow.getElementById(id)?.textContent ?? "").join(" ");
+    });
+    screen.rerender(<Refusing refused />);
+    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect(screen.shadow.activeElement).toBe(box);
+    expect(read).toBe("Give it a title.");
   });
 
   it("keeps a hidden label as the control's name", () => {
