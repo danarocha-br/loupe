@@ -131,7 +131,7 @@ describe("the Toolbar", () => {
     await settle();
     expect(panelText()).toContain("MenuItem ×1");
     // A component's name is never cut short: it may break only where its words meet, "Menu·Item".
-    const menuItem = [...shadow().querySelectorAll(".group summary .cname")].find((name) => name.textContent === "MenuItem");
+    const menuItem = [...shadow().querySelectorAll(".group button[aria-expanded] .cname")].find((name) => name.textContent === "MenuItem");
     expect(menuItem?.querySelectorAll("wbr")).toHaveLength(1);
 
     act(() => pageButton("Menu").click());
@@ -144,9 +144,8 @@ describe("the Toolbar", () => {
     await select(BIA);
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(BIA);
     // What a library set: one collapsed line.
-    const injected = [...shadow().querySelectorAll("details")].at(-1) as HTMLDetailsElement;
-    expect(injected.querySelector("summary")?.textContent).toBe("1 set by the library");
-    expect(injected.open).toBe(false);
+    // Inside Inspect only, which is folded too: hidden, so asked for as such.
+    expect(screen().getByRole("button", { name: "1 set by the library", expanded: false, hidden: true })).toBeTruthy();
     await backToList();
     expect(shadow().querySelector("[data-testid=instance-id]")).toBeNull();
     expect(panelText()).toContain("On this page");
@@ -281,7 +280,7 @@ describe("the Toolbar", () => {
       act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true, relatedTarget: pageButton("ana") })));
       await settle();
     };
-    const buttonRow = [...shadow().querySelectorAll("summary")].find((summary) => summary.querySelector(".cname")?.textContent === "Button");
+    const buttonRow = [...shadow().querySelectorAll("button[aria-expanded]")].find((row) => row.querySelector(".cname")?.textContent === "Button");
     await fromPage(buttonRow as HTMLElement);
     expect(ringKinds()).toEqual(["hover", "hover", "hover", "hover", "hover"]);
     await leave(buttonRow as HTMLElement);
@@ -1115,7 +1114,7 @@ describe("On this page: the page map over its rows", () => {
     expect(groupRow("Button").classList.contains("lit")).toBe(true);
     expect(ringKinds().length).toBeGreaterThan(0);
 
-    await hover(groupRow("Dialog").querySelector("summary") as HTMLElement);
+    await hover(groupRow("Dialog").querySelector("button[aria-expanded]") as HTMLElement);
     expect(groupRow("Button").classList.contains("lit")).toBe(false);
     expect(buttonBlocks().some((item) => item.classList.contains("lit"))).toBe(false);
   });

@@ -8,9 +8,9 @@ import { formatCurrent } from "./format.js";
 import type { FlagDefinition, FlagOption, FlagOverrides, FlagValue } from "./flags-preview.js";
 import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
-import { ChevronIcon, ClockIcon, ResetIcon } from "./icons.js";
+import { ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
-import { Chip, ChipGroup } from "./ui/index.js";
+import { Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [
@@ -73,18 +73,21 @@ export function FlagsCard() {
       {current.status === "loading" && <div className="muted">Reading the app’s flags…</div>}
       {current.status === "unavailable" && (
         // One line until it's opened: the fix is an engineer's, and the list comes first.
-        <details className="row off">
-          <summary>
+        <Fold className="off">
+          <FoldTrigger>
             <span className="dot amber small" />
             Flag previews are off
             <span className="muted"> · why</span>
-            {/* Every fold in the panel says it opens with a chevron. */}
-            <ChevronIcon />
-          </summary>
-          <div className="muted">{current.reason}</div>
-          {/* The one fix the reader makes in a file: say which and where. */}
-          {current.reason.startsWith("FLAGS_SECRET isn't set") && <Command text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} />}
-        </details>
+            <FoldChevron />
+          </FoldTrigger>
+          <FoldPanel>
+            <div className="why">
+              <div className="muted">{current.reason}</div>
+              {/* The one fix the reader makes in a file: say which and where. */}
+              {current.reason.startsWith("FLAGS_SECRET isn't set") && <Command text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} />}
+            </div>
+          </FoldPanel>
+        </Fold>
       )}
       {current.status === "ready" && (
         <>

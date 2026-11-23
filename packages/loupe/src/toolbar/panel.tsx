@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Chip, ChipGroup } from "./ui/index.js";
+import { Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -503,8 +503,8 @@ function GroupRow({
   const unmounted = group.instances.filter((item) => !item.mounted);
   return (
     <li className={`group ${hue}${lit ? " lit" : ""}${inspectOnly ? " inspect-only" : ""}`}>
-      <details>
-        <summary
+      <Fold>
+        <FoldTrigger
           onMouseOver={() => point(group)}
           onMouseLeave={() => point(null)}
           onFocus={() => point(group)}
@@ -540,8 +540,9 @@ function GroupRow({
               ),
             )}
           </span>
-          <ChevronIcon />
-        </summary>
+          <FoldChevron />
+        </FoldTrigger>
+        <FoldPanel>
         {group.sites.length > 0 && (
           <div className="sites">
             <div className="sites-head">{group.sitesText}</div>
@@ -568,7 +569,8 @@ function GroupRow({
             ))}
           </ul>
         )}
-      </details>
+        </FoldPanel>
+      </Fold>
     </li>
   );
 }
@@ -949,8 +951,8 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
   const rows = shared ? items.map((item) => ({ ...item, reason: null })) : items;
   return (
     <div className="inspect">
-      <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
-        <summary>
+      <Fold open={open} onOpenChange={setOpen}>
+        <FoldTrigger>
           <span className="glyph" aria-hidden="true">
             {PROP_ICONS.inspect}
           </span>
@@ -959,8 +961,9 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
             {!open && items.length > 0 && <span className="muted"> · {items.map((item) => item.name).join(", ")}</span>}
           </span>
           {body.inspectOnlyMeta ? <span className="meta">{body.inspectOnlyMeta}</span> : <span />}
-          <ChevronIcon />
-        </summary>
+          <FoldChevron />
+        </FoldTrigger>
+        <FoldPanel>
         {shared?.reason && (
           <p className="why">
             <span className="tag reason" title={shared.reasonTitle ?? undefined}>
@@ -971,11 +974,12 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
         )}
         <div className="inspect-rows">{rows.length === 0 ? <div className="muted">{TEXT.none}</div> : rows.map(row)}</div>
         {body.injected && (
-          <details className="injected">
-            <summary>
-              <ChevronIcon />
+          <Fold className="injected">
+            <FoldTrigger>
+              <FoldChevron />
               {body.injected.summary}
-            </summary>
+            </FoldTrigger>
+            <FoldPanel>
             {body.injected.rows.map((injected) => (
               <div className="row" key={injected.name}>
                 <div className="line">
@@ -984,9 +988,11 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
                 </div>
               </div>
             ))}
-          </details>
+            </FoldPanel>
+          </Fold>
         )}
-      </details>
+        </FoldPanel>
+      </Fold>
     </div>
   );
 }
@@ -1053,7 +1059,7 @@ function ScopeSection({
   // At a call site, widen to the page; at the page, narrow back to the call site.
   const other = options?.find((option) => option.scope === (scope === "group" ? "page" : "group") && option.enabled) ?? null;
   // Open while one is left out, as Figma keeps layers out of the properties until asked.
-  const [open, setOpen] = useState(members.members.some((member) => member.out));
+  const leftOut = members.members.some((member) => member.out);
   const toggle = (action: "include" | "exclude", id: string) =>
     attempt(() => (action === "include" ? debug.include(id, scope) : debug.exclude(id, scope)));
   const memberItem = (member: MembersView["members"][number]) => {
@@ -1082,7 +1088,7 @@ function ScopeSection({
   };
   const name = current ? current.label.replace(/ · \d+.*$/, "") : "Instances";
   return (
-    <>
+    <Fold defaultOpen={leftOut} className="scope-fold">
       <div className="scope" data-testid="members">
         <div className="scope-title">
           <div className="lead">
@@ -1122,13 +1128,14 @@ function ScopeSection({
               Reset this scope
             </button>
           )}
-          <button type="button" className="count-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <FoldTrigger inline className="count-toggle">
             {plural(members.members.length, "Instance")}
-            <ChevronIcon />
-          </button>
+            <FoldChevron />
+          </FoldTrigger>
         </div>
       </div>
-      <div className="members" hidden={!open}>
+      <FoldPanel>
+      <div className="members">
         <p className="hint">{TEXT.untick}</p>
         {members.sites === null ? (
           <ul className="list">{members.members.map(memberItem)}</ul>
@@ -1181,7 +1188,8 @@ function ScopeSection({
           </ul>
         )}
       </div>
-    </>
+      </FoldPanel>
+    </Fold>
   );
 }
 

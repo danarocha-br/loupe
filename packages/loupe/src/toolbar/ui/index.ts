@@ -6,5 +6,6 @@
 // nothing outside it imports UI SDK. `src/toolbar/ui/layers.test.ts` holds both.
 
 export { Chip, ChipGroup, type ChipGroupProps, type ChipProps } from "./chip-group/chip-group.js";
+export { Fold, FoldChevron, FoldPanel, type FoldPanelProps, type FoldProps, FoldTrigger, type FoldTriggerProps } from "./fold/fold.js";
 // The CSS is `./styles.js`'s, apart, so the collapsed pill loads none of the components.
 export { PRIMITIVES_CSS } from "./styles.js";

@@ -10,6 +10,8 @@ export default mergeConfig(
   defineConfig({
     test: {
       testTimeout: 60_000,
+      // jsdom's gaps that UI SDK's parts reach for, filled before any test runs.
+      setupFiles: ["./src/toolbar/surface/jsdom-gaps.fixture.ts"],
       hookTimeout: 60_000,
       // Without this, Vitest stubs every CSS import as an empty string.
       css: { include: /\.css(?:$|\?)/ },

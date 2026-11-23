@@ -1,0 +1,22 @@
+/*
+ * Fold (ADR 0003). Written against state attributes: UI SDK's `[data-open]` and
+ * `[data-closed]` on the Fold, its trigger and its panel, and the Fold's own parts,
+ * `[data-fold-trigger]`, `[data-fold-panel]` and `[data-fold-chevron]`. The trigger's
+ * and the panel's layout is the caller's. In the stylesheet's `primitives` layer.
+ */
+
+/* The panel's box is the Fold's: closed, hidden until found keeps it in the layout, so it has none of its own. */
+[data-fold-panel] { display: block; padding: 0; border: 0; margin: 0; }
+
+/* A row: the trigger fills it, its content reading from the start, as a `<summary>` did. */
+[data-fold-trigger] { text-align: start; }
+[data-fold-trigger]:not([data-inline]) { width: 100%; }
+
+/* The chevron points at the row closed and turns down open. */
+[data-fold-chevron] { display: block; flex: none; transition: transform var(--duration-fold) var(--ease-out); }
+[data-fold-trigger][data-open] [data-fold-chevron] { transform: rotate(90deg); }
+
+/* Under reduced motion it still turns to its place, without travelling there. */
+@media (prefers-reduced-motion: reduce) {
+  [data-fold-chevron] { transition: none; }
+}
