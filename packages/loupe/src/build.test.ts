@@ -64,7 +64,8 @@ describe("dist", () => {
     const expected = Object.keys(browserEntries()).map((name) => `${name}.js`);
     expect([...built].sort()).toEqual(expected.sort());
     // Rolldown marks each module it emits with its source path; tsc6 never does.
-    // A type-only module comes out empty.
+    // Its own minifier can drop the mark, which is why `vite.config.ts` turns
+    // Rolldown's `output.minify` off. A type-only module comes out empty.
     for (const file of built) {
       if (read(file).trim() !== "") expect(read(file), file).toMatch(/^\/\/ src\//m);
     }

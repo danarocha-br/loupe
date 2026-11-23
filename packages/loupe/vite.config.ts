@@ -104,6 +104,13 @@ export function browserConfig(entry: Record<string, string>, outDir: string): Us
           handler(level, log);
         },
         output: {
+          // `build.minify: false` doesn't reach Rolldown, whose own default is
+          // `"dce-only"`: it folds a top-level `const` used once into its user,
+          // and when that `const` opens a module, the module's `// src/...`
+          // marker goes with it (`toolbar/tokens.ts`'s `LIGHT_COLOR`). Off, each
+          // file keeps its module's statements as written, under its marker;
+          // tree-shaking still drops what nothing uses, and the host minifies.
+          minify: false,
           preserveModules: true,
           preserveModulesRoot: "src",
           // A `.css?inline` import is a module of its own, the stylesheet as a
