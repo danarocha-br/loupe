@@ -67,33 +67,13 @@ describe("loupe check on a supported repo", () => {
         dependencies: { next: "16.3.6", "@repo/design-system": "workspace:*" },
       },
     });
-    const { code, text } = await check(root);
-    expect(code).toBe(1);
-    expect(text).toMatch(/✗ Dev server uses webpack/);
+    const { code, text } = await check(root, ["yes"]);
+    expect(code).toBe(0);
+    expect(text).toMatch(/! Dev server uses webpack/);
   });
 });
 
 describe("loupe check refusing", () => {
-  it("refuses webpack in dev, names the fix and writes nothing", async () => {
-    const root = makeRepo({
-      "apps/web/package.json": {
-        name: "web",
-        scripts: { dev: "next dev --webpack -p 3000" },
-        dependencies: { next: "16.3.6", "@repo/design-system": "workspace:*" },
-      },
-    });
-    const before = snapshot(root);
-    const { code, text, questions } = await check(root, ["yes"]);
-    expect(code).toBe(1);
-    expect(questions).toEqual([]);
-    expect(text).toMatch(/✗ Dev server uses webpack \(`next dev --webpack`\) +not supported/);
-    expect(text).toContain("Loupe needs Turbopack in development");
-    expect(text).toContain("Fix: remove `--webpack` from the dev script in apps/web/package.json.");
-    expect(text).toContain("Nothing was written.");
-    expect(text).toContain(STATEMENT);
-    expect(snapshot(root)).toEqual(before);
-  });
-
   it.each([
     ["15.5.0", /✗ Next\.js 15\.5\.0 +not supported/],
     ["17.0.0", /✗ Next\.js 17\.0\.0 +not supported/],
@@ -216,6 +196,11 @@ describe("loupe check with untested items", () => {
   it.each([
     ["Next.js 16.1", { "apps/web/node_modules/next/package.json": { version: "16.1.0" } }, /! Next\.js 16\.1\.0 +not tested yet/],
     ["App + Pages Router", { "apps/web/pages/index.tsx": "" }, /! App Router and Pages Router +not tested yet/],
+    [
+      "webpack in dev",
+      { "apps/web/package.json": { name: "web", scripts: { dev: "next dev --webpack -p 3000" }, dependencies: { next: "16.3.6", "@repo/design-system": "workspace:*" } } },
+      /! Dev server uses webpack \(`next dev --webpack`\) +not tested yet/,
+    ],
     ["React Compiler", { "apps/web/next.config.ts": "export default { reactCompiler: true };\n" }, /! React Compiler +not tested yet/],
     [
       "shadcn on Radix",

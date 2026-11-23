@@ -39,6 +39,61 @@ describe("withLoupe", () => {
     expect(config.turbopack.rules).not.toHaveProperty("*.tsx");
   });
 
+  describe("under webpack (next dev --webpack)", () => {
+    // `withLoupe` hands back the config it was given, plus the hook.
+    type Hooked = { webpack?: (webpackConfig: unknown, context: unknown) => unknown };
+    const hooked = async (base: object) =>
+      (await withLoupe(base, options)(PHASE_DEVELOPMENT_SERVER)) as Hooked;
+    const loaderRule = async (extra: object = {}) => {
+      const result = await hooked({ ...config, ...extra });
+      const webpackConfig = result.webpack?.({ module: { rules: [{ test: /\.svg$/ }] } }, { dev: true }) as {
+        module: { rules: Array<Record<string, any>> };
+      };
+      return { result, rules: webpackConfig.module.rules, rule: webpackConfig.module.rules.at(-1)! };
+    };
+
+    it("adds the same loader as a pre-rule for .tsx outside node_modules", async () => {
+      const { rules, rule } = await loaderRule();
+      expect(rules).toHaveLength(2);
+      expect(rule.enforce).toBe("pre");
+      expect(rule.test.test("/repo/app/page.tsx")).toBe(true);
+      expect(rule.test.test("/repo/app/page.ts")).toBe(false);
+      // Webpack resolves a linked workspace package to its real path, so it is not excluded.
+      expect(rule.exclude.test("/repo/fixture/design-system/components/ui/button.tsx")).toBe(false);
+      expect(rule.exclude.test("/repo/node_modules/.pnpm/x@1/node_modules/x/index.tsx")).toBe(true);
+      expect(rule.exclude.test("C:\\repo\\node_modules\\x\\index.tsx")).toBe(true);
+      expect(rule.use).toHaveLength(1);
+      expect(path.basename(rule.use[0].loader)).toBe("loader.cjs");
+      expect(rule.use[0].options).toEqual({ root: dir, adaptList });
+    });
+
+    it("runs the host's own webpack hook first, and keeps the config it returns", async () => {
+      const seen: unknown[] = [];
+      const replaced = { module: { rules: [] as object[] }, name: "from-host" };
+      const result = await hooked({
+        webpack: (_: unknown, context: unknown) => {
+          seen.push(context);
+          return replaced;
+        },
+      });
+      const out = result.webpack?.({ module: { rules: [] } }, { dev: true }) as typeof replaced;
+      expect(seen).toEqual([{ dev: true }]);
+      expect(out).toBe(replaced);
+      expect(out.module.rules).toHaveLength(1);
+    });
+
+    it("copes with a config that has no module or rules yet", async () => {
+      const result = await hooked(config);
+      const out = result.webpack?.({}, { dev: true }) as { module: { rules: unknown[] } };
+      expect(out.module.rules).toHaveLength(1);
+    });
+
+    it("adds nothing outside next dev", async () => {
+      const untouched = await withLoupe(config, options)("phase-production-build");
+      expect(untouched).not.toHaveProperty("webpack");
+    });
+  });
+
   it("calls a phase-function config with the phase", async () => {
     const result = await withLoupe(
       async (phase: string) => ({ phase, turbopack: {} as { rules?: object } }),

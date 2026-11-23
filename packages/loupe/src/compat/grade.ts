@@ -161,11 +161,11 @@ function gradeBundler(app: Pkg): Item {
   if (dev?.webpack) {
     return {
       key: "bundler",
-      grade: "unsupported",
+      grade: "untested",
       label: "Dev server uses webpack (`next dev --webpack`)",
       seen: "webpack",
-      detail: "Loupe needs Turbopack in development: webpack ignores `turbopack.rules`, so no component would be connected.",
-      fix: `remove \`--webpack\` from the ${dev.script} script in ${app.dir}/package.json.`,
+      detail:
+        "`withLoupe` registers the dev loader as a webpack rule too, and it works on this repo's test app, but it has not been proven on another repo. If no component shows up, try Turbopack.",
     };
   }
   const babel = babelConfig(app.abs);
