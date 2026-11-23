@@ -541,8 +541,8 @@ function CardRowStates() {
           <ul className="wb-list">
             <Row as="li" look="ruled">
               <RowLine>
-                <span>Button, Card</span>
-                <RowValue title="components/button.tsx">components/button.tsx</RowValue>
+                <span>Button, ButtonGroup, ButtonGroupSeparator</span>
+                <RowValue title="ui/button.tsx">ui/button.tsx</RowValue>
               </RowLine>
             </Row>
           </ul>

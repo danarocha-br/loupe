@@ -162,6 +162,10 @@ describe("Row's CSS", () => {
     expect(body).toMatch(/\[data-row-line\] \{[^}]*min-height: var\(--row-line\)/);
   });
 
+  it("sizes the value from its own width, so one that doesn't fit beside the name takes a line of its own", () => {
+    expect(body).toMatch(/\[data-row-value\] \{[^}]*flex: 1 1 auto/);
+  });
+
   it("draws its hairline as a border, which forced colours keep", () => {
     expect(body).toMatch(/\[data-row="ruled"\], \[data-row="pair"\] \{ border-top: 1px solid var\(--rule\); \}/);
     expect(body).not.toMatch(/box-shadow/);

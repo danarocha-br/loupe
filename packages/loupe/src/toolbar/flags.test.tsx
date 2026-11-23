@@ -293,10 +293,17 @@ describe("the Feature flags card", () => {
       { key: "showBetaFeature", value: true },
     ]);
 
-    act(() => within(container.querySelector('[data-flag="plan"]') as HTMLElement).getByRole("button", { name: "Clear" }).click());
+    // Clear goes with the preview: focus moves to the cleared flag's options, not another flag's.
+    const clear = within(container.querySelector('[data-flag="plan"]') as HTMLElement).getByRole("button", { name: "Clear" });
+    clear.focus();
+    act(() => clear.click());
     await idle();
     expect(await previewedFlags()).toEqual([{ key: "showBetaFeature", value: true }]);
     expect(container.querySelector('[data-flag="plan"]')?.textContent).toContain("App decides");
+    await until(() => {
+      if (!within(container).getByRole("radiogroup", { name: "plan" }).contains(document.activeElement)) throw new Error("focus not on plan");
+    });
+    expect(document.activeElement?.getAttribute("role")).toBe("radio");
 
     act(() => button("Clear flag previews").click());
     await idle();

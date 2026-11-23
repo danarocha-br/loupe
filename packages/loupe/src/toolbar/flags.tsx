@@ -18,6 +18,9 @@ const ON_OFF: FlagOption[] = [
   { value: true, label: "On" },
 ];
 
+/** A flag's options are one radio group, one Tab stop: the radio that holds it. */
+const TAB_STOP = '[role="radio"][tabindex="0"]';
+
 export function FlagsCard() {
   const current = useSyncExternalStore(onFlagsChange, flagsView);
   // A refused write, said as it lands, each time: the card shows it below.
@@ -46,12 +49,13 @@ export function FlagsCard() {
   const clearing = (from: HTMLElement, done: Promise<void>) => {
     const root = from.getRootNode() as Document | ShadowRoot;
     if (root.activeElement !== from) return;
-    const row = from.closest(".flag");
+    const row = from.closest("[data-flag]");
     void done.then(() => {
       if (from.isConnected && !(from as HTMLButtonElement).disabled) return;
+      // The cleared flag's options, at their tab stop (ChipGroup's roving one); else the card's first control.
       const next =
-        (row?.isConnected ? row.querySelector<HTMLElement>(".pills button") : null) ??
-        card.current?.querySelector<HTMLElement>(".pills button, button:not(:disabled)") ??
+        (row?.isConnected ? row.querySelector<HTMLElement>(TAB_STOP) : null) ??
+        card.current?.querySelector<HTMLElement>(`${TAB_STOP}, button:not(:disabled)`) ??
         null;
       next?.focus();
     });

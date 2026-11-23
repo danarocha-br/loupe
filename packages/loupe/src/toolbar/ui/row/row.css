@@ -22,14 +22,18 @@
 [data-row][data-glyphed] > :not([data-row-glyph]) { grid-column: 2; }
 [data-row-glyph] { grid-row: 1; grid-column: 1; display: flex; align-items: center; justify-content: center; height: var(--row-line); color: var(--ink); }
 
-/* The line: name, what qualifies it, value and action, wrapping when they don't fit. */
+/*
+ * The line: name, what qualifies it, value and action, wrapping when they don't fit. The
+ * value grows into the free space from its own width (`auto`, not 0), so one that doesn't fit
+ * beside the name goes to a line of its own instead of breaking a letter per line.
+ */
 [data-row-line] { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-sheet); min-height: var(--row-line); flex-shrink: 0; }
 /* A delta before the name: its triangle overhangs, so the name keeps its place. */
 [data-row-line] [data-delta] { margin: -1px -2px -1px -3px; }
 [data-row-name] { flex: none; display: flex; align-items: baseline; gap: var(--space-sheet); max-width: 100%; font: var(--font-title); letter-spacing: var(--tracking-title); }
 [data-row-name][data-mono] { font: var(--font-mono); font-weight: 500; letter-spacing: 0; }
 [data-row-code] { font: var(--font-mono-small); letter-spacing: 0; color: var(--faint); }
-[data-row-value] { flex: 1; min-width: 0; text-align: right; font: var(--font-mono-small); color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+[data-row-value] { flex: 1 1 auto; min-width: 0; text-align: right; font: var(--font-mono-small); color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 [data-row-action] { display: inline-flex; flex: none; align-items: center; gap: var(--space-inset); margin-left: auto; }
 
 /* A switch at the line's end is 22px: the line and the glyph take its height, and the name gives way rather than wrap under it. */
