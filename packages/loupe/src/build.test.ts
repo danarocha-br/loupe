@@ -76,14 +76,11 @@ describe("dist", () => {
       .map((file) => `toolbar/${file.split(path.sep).join("/")}.js`);
     const expected = [...Object.keys(browserEntries()).map((name) => `${name}.js`), ...stylesheets];
     expect([...built].sort()).toEqual(expected.sort());
-    // Rolldown marks each module it emits with its source path, but not one with no
-    // imports whose first statement carries a comment (tokens.js); it then still writes
-    // one export list at the end, where tsc6 keeps \`export const\`. A type-only module comes out empty.
+    // Rolldown marks each module it emits with its source path (`vite.config.ts`'s
+    // `sourceMark` puts back a mark its DCE pass drops); tsc6 never does.
+    // A type-only module comes out empty.
     for (const file of built) {
-      const code = read(file);
-      if (code.trim() === "" || /^\/\/ src\//m.test(code)) continue;
-      expect(code, file).toMatch(/^export \{[^}]*\};\s*$/m);
-      expect(code, file).not.toMatch(/^export (const|let|function|class) /m);
+      if (read(file).trim() !== "") expect(read(file), file).toMatch(/^\/\/ src\//m);
     }
   });
 
