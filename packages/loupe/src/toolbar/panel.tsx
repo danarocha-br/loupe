@@ -161,11 +161,13 @@ export function Panel(props: PanelProps) {
   const root = middle.current?.getRootNode();
   focusWasHere.current = root instanceof ShadowRoot && root.activeElement !== null;
   // A new selection, or back to the list, opens at the top. Focus follows it when it
-  // was in the panel: a pick on the page leaves the app's focus where it is.
+  // was in the panel: a pick on the page leaves the app's focus where it is. The same
+  // selection changing kind counts too: an Instance that unmounts swaps the Inspector
+  // for Gone (and back when it mounts again), and takes the focused control with it.
   useEffect(() => {
     if (middle.current) middle.current.scrollTop = 0;
     if (focusWasHere.current) heading.current?.focus();
-  }, [opened]);
+  }, [opened, body.kind]);
   const status = props.picking ? (
       <>
         {props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected"} ·{" "}
@@ -999,15 +1001,29 @@ function NoGroup({ options, onScope }: { options: ScopeOption[]; onScope(scope: 
   return (
     <div className="selection">
       <span className="muted">{group?.title ?? "Only this Instance can be selected here."}</span>
-      {page?.enabled && <WidenButton option={page} verb="Widen to" onScope={onScope} />}
+      {/* Widened, this goes, and the page scope has no call site to narrow back to: its button goes with it. */}
+      {page?.enabled && <WidenButton option={page} verb="Widen to" onScope={onScope} goes />}
     </div>
   );
 }
 
-/** Widens a call site's selection to the page, or narrows it back: "Widen to All on page · 7". */
-function WidenButton({ option, verb, onScope }: { option: ScopeOption; verb: string; onScope(scope: Scope): void }) {
+/**
+ * Widens a call site's selection to the page, or narrows it back: "Widen to All on page · 7".
+ * One that `goes` once pressed hands focus to the heading, as a spent Reset does.
+ */
+function WidenButton({ option, verb, onScope, goes = false }: { option: ScopeOption; verb: string; onScope(scope: Scope): void; goes?: boolean }) {
   return (
-    <button type="button" className="widen" data-scope={option.scope} title={option.title ?? option.label} onClick={() => onScope(option.scope)}>
+    <button
+      type="button"
+      className="widen"
+      data-scope={option.scope}
+      title={option.title ?? option.label}
+      onClick={(event) => {
+        const button = event.currentTarget;
+        onScope(option.scope);
+        if (goes) focusHeading(button);
+      }}
+    >
       <WidenIcon />
       {/* What it can't change stays in the tooltip: "(1 server-rendered, inspect only)". */}
       {verb} {option.label.replace(/ \(.*\)$/, "")}
