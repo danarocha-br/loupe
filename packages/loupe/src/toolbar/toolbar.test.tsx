@@ -1106,7 +1106,7 @@ describe("On this page: the page map over its rows", () => {
 
   const section = () => shadow().querySelector(".on-page") as HTMLElement;
   const blocks = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-sheet .blk")];
-  const buttonBlocks = () => blocks().filter((block) => block.getAttribute("aria-label") === "Inspect this Button");
+  const buttonBlocks = () => blocks().filter((block) => block.textContent?.startsWith("Inspect Button "));
   const groupRow = (component: string) =>
     [...shadow().querySelectorAll<HTMLElement>("li.group")].find((item) => item.querySelector(".cname")?.textContent === component) as HTMLElement;
 

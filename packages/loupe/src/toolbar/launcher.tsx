@@ -28,6 +28,7 @@ import {
   type Rect,
   type Viewport,
 } from "./launcher-place.js";
+import { SHORTCUT_ARIA, shortcutLabel } from "./shortcut.js";
 
 export type { Rect };
 
@@ -226,7 +227,8 @@ export function Launcher({ onOpen, onPreload, leaving = false }: { onOpen(): voi
         // Placed by translate, not left and top, so its travel stays off layout.
         style={{ translate: `${round(centre.x - BODY.width / 2)}px ${round(centre.y - BODY.height / 2)}px` }}
         aria-label="Show Loupe"
-        title="Show Loupe · drag it anywhere, or to a side to keep it there"
+        aria-keyshortcuts={SHORTCUT_ARIA}
+        title={`Show Loupe (${shortcutLabel()} focuses it) · drag it anywhere, or to a side to keep it there`}
         tabIndex={leaving ? -1 : undefined}
         // About to be opened: the panel's module starts loading, so the click doesn't wait for it.
         onPointerEnter={onPreload}

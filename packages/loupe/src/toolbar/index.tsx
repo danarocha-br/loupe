@@ -20,6 +20,7 @@ import { columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.
 import { Launcher } from "./launcher.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import type { SelectMode } from "./picker.js";
+import { useFocusShortcut } from "./shortcut.js";
 import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
 import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
 
@@ -200,6 +201,15 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     setHidden(true);
   };
   const focusIsHere = () => (host.shadowRoot?.activeElement ?? null) !== null;
+  // The keyboard's way in (shortcut.ts): the pill while collapsed, else the panel's heading, as Show does.
+  useFocusShortcut(host, () => {
+    if (closing) return;
+    const inside = host.shadowRoot;
+    const target = hidden ? inside?.querySelector<HTMLElement>(".launcher") : inside?.querySelector<HTMLElement>("h2.name");
+    if (target) target.focus();
+    // The panel's module is still loading: `shown` takes focus to its heading once it is there.
+    else if (!hidden) focusSwap.current = true;
+  });
   const select = (id: string | null, next?: SelectMode) => {
     setSelected(id);
     setWidened(false);

@@ -61,6 +61,7 @@ import {
   LEGEND,
   TEXT,
 } from "./panel-view/index.js";
+import { appLang } from "./app-lang.js";
 import { hueOf, PageMap } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
 import { keepUndoWhile, offerUndo, recordsKey, takeUndo, useUndoOffer } from "./undo.js";
@@ -87,12 +88,6 @@ type PanelProps = {
   theme: "light" | "dark";
   onTheme(): void;
 };
-
-/**
- * The app's language, for its own words inside Loupe's English (the host says `lang="en"`):
- * an Instance's visible name is read in the app's voice. Undefined when the app sets none.
- */
-const appLang = () => (typeof document === "undefined" ? undefined : document.documentElement.lang || undefined);
 
 /** The sheet stands this far inside its column on every side, as `.panel` sets it. */
 const PANEL_INSET = 8;

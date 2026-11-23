@@ -1,13 +1,17 @@
-// Esc at the window, in one place (ADR 0003, "Esc between layers"). Three of Loupe's
-// layers answer it: picking, Copy Proposal's popover and the selection. Each claims
+// Esc at the window, in one place (ADR 0003, "Esc between layers"). Four of Loupe's
+// layers answer it: picking, Copy Proposal's popover, focus on loan from the page (the
+// Alt+Shift+L shortcut, `shortcut.ts`) and the selection. Each claims
 // Esc while it is up, and one key press goes to the topmost claim that takes it, so
 // none has to look for another in the DOM. UI SDK's popups keep their own Esc; the
 // app keeps every Esc no claim takes.
 
 import { useEffect, useRef } from "react";
 
-/** The layers, topmost first: picking ends before a popover closes, a popover before the selection goes. */
-const ORDER = ["picking", "popover", "selection"] as const;
+/**
+ * The layers, topmost first: picking ends before a popover closes, a popover before focus
+ * goes back to the page, and that before the selection goes: the more passing a state, the sooner Esc ends it.
+ */
+const ORDER = ["picking", "popover", "focus", "selection"] as const;
 
 export type EscapeLayer = (typeof ORDER)[number];
 
