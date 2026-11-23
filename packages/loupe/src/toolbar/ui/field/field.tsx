@@ -2,7 +2,7 @@
 // (ADR 0003). UI SDK's `field` with its `input` or `textarea`, behind Loupe's own
 // interface: plain props, the caller keeps the value. See field.md.
 
-import { Field as SdkField, FieldDescription, FieldError, FieldLabel } from "@ui-sdk/react/field";
+import { Field as SdkField, FieldDescription, FieldLabel } from "@ui-sdk/react/field";
 import { Input } from "@ui-sdk/react/input";
 import { Textarea } from "@ui-sdk/react/textarea";
 import type { ComponentPropsWithRef, ReactNode } from "react";
@@ -67,11 +67,10 @@ export function Field(props: FieldProps) {
         )}
       </div>
       {hint !== undefined && <FieldDescription data-field-hint="">{hint}</FieldDescription>}
-      {error !== undefined && (
-        <FieldError match data-field-error="">
-          {error}
-        </FieldError>
-      )}
+      {/* A description, not UI SDK's FieldError: that one announces itself into the host's
+          document, outside the surface. The caller moves focus here, which reads the
+          error, or announces it when focus is here already (field.md). */}
+      {error !== undefined && <FieldDescription data-field-error="">{error}</FieldDescription>}
     </SdkField>
   );
 }

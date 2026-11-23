@@ -15,7 +15,7 @@ import { singleLine } from "../runtime/label-text.js";
 import { Delta, LockIcon, ResetIcon } from "./icons.js";
 import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { Button, Chip, ChipGroup, Field, Switch } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Field, Switch, useAnnounceChange } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -118,6 +118,9 @@ export function PropRowView({
   onHover(ids: string[]): void;
 }) {
   const { reset } = item;
+  // The app pushing back on a held value is news while the row is in view: said as it lands.
+  const { held } = item;
+  useAnnounceChange(held ? `${held.before} ${held.value}${held.middle} ${held.tried}${held.after}` : "");
   const toggle = switchOf(item.control);
   const resetButton = reset && (
     <Button
@@ -219,7 +222,7 @@ export function PropRowView({
         </div>
       )}
       {item.held && (
-        <div className="notice" role="status" data-testid="held">
+        <div className="notice" data-testid="held">
           {item.held.before} <code>{item.held.value}</code>
           {item.held.middle} <code>{item.held.tried}</code>
           {item.held.after} {reset?.inNotice && resetButton}

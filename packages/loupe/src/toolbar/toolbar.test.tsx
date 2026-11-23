@@ -19,6 +19,7 @@ import { OPEN_KEY } from "./launcher-place.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
 import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
+import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
 import { dismissUndo } from "./undo.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -65,8 +66,21 @@ async function mount(onRowClick: (member: string) => void = () => {}, page: { co
       </>,
     ),
   );
+  heard = listen(shadow());
   await settle();
   await settle();
+}
+
+/** What the toolbar's announcer has said since `mount()`. */
+let heard: Heard;
+/** Settles until the announcer has said `text` at `politeness`; how many times it has. */
+async function saidTimes(text: string, politeness: "polite" | "assertive" = "polite"): Promise<number> {
+  const times = () => heard[politeness].filter((said) => said === text).length;
+  for (let i = 0; i < 40 && times() === 0; i++) await settle();
+  // A second saying would land within the announcer's delay: give it the time.
+  await settle();
+  await settle();
+  return times();
 }
 
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
@@ -124,7 +138,8 @@ const selectTool = (name: "Select one" | "Select multiple") =>
 const startTile = (name: "Select one" | "Select multiple") =>
   within(screen().getByRole("radiogroup", { name: "Start selecting" })).getByRole("radio", { name: new RegExp(`^${name}`) });
 /** Whether a select tool is armed: a state of the page, said by the status strip, not by the button. */
-const armed = () => screen().getAllByRole("status").some((status) => /Esc cancels/.test(status.textContent ?? ""));
+/** The status strip shows how to pick (and the announcer says it): read from the strip, not the announcer's region. */
+const armed = () => screen().queryAllByText(/^Click an Instance/, { ignore: "[role=status], script, style" }).length > 0;
 /** Ends picking, which a select tool arms, so the page's own clicks go through again. */
 const escape = async () => {
   act(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
@@ -248,12 +263,17 @@ describe("the Toolbar", () => {
     expect(loupe.records()).toEqual([]);
     expect(panelText()).toContain("0 changes");
 
-    // It asked nothing, so the footer offers to put them back.
+    // It asked nothing, so the footer offers to put them back, and says what it dropped: the
+    // offer, made with the count's change, is the one said.
     expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 2 OverridesUndo");
+    expect(await saidTimes("Reset 2 Overrides"), JSON.stringify(heard)).toBe(1);
+    expect(heard.polite).not.toContain("0 changes");
     await clickInPanel(panelButton("Undo"));
     expect(loupe.records().map((record) => record.values)).toEqual(before.map((record) => record.values));
     expect(panelText()).toContain("2 changes");
     expect(shadow().querySelector(".undo")?.textContent).toBe("");
+    // The count says what Undo put back.
+    expect(await saidTimes("2 changes")).toBe(1);
   });
 
   it("outlines every Instance a change reaches, a few pixels out, numbered in the panel", async () => {
@@ -442,6 +462,8 @@ describe("controls at This instance", () => {
     await settle();
     const notice = row("open").querySelector("[data-testid=held]") as HTMLElement;
     expect(notice.textContent).toBe("Your Override holds this at true; the app tried to set false. Reset");
+    // The notice is for the eye; the announcer says it as the app pushes back, once.
+    expect(await saidTimes("Your Override holds this at true; the app tried to set false.")).toBe(1);
     await clickInPanel([...notice.querySelectorAll("button")].find((button) => button.textContent === "Reset") as HTMLButtonElement);
     expect(container.querySelector("[role=dialog]")).toBeNull();
     expect(row("open").querySelector("[data-testid=held]")).toBeNull();
@@ -1063,13 +1085,18 @@ describe("keyboard focus (review 2026-11-20)", () => {
     expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
   });
 
-  it("keeps its live regions in place while they are empty, so what lands in them is announced", async () => {
+  it("says the status strip's words through the announcer as they change, once, and the count as it changes", async () => {
     await mount();
-    expect(shadow().querySelector(".status-region")?.getAttribute("role")).toBe("status");
-    expect(shadow().querySelector(".status-region")?.textContent).toBe("");
-    expect(shadow().querySelector(".footer .undo")?.getAttribute("role")).toBe("status");
+    // One polite and one assertive region in the whole surface: the announcer's (listen() checks it).
+    expect(within(shadow() as unknown as HTMLElement).getAllByRole("status")).toHaveLength(1);
+    expect(within(shadow() as unknown as HTMLElement).getAllByRole("alert")).toHaveLength(1);
     await clickInPanel(selectTool("Select one"));
-    expect(shadow().querySelector(".status-region")?.textContent).toContain("Click an Instance on the page");
+    const strip = shadow().querySelector(".status-line")?.textContent ?? "";
+    expect(strip).toBe("Click an Instance on the page · Esc cancels");
+    expect(await saidTimes(strip)).toBe(1);
+
+    act(() => loupe.set(ANA, "variant", "default"));
+    expect(await saidTimes("1 change")).toBe(1);
   });
 });
 

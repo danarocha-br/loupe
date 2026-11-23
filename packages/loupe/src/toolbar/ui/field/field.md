@@ -39,6 +39,7 @@ A view rule may still adjust the control (`.row.overridden .text [data-field-con
 
 - A native `input` or `textarea` (`textbox`), named by its label through `aria-labelledby`, beside a native `<label for>`. Pressing the label focuses it.
 - The hint and any error describe it through `aria-describedby`; while there is an error, `aria-invalid="true"`.
+- **Field announces nothing.** Its error is a description (UI SDK's `FieldDescription`), not UI SDK's `FieldError`, which writes its error into a live region it adds to the host's `document.body`, outside Loupe's shadow root (`announcer.md`). Whoever sets the error moves focus to the control, which reads the error with it, or, when focus is in the control already (Enter pressed in it), announces the error through the surface's announcer, assertively: either way it is said once. Copy Proposal's Title does both.
 - Typing, selection and the browser's editing keys are the element's own. **Enter** in a multiline field adds a line unless the caller stops it (a text prop is one line). **Escape** is not its.
 
 ## Tests

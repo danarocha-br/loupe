@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -148,10 +148,8 @@ export function Panel(props: PanelProps) {
   );
   // The notices' cards come and go with the view; what they say is announced from here.
   const layerSaid = layerAnnouncement(props.layer);
-  const announced = {
-    alert: layerSaid.alert,
-    status: [layerSaid.status, view.banner ? `${view.banner.title}. ${view.banner.body}` : ""].filter(Boolean).join(" "),
-  };
+  useAnnounceChange(layerSaid.alert, { politeness: "assertive" });
+  useAnnounceChange([layerSaid.status, view.banner ? `${view.banner.title}. ${view.banner.body}` : ""].filter(Boolean).join(" "));
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
   // Read while rendering, before React swaps the view: once the row that had focus is
@@ -179,6 +177,16 @@ export function Panel(props: PanelProps) {
     ) : props.marksHidden ? (
       <>Outlines are hidden on the page</>
     ) : null;
+  // The strip is for the eye; the announcer says it, in the strip's words, as it changes.
+  useAnnounceChange(
+    props.picking
+      ? `${props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected"} · Esc cancels`
+      : covered
+        ? "A dialog on the page runs under the panel · hold Alt to see through"
+        : props.marksHidden
+          ? "Outlines are hidden on the page"
+          : "",
+  );
   return (
     <section
       className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
@@ -236,16 +244,7 @@ export function Panel(props: PanelProps) {
           </Button>
         </div>
       </header>
-      {/* Each region is always there and only its text changes, so a screen reader hears it. */}
-      <div className="status-region" role="status">
-        {status && <div className="status-line">{status}</div>}
-      </div>
-      <p className="sr-only" role="status" data-testid="announce-status">
-        {announced.status}
-      </p>
-      <p className="sr-only" role="alert" data-testid="announce-alert">
-        {announced.alert}
-      </p>
+      <div className="status-region">{status && <div className="status-line">{status}</div>}</div>
       <div className="middle" ref={middle}>
         {body.kind === "list" ? (
           <ComponentList {...props} body={body} notices={notices} heading={heading} />
@@ -1198,6 +1197,11 @@ function Footer({
   onTheme,
 }: Pick<Actions, "debug"> & Pick<PanelProps, "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
+  // Each offer as it is made, and the count as it changes, unless an offer is up: the
+  // offer says what the change was (Reset all), and Undo's count is said once the
+  // restored records reach the view.
+  useAnnounceChange(offer?.text ?? "", { key: offer });
+  useAnnounceChange(offer ? "" : footer.countText, { key: footer.countText });
   // The offer stays until the Overrides move on from what the drop left (undo.ts).
   useEffect(() => {
     if (offer !== null) keepUndoWhile(recordsKey(debug));
@@ -1227,7 +1231,7 @@ function Footer({
   return (
     <footer ref={frame} className="footer">
       <div className="tally">
-        <span className="count" aria-live="polite">
+        <span className="count">
           <span className="sr-only">{footer.countText}</span>
           <span className="n" aria-hidden="true">
             {footer.changes.count}
@@ -1258,7 +1262,7 @@ function Footer({
           <ResetIcon />
           Reset all
         </Button>
-        <span className="undo" role="status">
+        <span className="undo">
           {offer && (
             <>
               <span className="what">{offer.text}</span>

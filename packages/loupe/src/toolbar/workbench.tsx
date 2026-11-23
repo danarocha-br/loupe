@@ -8,7 +8,21 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Surface, type Theme } from "./surface/index.js";
-import { Button, Chip, ChipGroup, Field, Fold, FoldChevron, FoldPanel, FoldTrigger, Popover, PopoverPanel, Switch, Toggle } from "./ui/index.js";
+import {
+  Button,
+  Chip,
+  ChipGroup,
+  Field,
+  Fold,
+  FoldChevron,
+  FoldPanel,
+  FoldTrigger,
+  Popover,
+  PopoverPanel,
+  Switch,
+  Toggle,
+  useAnnounce,
+} from "./ui/index.js";
 
 /** Whether a media feature the frame depends on is on in this browser right now. */
 function useMedia(query: string): boolean {
@@ -67,7 +81,7 @@ function ChipGroupStates() {
             </Chip>
           ))}
         </ChipGroup>
-        <p className="wb-note" aria-live="polite">
+        <p className="wb-note">
           Last chosen: {chosen}
         </p>
       </Row>
@@ -93,6 +107,38 @@ function ChipGroupStates() {
           <Chip value="pro">Pro</Chip>
           <Chip value="team">Team</Chip>
         </ChipGroup>
+      </Row>
+    </div>
+  );
+}
+
+// The notes under a control are for the eye: the control says its own state (checked,
+// pressed), and nothing in a frame is a live region of its own. What a screen reader is
+// told goes through the frame's announcer, tried below.
+
+const COPIED = "Copied “Calmer rows”. Paste it into your coding agent.";
+
+/** The Announcer: a polite message, the same one twice, and an assertive one, to hear in a screen reader. */
+function AnnouncerStates() {
+  const announce = useAnnounce();
+  const [said, setSaid] = useState<string>("—");
+  const say = (text: string, politeness: "polite" | "assertive" = "polite") => {
+    announce(text, { politeness });
+    setSaid(`${politeness}: ${text}`);
+  };
+  return (
+    <div className="wb-states">
+      <Row title="Polite waits for a pause; the same message twice is read twice">
+        <div className="wb-line">
+          <Button onClick={() => say(COPIED)}>Announce a copy</Button>
+          <Button onClick={() => say("Reset 2 Overrides")}>Announce a reset</Button>
+        </div>
+      </Row>
+      <Row title="Assertive interrupts: a refusal to act on">
+        <div className="wb-line">
+          <Button onClick={() => say("Couldn’t reach the clipboard. Select the command and copy it.", "assertive")}>Announce a refusal</Button>
+        </div>
+        <p className="wb-note">Last said, {said}</p>
       </Row>
     </div>
   );
@@ -182,7 +228,7 @@ function ButtonStates() {
           </Button>
           <Button disabled>Reset all</Button>
         </div>
-        <p className="wb-note" aria-live="polite">
+        <p className="wb-note">
           Pressed {presses} times
         </p>
       </Row>
@@ -219,7 +265,7 @@ function ButtonStates() {
           </Toggle>
         </div>
         {/* Unmarked: in the panel the theme itself shows it's pressed; here this line does. */}
-        <p className="wb-note" aria-live="polite">
+        <p className="wb-note">
           Dark theme {dark ? "pressed" : "not pressed"}: the button draws no mark
         </p>
       </Row>
@@ -392,6 +438,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <div className="wb-card">
             <h2>Popover</h2>
             <PopoverStates />
+          </div>
+          <div className="wb-card">
+            <h2>Announcer</h2>
+            <AnnouncerStates />
           </div>
         </div>
       </Surface>

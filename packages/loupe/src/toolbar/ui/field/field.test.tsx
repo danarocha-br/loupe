@@ -4,10 +4,11 @@
 // asks the caller for each new value; a line, or a box of lines, or a read-only well.
 
 import { userEvent } from "@testing-library/user-event";
-import { createRef, useState } from "react";
+import { act, createRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STYLESHEET } from "../../surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
+import { listen } from "../announcer/announcer.fixture.js";
 import { Field, type FieldProps } from "./field.js";
 import CSS from "./field.css?inline";
 
@@ -87,6 +88,21 @@ describe("Field", () => {
     expect(box.hasAttribute("aria-invalid")).toBe(false);
     expect(description(box)).toBe("");
     expect(screen.queryByText("Give it a title.")).toBeNull();
+  });
+
+  it("announces nothing itself, and puts no live region in the host's document, as an error comes and changes", async () => {
+    const screen = renderInSurface(<Field label="Title" value="" required />);
+    const heard = listen(screen.shadow);
+    const tick = () => act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+    // UI SDK's field stays quiet for a tick after it mounts.
+    await tick();
+    screen.rerender(<Field label="Title" value="" required error="Give it a title." />);
+    screen.rerender(<Field label="Title" value="" required error="Give it a shorter title." />);
+    // UI SDK's FieldError would announce, after a tick, into a region on the host's body.
+    await tick();
+    expect(document.body.querySelectorAll("[aria-live], [data-ui-sdk-announcer]")).toHaveLength(0);
+    expect(heard.polite).toEqual([]);
+    expect(heard.assertive).toEqual([]);
   });
 
   it("keeps a hidden label as the control's name", () => {
