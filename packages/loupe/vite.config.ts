@@ -78,13 +78,41 @@ export function reactCompiler(): PluginOption {
   });
 }
 
+/**
+ * Every built module keeps the `// src/...` line Rolldown heads it with, the mark
+ * `src/build.test.ts` tells Vite's output from tsc6's by. Rolldown attaches it to the
+ * module's first statement, and `build.minify: false` still runs its `"dce-only"` pass,
+ * which folds a `const` used once into its one use and loses the line with it:
+ * `tokens.ts` opens with `LIGHT_COLOR`, folded into `COLOR`. Where the line is lost, this
+ * writes it back after the pass, where Rolldown puts it: after the directive and imports.
+ * Turning the pass off instead would leave the imports of every inlined constant behind.
+ */
+function sourceMark(): Plugin {
+  return {
+    name: "loupe:source-mark",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        const id = chunk.type === "chunk" ? chunk.facadeModuleId : null;
+        if (chunk.type !== "chunk" || !id?.startsWith(src + sep)) continue;
+        if (chunk.code.trim() === "" || /^\/\/ src\//m.test(chunk.code)) continue;
+        const lines = chunk.code.split("\n");
+        let at = 0;
+        while (/^(?:"use \w+";|import\b.*;)\s*$/.test(lines[at] ?? "")) at++;
+        lines.splice(at, 0, `// ${relative(root, id).split(sep).join("/")}`);
+        chunk.code = lines.join("\n");
+      }
+    },
+  };
+}
+
 const isBare = (id: string) => !id.startsWith(".") && !id.startsWith("\0") && !isAbsolute(id);
 
 /** The build, for any set of entries: `dist` gets the browser side; a test builds a probe. */
 export function browserConfig(entry: Record<string, string>, outDir: string): UserConfig {
   return {
     root,
-    plugins: [nodeSideExternal(), reactCompiler()],
+    plugins: [nodeSideExternal(), reactCompiler(), sourceMark()],
     oxc: { include: /\.[cm]?tsx?$/, jsx: { runtime: "automatic" } },
     build: {
       outDir,

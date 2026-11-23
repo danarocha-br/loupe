@@ -72,7 +72,8 @@ describe("dist", () => {
     const built = new Set(jsFiles().filter(isBrowserSide));
     const expected = Object.keys(browserEntries()).map((name) => `${name}.js`);
     expect([...built].sort()).toEqual(expected.sort());
-    // Rolldown marks each module it emits with its source path; tsc6 never does.
+    // Rolldown marks each module it emits with its source path (`vite.config.ts`'s
+    // `sourceMark` puts back a mark its DCE pass drops); tsc6 never does.
     // A type-only module comes out empty.
     for (const file of built) {
       if (read(file).trim() !== "") expect(read(file), file).toMatch(/^\/\/ src\//m);
