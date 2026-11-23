@@ -5,7 +5,7 @@
 // (`panel-view/`, `runtime/`, the views), so it can become a package by moving it;
 // nothing outside it imports UI SDK. `src/toolbar/ui/layers.test.ts` holds both.
 
-export { Button, type ButtonLook, type ButtonProps, type ButtonSize } from "./button/button.js";
+export { Button, type ButtonLook, type ButtonProps, type ButtonSize, lookAttributes } from "./button/button.js";
 export { Chip, ChipGroup, type ChipGroupProps, type ChipProps } from "./chip-group/chip-group.js";
 export { Fold, FoldChevron, FoldPanel, type FoldPanelProps, type FoldProps, FoldTrigger, type FoldTriggerProps } from "./fold/fold.js";
 export { Switch, type SwitchProps } from "./switch/switch.js";

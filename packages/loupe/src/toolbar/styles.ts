@@ -76,9 +76,6 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 /* Controls: Button and Toggle (ui/button/, ui/toggle/). A view that sets a button's background restates its hover:
    the views' rules come after the primitives' layer, so a background here would win over the layer's hover. */
 .link { font: 600 ${size(12)}/1.3333 ${SANS}; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; min-height: 24px; }
-/* The select tools are ChipGroup's chips (bare), drawn as Button's tool look. */
-.select-tools .tool { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-pill); color: var(--muted); transition: background-color var(--duration-hover) var(--ease-out), color var(--duration-hover) var(--ease-out), box-shadow var(--duration-hover) var(--ease-out); }
-@media (hover: hover) { .select-tools .tool:hover { background: var(--sunk); color: var(--primary); } }
 
 /* The panel: a sheet in the column the page makes room for (dock.ts), white cards on it */
 .panel {
@@ -105,7 +102,7 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .report { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 ${size(10)}/1.4 ${MONO}; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); font-variant-numeric: tabular-nums; }
 .header .report { padding-top: 4px; }
 .tools { flex: none; display: flex; align-items: center; gap: 2px; }
-.select-tools { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--tools-wash); }
+.select-tools { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-pill); background: var(--tools-wash); }
 .select-tools .tool[data-checked], .select-tools .tool[data-armed] { background: var(--card); color: var(--primary); box-shadow: var(--raised-shadow); }
 .tools .divider { flex: none; width: 1px; height: 16px; margin: 0 2px 0 11px; border-radius: 1px; background: var(--divider); }
 .status-region { flex: none; }
@@ -318,7 +315,8 @@ kbd { font: 500 ${size(11)}/1.2727 ${MONO}; padding: 1px 5px; border-radius: 5px
 .scope .reach { margin-left: 28px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
 .scope .reach b { font-weight: 600; color: var(--ink); }
 .scope .scope-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin: 4px 0 0 28px; }
-.widen { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px 0 9px; border-radius: 999px; background: var(--link-wash); box-shadow: inset 0 0 0 1px var(--link-edge); color: var(--link); font: 500 ${size(12)}/1.3333 ${SANS}; white-space: nowrap; }
+/* A soft Button in navy, 28px: its background is the view's, so its hover is too. */
+.widen { height: 28px; padding: 0 11px 0 9px; background: var(--link-wash); box-shadow: inset 0 0 0 1px var(--link-edge); color: var(--link); }
 @media (hover: hover) { .widen:hover { background: var(--link-edge); } }
 .scope .count-toggle { display: inline-flex; align-items: center; gap: 2px; min-height: 28px; margin-left: auto; font: var(--font-control); color: var(--ink); }
 .scope .count-toggle [data-fold-chevron] { color: var(--muted); }
@@ -424,8 +422,6 @@ fieldset.site .list > li { padding-left: 42px; }
 .row.switch .line { min-height: 20px; flex-wrap: nowrap; }
 .row.switch .name { min-width: 0; flex: 0 1 auto; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
-/* The switch: Switch (ui/switch/). */
-
 /* Inspect only: the props this Instance shows but can't change here, folded to one row */
 .inspect { overflow: hidden; }
 .inspect > [data-fold] > [data-fold-trigger] { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto 16px; align-items: center; column-gap: 8px; min-height: 44px; padding: 12px 14px; }
@@ -458,7 +454,7 @@ fieldset.site .list > li { padding-left: 42px; }
 .group [data-fold][data-open] { background: var(--hover); }
 .group [data-fold][data-open]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; border-radius: 0 2px 2px 0; background: var(--hue); }
 @media (hover: hover) { .group [data-fold-trigger]:hover { background: var(--hover); } }
-.group [data-fold-trigger] .cname { grid-area: name; display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: break-word; font: 500 ${size(13)}/1.3846 ${SANS}; }
+.group [data-fold-trigger] .cname { grid-area: name; display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: break-word; font: var(--font-body); font-weight: 500; }
 .group [data-fold-trigger] .cname .icon { color: var(--muted); }
 .group [data-fold-trigger] .bar { grid-area: bar; position: relative; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--rule); }
 .group [data-fold-trigger] .bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--hue); }
@@ -560,7 +556,8 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
 /* The list's start (guided start): what to change, and the two select tools as tiles that show what each does */
 .hero { gap: 0; padding: 16px 14px 14px; }
 .hero .hero-title { font-size: ${size(20)}; line-height: 1.3; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); text-wrap: balance; }
-.hero .hero-title:focus { outline: none; }
+/* Focus lands on the heading when the list opens: no ring, but an outline forced colours draw. */
+.hero .hero-title:focus { outline: 2px solid transparent; }
 .hero .body { margin-top: 6px; line-height: 1.4615; }
 .hero-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
 .big-tool { display: flex; flex-direction: column; align-items: stretch; padding: 4px 4px 12px; border-radius: 14px; background: var(--card); color: var(--ink); text-align: left; box-shadow: var(--tile-shadow); transition: box-shadow 120ms ease-out; }

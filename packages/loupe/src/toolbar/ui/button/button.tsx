@@ -4,8 +4,8 @@
 
 import { Button as SdkButton } from "@ui-sdk/react/button";
 import type { ComponentPropsWithRef, MouseEvent, ReactNode } from "react";
+import type { DataAttributes } from "../data-attributes.js";
 
-type DataAttributes = { [name: `data-${string}`]: string | undefined };
 
 /** `soft`: the pill every action is. `primary`: the dark one kept for the one exit. `tool`: the header's round icon. */
 export type ButtonLook = "soft" | "primary" | "tool";
@@ -13,13 +13,14 @@ export type ButtonLook = "soft" | "primary" | "tool";
 /** A soft pill's height: 26px, 30px or 40px. The primary is always 40px and a tool 30px. */
 export type ButtonSize = "small" | "medium" | "large";
 
-/** The look as attributes: what `button.css` styles, and what Toggle draws with too. */
+/**
+ * The look: what `button.css` styles, and what Toggle draws with too. Only a soft pill
+ * takes a size; the primary is always 40px and a tool 30px.
+ */
 export type LookProps = {
-  look?: ButtonLook;
-  size?: ButtonSize;
   /** Round, its width its height: an icon with its name for a screen reader beside it. */
   iconOnly?: boolean;
-};
+} & ({ look?: "soft"; size?: ButtonSize } | { look: "primary" | "tool"; size?: never });
 
 type NativeProps = Omit<ComponentPropsWithRef<"button">, "type" | "onClick" | "className" | "children" | "disabled">;
 
@@ -33,14 +34,14 @@ export type ButtonProps = NativeProps &
     children: ReactNode;
   } & DataAttributes;
 
-const SIZE: Record<ButtonLook, ButtonSize> = { soft: "medium", primary: "large", tool: "medium" };
+const DEFAULT_SIZE: Record<ButtonLook, ButtonSize> = { soft: "medium", primary: "large", tool: "medium" };
 
-/** The attributes a look draws by, shared with Toggle. */
-export function lookAttributes({ look = "soft", size, iconOnly }: LookProps): DataAttributes {
+/** The attributes a look draws by: Toggle draws with them, and so can a part that looks like a button (a select tool's chip). */
+export function lookAttributes({ look = "soft", size, iconOnly }: { look?: ButtonLook; size?: ButtonSize; iconOnly?: boolean }): DataAttributes {
   return {
     "data-button": "",
     "data-look": look,
-    "data-size": look === "soft" ? (size ?? SIZE.soft) : SIZE[look],
+    "data-size": size ?? DEFAULT_SIZE[look],
     "data-icon-only": iconOnly ? "" : undefined,
   };
 }

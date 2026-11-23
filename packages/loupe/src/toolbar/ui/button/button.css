@@ -12,15 +12,15 @@
 [data-button]:disabled { cursor: default; opacity: 0.45; }
 
 /* Soft: the pill, `sunk`, 30px, 12px/500 (26px small, 40px large). */
-[data-button][data-look="soft"] { gap: 6px; height: 30px; padding: 0 12px; background: var(--sunk); color: var(--ink); font: var(--font-control); }
+[data-button][data-look="soft"] { gap: var(--space-sheet); height: 30px; padding: 0 var(--space-card); background: var(--sunk); color: var(--ink); font: var(--font-control); }
 [data-button][data-look="soft"][data-size="small"] { gap: 5px; height: 26px; padding: 0 11px; }
 /* Large steps its words up to 13px, at 500: the popovers' actions beside the primary. */
-[data-button][data-look="soft"][data-size="large"] { gap: 8px; height: 40px; padding: 0 16px; font: var(--font-action); font-weight: 500; }
+[data-button][data-look="soft"][data-size="large"] { gap: var(--space-inset); height: 40px; padding: 0 var(--space-hero); font: var(--font-action); font-weight: 500; }
 @media (hover: hover) { [data-button][data-look="soft"]:not(:disabled):hover { background: var(--sunk-hover); } }
 
 /* Primary: the dark one, 40px; hover brightens it in light and dims it in dark. */
 [data-button][data-look="primary"] {
-  gap: 8px; height: 40px; padding: 0 18px 0 16px; background: var(--primary); color: var(--on-primary);
+  gap: var(--space-inset); height: 40px; padding: 0 18px 0 var(--space-hero); background: var(--primary); color: var(--on-primary);
   font: var(--font-action); box-shadow: var(--primary-shadow);
 }
 @media (hover: hover) {

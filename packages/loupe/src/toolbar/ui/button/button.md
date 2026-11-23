@@ -25,7 +25,9 @@ Runs an action: Reset all, Discard, a prop's Reset, Copy, the header's Hide pane
 - `onClick(event)`: what a press does. Its return value is ignored, so a press is never left pending: UI SDK would hold a button whose handler returns a Promise (the command's Copy returns the clipboard's), and Loupe's actions say their own progress.
 - `ref`, `title`, `aria-*`, `data-*` and the other button props pass through. A caller's `aria-disabled` stays (Copy Proposal's popover keeps its buttons focusable while a copy runs).
 
-## Looks
+## States
+
+Every state is an attribute, and `button.css` styles the attributes:
 
 | `data-look` | `data-size` | Draws |
 | --- | --- | --- |
@@ -33,7 +35,7 @@ Runs an action: Reset all, Discard, a prop's Reset, Copy, the header's Hide pane
 | `primary` | `large` | The `primary` fill, `on-primary` text, `--font-action` (13px/600), the primary shadow; hover brightens it in light (1.3) and dims it in dark (0.92). |
 | `tool` | `medium` | A 30px round muted icon; hover fills it `sunk` with a `primary` icon. |
 
-`data-icon-only` makes it round at its size. `:disabled` drops it to 45% opacity. Focus is the stylesheet's `:focus-visible` ring. Under forced colours a soft or primary pill keeps a `ButtonText` edge.
+`data-icon-only` makes it round at its size. `:disabled` (the browser's) drops it to 45% opacity; `data-pending` (UI SDK's) never shows, since a press is never left pending. Focus is the stylesheet's `:focus-visible` ring. Under forced colours a soft or primary pill keeps a `ButtonText` edge.
 
 A view that gives a button its own background (`.command .copy`, `.notice .reset`, `.back`) restates its hover: the views' rules come after the `primitives` layer, so their background would beat the layer's hover.
 

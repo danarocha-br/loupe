@@ -5,8 +5,8 @@
 import { Toggle as SdkToggle } from "@ui-sdk/react/toggle";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { type LookProps, lookAttributes } from "../button/button.js";
+import type { DataAttributes } from "../data-attributes.js";
 
-type DataAttributes = { [name: `data-${string}`]: string | undefined };
 
 type NativeProps = Omit<ComponentPropsWithRef<"button">, "type" | "onClick" | "onChange" | "className" | "children" | "disabled" | "value" | "defaultValue">;
 

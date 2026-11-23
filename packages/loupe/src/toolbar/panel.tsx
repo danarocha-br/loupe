@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, Toggle } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -116,6 +116,9 @@ function hoverProps(onHover: Actions["onHover"], ids: string[]) {
   };
 }
 
+/** The header's select tools are chips of a radio group drawn as Button's round tool. */
+const TOOL_LOOK = lookAttributes({ look: "tool", iconOnly: true });
+
 /** The header's two select tools: what each is called, and the scope it opens a selection at. */
 const SELECT_TOOLS: { mode: SelectMode; scope: Scope; label: string; hint: string; title: string; icon: ReactNode }[] = [
   {
@@ -205,6 +208,7 @@ export function Panel(props: PanelProps) {
               <Chip
                 key={tool.mode}
                 value={tool.mode}
+                {...TOOL_LOOK}
                 className="tool"
                 data-scope={tool.scope}
                 data-armed={props.picking && props.mode === tool.mode ? "" : undefined}
@@ -1016,8 +1020,7 @@ function NoGroup({ options, onScope }: { options: ScopeOption[]; onScope(scope: 
  */
 function WidenButton({ option, verb, onScope, goes = false }: { option: ScopeOption; verb: string; onScope(scope: Scope): void; goes?: boolean }) {
   return (
-    <button
-      type="button"
+    <Button
       className="widen"
       data-scope={option.scope}
       title={option.title ?? option.label}
@@ -1030,7 +1033,7 @@ function WidenButton({ option, verb, onScope, goes = false }: { option: ScopeOpt
       <WidenIcon />
       {/* What it can't change stays in the tooltip: "(1 server-rendered, inspect only)". */}
       {verb} {option.label.replace(/ \(.*\)$/, "")}
-    </button>
+    </Button>
   );
 }
 

@@ -5,8 +5,8 @@
 
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "@ui-sdk/react/collapsible";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { DataAttributes } from "../data-attributes.js";
 
-type DataAttributes = { [name: `data-${string}`]: string | undefined };
 
 export type FoldProps = {
   /** Open now: pass it, with `onOpenChange`, to keep the state yourself. */

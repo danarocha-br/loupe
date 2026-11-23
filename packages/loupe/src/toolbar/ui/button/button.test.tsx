@@ -114,6 +114,21 @@ describe("Button", () => {
     expect(look("Hide panel")).toEqual(["tool", "medium", true]);
   });
 
+  it("takes a size on a soft pill only: the primary is always 40px and a tool 30px", () => {
+    renderInSurface(
+      <>
+        {/* @ts-expect-error A tool has one size. */}
+        <Button look="tool" size="large">
+          Tool
+        </Button>
+        {/* @ts-expect-error The primary has one size. */}
+        <Button look="primary" size="small">
+          Primary
+        </Button>
+      </>,
+    );
+  });
+
   it("passes axe", async () => {
     const screen = renderInSurface(
       <>
@@ -148,6 +163,8 @@ describe("Button's CSS", () => {
     expect(CSS).not.toMatch(/font(-size)?: *\d/);
     expect(CSS).not.toMatch(/#[0-9a-f]{3,8}\b/i);
     expect(CSS).not.toMatch(/\d+ms|999px|border-radius: *\d/);
+    // Spacing that has a step on the scale takes it: 6, 8, 12 and 16px.
+    expect(CSS).not.toMatch(/(gap|padding)[^;]*\b(6|8|12|16)px/);
     expect(CSS).toContain("var(--font-control)");
     expect(CSS).toContain("var(--font-action)");
   });
