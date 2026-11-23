@@ -8,7 +8,7 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { Surface, type Theme } from "./surface/index.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, Toggle } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, Switch, Toggle } from "./ui/index.js";
 
 /** Whether a media feature the frame depends on is on in this browser right now. */
 function useMedia(query: string): boolean {
@@ -223,6 +223,30 @@ function ButtonStates() {
   );
 }
 
+/** Switch's states: off, on, and disabled. */
+function SwitchStates() {
+  const [open, setOpen] = useState(false);
+  const [modal, setModal] = useState(true);
+  return (
+    <div className="wb-states">
+      <Row title="Space or Enter turns it; the thumb slides with its corners">
+        <label className="wb-switch-row">
+          <span>open</span>
+          <Switch label="open" checked={open} onCheckedChange={setOpen} />
+        </label>
+        <label className="wb-switch-row">
+          <span>modal</span>
+          <Switch label="modal" checked={modal} onCheckedChange={setModal} />
+        </label>
+        <label className="wb-switch-row">
+          <span>disabled</span>
+          <Switch label="disabled" checked={false} disabled onCheckedChange={() => {}} />
+        </label>
+      </Row>
+    </div>
+  );
+}
+
 function Row({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -240,6 +264,7 @@ const FRAME_CSS = `
 .wb-row h3 { font: var(--font-label); color: var(--muted); }
 .wb-note { font: var(--font-meta); color: var(--faint); }
 .wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wb-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; font: var(--font-title); color: var(--ink); }
 .wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
 .wb-card > h2 { margin-bottom: 12px; font: var(--font-title); color: var(--ink); }
 .wb-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; font: var(--font-title); color: var(--ink); }
@@ -272,6 +297,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <div className="wb-card">
             <h2>Button and Toggle</h2>
             <ButtonStates />
+          </div>
+          <div className="wb-card">
+            <h2>Switch</h2>
+            <SwitchStates />
           </div>
           <div className="wb-card">
             <h2>Fold</h2>

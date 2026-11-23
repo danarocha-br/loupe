@@ -423,15 +423,7 @@ fieldset.site .list > li { padding-left: 42px; }
 .row.switch .line { min-height: 20px; flex-wrap: nowrap; }
 .row.switch .name { min-width: 0; flex: 0 1 auto; }
 .toggle { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
-/* A pill on a taupe edge; the thumb is the filled half it sits in, a round hole through it: taupe on the left off, teal on the right on. Each at 3:1 on the card. */
-.switch-track { position: relative; flex: none; width: 42px; height: 22px; overflow: hidden; border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--switch-off); }
-.switch-track .thumb { position: absolute; inset: 0 auto 0 0; width: 50%; border-radius: 11px 0 0 11px; background: var(--switch-off); transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 180ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 160ms ease-out; }
-.switch-track .thumb::after { content: ""; position: absolute; inset: 0; width: 16px; height: 16px; margin: auto; border-radius: 50%; background: var(--card); }
-.switch-track[aria-checked="true"] .thumb { transform: translateX(calc(100% + 6px)); border-radius: 0 11px 11px 0; background: var(--switch-on); }
-/* Under reduced motion the thumb and the chevrons still move to their place, without travelling there. */
-@media (prefers-reduced-motion: reduce) {
-  .switch-track, .switch-track .thumb { transition: none; }
-}
+/* The switch: Switch (ui/switch/). */
 
 /* Inspect only: the props this Instance shows but can't change here, folded to one row */
 .inspect { overflow: hidden; }
@@ -589,10 +581,6 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
   .legend i { forced-color-adjust: none; background: CanvasText; }
-  .switch-track { forced-color-adjust: none; background: Canvas; box-shadow: inset 0 0 0 1.5px ButtonText; }
-  .switch-track .thumb { forced-color-adjust: none; background: ButtonText; }
-  .switch-track .thumb::after { forced-color-adjust: none; background: Canvas; }
-  .switch-track[aria-checked="true"] .thumb { background: Highlight; }
   .members input[type="checkbox"]:checked { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
   .members input[type="checkbox"]:checked::after { border-color: HighlightText; }
   .dot:not(.hollow):not(.ring):not(.none), .meter i.in { forced-color-adjust: none; background: CanvasText; }

@@ -15,7 +15,7 @@ import { singleLine } from "../runtime/label-text.js";
 import { Delta, LockIcon, ResetIcon } from "./icons.js";
 import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { Button, Chip, ChipGroup } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Switch } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -246,19 +246,7 @@ export function PropRowView({
 /** A true/false prop's switch: on sets true, off sets false. */
 function SwitchView({ control, label, debug }: { control: Options & { on: boolean }; label: string; debug: LoupeDebug }) {
   const { write } = control;
-  return (
-    <button
-      type="button"
-      role="switch"
-      className="switch-track"
-      aria-checked={control.on}
-      aria-label={label}
-      data-switch={label}
-      onClick={() => attempt(() => debug.set(write.id, write.prop, !control.on, write.scope))}
-    >
-      <span className="thumb" />
-    </button>
-  );
+  return <Switch label={label} checked={control.on} onCheckedChange={(on) => attempt(() => debug.set(write.id, write.prop, on, write.scope))} />;
 }
 
 /**

@@ -13,7 +13,7 @@ export default function WorkbenchPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-medium">Loupe workbench</h1>
         <p className="text-sm text-muted-foreground">
-          ChipGroup: arrow keys move, Space or Enter chooses, Escape stays the app’s.
+          ChipGroup, Button and Toggle, Switch and Fold. Every key is the primitive’s own; Escape stays the app’s.
         </p>
       </header>
       <WorkbenchMount />

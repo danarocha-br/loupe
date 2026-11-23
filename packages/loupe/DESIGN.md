@@ -576,7 +576,7 @@ On the page, a solid outline is the one Instance in hand and a dashed coral one 
 The toolbar is built in four layers (ADR 0003). Each imports only from the layers before it:
 
 1. **Tokens.** `src/toolbar/tokens.ts`, one typed module: colour by role and theme, the page's marks, the map's hues, type, space, radius, shadow and motion. It is declared on the host as custom properties (`--ink`, `--space-sheet`, `--radius-chip`, `--font-option`, …). The tests read the module, and `design-md.test.ts` holds this file's front matter to it.
-2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip), plain props for a single control. The first is ChipGroup.
+2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel), plain props for a single control (Button, Toggle, Switch). So far: ChipGroup, Fold, Button, Toggle and Switch.
 3. **Patterns.** PropRow, ScopeSection, SiteCard, CopySplit, Identity and the like: primitives composed, taking `panel-view` types. None has moved yet.
 4. **Views.** The panel, the list, the Inspector. They render only what `panelView()` decides, words included.
 
@@ -644,7 +644,7 @@ The Inspector's core: one row per prop, on hairlines.
 - **Under the control**, when they apply: "App value: …", why a field can't change it, a lock and the reason a prop gets no control, the holding notice for a State prop ("Your Override holds this at `true`; the app tried to set `false`."), and "1 of 4 keeps its own value", a navy link that selects them.
 
 ### Switches
-A true/false prop is a row like the others, its switch at the right edge in place of chips (State props, such as a menu's `open`, come first). Off, the thumb is the `switch-off` taupe half on the left; on, the `switch-on` teal half on the right, sliding across over 180ms with its corners. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name.
+A true/false prop is a row like the others, its switch at the right edge in place of chips (State props, such as a menu's `open`, come first). Off, the thumb is the `switch-off` taupe half on the left; on, the `switch-on` teal half on the right, sliding across over 180ms with its corners. The switch says true or false itself; at a scope whose Instances differ, their counts show beside the name. Space or Enter turns it.
 
 ### Inspect only
 The props it shows but can't change here, folded to one 44px row with an eye glyph: "Inspect only · 6", naming them while closed, open by itself when nothing else can change. When one reason covers them all it is said once under the row, not tagged on every row. Open, each prop is a line of name (mono, muted) and value (mono, ink); what the library sets is folded once more ("3 set by the library").
