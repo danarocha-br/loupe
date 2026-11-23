@@ -405,8 +405,9 @@ button:disabled { cursor: default; opacity: 0.45; }
 @media (hover: hover) and (pointer: fine) { .launcher:not(.dragging):hover .goo rect { fill: var(--band-hover); } }
 /* Travelling, each side's body moves by the opposite of the pill's travel on the same curve, so it holds still on the window's edge. */
 .launcher.settling .goo .wall { transition: fill 120ms ease-out, translate 260ms cubic-bezier(0.23, 1, 0.32, 1); }
-/* Landed: the edge draws back, a beat after, so the neck stretches and snaps and the pill sits clean. Held, they follow at once. */
-.launcher:not(.settling):not(.dragging) .goo .wall { transition: fill 120ms ease-out, translate 280ms cubic-bezier(0.23, 1, 0.32, 1) 60ms; }
+/* Landed: the edge draws back slowly at first, so the neck visibly thins and pinches (~115ms), then
+   fast, so the stubs pull back once it breaks, as a liquid neck does. Held, they follow at once. */
+.launcher:not(.settling):not(.dragging) .goo .wall { transition: fill 120ms ease-out, translate 320ms cubic-bezier(0.77, 0, 0.175, 1); }
 .launcher .mark { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
 .launcher .glyph { display: block; }
 .launcher.dragging { cursor: grabbing; }

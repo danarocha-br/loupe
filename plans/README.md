@@ -10,6 +10,7 @@ any agent, or `improve-animations execute <plan>`.
 | [002](002-dock-without-goo.md) | Dock the pill crisply: a rigid pill, a flat side, and a preview of where it will land | HIGH | DONE |
 | [003](003-tab-flares-into-its-side.md) | Docked, the tab flares into its side: two static fillets that arrive as it lands | MEDIUM | DONE, then replaced by the goo (2026-11-23) |
 | [004](004-edge-seam-while-held.md) | While held in reach, the window's edge lights a short seam where the pill will join it | LOW | DONE, then removed for the goo (2026-11-23) |
+| [005](005-let-the-neck-go-slowly.md) | Let the neck go slowly: thin, pinch, retract, instead of jumping | HIGH | DONE |
 
 ## Order and dependencies
 
@@ -43,6 +44,11 @@ judge it by hand, then decide whether 004 adds or only adds noise.
 Considered and not planned: an SVG goo filter (`feGaussianBlur` + `feColorMatrix`), which is
 the liquid look the designer has turned down twice; and a one-off squash against the edge on
 landing, which reads as a bounce in a crisp tool.
+
+## The neck's release (written 2026-11-23 at 024879f)
+
+005 stands alone: one CSS rule. It fixes the glued-to-parked jump, where the neck pinched
+inside a single frame of a strong ease-out, after ~170ms frozen.
 
 ## Not planned yet
 
