@@ -1,5 +1,6 @@
 import { type CSSProperties, useContext, useEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
+import { appLang } from "./app-lang.js";
 import { boxesOf, PageSignalContext, type PageSignal } from "./page-signal.js";
 import type { GroupItem } from "./panel-view/types.js";
 
@@ -113,7 +114,10 @@ export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
         group,
         hue: hueOf(index),
         box: measured.get(item.id) ?? null,
-        name: `Inspect ${group.component} ${nth + 1} of ${here.length}, ${item.name ?? item.label}`,
+        // Loupe's words, and then the Instance's own: what it shows on screen is the app's, in its language and direction.
+        lead: `Inspect ${group.component} ${nth + 1} of ${here.length}, `,
+        who: item.name ?? item.label,
+        shows: item.name !== null,
       }));
     })
     .filter((b): b is typeof b & { box: Box } => b.box !== null);
@@ -142,7 +146,6 @@ export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
             className={`blk ${b.hue}${lit === b.group.component ? " lit" : ""}`}
             style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
             title={`${b.group.component} ${b.group.count}`}
-            aria-label={b.name}
             tabIndex={b.id === stop ? 0 : -1}
             onMouseOver={() => onPoint(b.group)}
             onFocus={() => {
@@ -157,7 +160,15 @@ export function PageMap({ debug, groups, lit, onPoint, onSelect }: Props) {
               nodes.current.get(to)?.focus();
             }}
             onClick={() => onSelect(b.id)}
-          />
+          >
+            {/* Its name is its content, not an `aria-label`, so the app's words keep the app's language. */}
+            <span className="sr-only">
+              {b.lead}
+              <span dir="auto" lang={b.shows ? appLang() : undefined}>
+                {b.who}
+              </span>
+            </span>
+          </button>
         ))}
       </div>
     </div>

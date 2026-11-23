@@ -76,7 +76,7 @@ describe("the page map's keyboard", () => {
     expect(
       screen
         .getAllByRole("button")
-        .map((block) => block.getAttribute("aria-label"))
+        .map((block) => block.textContent)
         .sort(),
     ).toEqual([
       "Inspect Button 1 of 3, Ana Souza",
@@ -87,11 +87,26 @@ describe("the page map's keyboard", () => {
     ]);
   });
 
+  it("keeps the app's words in the app's language, apart from Loupe's own", () => {
+    document.documentElement.lang = "pt-BR";
+    try {
+      const screen = renderInSurface(<Sheet />);
+      const name = screen.getByRole("button", { name: /Button 1 of 3/ }).querySelector("[lang]");
+      expect(name?.textContent).toBe("Ana Souza");
+      expect(name?.getAttribute("lang")).toBe("pt-BR");
+      expect(name?.getAttribute("dir")).toBe("auto");
+      // Where the Instance shows no name, what is read is Loupe's own: its call site.
+      expect(screen.getByRole("button", { name: /Button 3 of 3/ }).querySelector("[lang]")).toBeNull();
+    } finally {
+      document.documentElement.lang = "";
+    }
+  });
+
   it("is one Tab stop, on the first block in reading order", () => {
     // user-event's Tab doesn't walk into a shadow root: the stop is read from `tabIndex`.
     const screen = renderInSurface(<Sheet />);
     const stops = screen.getAllByRole("button").filter((block) => block.tabIndex === 0);
-    expect(stops.map((block) => block.getAttribute("aria-label"))).toEqual(["Inspect Button 1 of 3, Ana Souza"]);
+    expect(stops.map((block) => block.textContent)).toEqual(["Inspect Button 1 of 3, Ana Souza"]);
     expect(screen.getAllByRole("button").filter((block) => block.tabIndex === -1)).toHaveLength(3);
   });
 

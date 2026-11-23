@@ -141,6 +141,35 @@ describe("Alt+Shift+L, collapsed", () => {
     expect(inLoupe()).not.toBeNull();
   });
 
+  it("forgets where focus came from on a press on the page, which moves no focus", async () => {
+    await mount("closed");
+    act(() => before().focus());
+    shortcut();
+    // A click on blank page content blurs Loupe without a focusin on the page.
+    act(() => void before().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true })));
+    act(() => screen().getByRole("button", { name: "Show Loupe" }).focus());
+    esc();
+    expect(inLoupe()).not.toBeNull();
+  });
+
+  it("brings focus to the pill, not off it, when focus got there by a Tab", async () => {
+    await mount("closed");
+    const pill = screen().getByRole("button", { name: "Show Loupe" });
+    act(() => pill.focus());
+    shortcut();
+    expect(inLoupe()).toBe(pill);
+  });
+
+  it("lets go when the element focus came from won't take it back", async () => {
+    await mount("closed");
+    act(() => before().focus());
+    shortcut();
+    // Loupe's own inspector can disable the page control that lent it focus.
+    act(() => before().setAttribute("disabled", ""));
+    esc();
+    expect(inLoupe()).toBeNull();
+  });
+
   it("answers only Alt, Shift and the L key", async () => {
     await mount("closed");
     expect(isShortcut(new KeyboardEvent("keydown", { code: "KeyL", altKey: true, shiftKey: true }))).toBe(true);
@@ -175,6 +204,14 @@ describe("Alt+Shift+L, open", () => {
     expect(inLoupe()).toBe(screen().getByRole("heading", { level: 2 }));
     shortcut();
     expect(document.activeElement).toBe(before());
+  });
+
+  it("brings focus to the heading from elsewhere in the panel, not off it", async () => {
+    await mount("open");
+    act(() => screen().getAllByRole("radio")[0]?.focus());
+    expect(inLoupe()?.getAttribute("role")).toBe("radio");
+    shortcut();
+    expect(inLoupe()).toBe(screen().getByRole("heading", { level: 2 }));
   });
 
   it("takes Esc before the selection does, which goes on the Esc after", async () => {

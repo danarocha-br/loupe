@@ -63,8 +63,9 @@ export function useFocusShortcut(host: HTMLElement, focusToolbar: () => void): v
     from.current = null;
     setBorrowed(false);
     if (target && target !== document.body && target.isConnected && "focus" in target) (target as HTMLElement).focus({ preventScroll: true });
-    // Nowhere to go back to (focus was on the page itself, or the element is gone): let go.
-    else (host.shadowRoot?.activeElement as HTMLElement | null)?.blur();
+    // Nowhere to go back to (focus was on the page itself, the element is gone, or it won't take
+    // focus now, a button Loupe has since disabled): if focus is still here, let go.
+    (host.shadowRoot?.activeElement as HTMLElement | null)?.blur();
   }, [host]);
 
   useEffect(() => {
@@ -72,7 +73,9 @@ export function useFocusShortcut(host: HTMLElement, focusToolbar: () => void): v
       if (!isShortcut(event)) return;
       event.preventDefault();
       if (inside()) {
-        giveBack();
+        // Focus got here some other way (a Tab, a click): there is no page element to give it back to, so the keys bring it to the toolbar's entry.
+        if (from.current !== null) giveBack();
+        else latest.current();
         return;
       }
       from.current = deepActive();
@@ -86,13 +89,19 @@ export function useFocusShortcut(host: HTMLElement, focusToolbar: () => void): v
 
   useEffect(() => {
     if (!borrowed) return;
-    const onFocusIn = (event: FocusEvent) => {
+    const onFocusIn = (event: Event) => {
       if (event.composedPath().includes(host)) return;
       from.current = null;
       setBorrowed(false);
     };
+    const onPointerDown = onFocusIn;
+    // A Tab or a script moves focus to the page with a focusin; a click on blank page content moves none, so the press counts too.
     window.addEventListener("focusin", onFocusIn, true);
-    return () => window.removeEventListener("focusin", onFocusIn, true);
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      window.removeEventListener("focusin", onFocusIn, true);
+      window.removeEventListener("pointerdown", onPointerDown, true);
+    };
   }, [borrowed, host]);
 
   // Esc is the field's while one has focus (its own clearing, as at the selection's layer).
