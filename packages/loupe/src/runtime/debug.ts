@@ -130,9 +130,28 @@ export const UNADAPTED_REASON = "No Adapter renders this Instance, so Overrides 
 function createDebug(): LoupeDebug {
   const reg = registry();
 
-  /** The Instances on the page as it is now. */
-  const page = (): Discovery =>
-    discover(typeof document === "undefined" ? undefined : document, reg.instances.values());
+  /**
+   * The Instances on the page as it is now. One walk serves every answer until the
+   * registry's version moves: an Instance mounting, unmounting or committing, or a
+   * watcher reporting a change to the DOM. While nothing watches the DOM, a walk is
+   * good for the task it was made in only: a server-rendered Instance can come or
+   * go with no Adapter committing.
+   */
+  let walked: { version: number; discovery: Discovery } | null = null;
+  const page = (): Discovery => {
+    if (walked !== null && walked.version === reg.version) return walked.discovery;
+    const entry = {
+      version: reg.version,
+      discovery: discover(typeof document === "undefined" ? undefined : document, reg.instances.values()),
+    };
+    walked = entry;
+    if (reg.watchers === 0) {
+      queueMicrotask(() => {
+        if (walked === entry) walked = null;
+      });
+    }
+    return entry.discovery;
+  };
 
   /** An Instance no Adapter registered, or undefined. */
   const foundInstance = (id: string): FoundInstance | undefined => {

@@ -19,7 +19,7 @@ import { Highlight } from "./highlight.js";
 import type { Theme } from "./surface/index.js";
 import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
-import { usePageVersion } from "./page.js";
+import { createPageSignal, PageSignalContext, usePageVersion } from "./page-signal.js";
 import { Panel } from "./panel.js";
 import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
@@ -83,7 +83,9 @@ export function ToolbarOpen({
   useEffect(onShown, [onShown]);
   // An inline function: React Compiler skips a component whose useMemo takes a reference.
   const debug = useMemo(() => debugOf(), []);
-  const version = usePageVersion(host);
+  // Awake while the panel is open: collapsed, the Toolbar watches nothing on the page.
+  const signal = useMemo(() => createPageSignal({ doc: document, debug: () => debug, host: () => host }), [debug, host]);
+  const version = usePageVersion(signal);
   const layer = useLayerStatus(version);
   const view = usePanelView(debug, layer, selected, scope, version);
   useInstanceMeta(view.metaAnchor);
@@ -115,9 +117,10 @@ export function ToolbarOpen({
   useDeselect({ debug, host, ids: selection, active: selected !== null && !picker.picking, onDeselect: () => onSelect(null) });
 
   return (
-    <>
+    <PageSignalContext value={signal}>
       <Highlight
         debug={debug}
+        signal={signal}
         version={version}
         selected={selected}
         selectedLabel={view.outline.label}
@@ -145,6 +148,6 @@ export function ToolbarOpen({
         theme={theme}
         onTheme={onTheme}
       />
-    </>
+    </PageSignalContext>
   );
 }

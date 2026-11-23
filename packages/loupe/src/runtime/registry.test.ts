@@ -3,7 +3,7 @@
 // again finds it, and after a `resetLoupe()` nothing of the old one listens.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { callSiteId, instanceId } from "../call-site.js";
-import { committed, type MountedInstance, register, registry } from "./registry.js";
+import { committed, emitChange, type MountedInstance, onMountChange, register, registry, unregister } from "./registry.js";
 import { resetLoupe } from "./slot.js";
 
 const ANCHOR = callSiteId({ path: "app/page.tsx", enclosing: "Page", component: "Button", ordinal: 1 });
@@ -85,5 +85,30 @@ describe("a mounted Instance", () => {
     history.pushState(null, "", "/billing");
     committed(instance, null, "app/page.tsx:12:5 1/1");
     expect(instance).toMatchObject({ route: "/members", renders: 2, hint: "app/page.tsx:12:5 1/1" });
+  });
+
+  it("counts Instances per base id as they mount and unmount, so a duplicate is known without looking at every other", () => {
+    const entry = () => ({ anchor: ANCHOR, hint: null, component: "Button", keyPath: "", live: () => ({ current: {}, injected: {}, authorship: "recorded" as const }), writes: () => null, stateProps: [], meta: null, attempts: new Map(), notify: () => {}, fiber: null });
+    const heard: [string, boolean][] = [];
+    onMountChange((instance, mounted) => heard.push([instance.id, mounted]));
+    const first = register(ID, entry());
+    const second = register(ID, entry());
+    expect(registry().bases.get(ID)).toBe(2);
+    unregister(first);
+    unregister(second);
+    expect(registry().bases.has(ID)).toBe(false);
+    expect(heard).toEqual([
+      [ID, true],
+      [`${ID}~2`, true],
+      [ID, false],
+      [`${ID}~2`, false],
+    ]);
+  });
+
+  it("moves its version on every change, and calls no one when no one listens", () => {
+    const before = registry().version;
+    emitChange();
+    expect(registry().version).toBe(before + 1);
+    expect(registry().listeners.size).toBe(0);
   });
 });
