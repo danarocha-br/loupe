@@ -22,7 +22,7 @@ import { attempt, Breakable, Key, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Chip, ChipGroup, Fold, FoldChevron, FoldPanel, FoldTrigger, lookAttributes, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Tag, type TagLook, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
   BackIcon,
@@ -56,7 +56,7 @@ import {
   type PropItem,
   type ScopeOption,
   type StatusTag,
-  type Tag,
+  type Tag as TagText,
   inspectOnlyTitle,
   LEGEND,
   TEXT,
@@ -175,7 +175,7 @@ export function Panel(props: PanelProps) {
         ? ["Outlines are hidden on the page"]
         : null;
   useAnnounceChange(strip ? strip.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
-  const status = strip?.map((part, index) => (typeof part === "string" ? part : <kbd key={index}>{part.key}</kbd>));
+  const status = strip?.map((part, index) => (typeof part === "string" ? part : <Kbd key={index}>{part.key}</Kbd>));
   return (
     <section
       className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
@@ -291,7 +291,7 @@ function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) 
     <div className="section notice-card banner">
       <div className="head">
         <div className="title">
-          <span className="dot alert" />
+          <Dot tone="alert" />
           {banner.title}
         </div>
       </div>
@@ -300,18 +300,18 @@ function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) 
   );
 }
 
-const TAG_CLASS: Record<Tag["kind"], string> = {
-  server: "tag",
-  suspended: "tag held",
-  "not-mounted": "tag dashed",
-  stale: "tag stale",
-  "left-out": "tag",
-  "left-out-unmounted": "tag dashed",
-  "not-visible": "tag dashed",
+const TAG_LOOK: Record<TagText["kind"], TagLook> = {
+  server: "plain",
+  suspended: "ring",
+  "not-mounted": "dashed",
+  stale: "amber",
+  "left-out": "plain",
+  "left-out-unmounted": "dashed",
+  "not-visible": "dashed",
 };
 
-function TagView({ tag }: { tag: Tag }) {
-  return <span className={TAG_CLASS[tag.kind]}>{tag.text}</span>;
+function TagView({ tag }: { tag: TagText }) {
+  return <Tag look={TAG_LOOK[tag.kind]}>{tag.text}</Tag>;
 }
 
 const STATUS_CLASS: Record<StatusTag["kind"], string> = {
@@ -519,7 +519,7 @@ function GroupRow({
                 </span>
               ) : note.kind === "stale" ? (
                 <span key={note.kind} className="stale">
-                  <span className="dot small amber" />
+                  <Dot tone="amber" small />
                   {note.text}
                 </span>
               ) : (
@@ -620,7 +620,7 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
     <div className="section list-card" data-testid="held-for-review">
       <div className="head">
         <div className="title">
-          <span className="dot ring" />
+          <Dot tone="ring" />
           <h3>Held for review</h3>
         </div>
         <span className="meta">{meta}</span>
@@ -851,15 +851,13 @@ function Inspector({
                 <TagView key={tag.kind} tag={tag} />
               ))}
               {chips.map((chip) => (
-                <span key={chip} className="tag">
-                  {chip}
-                </span>
+                <Tag key={chip}>{chip}</Tag>
               ))}
             </div>
           )}
           {body.coverage.notGenerated && (
             <div className="warn" data-testid="not-generated">
-              <span className="dot" />
+              <Dot tone="amber" />
               <span>
                 <StatusView status={body.coverage.notGenerated.tag} /> {TEXT.run}{" "}
                 <span className="mono verbatim">{body.coverage.notGenerated.command}</span> {TEXT.fromRootToReadProps}
@@ -983,9 +981,9 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
         <FoldPanel>
         {shared?.reason && (
           <p className="why">
-            <span className="tag reason" title={shared.reasonTitle ?? undefined}>
+            <Tag look="reason" title={shared.reasonTitle ?? undefined}>
               {shared.reason}
-            </span>{" "}
+            </Tag>{" "}
             {shared.reasonTitle}
           </p>
         )}
@@ -1097,7 +1095,7 @@ function ScopeSection({
             </span>
           </span>
           {member.tag && <TagView tag={member.tag} />}
-          {picked && <span className="tag picked">{TEXT.picked}</span>}
+          {picked && <Tag look="picked">{TEXT.picked}</Tag>}
         </label>
       </li>
     );
@@ -1259,7 +1257,7 @@ function Footer({
           </span>
           {footer.states.chip && (
             <span className="held-chip" aria-hidden="true" title={footer.states.title}>
-              <span className="dot" />
+              <Dot tone="amber" small />
               {footer.states.chip}
             </span>
           )}

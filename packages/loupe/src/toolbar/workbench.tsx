@@ -12,14 +12,18 @@ import {
   Button,
   Chip,
   ChipGroup,
+  Delta,
+  Dot,
   Field,
   Fold,
   FoldChevron,
   FoldPanel,
   FoldTrigger,
+  Kbd,
   Popover,
   PopoverPanel,
   Switch,
+  Tag,
   Toggle,
   type Politeness,
   useAnnounce,
@@ -372,6 +376,65 @@ function PopoverStates() {
   );
 }
 
+/** The marks: Tag in each look, Dot in each tone, Delta numbered and empty, Kbd in a sentence. */
+function MarkStates() {
+  return (
+    <div className="wb-states">
+      <Row title="Tag: plain, reason, picked, amber, ring, dashed, empty">
+        <div className="wb-line">
+          <Tag>State prop</Tag>
+          <Tag look="reason" title="The library sets this prop; the call site doesn’t pass it">set by the library</Tag>
+          <Tag look="picked">picked</Tag>
+          <Tag look="amber">Source changed</Tag>
+          <Tag look="ring">Held for review</Tag>
+          <Tag look="dashed">Not visible now</Tag>
+          <Tag look="empty">empty</Tag>
+        </div>
+      </Row>
+      <Row title="Dot: hidden; the words beside it say what it marks">
+        <div className="wb-line">
+          <span className="wb-mark">
+            <Dot tone="alert" /> Product layer missing
+          </span>
+          <span className="wb-mark">
+            <Dot tone="amber" /> Not generated yet
+          </span>
+          <span className="wb-mark">
+            <Dot tone="amber" small /> Source changed
+          </span>
+          <span className="wb-mark">
+            <Dot tone="lilac" small /> Previewing on
+          </span>
+          <span className="wb-mark">
+            <Dot tone="hollow" small /> App decides
+          </span>
+          <span className="wb-mark">
+            <Dot tone="ring" /> Held for review
+          </span>
+        </div>
+      </Row>
+      <Row title="Delta: numbered (an image named “Change n”), and empty and dashed (hidden)">
+        <div className="wb-line">
+          <Delta n={1} label="Change 1" title="Change 1 in the Proposal" />
+          <Delta n={2} label="Change 2" title="Change 2 in the Proposal" />
+          <Delta n={12} label="Change 12" title="Change 12 in the Proposal" />
+          <span className="wb-mark">
+            <Delta title="Held open: shown as a state" /> open <Tag>State prop</Tag>
+          </span>
+        </div>
+      </Row>
+      <Row title="Kbd: a key in running text">
+        <p className="wb-status">
+          Click an Instance on the page · <Kbd>Esc</Kbd> cancels
+        </p>
+        <p className="wb-status">
+          A dialog on the page runs under the panel · hold <Kbd>Alt</Kbd> to see through
+        </p>
+      </Row>
+    </div>
+  );
+}
+
 function Row({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -398,6 +461,8 @@ const FRAME_CSS = `
 .wb-fold-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: var(--font-label); color: var(--faint); }
 .wb-fold-line .wb-fold-row { font: var(--font-control); }
 .wb-footer { padding: 14px; border-radius: var(--radius-card); background: var(--card); box-shadow: var(--shadow); }
+.wb-mark { display: inline-flex; align-items: center; gap: 6px; font: var(--font-control); color: var(--ink); }
+.wb-status { padding: 8px 14px; border-radius: var(--radius-status); background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); font: var(--font-caption); }
 .wb-fold-body { padding: 4px 0 4px 12px; font: var(--font-paragraph); color: var(--muted); }
 `;
 
@@ -439,6 +504,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <div className="wb-card">
             <h2>Popover</h2>
             <PopoverStates />
+          </div>
+          <div className="wb-card">
+            <h2>Tag, Dot, Delta and Kbd</h2>
+            <MarkStates />
           </div>
           <div className="wb-card">
             <h2>Announcer</h2>

@@ -1,0 +1,22 @@
+/*
+ * Delta (ADR 0003, DESIGN.md "Shapes"): a revision's triangle, 22 × 20px, card-filled on a
+ * 1.25px lilac stroke, its number at the base. Written against `[data-delta]`,
+ * `[data-empty]` and `[data-delta-n]`. Values from the tokens. In the `primitives` layer.
+ */
+
+[data-delta] { position: relative; display: inline-block; flex: none; width: 22px; height: 20px; }
+[data-delta] svg { display: block; width: 100%; height: 100%; overflow: visible; }
+[data-delta] path { fill: var(--card); stroke: var(--revision-line); stroke-width: 1.25; }
+/* Empty: dashed, with no number. */
+[data-delta][data-empty] path { stroke-dasharray: 2.2 1.6; }
+[data-delta-n] {
+  position: absolute; inset: 0; display: grid; place-items: end center; padding-bottom: 2.5px;
+  font: var(--font-delta); font-variant-numeric: tabular-nums; color: var(--revision-text);
+}
+
+/* Forced colours: the triangle and its number in the system's text colour, on its background. */
+@media (forced-colors: active) {
+  [data-delta] { forced-color-adjust: none; }
+  [data-delta] path { fill: Canvas; stroke: CanvasText; }
+  [data-delta-n] { color: CanvasText; }
+}

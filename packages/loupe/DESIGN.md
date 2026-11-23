@@ -203,6 +203,11 @@ typography:
     fontWeight: 400
     lineHeight: "14px"
     fontFeature: "\"tnum\""
+  tag:
+    fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
+    fontSize: "11px"
+    fontWeight: 400
+    lineHeight: "16px"
   delta:
     fontFamily: "system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", sans-serif"
     fontSize: "9px"
@@ -219,6 +224,22 @@ typography:
     fontSize: "11px"
     fontWeight: 400
     lineHeight: "16px"
+  key:
+    fontFamily: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
+    fontSize: "11px"
+    fontWeight: 500
+    lineHeight: "14px"
+  tag-mono:
+    fontFamily: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
+    fontSize: "10px"
+    fontWeight: 400
+    lineHeight: "16px"
+    letterSpacing: "0.02em"
+  chip:
+    fontFamily: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
+    fontSize: "10px"
+    fontWeight: 500
+    lineHeight: "14px"
   annotation:
     fontFamily: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
     fontSize: "10px"
@@ -518,10 +539,10 @@ Where the Paper boards draw lighter, the code keeps the contrast:
 - **Body** (400, 13px/18px): the base text, a component's name (500, muted in the identity), list rows (500), text fields, the copy popover's fields. Explanatory paragraphs run 13px/19px in muted, and any 12px sentence that can wrap runs 12px/17px: nothing that wraps to three lines sits under a 1.4 line height.
 - **Control** (500, 12px/16px): buttons, Widen, the count toggle. **Action** (600, 13px/17px) is Control stepped up, for Copy Proposal and the primary button; the popovers' other actions step up to 13px at 500. The footer's Undo is a 600 12px link, underlined at 3px.
 - **Option** (400, 12px/16px): option chips; the chip that shows now at 500.
-- **Label** (500, 11px/14px) and **Meta** (400, 11px/14px, tabular, faint): field labels, the "Inside" label, and the counts beside card titles.
+- **Label** (500, 11px/14px) and **Meta** (400, 11px/14px, tabular, faint): field labels, the "Inside" label, and the counts beside card titles. **Tag** (400, 11px/16px): a tag's words.
 - **Delta** (700, 9px/1, tabular): the number inside a delta. The 9px step is the delta's alone.
 - **Mono** (400, 12px) and **Mono Small** (400, 11px): call sites, change lines, the change list, values in Inspect only, a row's counts at a scope (`"outline" 1 · "ghost" 3`), never recased since they quote values. A component's count in the list is mono 600 13px.
-- **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page after the wordmark ("/ Billing") and beside the component's name, and the "app" tag on a chip (500). The status chip, the held chip, the "picked" tag and a chip's count are 10px mono 500, not recased. The Proposal's text in a refused copy is 10px/15px mono.
+- **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page after the wordmark ("/ Billing") and beside the component's name, and the "app" tag on a chip (500). The status chip, the held chip, the "picked" tag and a chip's count are 10px mono 500, not recased (**Chip**, 500 10px/14px). A reason tag is **Tag Mono** (400, 10px/16px, 0.02em). A key in running text is **Key** (500, 11px/14px mono). The Proposal's text in a refused copy is 10px/15px mono.
 
 ### Named Rules
 **The Mono Is Evidence Rule.** Mono is for what an engineer would paste (values, call sites, commands, flag keys) and for small annotations. Names a designer reads on screen stay in sans.
@@ -581,7 +602,7 @@ On the page, a solid outline is the one Instance in hand and a dashed coral one 
 The toolbar is built in four layers (ADR 0003). Each imports only from the layers before it:
 
 1. **Tokens.** `src/toolbar/tokens.ts`, one typed module: colour by role and theme, the page's marks, the map's hues, type, space, radius, shadow and motion. It is declared on the host as custom properties (`--ink`, `--space-sheet`, `--radius-chip`, `--font-option`, …). The tests read the module, and `design-md.test.ts` holds this file's front matter to it.
-2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel, Popover and its panel), plain props for a single control (Button, Toggle, Switch, Field). So far: ChipGroup, Fold, Button, Toggle, Switch, Field, Popover and the Announcer, the one primitive with no UI SDK part under it: UI SDK’s announcer writes into the host’s document (ADR 0008).
+2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel, Popover and its panel), plain props for a single control (Button, Toggle, Switch, Field) or mark (Tag, Dot, Delta, Kbd). So far: ChipGroup, Fold, Button, Toggle, Switch, Field and Popover, the marks Tag, Dot, Delta and Kbd, which UI SDK has no part for and need none, and the Announcer, which has none under it either: UI SDK’s announcer writes into the host’s document (ADR 0008).
 3. **Patterns.** PropRow, ScopeSection, SiteCard, CopySplit, Identity and the like: primitives composed, taking `panel-view` types. None has moved yet.
 4. **Views.** The panel, the list, the Inspector. They render only what `panelView()` decides, words included.
 
@@ -655,7 +676,7 @@ A true/false prop is a row like the others, its switch at the right edge in plac
 The props it shows but can't change here, folded to one 44px row with an eye glyph: "Inspect only · 6", naming them while closed, open by itself when nothing else can change. When one reason covers them all it is said once under the row, not tagged on every row. Open, each prop is a line of name (mono, muted) and value (mono, ink); what the library sets is folded once more ("3 set by the library").
 
 ### Revision marks (signature)
-The numbered delta that ties a change together.
+The numbered delta that ties a change together: the Delta primitive (`ui/delta`).
 - **In the panel:** a 22 × 20px delta before the prop's name, at the right of the identity for every change the Instance holds, and before each row of the change list ("Changes · numbered as in the Proposal": the delta, the change in 12px mono, where it applies in muted). A change's number is the one it got when it was made: it never moves, and a reset one leaves a gap.
 - **On the page:** no number. As a change lands, every Instance it reaches is outlined, the selected one solid, the others dashed; after 2 seconds the outlines fade, the selection's too, and the page shows the change as it will ship. They come back for 2 seconds when an Instance a change reaches is selected, and for as long as the pointer or focus is on the change's row or a row naming the Instance. Drawn only where the Instance is actually visible (not under a menu, dialog or the panel).
 - **Motion:** a change's outlines fade in over 160ms and step back over 480ms; reduced motion removes both.
@@ -683,12 +704,12 @@ A split button filling the footer beside the theme button (Paper, "Copy flow v2 
 - **Closing:** Esc anywhere, a press outside it and its split, focus leaving it, or the chevron again. Focus inside goes back to the half that opened it. Both popovers are the Popover primitive, their fields Field (`ui/`).
 
 ### Notices and status
-- **Status strip:** salmon with its ring, 14px corners, 12px text, `kbd` keys.
+- **Status strip:** salmon with its ring, 14px corners, 12px text, keys in the Kbd primitive (`ui/kbd`).
 - **Warn strip:** amber wash, amber text and an 8px amber dot, 12px corners.
 - **Notice card:** a card with a dot and a title (alert orange for a failure, amber for a warning), a muted paragraph, and when there is something to run, a command in a 12px mono well with a Copy button.
 - **Note:** inside the Inspector, an info icon, a title and a paragraph (a server-rendered Instance, no Adapter, props spread here).
-- **Tags and chips:** `sunk` pills, 11px muted; status chips 10px mono; stale ones amber; held ones a pencil ring; not-there-now ones dashed; "empty" label text dashed in ink.
-- **Dots:** 8px (6px small): alert orange for failures, amber for warnings, a pencil ring for held for review; in Feature flags, lilac while a flag is previewing and a hollow ring while it isn't.
+- **Tags and chips:** `sunk` pills, 11px muted; status chips 10px mono; stale ones amber; held ones a pencil ring; not-there-now ones dashed; "empty" label text dashed in ink. Tags are the Tag primitive (`ui/tag`); status chips are still the views'.
+- **Dots:** 8px (6px small): alert orange for failures, amber for warnings, a pencil ring for held for review; in Feature flags, lilac while a flag is previewing and a hollow ring while it isn't. The Dot primitive (`ui/dot`), always hidden from assistive technology: the words beside it say what it marks.
 - **Held chip:** in the footer, "1 held" in 10px mono on amber with a 6px amber dot: State props held open, which the Proposal shows as states.
 
 ### Collapsed
@@ -719,7 +740,7 @@ Reset all, Reset this Instance, Reset this scope and Discard act immediately; th
 - **Left to right** in any app: the host sets `direction: ltr`; the app's own words keep `dir="auto"`.
 - **Narrow windows:** under 360px the column narrows to the viewport, so at 320px nothing is off-screen. The middle keeps its scrolling to itself (`overscroll-behavior: contain`).
 - **Touch:** on a coarse pointer, text fields and the popover's fields are 16px so iOS Safari doesn't zoom.
-- **Forced colours:** cards, the header, footer, sheet and popover get transparent borders back, the collapsed pill is drawn in `ButtonText` with its L in `ButtonFace`; the chip that shows now, the switch and a ticked box are drawn in `Highlight`; the app's value takes a dashed outline; dots, the meter and the legend's marks are drawn in `CanvasText`.
+- **Forced colours:** cards, the header, footer, sheet and popover get transparent borders back, the collapsed pill is drawn in `ButtonText` with its L in `ButtonFace`; the chip that shows now, the switch and a ticked box are drawn in `Highlight`; the app's value takes a dashed outline; dots, the meter and the legend's marks are drawn in `CanvasText`; tags and keys keep their pill and box as an outline, and a delta is drawn in `CanvasText` on `Canvas`.
 - **Reduced motion:** the switch's thumb and the chevrons move to their place without travelling there; the panel and the collapsed pill fade instead of sliding; the toast appears without rising; the page's outlines appear and go without fading. Switching light and dark turns every transition off for the frame it lands in, so the colours change at once rather than smearing.
 - Apostrophes in panel text are typographic (’).
 
