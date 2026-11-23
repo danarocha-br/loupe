@@ -48,7 +48,7 @@ repo as one of three results:
 | -- | -- | -- | -- |
 | Next.js, in the app | 16.3.x | other 16.x | below 16.0, and 17 or later |
 | Router | App Router | App Router and Pages Router together (Pages routes aren't covered) | Pages Router only |
-| Dev bundler | Turbopack, Next 16's default | a Babel config, or the React Compiler; a `dev` script without `next dev` | `next dev --webpack` |
+| Dev bundler | Turbopack, Next 16's default | `next dev --webpack` (`withLoupe` adds the loader as a webpack rule, proven on this repo's test app only); a Babel config, or the React Compiler; a `dev` script without `next dev` | |
 | Dev server runtime | Node 22, or Bun (`bun --bun next dev`) | other Node versions | |
 
 How the runtime is read: Bun counts when the app's `dev` script runs

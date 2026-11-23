@@ -4,6 +4,10 @@
 // `next dev`. Every other phase gets the config untouched, because `next build`
 // serialises `turbopack.rules`, loader path included, into
 // `.next/required-server-files.json` even when the rule's condition never fires.
+//
+// The loader is registered for both bundlers: a Turbopack rule, and a webpack rule
+// for `next dev --webpack`. Registering only the first left webpack running with
+// no anchors and no error, so the Toolbar found nothing to pick.
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -20,7 +24,12 @@ export type LoupeOptions = {
 };
 
 // Structural, so Next's own `NextConfig` interface fits without Loupe importing it.
-type Config = { turbopack?: { rules?: object }; env?: Record<string, string | undefined> };
+type WebpackHook = (webpackConfig: any, context: any) => any;
+type Config = {
+  turbopack?: { rules?: object };
+  webpack?: WebpackHook | null;
+  env?: Record<string, string | undefined>;
+};
 type ConfigFunction<C> = (phase: string, context: unknown) => C | Promise<C>;
 
 export function withLoupe<C extends Config>(
@@ -63,12 +72,17 @@ export function withLoupe<C extends Config>(
     }
     if (notice) console.error(`[loupe] ${notice}`);
 
+    // Next sets TURBOPACK for a Turbopack run and leaves it unset under `--webpack`. Only
+    // a Turbopack run reads `turbopack.rules`, so only there can a host's own `*.tsx`
+    // rule conflict with ours; a webpack run leaves the host's Turbopack rules as they are.
+    const turbopack = Boolean(process.env.TURBOPACK);
     const rules = base.turbopack?.rules ?? {};
-    if (LOADER_RULE in rules) {
+    if (turbopack && LOADER_RULE in rules) {
       throw new Error(
         `withLoupe: turbopack.rules already has a "${LOADER_RULE}" rule, and Loupe will not merge into it.`,
       );
     }
+    const loader = { loader: path.join(__dirname, "loader.cjs"), options: { root, adaptList } };
     return {
       ...base,
       env,
@@ -76,13 +90,36 @@ export function withLoupe<C extends Config>(
         ...base.turbopack,
         rules: {
           ...rules,
-          [LOADER_RULE]: {
-            // Design-system packages linked from the workspace are not foreign,
-            // so their own call sites are anchored too.
-            condition: { all: ["development", { not: "foreign" }] },
-            loaders: [{ loader: path.join(__dirname, "loader.cjs"), options: { root, adaptList } }],
-          },
+          ...(LOADER_RULE in rules
+            ? {}
+            : {
+                [LOADER_RULE]: {
+                  // Design-system packages linked from the workspace are not foreign,
+                  // so their own call sites are anchored too.
+                  condition: { all: ["development", { not: "foreign" }] },
+                  loaders: [loader],
+                },
+              }),
         },
+      },
+      webpack(webpackConfig: any, context: any) {
+        // The host's own hook first; its result is the config we extend.
+        const hosted = base.webpack ? base.webpack(webpackConfig, context) : webpackConfig;
+        const next = hosted ?? webpackConfig;
+        next.module ??= {};
+        next.module.rules ??= [];
+        next.module.rules.push({
+          test: /\.tsx$/,
+          // "pre" so the loader reads the source before Next's own transforms, as
+          // Turbopack runs it. Webpack resolves workspace symlinks to real paths,
+          // so a linked design system is outside node_modules and is anchored too.
+          // (A host hook that sets `resolve.symlinks: false` keeps the linked path, which
+          // is inside node_modules, and that package's own call sites go unanchored.)
+          enforce: "pre",
+          exclude: /[\\/]node_modules[\\/]/,
+          use: [loader],
+        });
+        return next;
       },
     };
   };

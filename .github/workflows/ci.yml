@@ -37,3 +37,6 @@ jobs:
         run: pnpm --filter @fixture/app build
       - name: The build has no trace of the dev loader
         run: scripts/check-fixture-build-clean.sh
+      # After the clean check: it scans .next, which a dev server writes to.
+      - name: next dev --webpack anchors call sites
+        run: scripts/check-fixture-webpack-anchors.sh
