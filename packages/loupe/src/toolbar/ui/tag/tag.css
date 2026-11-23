@@ -15,7 +15,7 @@
 }
 
 /* Why, quoted: mono, tracked, with more in its title. */
-[data-tag-look="reason"] { font: var(--font-tag-mono); letter-spacing: 0.02em; cursor: help; }
+[data-tag-look="reason"] { font: var(--font-tag-mono); letter-spacing: var(--tracking-tag-mono); cursor: help; }
 
 /* Chosen: 16px, in the accent's wash. */
 [data-tag-look="picked"] { height: 16px; padding-block: 0; background: var(--accent-wash); color: var(--accent-text); font: var(--font-chip); }

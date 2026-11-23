@@ -394,16 +394,22 @@ const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.to
 
 /**
  * Each type step as a `font` shorthand, `--font-<role>`, for the primitives' real CSS
- * files (ADR 0003), which can't call `font()`. Tracking, case and figures stay with the rule.
+ * files (ADR 0003), which can't call `font()`. Case and figures stay with the rule; a
+ * tracked step's tracking is `--tracking-<role>`, so the value lives in the token alone.
  */
-export const TYPE_PROPERTIES: Record<string, string> = Object.fromEntries(
-  Object.entries(TYPE).map(([role, style]) => [`font-${kebab(role)}`, font(style)]),
-);
+export const TYPE_PROPERTIES: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(TYPE).map(([role, style]) => [`font-${kebab(role)}`, font(style)])),
+  ...Object.fromEntries(
+    Object.entries(TYPE as Record<string, TypeStyle>)
+      .filter(([, style]) => style.tracking !== undefined)
+      .map(([role, style]) => [`tracking-${kebab(role)}`, style.tracking as string]),
+  ),
+};
 
 /**
  * The host's custom properties for one theme: its colours and shadows. The light block
  * also carries the scales that don't change with the theme (`--space-*`, `--radius-*`,
- * `--duration-*`, `--ease-*`, `--font-*`): the dark block only overrides the themed ones.
+ * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`): the dark block only overrides the themed ones.
  */
 export function hostDeclarations(theme: Theme): string {
   const themed = declare({ ...COLOR[theme], ...SHADOW[theme] });

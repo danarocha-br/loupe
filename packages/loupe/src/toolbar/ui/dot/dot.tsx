@@ -10,13 +10,21 @@ import type { DataAttributes } from "../data-attributes.js";
  */
 export type DotTone = "alert" | "amber" | "lilac" | "hollow" | "ring";
 
-export type DotProps = {
-  tone: DotTone;
-  /** 6px rather than 8px. A `ring` is always 10px. */
-  small?: boolean;
+type DotCommon = {
   className?: string;
 } & DataAttributes;
 
-export function Dot({ tone, small = false, className, ...rest }: DotProps) {
-  return <span {...rest} aria-hidden="true" data-dot={tone} data-small={small && tone !== "ring" ? "" : undefined} className={className} />;
+export type DotProps = DotCommon &
+  (
+    | {
+        tone: Exclude<DotTone, "ring">;
+        /** 6px rather than 8px. */
+        small?: boolean;
+      }
+    // A ring is always 10px: a size it can't take is a type error, not a prop quietly dropped.
+    | { tone: "ring"; small?: never }
+  );
+
+export function Dot({ tone, small, className, ...rest }: DotProps) {
+  return <span {...rest} aria-hidden="true" data-dot={tone} data-small={small ? "" : undefined} className={className} />;
 }

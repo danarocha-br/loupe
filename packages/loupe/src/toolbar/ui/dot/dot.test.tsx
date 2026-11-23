@@ -31,7 +31,8 @@ describe("Dot", () => {
     const screen = renderInSurface(
       <>
         {TONES.map((tone) => (
-          <Dot key={tone} tone={tone} small data-testid={tone} />
+          // A ring takes no size: `small` on it is a type error.
+          <Dot key={tone} {...(tone === "ring" ? { tone } : { tone, small: true })} data-testid={tone} />
         ))}
         <Dot tone="amber" data-testid="medium" />
       </>,
