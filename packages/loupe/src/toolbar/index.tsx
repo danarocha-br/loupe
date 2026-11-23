@@ -8,9 +8,10 @@
 // reaches the page only through `<LoupeMount />`'s development-only dynamic import,
 // so a production build never holds this module.
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { debugOf } from "../runtime/debug.js";
+import type { LayerStatus } from "../layer-status.js";
+import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
 import { useDeselect } from "./deselect.js";
 import { type Column, columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.js";
@@ -20,113 +21,26 @@ import { Launcher } from "./launcher.js";
 import { useLayerStatus } from "./notices.js";
 import { usePageVersion } from "./page.js";
 import { Panel } from "./panel.js";
-import { panelView, type SeenComponents } from "./panel-view/index.js";
+import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startToolbar } from "./start.js";
-import { CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "./styles.js";
+import { SurfaceBoundary, type Theme, useTheme, useToolbarSurface } from "./surface/index.js";
 
-export type Theme = "light" | "dark";
+export type { Theme } from "./surface/index.js";
 
 export default function Toolbar() {
+  return (
+    <SurfaceBoundary>
+      <ToolbarSurface />
+    </SurfaceBoundary>
+  );
+}
+
+function ToolbarSurface() {
   useEffect(startToolbar, []);
-  const root = useShadowRoot();
+  const root = useToolbarSurface();
   if (!root) return null;
   return createPortal(<ToolbarBody host={root.host as HTMLElement} />, root);
-}
-
-/** A host element on the body with an open shadow root, so the app's CSS can't reach the Toolbar. */
-function useShadowRoot(): ShadowRoot | null {
-  const [root, setRoot] = useState<ShadowRoot | null>(null);
-  useEffect(() => {
-    const host = document.createElement("div");
-    host.setAttribute(HOST_ATTRIBUTE, "");
-    // Loupe's words are English whatever the app's `lang`: a screen reader reads them in an English voice.
-    host.setAttribute("lang", "en");
-    if (registerTextScale()) host.setAttribute(SCALE_ATTRIBUTE, "");
-    const shadow = host.attachShadow({ mode: "open" });
-    const style = document.createElement("style");
-    style.textContent = CSS;
-    shadow.append(style);
-    document.body.append(host);
-    setRoot(shadow);
-    return () => host.remove();
-  }, []);
-  return root;
-}
-
-type PropertyRegistry = { registerProperty?(definition: { name: string; syntax: string; inherits: boolean; initialValue: string }): void };
-
-/**
- * Registers `--loupe-px` as a length, so `calc(1em / 16)` on the host resolves there,
- * once, to the reader's default text size over 16, and every font size follows it
- * (styles.ts `size()`). True once it is registered, by this mount or an earlier one;
- * false where the browser can't, and the sizes then stay as written.
- */
-function registerTextScale(): boolean {
-  // `CSS` here is the stylesheet: the browser's CSS namespace is the window's.
-  const registry = (window as unknown as { CSS?: PropertyRegistry }).CSS;
-  if (typeof registry?.registerProperty !== "function") return false;
-  try {
-    registry.registerProperty({ name: "--loupe-px", syntax: "<length>", inherits: true, initialValue: "1px" });
-    return true;
-  } catch (error) {
-    // Registered already: a second mount, or a Fast Refresh.
-    return error instanceof DOMException && error.name === "InvalidModificationError";
-  }
-}
-
-/** Storage can throw (a private window, blocked site data): the OS preference decides then. */
-function storedTheme(): Theme | null {
-  try {
-    const value = localStorage.getItem(THEME_KEY);
-    return value === "light" || value === "dark" ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-const DARK_QUERY = "(prefers-color-scheme: dark)";
-
-function systemTheme(): Theme {
-  return typeof matchMedia === "function" && matchMedia(DARK_QUERY).matches ? "dark" : "light";
-}
-
-/**
- * Light or dark: the OS preference, until the header's toggle picks one, which
- * this browser then remembers for every app on the origin.
- */
-function useTheme(host: HTMLElement): [Theme, () => void] {
-  const [chosen, setChosen] = useState<Theme | null>(storedTheme);
-  const [system, setSystem] = useState<Theme>(systemTheme);
-  useEffect(() => {
-    if (typeof matchMedia !== "function") return;
-    const query = matchMedia(DARK_QUERY);
-    const change = () => setSystem(query.matches ? "dark" : "light");
-    query.addEventListener?.("change", change);
-    return () => query.removeEventListener?.("change", change);
-  }, []);
-  const theme = chosen ?? system;
-  // Before paint, so a dark system never sees one light frame. Transitions are off for
-  // the frame the theme lands in: every colour easing at once would smear the switch.
-  useLayoutEffect(() => {
-    host.setAttribute(SWITCHING_ATTRIBUTE, "");
-    host.setAttribute(THEME_ATTRIBUTE, theme);
-    const panel = host.shadowRoot?.querySelector(".panel");
-    // Reading a style makes the browser apply the new theme now, with transitions still off.
-    if (panel) void getComputedStyle(panel).opacity;
-    const timer = setTimeout(() => host.removeAttribute(SWITCHING_ATTRIBUTE), 1);
-    return () => clearTimeout(timer);
-  }, [host, theme]);
-  const toggle = useCallback(() => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    setChosen(next);
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      // Not remembered: it still holds for this page load.
-    }
-  }, [theme]);
-  return [theme, toggle];
 }
 
 /** The drawer's close and the handle's tuck (styles.ts `.panel.closing`, `.launcher.leaving`). */
@@ -206,7 +120,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
   // the page, so a change can be judged as it will ship. Kept for the page load.
   const [marksHidden, setMarksHidden] = useState(false);
-  const [theme, toggleTheme] = useTheme(host);
+  const [theme, toggleTheme] = useTheme(host, ".panel");
   const column = useColumn(!hidden);
   // Hide and Show swap the panel for its tab: focus goes with them when it was on the one
   // pressed, so a keyboard isn't dropped on the page (review 2026-11-20).
@@ -250,6 +164,22 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   );
 }
 
+/**
+ * What the panel shows, from `panelView()`. "Appears on interaction" remembers components
+ * across page versions: `panelView()` takes what it returned last time and returns the
+ * next, kept in a ref read while rendering. That is why this is a hook of its own: React
+ * Compiler skips a function that reads a ref in render, and the skip stays here rather
+ * than taking `ToolbarOpen` with it, whose memoised `<Panel>` keeps a hover from
+ * re-rendering the whole Panel (ADR 0003).
+ */
+function usePanelView(debug: LoupeDebug, layer: LayerStatus | null, selected: string | null, scope: Scope, version: number): PanelView {
+  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
+  // `version` is the trigger: it moves whenever the registry or the page changes.
+  const view = useMemo(() => panelView({ debug, layer, selected, scope, seen: seen.current }), [debug, layer, selected, scope, version]);
+  seen.current = view.seen;
+  return view;
+}
+
 /** Everything that watches the page, mounted only while the panel is open. */
 function ToolbarOpen({
   host,
@@ -280,18 +210,11 @@ function ToolbarOpen({
   theme: Theme;
   onTheme(): void;
 }) {
-  const debug = useMemo(debugOf, []);
+  // An inline function: React Compiler skips a component whose useMemo takes a reference.
+  const debug = useMemo(() => debugOf(), []);
   const version = usePageVersion(host);
   const layer = useLayerStatus(version);
-  // "Appears on interaction" remembers components across page versions: `panelView()`
-  // takes what it returned last time and returns the next.
-  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
-  // `version` is the trigger: it moves whenever the registry or the page changes.
-  const view = useMemo(
-    () => panelView({ debug, layer, selected, scope, seen: seen.current }),
-    [debug, layer, selected, scope, version],
-  );
-  seen.current = view.seen;
+  const view = usePanelView(debug, layer, selected, scope, version);
   useInstanceMeta(view.metaAnchor);
   const [hovered, setHovered] = useState<string[]>([]);
   // A row's hover can repeat as the pointer crosses its children: the same Instances change nothing.

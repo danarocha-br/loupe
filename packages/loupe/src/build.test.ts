@@ -61,12 +61,20 @@ describe("dist", () => {
 
   it("is built by Vite on the browser side, one file per source module", () => {
     const built = new Set(jsFiles().filter(isBrowserSide));
-    const expected = Object.keys(browserEntries()).map((name) => `${name}.js`);
+    // A `.css` file imported as a string is a module of its own too: `chip-group.css.js`.
+    const stylesheets = readdirSync(path.join(pkg, "src", "toolbar"), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".css"))
+      .map((file) => `toolbar/${file.split(path.sep).join("/")}.js`);
+    const expected = [...Object.keys(browserEntries()).map((name) => `${name}.js`), ...stylesheets];
     expect([...built].sort()).toEqual(expected.sort());
-    // Rolldown marks each module it emits with its source path; tsc6 never does.
-    // A type-only module comes out empty.
+    // Rolldown marks each module it emits with its source path, but not one with no
+    // imports whose first statement carries a comment (tokens.js); it then still writes
+    // one export list at the end, where tsc6 keeps \`export const\`. A type-only module comes out empty.
     for (const file of built) {
-      if (read(file).trim() !== "") expect(read(file), file).toMatch(/^\/\/ src\//m);
+      const code = read(file);
+      if (code.trim() === "" || /^\/\/ src\//m.test(code)) continue;
+      expect(code, file).toMatch(/^export \{[^}]*\};\s*$/m);
+      expect(code, file).not.toMatch(/^export (const|let|function|class) /m);
     }
   });
 
@@ -74,6 +82,7 @@ describe("dist", () => {
   it.each([
     ["mount.js", "use client"],
     ["toolbar/index.js", "use client"],
+    ["toolbar/workbench.js", "use client"],
     ["toolbar/flags-server.js", "use server"],
     ["toolbar/layer-server.js", "use server"],
     ["toolbar/meta-server.js", "use server"],
@@ -129,6 +138,8 @@ describe("dist", () => {
       "./mount": { types: "./dist/mount.d.ts", default: "./dist/mount.js" },
       "./next": { types: "./dist/next.d.cts", default: "./dist/next.cjs" },
       "./runtime": { types: "./dist/runtime/index.d.ts", default: "./dist/runtime/index.js" },
+      // The fixture's workbench page (ADR 0003), loaded in development only; not for hosts.
+      "./workbench": { types: "./dist/toolbar/workbench.d.ts", default: "./dist/toolbar/workbench.js" },
       "./proposal.schema.json": "./proposal.schema.json",
       "./package.json": "./package.json",
     });
@@ -151,6 +162,10 @@ describe("dist", () => {
     const compiled = (file: string) => /from\s*"react\/compiler-runtime"/.test(read(file));
     expect(compiled("toolbar/panel.js")).toBe(true);
     expect(compiled("toolbar/launcher.js")).toBe(true);
+    // ToolbarOpen and usePicker: compiled, a hover leaves the Panel alone (hover-render.test.tsx).
+    expect(compiled("toolbar/index.js")).toBe(true);
+    expect(compiled("toolbar/picker.js")).toBe(true);
+    expect(compiled("toolbar/ui/chip-group/chip-group.js")).toBe(true);
     for (const file of jsFiles().filter((file) => file.startsWith("runtime/") || file === "mount.js")) {
       expect(compiled(file), file).toBe(false);
     }

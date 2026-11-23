@@ -17,6 +17,10 @@
       "types": "./dist/runtime/index.d.ts",
       "default": "./dist/runtime/index.js"
     },
+    "./workbench": {
+      "types": "./dist/toolbar/workbench.d.ts",
+      "default": "./dist/toolbar/workbench.js"
+    },
     "./proposal.schema.json": "./proposal.schema.json",
     "./package.json": "./package.json"
   },
@@ -48,11 +52,14 @@
   "devDependencies": {
     "@babel/core": "7.29.13",
     "@rolldown/plugin-babel": "0.3.1",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/user-event": "14.6.1",
     "@types/node": "^22.19.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "ajv": "8.17.1",
     "ajv-formats": "3.0.1",
+    "axe-core": "4.14.1",
     "babel-plugin-react-compiler": "1.0.0",
     "flags": "4.2.4",
     "jsdom": "26.1.0",
@@ -64,6 +71,8 @@
   },
   "dependencies": {
     "@babel/parser": "^7.29.13",
+    "@ui-sdk/core": "0.1.0-beta.14",
+    "@ui-sdk/react": "0.1.0-beta.14",
     "jsonc-parser": "3.3.1",
     "magic-string": "^0.30.21",
     "react-docgen-typescript": "2.4.0",

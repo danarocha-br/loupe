@@ -7,6 +7,7 @@
 // It isn't modal: the page and the panel stay usable while it is open.
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
 import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./icons.js";
 
@@ -176,7 +177,7 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
 /**
  * A popover over the footer, pointing at what opened it. Escape anywhere, or a press
  * outside it and its split button, closes it; Escape while it is open is its alone
- * (`deselect.ts` leaves it be), so the selection stays.
+ * (escape.ts: the popover's layer is above the selection's), so the selection stays.
  */
 function Popover({
   anchor,
@@ -201,16 +202,10 @@ function Popover({
       const inside = path.some((node) => node === element.current || (node instanceof HTMLElement && node.classList.contains("split")));
       if (!inside) latest.current(false);
     };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.isComposing) latest.current(true);
-    };
     document.addEventListener("pointerdown", outside, true);
-    window.addEventListener("keydown", escape, true);
-    return () => {
-      document.removeEventListener("pointerdown", outside, true);
-      window.removeEventListener("keydown", escape, true);
-    };
+    return () => document.removeEventListener("pointerdown", outside, true);
   }, []);
+  useEscape("popover", true, () => latest.current(true));
   return (
     <div ref={element} className="copy-popover" role="dialog" aria-label={label} data-anchor={anchor}>
       {children}

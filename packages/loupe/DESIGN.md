@@ -566,17 +566,42 @@ Three shapes carry meaning and appear nowhere else:
 
 On the page, a solid outline is the one Instance in hand and a dashed coral one is the rest of what it reaches. Grey dashes mean "not applied": a left-out Instance's outline, a hovered outline. In the panel a dashed tag means not there now ("Not visible now", "No Instance mounted").
 
+## Layers
+
+The toolbar is built in four layers (ADR 0003). Each imports only from the layers before it:
+
+1. **Tokens.** `src/toolbar/tokens.ts`, one typed module: colour by role and theme, the page's marks, the map's hues, type, space, radius, shadow and motion. It is declared on the host as custom properties (`--ink`, `--space-sheet`, `--radius-chip`, `--font-option`, …). The tests read the module, and `design-md.test.ts` holds this file's front matter to it.
+2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip), plain props for a single control. The first is ChipGroup.
+3. **Patterns.** PropRow, ScopeSection, SiteCard, CopySplit, Identity and the like: primitives composed, taking `panel-view` types. None has moved yet.
+4. **Views.** The panel, the list, the Inspector. They render only what `panelView()` decides, words included.
+
+**The import rule.**
+- Nothing outside `src/toolbar/ui/` imports UI SDK.
+- `ui/` imports nothing from the rest of the toolbar (`panel-view/`, `runtime/`, the views), so it can become a package by moving it. Its tests draw in the surface's test host.
+- `src/toolbar/ui/layers.test.ts` fails when either breaks.
+
+**The stylesheet.** Every surface adopts one stylesheet, assembled in `src/toolbar/surface/` as `@layer tokens, primitives, patterns`:
+- the `tokens` layer holds the host's custom properties and the elements' defaults (`button { padding: 0 }`), below everything, so a reset never undoes a primitive;
+- the `primitives` layer holds each primitive's `.css`, written against state attributes (`[data-checked]`, `[data-tagged]`) rather than Loupe's classes;
+- the `patterns` layer is empty until the first pattern lands.
+
+The views' rules (`styles.ts`) are not in a layer yet. They come after every layer, so a view can still adjust a primitive while its rules move.
+
+**The surface.** `src/toolbar/surface/` owns the shadow root: the stylesheet, the theme, the reader's text size, `lang="en"`, and an error boundary, so a throw stops at Loupe and never reaches the host's layout. It has two adapters: the Toolbar's host on the body, and `<Surface>`, which draws any primitive in place. The tests (`surface/render.fixture.tsx`) and the fixture's `/workbench` page use the second. The workbench draws each primitive in light and dark, under forced colours, with reduced motion and at a larger text size.
+
+**Esc between layers.** UI SDK coordinates Esc among its own popups. Loupe's window-level Esc lives in `escape.ts`: picking, then Copy Proposal's popover, then the selection, each claiming it while it is up. Whatever none of them takes stays the app's.
+
 ## Components
 
 ### Select tools
 The scope of a change, chosen the way Figma selects.
 - **Select one** (the arrow) and **Select multiple** (two stacked frames and the arrow) sit together in a `tools-wash` pill in the header (2px inset, 2px apart). At rest a tool is a muted icon; hover fills it `sunk` with a `primary` icon.
-- **Mode:** the tool in use is a white chip with a `primary` icon and the raised shadow. It is kept for the next selection until the page reloads.
-- **Armed:** pressing a tool re-scopes the current selection at once and waits for a click on the page. It looks as in use; the salmon strip says what a click will select ("Click an Instance on the page · Esc cancels"). Pressed again, or Esc, it stops.
+- **Mode:** the two tools are one radio group (ChipGroup), and the tool in use is its checked chip: white, with a `primary` icon and the raised shadow. It is kept for the next selection until the page reloads.
+- **Armed:** pressing a tool re-scopes the current selection at once and waits for a click on the page. Armed is a state of the page, not of the button: it looks as in use, and the salmon strip says what a click will select ("Click an Instance on the page · Esc cancels"). Pressed again, or Esc, it stops.
 - **Leaving a selection**, as in Figma: Esc, or a pointer click on the page outside every selected Instance (at Select multiple, outside every one it reaches), goes back to the list. Loupe only listens: the key and the click still reach the app, never stopped or delayed. Esc stays the app's while it has a menu or dialog open, a text field's while one has focus, a select tool's while one is armed (Esc then stops picking first), and the copy popover's while it is open. A click in the panel, or one from the keyboard, never counts.
 
 ### Start
-With nothing selected, the first card asks "What do you want to change?" in the hero style, "Pick it right on the page, or start from what this page uses most." under it, and the two select tools again as tiles side by side. Each tile shows what its tool does: a 56px sunk preview of three small controls and a pointer, the middle one ringed in coral, and for Select multiple the other two dashed; then its name (13px/600) and a faint hint ("Click one thing on the page", "Every Instance from one call site"). Armed, the tile takes a 1.5px coral ring.
+With nothing selected, the first card asks "What do you want to change?" in the hero style, "Pick it right on the page, or start from what this page uses most." under it, and the two select tools again as tiles side by side. Each tile shows what its tool does: a 56px sunk preview of three small controls and a pointer, the middle one ringed in coral, and for Select multiple the other two dashed; then its name (13px/600) and a faint hint ("Click one thing on the page", "Every Instance from one call site"). The tiles are the same radio group as the header's tools: the mode's tile takes a 1px `field-edge` ring, and armed, a 1.5px coral one.
 
 ### Buttons
 Soft pills, with the dark primary kept for the one exit.
@@ -608,7 +633,7 @@ The Inspector's core: one row per prop, on hairlines.
 - **Change line:** 2px under the head, `"ghost" → "outline"` in 11px mono, the arrow faint, the new value in ink at 600, then "· from All on page" only when the value comes from a wider scope than the one in view.
 - **Chips:** 13px under the head, the options wrap in a row 6px apart, each a 26px `sunk` chip with an 8px corner and a hairline ring, 12px muted. Three marks, so a designer never has to guess: the chip that shows now is salmon with its ring, at 500; the app's own value, once overridden, gets a 1px `field-edge` ring, ink text and an "APP" tag; the design system's default, when the metadata knows it, a 4px faint dot after its label. At a scope each chip counts the Instances showing it now, a narrower Override's value included, so "Same on all 4" is only ever true.
 - **Legend:** after the option rows, when any chip marks a default, a row of its own says what the marks mean: Shows now, App's value (only while an Override is in view at This instance), Default.
-- **Keyboard:** a row of chips is one radio group and one Tab stop; the arrow keys move through it and choose as they go, Home and End jump.
+- **Keyboard:** a row of chips is one radio group (ChipGroup) and one Tab stop; the arrow keys move through it, and Space or Enter chooses. Choosing as focus moved would write an Override to every Instance in scope on each press.
 - **Long values** wrap inside their chip; nothing is cut short.
 - **Text field:** a card-white field with a 1px `field-edge` border and 12px corners, 13px text, one line that grows to fit its text; focus turns the edge coral with a 3px `focus-glow` ring; an overridden field keeps a `shown-edge` border.
 - **Under the control**, when they apply: "App value: …", why a field can't change it, a lock and the reason a prop gets no control, the holding notice for a State prop ("Your Override holds this at `true`; the app tried to set `false`."), and "1 of 4 keeps its own value", a navy link that selects them.
