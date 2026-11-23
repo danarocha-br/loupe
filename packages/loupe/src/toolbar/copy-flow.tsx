@@ -6,11 +6,11 @@
 // popover points at what opened it: the chevron, or the button a one-click copy came from.
 // It isn't modal: the page and the panel stay usable while it is open.
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
 import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./icons.js";
-import { Button } from "./ui/index.js";
+import { Button, Field, Popover, PopoverPanel } from "./ui/index.js";
 
 /** Every word the flow shows, beside the component that shows it. */
 export const COPY = {
@@ -30,6 +30,7 @@ export const COPY = {
   selectAll: "Select all",
   retry: "Try again",
   pasteIt: "Paste it into your coding agent",
+  proposal: "The Proposal",
 } as const;
 
 /** Under the title field when the details' copy is pressed with none. */
@@ -54,8 +55,8 @@ const STATES = {
   failed: { icon: <AlertIcon />, text: COPY.failed },
 } as const;
 
-/** `disabled` while there is nothing to copy. */
-export function CopyFlow({ disabled }: { disabled: boolean }) {
+/** `disabled` while there is nothing to copy; `frame`, the footer the popovers stand over. */
+export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObject<HTMLElement | null> }) {
   const [details, setDetails] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [copied, setCopied] = useState<Landed | null>(null);
@@ -63,8 +64,11 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
   const [busy, setBusy] = useState(false);
   // State lags a second click in the same frame; the ref doesn't.
   const running = useRef(false);
+  const split = useRef<HTMLDivElement>(null);
   const chevron = useRef<HTMLButtonElement>(null);
   const main = useRef<HTMLButtonElement>(null);
+  const titleField = useRef<HTMLInputElement>(null);
+  const retry = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (copied === null) return;
@@ -76,6 +80,9 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
     const timer = setTimeout(() => setToast(null), TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
+  // The popover takes Escape itself (ui/popover) and hands focus back. Claiming its layer
+  // while it is up keeps the key from the selection beneath (escape.ts), so that stays.
+  useEscape("popover", details || failure !== null, () => {});
 
   const halfFor = (from: From) => (from === "copy" ? main : chevron);
   const run = (from: From, copyDetails: CopyDetails) => {
@@ -86,13 +93,12 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
       ({ title }) => {
         running.current = false;
         setBusy(false);
+        // Closing with focus inside hands it back to the half that opened the popover.
         setFailure(null);
         setDetails(false);
         const landed = { title, at: Date.now() };
         setCopied(landed);
         setToast(landed);
-        // The popover held focus: hand it back to the half that opened it.
-        halfFor(from).current?.focus();
       },
       (error: unknown) => {
         running.current = false;
@@ -109,12 +115,9 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
       },
     );
   };
-  /** Closes the popover; `returnFocus` when closed from the keyboard or a button, not by a press elsewhere. */
-  const close = (returnFocus: boolean) => {
-    const from = failure?.from ?? "details";
+  const close = () => {
     setDetails(false);
     setFailure(null);
-    if (returnFocus) halfFor(from).current?.focus();
   };
 
   const state = failure?.from === "copy" ? "failed" : copied !== null ? "copied" : "idle";
@@ -122,7 +125,7 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
   const detailsOpen = details || failure?.from === "details";
   return (
     <>
-      <div className="split" data-state={state} aria-busy={busy || undefined}>
+      <div ref={split} className="split" data-state={state} aria-busy={busy || undefined}>
         <button
           ref={main}
           type="button"
@@ -145,14 +148,34 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
           aria-expanded={detailsOpen}
           aria-haspopup="dialog"
           title={COPY.detailsTitle}
-          onClick={() => (details || failure ? close(true) : setDetails(true))}
+          onClick={() => {
+            if (!details && !failure) return setDetails(true);
+            close();
+            chevron.current?.focus();
+          }}
         >
           <ChevronUpIcon />
           <span className="sr-only">{COPY.details}</span>
         </button>
       </div>
-      {details && <Details busy={busy} onCopy={(copyDetails) => run("details", copyDetails)} onClose={close} />}
-      {failure && <NotCopied failure={failure} busy={busy} onRetry={() => run(failure.from, formDetails())} onClose={close} />}
+      {/* A press on the split is its own: the chevron toggles, the main half copies again. */}
+      <Popover open={details} onOpenChange={(open) => !open && setDetails(false)} inside={split}>
+        <PopoverPanel label={COPY.details} anchor={frame} returnFocus={chevron} initialFocus={titleField} caret="end" className="copy-popover">
+          <Details titleField={titleField} busy={busy} onCopy={(copyDetails) => run("details", copyDetails)} />
+        </PopoverPanel>
+      </Popover>
+      <Popover open={failure !== null} onOpenChange={(open) => !open && setFailure(null)} inside={split}>
+        <PopoverPanel
+          label={COPY.notCopied}
+          anchor={frame}
+          returnFocus={halfFor(failure?.from ?? "details")}
+          initialFocus={retry}
+          caret={failure?.from === "copy" ? "center" : "end"}
+          className="copy-popover"
+        >
+          {failure && <NotCopied failure={failure} busy={busy} retry={retry} onRetry={() => run(failure.from, formDetails())} />}
+        </PopoverPanel>
+      </Popover>
       {toast !== null && failure === null && !details && (
         <div className="copy-toast" aria-hidden="true">
           <span className="badge">
@@ -175,58 +198,13 @@ export function CopyFlow({ disabled }: { disabled: boolean }) {
   );
 }
 
-/**
- * A popover over the footer, pointing at what opened it. Escape anywhere, or a press
- * outside it and its split button, closes it; Escape while it is open is its alone
- * (escape.ts: the popover's layer is above the selection's), so the selection stays.
- */
-function Popover({
-  anchor,
-  label,
-  onClose,
-  children,
-}: {
-  anchor: From;
-  label: string;
-  onClose(returnFocus: boolean): void;
-  children: ReactNode;
-}) {
-  const element = useRef<HTMLDivElement>(null);
-  // Read when the key or press comes, so the listeners stay put across renders.
-  const latest = useRef(onClose);
-  useEffect(() => {
-    latest.current = onClose;
-  });
-  useEffect(() => {
-    const outside = (event: PointerEvent) => {
-      const path = event.composedPath();
-      const inside = path.some((node) => node === element.current || (node instanceof HTMLElement && node.classList.contains("split")));
-      if (!inside) latest.current(false);
-    };
-    document.addEventListener("pointerdown", outside, true);
-    return () => document.removeEventListener("pointerdown", outside, true);
-  }, []);
-  useEscape("popover", true, () => latest.current(true));
-  return (
-    <div ref={element} className="copy-popover" role="dialog" aria-label={label} data-anchor={anchor}>
-      {children}
-      <svg className="caret" width="22" height="12" viewBox="0 0 22 12" aria-hidden="true">
-        <path className="fill" d="M0 0H22L11 11Z" />
-        <path className="edge" d="M0.5 0L11 10.5L21.5 0" />
-      </svg>
-    </div>
-  );
-}
-
 /** The chevron's popover: a title, prefilled from the suggestion until edited, and an optional designer. */
-function Details({ busy, onCopy, onClose }: { busy: boolean; onCopy(details: CopyDetails): void; onClose(returnFocus: boolean): void }) {
+function Details({ titleField, busy, onCopy }: { titleField: RefObject<HTMLInputElement | null>; busy: boolean; onCopy(details: CopyDetails): void }) {
   const form = copyForm();
   const [title, setTitle] = useState(form.title ?? "");
   const [designer, setDesigner] = useState(form.designer);
   const [missing, setMissing] = useState(false);
-  const titleInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    titleInput.current?.focus();
     let live = true;
     // Prefilled from the first change until the designer writes their own.
     if (copyForm().title === null) {
@@ -240,73 +218,58 @@ function Details({ busy, onCopy, onClose }: { busy: boolean; onCopy(details: Cop
     };
   }, []);
   return (
-    <Popover anchor="details" label={COPY.details} onClose={onClose}>
-      <form
-        className="details"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (title.trim() === "") {
-            setMissing(true);
-            titleInput.current?.focus();
-            return;
-          }
-          onCopy({ title, designer });
+    // The title's error is the form's own, in the page: the browser's bubble would sit outside Loupe.
+    <form
+      className="details"
+      noValidate
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (title.trim() === "") {
+          setMissing(true);
+          titleField.current?.focus();
+          return;
+        }
+        onCopy({ title, designer });
+      }}
+    >
+      <Field
+        ref={titleField}
+        label={COPY.title}
+        name="title"
+        required
+        error={missing ? TITLE_MISSING : undefined}
+        value={title}
+        onValueChange={(next) => {
+          setTitle(next);
+          if (next.trim() !== "") setMissing(false);
+          copyForm().title = next;
         }}
-      >
-        {/* The error sits outside the label, so it describes the field without joining its name. */}
-        <div className="field">
-          <label htmlFor="loupe-copy-title-field">{COPY.title}</label>
-          <input
-            id="loupe-copy-title-field"
-            ref={titleInput}
-            name="title"
-            required
-            aria-invalid={missing || undefined}
-            aria-describedby={missing ? "loupe-title-missing" : undefined}
-            value={title}
-            onChange={(event) => {
-              setTitle(event.target.value);
-              if (event.target.value.trim() !== "") setMissing(false);
-              copyForm().title = event.target.value;
-            }}
-          />
-          {missing && (
-            <span className="field-error" id="loupe-title-missing">
-              {TITLE_MISSING}
-            </span>
-          )}
-        </div>
-        <label className="field">
-          <span>
-            {COPY.designer} <span className="optional">{COPY.optional}</span>
-          </span>
-          <input
-            name="designer"
-            placeholder={COPY.designerHint}
-            value={designer}
-            onChange={(event) => {
-              setDesigner(event.target.value);
-              copyForm().designer = event.target.value;
-            }}
-          />
-        </label>
-        <Button type="submit" look="primary" className="submit" aria-disabled={busy || undefined}>
-          <CopyIcon size={16} />
-          {COPY.copyWith}
-        </Button>
-      </form>
-    </Popover>
+      />
+      <Field
+        label={COPY.designer}
+        optional={COPY.optional}
+        name="designer"
+        placeholder={COPY.designerHint}
+        value={designer}
+        onValueChange={(next) => {
+          setDesigner(next);
+          copyForm().designer = next;
+        }}
+      />
+      <Button type="submit" look="primary" className="submit" aria-disabled={busy || undefined}>
+        <CopyIcon size={16} />
+        {COPY.copyWith}
+      </Button>
+    </form>
   );
 }
 
 /** A refused copy: why, the Proposal's text to copy by hand when it was built, and another try. */
-function NotCopied({ failure, busy, onRetry, onClose }: { failure: Failure; busy: boolean; onRetry(): void; onClose(returnFocus: boolean): void }) {
+function NotCopied({ failure, busy, retry, onRetry }: { failure: Failure; busy: boolean; retry: RefObject<HTMLButtonElement | null>; onRetry(): void }) {
   const text = useRef<HTMLTextAreaElement>(null);
-  const retry = useRef<HTMLButtonElement>(null);
-  useEffect(() => retry.current?.focus(), []);
   const hasText = failure.text !== "";
   return (
-    <Popover anchor={failure.from} label={COPY.notCopied} onClose={onClose}>
+    <>
       <div className="not-copied">
         <span className="badge" aria-hidden="true">
           <ExclaimIcon />
@@ -317,9 +280,7 @@ function NotCopied({ failure, busy, onRetry, onClose }: { failure: Failure; busy
         </div>
       </div>
       {hasText && (
-        <div className="proposal-text">
-          <textarea ref={text} readOnly value={failure.text} aria-label="The Proposal" spellCheck={false} />
-        </div>
+        <Field ref={text} className="proposal-text" label={COPY.proposal} labelHidden look="well" multiline readOnly spellCheck={false} value={failure.text} />
       )}
       <div className={hasText ? "popover-actions" : "popover-actions alone"}>
         {hasText && (
@@ -338,6 +299,6 @@ function NotCopied({ failure, busy, onRetry, onClose }: { failure: Failure; busy
           {COPY.retry}
         </Button>
       </div>
-    </Popover>
+    </>
   );
 }

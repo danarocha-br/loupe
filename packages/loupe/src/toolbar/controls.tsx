@@ -9,13 +9,13 @@
 // The row comes decided from `panelView()` (PER-214); this file draws it, makes the
 // write its data names, and keeps the Text field's unsent text while it has focus.
 
-import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
 import { Delta, LockIcon, ResetIcon } from "./icons.js";
 import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
 import type { SelectMode } from "./picker.js";
-import { Button, Chip, ChipGroup, Switch } from "./ui/index.js";
+import { Button, Chip, ChipGroup, Field, Switch } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -305,36 +305,32 @@ function ControlView({ control, label, app, debug }: { control: Control; label: 
 
 /**
  * Label text (PER-113): one line, no length limit, applied while typing, and it
- * may be left empty. It wraps and grows to its text rather than scrolling.
+ * may be left empty. It wraps and grows to its text rather than scrolling. The row
+ * shows the prop's name: the field says it to a screen reader.
  */
 function TextField({ label, value, set }: { label: string; value: string; set(next: string): void }) {
   // The Toolbar redraws once a frame, so the field keeps its own text while it has focus,
   // with the value that text was typed over.
   const [draft, setDraft] = useState<{ text: string; from: string } | null>(null);
-  const ref = useRef<HTMLTextAreaElement>(null);
   // Something else moved the value (a reset, another scope): drop the draft.
   const stale = draft !== null && value !== draft.from && value !== draft.text;
   if (stale) setDraft(null);
   const text = draft === null || stale ? value : draft.text;
-  useLayoutEffect(() => {
-    const field = ref.current;
-    if (!field) return;
-    field.style.height = "auto";
-    // scrollHeight leaves out the borders, which border-box sizing counts.
-    field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
-  }, [text]);
   return (
-    <textarea
-      ref={ref}
-      className="text"
+    <Field
+      label={label}
+      labelHidden
+      look="outline"
+      multiline
+      autoResize
       rows={1}
-      aria-label={label}
+      className="text"
       value={text}
       onKeyDown={(event) => {
         if (event.key === "Enter") event.preventDefault();
       }}
-      onChange={(event) => {
-        const next = singleLine(event.target.value);
+      onValueChange={(typed) => {
+        const next = singleLine(typed);
         setDraft({ text: next, from: value });
         set(next);
       }}

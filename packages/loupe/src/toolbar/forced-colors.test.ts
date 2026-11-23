@@ -18,12 +18,14 @@ describe("focus under forced colours", () => {
   const all = rules(CSS);
 
   it("keeps an outline forced colours draw on every field that trades its outline for a ring", () => {
-    const fields = all.filter((rule) => /outline: none/.test(rule.body) && /(input|textarea|\.text)\s*$/.test(rule.selector));
-    expect(fields.map((rule) => rule.selector).sort()).toEqual([".copy-popover input", ".proposal-text textarea", ".row .text"]);
-    for (const field of fields) {
-      const focus = all.find((rule) => rule.selector === `${field.selector}:focus` || rule.selector === `${field.selector}:focus-visible`);
-      expect(focus?.body, field.selector).toMatch(/box-shadow:/);
-      expect(focus?.body, field.selector).toMatch(/outline: 2px solid transparent/);
+    // Every text field is Field's (ui/field): it drops the outline once, and each look draws its own ring.
+    const fields = all.filter((rule) => /outline: none/.test(rule.body) && /(input|textarea|\.text|\[data-field-control\])\s*$/.test(rule.selector));
+    expect(fields.map((rule) => rule.selector)).toEqual(["[data-field-control]"]);
+    for (const look of ["filled", "outline", "well"]) {
+      const selector = `[data-look="${look}"] [data-field-control]`;
+      const focus = all.find((rule) => rule.selector === `${selector}:focus` || rule.selector === `${selector}:focus-visible`);
+      expect(focus?.body, look).toMatch(/box-shadow:/);
+      expect(focus?.body, look).toMatch(/outline: 2px solid transparent/);
     }
   });
 

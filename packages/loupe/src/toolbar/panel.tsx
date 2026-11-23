@@ -1227,8 +1227,10 @@ function Footer({
     if (button.disabled) focusHeading(button);
     else button.focus();
   });
+  // Copy Proposal's popovers stand over the whole footer.
+  const frame = useRef<HTMLElement>(null);
   return (
-    <footer className="footer">
+    <footer ref={frame} className="footer">
       <div className="tally">
         <span className="count" aria-live="polite">
           <span className="sr-only">{footer.countText}</span>
@@ -1294,7 +1296,7 @@ function Footer({
           <ContrastIcon />
           <span className="sr-only">Dark theme</span>
         </Toggle>
-        <CopyFlow disabled={!footer.copyEnabled} />
+        <CopyFlow disabled={!footer.copyEnabled} frame={frame} />
       </div>
     </footer>
   );

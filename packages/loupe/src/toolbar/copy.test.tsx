@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { within } from "@testing-library/dom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -69,14 +70,20 @@ async function until(done: () => boolean, tries = 100): Promise<void> {
   expect(done()).toBe(true);
 }
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
+/** The toolbar's shadow root, queried by role. */
+const screen = () => within(shadow() as unknown as HTMLElement);
 /** The popover over the footer: the details to copy with, or why a copy failed. */
-const popover = () => shadow().querySelector<HTMLElement>(".copy-popover");
+const popover = () => screen().queryByRole("dialog");
 const toast = () => shadow().querySelector<HTMLElement>(".copy-toast");
 /** What a screen reader hears: the status region the flow keeps mounted. */
 const announced = () => shadow().querySelector("[data-testid=copy-status]")?.textContent ?? "";
 const button = (text: string, scope: ParentNode = shadow()) =>
   [...scope.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent === text);
-const field = <T extends HTMLInputElement | HTMLTextAreaElement>(selector: string) => popover()?.querySelector<T>(selector) as T;
+/** A text box in the popover, by name: "Title", "Designer optional", "The Proposal". */
+const field = <T extends HTMLInputElement | HTMLTextAreaElement = HTMLInputElement>(name: string) => {
+  const open = popover();
+  return (open ? within(open).queryByRole("textbox", { name }) : null) as T;
+};
 /** The split button's two halves: Copy Proposal, and the chevron that opens the details. */
 const copy = () => shadow().querySelector<HTMLButtonElement>("[data-copy]") as HTMLButtonElement;
 const more = () => shadow().querySelector<HTMLButtonElement>("[data-copy-details]") as HTMLButtonElement;
@@ -102,7 +109,7 @@ function copiedProposal(): Proposal {
 /** Opens the details popover, once its title is prefilled from the suggestion. */
 async function openDetails(): Promise<void> {
   act(() => more().click());
-  await until(() => (field<HTMLInputElement>('input[name="title"]')?.value ?? "") !== "");
+  await until(() => (field("Title")?.value ?? "") !== "");
 }
 
 /** A change, so there is something to copy. */
@@ -174,14 +181,14 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     const records = registry().store.records();
     await openDetails();
     expect(more().getAttribute("aria-expanded")).toBe("true");
-    expect(popover()?.getAttribute("role")).toBe("dialog");
-    const title = field<HTMLInputElement>('input[name="title"]');
+    expect(popover()).toBe(screen().getByRole("dialog", { name: "Copy with details" }));
+    const title = field("Title");
     expect(title.value).toBe("Button variant in MemberRow");
     expect(shadow().activeElement).toBe(title);
-    expect(field<HTMLInputElement>('input[name="designer"]').placeholder).toBe("Who is asking for this?");
+    expect(field("Designer optional").placeholder).toBe("Who is asking for this?");
 
     type(title, "Calmer rows");
-    type(field('input[name="designer"]'), "Dana");
+    type(field("Designer optional"), "Dana");
     act(() => button("Copy with these details")?.click());
     await until(() => copies.length === 1);
     await settle();
@@ -196,15 +203,15 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(registry().store.records()).toEqual(records);
     expect(shadow().activeElement).toBe(more());
     await openDetails();
-    expect(field<HTMLInputElement>('input[name="title"]').value).toBe("Calmer rows");
-    expect(field<HTMLInputElement>('input[name="designer"]').value).toBe("Dana");
+    expect(field("Title").value).toBe("Calmer rows");
+    expect(field("Designer optional").value).toBe("Dana");
   });
 
   it("holds the details' copy back while the title is empty, and says so under the field", async () => {
     await change();
     await openDetails();
     const submit = button("Copy with these details");
-    const title = field<HTMLInputElement>('input[name="title"]');
+    const title = field("Title");
     type(title, "   ");
     // Never disabled with no reason given (review 2026-11-20): pressed, it says what is missing.
     expect(submit?.disabled).toBe(false);
@@ -217,21 +224,22 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(shadow().activeElement).toBe(title);
     type(title, "Calmer rows");
     expect(title.hasAttribute("aria-invalid")).toBe(false);
-    expect(popover()?.querySelector(".field-error")).toBeNull();
+    expect(within(popover() as HTMLElement).queryByText(TITLE_MISSING)).toBeNull();
+    // Empty, it says the same in the page: the browser's own bubble would sit outside Loupe.
+    type(title, "");
+    act(() => submit?.click());
+    await settle();
+    expect(copies).toEqual([]);
+    expect(within(popover() as HTMLElement).getByText(TITLE_MISSING)).toBeDefined();
   });
 
-  it("closes the details on a press outside, leaving focus where the press put it", async () => {
+  it("leaves a press on the split button to the split: the chevron's own, or another copy", async () => {
+    // A press anywhere else closes the popover: ui/popover's tests.
     await change();
     await openDetails();
     act(() => {
-      document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
-    });
-    expect(popover()).toBeNull();
-    expect(shadow().activeElement).toBeNull();
-    // A press on the split button is the chevron's own: it doesn't count as outside.
-    await openDetails();
-    act(() => {
       more().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
+      copy().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
     });
     expect(popover()).not.toBeNull();
   });
@@ -243,8 +251,8 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await change();
     act(() => copy().click());
     await until(() => popover() !== null);
-    expect(popover()?.querySelector('[role="alert"]')?.textContent).toBe("The project server didn’t answer.");
-    expect(popover()?.querySelector("textarea")).toBeNull();
+    expect(within(popover() as HTMLElement).queryByRole("alert")?.textContent).toBe("The project server didn’t answer.");
+    expect(field("The Proposal")).toBeNull();
     expect(button("Select all")).toBeUndefined();
     expect(button("Try again")).toBeDefined();
   });
@@ -254,7 +262,7 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await openDetails();
     act(() => {
       // Composed, as a browser's key events are: it reaches the window the popover listens on.
-      field('input[name="title"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
+      field("Title").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
     });
     expect(popover()).toBeNull();
     expect(shadow().activeElement).toBe(more());
@@ -275,15 +283,17 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     vi.spyOn(console, "warn").mockImplementation(() => {});
     await change();
     act(() => copy().click());
-    await until(() => popover() !== null && popover()?.querySelector("textarea")?.value !== "");
+    await until(() => popover() !== null && field<HTMLTextAreaElement>("The Proposal")?.value !== "");
 
     expect(copy().textContent).toBe("Not copied");
     expect(shadow().querySelector(".split")?.getAttribute("data-state")).toBe("failed");
-    // From the button, the caret points at the button; from the details, at the chevron.
-    expect(popover()?.getAttribute("data-anchor")).toBe("copy");
-    expect(popover()?.querySelector("h3")?.textContent).toBe("Couldn’t copy automatically");
-    expect(popover()?.querySelector('[role="alert"]')?.textContent).toBe("Write permission denied. Your Proposal is below.");
-    const text = popover()?.querySelector("textarea") as HTMLTextAreaElement;
+    // From the button, the caret sits under the popover's middle; from the details, near its end, at the chevron.
+    expect(popover()?.getAttribute("data-caret")).toBe("center");
+    expect(popover()).toBe(screen().getByRole("dialog", { name: "Couldn’t copy automatically" }));
+    expect(shadow().activeElement).toBe(button("Try again"));
+    expect(within(popover() as HTMLElement).getByRole("heading").textContent).toBe("Couldn’t copy automatically");
+    expect(within(popover() as HTMLElement).queryByRole("alert")?.textContent).toBe("Write permission denied. Your Proposal is below.");
+    const text = field<HTMLTextAreaElement>("The Proposal");
     expect(text.readOnly).toBe(true);
     expect(text.value.startsWith("# Button variant in MemberRow\n")).toBe(true);
     expect(String(info.mock.calls[0]?.[0])).toMatch(/^\[loupe\] Proposal:\n\n# Button variant in MemberRow\n/);
@@ -295,9 +305,9 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     });
     expect(popover()).toBeNull();
     act(() => copy().click());
-    await until(() => popover() !== null && popover()?.querySelector("textarea")?.value !== "");
+    await until(() => popover() !== null && field<HTMLTextAreaElement>("The Proposal")?.value !== "");
     act(() => button("Select all")?.click());
-    const again = popover()?.querySelector("textarea") as HTMLTextAreaElement;
+    const again = field<HTMLTextAreaElement>("The Proposal");
     expect([again.selectionStart, again.selectionEnd]).toEqual([0, again.value.length]);
 
     refuse = false;
@@ -315,10 +325,12 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await change();
     await openDetails();
     act(() => button("Copy with these details")?.click());
-    await until(() => popover()?.querySelector("h3") !== null && popover()?.querySelector("h3") !== undefined);
+    await until(() => popover() !== null && within(popover() as HTMLElement).queryByRole("heading") !== null);
 
-    expect(popover()?.getAttribute("data-anchor")).toBe("details");
-    expect(popover()?.querySelector('[role="alert"]')?.textContent).toBe(`${BLOCKED} Your Proposal is below.`);
+    expect(popover()?.getAttribute("data-caret")).toBe("end");
+    // The details closed and the refusal opened: focus is on its Try again, not back on the chevron.
+    expect(shadow().activeElement).toBe(button("Try again"));
+    expect(within(popover() as HTMLElement).queryByRole("alert")?.textContent).toBe(`${BLOCKED} Your Proposal is below.`);
     // A failed copy from the details leaves the button as it was: the popover says what happened.
     expect(copy().textContent).toBe("Copy Proposal");
   });
