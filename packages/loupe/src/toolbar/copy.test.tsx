@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteHint, callSiteId, instanceId, SOURCE_ATTRIBUTE } from "../call-site.js";
 import { devMount } from "../mount.js";
 import { readProposal } from "../locate/input.js";
@@ -12,6 +12,8 @@ import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { BLOCKED } from "./copy.js";
 import { TITLE_MISSING } from "./copy-flow.js";
+import { OPEN_KEY } from "./launcher-place.js";
+import { loadPanel } from "./start.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -109,8 +111,15 @@ async function change(): Promise<void> {
   await settle();
 }
 
+// The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
+beforeAll(async () => {
+  await loadPanel();
+});
+
 beforeEach(async () => {
   resetLoupe();
+  // These read the open panel: it was left open in this browser.
+  localStorage.setItem(OPEN_KEY, "open");
   copies = [];
   // jsdom has no clipboard: the one a browser on localhost gives, as far as text goes.
   Object.defineProperty(navigator, "clipboard", {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ANCHOR_ATTRIBUTE, callSiteId } from "../call-site.js";
 import { missingLayerAdvice } from "../format-notice.js";
 import type { LayerStatus } from "../layer-status.js";
@@ -10,6 +10,8 @@ import { createAdapter } from "../runtime/adapter.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { COPY_REFUSED } from "./command.js";
 import Toolbar from "./index.js";
+import { OPEN_KEY } from "./launcher-place.js";
+import { loadPanel } from "./start.js";
 import { CSS, HOST_ATTRIBUTE } from "./styles.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -51,8 +53,15 @@ const MISSING: LayerStatus = { command: WRITE_AGAIN, missing: true, format: null
 let container: HTMLDivElement;
 let root: Root;
 
+// The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
+beforeAll(async () => {
+  await loadPanel();
+});
+
 beforeEach(() => {
   resetLoupe();
+  // These read the open panel: it was left open in this browser.
+  localStorage.setItem(OPEN_KEY, "open");
   server.status = null;
   server.calls = 0;
   server.refusal = null;

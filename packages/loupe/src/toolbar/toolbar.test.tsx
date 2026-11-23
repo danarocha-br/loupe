@@ -6,14 +6,16 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { devMount } from "../mount.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { disableOverrides, onRegistryChange } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { LINGER, tagPlace } from "./highlight.js";
 import Toolbar from "./index.js";
+import { OPEN_KEY } from "./launcher-place.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
+import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 import { dismissUndo } from "./undo.js";
 
@@ -25,8 +27,15 @@ let container: HTMLDivElement;
 let root: Root;
 let loupe: LoupeDebug;
 
+// The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
+beforeAll(async () => {
+  await loadPanel();
+});
+
 beforeEach(() => {
   resetLoupe();
+  // These read the open panel: it was left open in this browser.
+  localStorage.setItem(OPEN_KEY, "open");
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);

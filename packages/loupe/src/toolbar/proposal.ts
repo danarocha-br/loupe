@@ -8,16 +8,19 @@
 // `__loupe.proposalText(options?)` the Copy Proposal text (`start.ts`).
 
 import { parseInstanceId } from "../call-site.js";
-import { buildProposalKeyed, type RouteContext, type Sighting, setOnKey } from "../proposal/build.js";
+import { buildProposalKeyed, type Sighting } from "../proposal/build.js";
 import { proposalText } from "../proposal/text.js";
 import type { JsonValue, Proposal, ProposalProject } from "../proposal/types.js";
 import { debugOf } from "../runtime/debug.js";
-import { currentRoute, onRegistryChange, registry } from "../runtime/registry.js";
-import { type PerPageOptions, perPage } from "../runtime/slot.js";
-import { pageWidth } from "./dock.js";
+import { currentRoute, registry } from "../runtime/registry.js";
 import { previewedFlags } from "./flags-store.js";
 import { numberChanges } from "./numbers.js";
 import { readProjectContext } from "./project-server.js";
+import { refreshTracker, startTracking } from "./tracker.js";
+
+// The tracker (what each Instance last showed, the route each record was set on) is
+// `tracker.ts`'s: the collapsed pill starts it on the first change, before this module loads.
+export { pageTheme, startTracking } from "./tracker.js";
 
 export type ProposalOptions = {
   title?: string;
@@ -25,109 +28,6 @@ export type ProposalOptions = {
   /** Per record (`setOnKey`), the designer's note for its entry (PER-139). */
   notes?: Readonly<Record<string, string>>;
 };
-
-type Tracker = {
-  sightings: Map<string, Sighting>;
-  /** `setOnKey(target)` → the route it was first set on. */
-  setOn: Record<string, string>;
-  routes: Record<string, RouteContext>;
-  stop: () => void;
-};
-
-const REFRESH_MS = 100;
-
-const ON_RESET: PerPageOptions<Tracker> = { stop: (tracker) => tracker.stop() };
-
-/**
- * Starts remembering what the page shows, once per page. The tracker is kept in the
- * page's slot across a Fast Refresh, and `resetLoupe()` stops it.
- */
-export function startTracking(): Tracker {
-  return perPage("tracker", makeTracker, ON_RESET);
-}
-
-function makeTracker(): Tracker {
-  const reg = registry();
-  const tracker: Tracker = { sightings: new Map(), setOn: {}, routes: {}, stop: () => {} };
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  // Registry listeners run inside a commit: read after it, and at most every
-  // REFRESH_MS, so a page that rerenders often doesn't pay for a walk each commit.
-  const schedule = () => {
-    if (timer !== null) return;
-    timer = setTimeout(() => {
-      timer = null;
-      refresh(tracker);
-    }, REFRESH_MS);
-  };
-  const unsubscribe = reg.store.subscribe((target) => {
-    if (target.scope === "page") return;
-    const key = setOnKey(target);
-    const exists = reg.store.records().some((record) => setOnKey(record.target) === key);
-    // A record set again after it was dropped belongs to the route it is set on now.
-    if (!exists) delete tracker.setOn[key];
-    else if (!(key in tracker.setOn)) tracker.setOn[key] = currentRoute();
-  });
-  const unwatch = onRegistryChange(schedule);
-  tracker.stop = () => {
-    unsubscribe();
-    unwatch();
-    if (timer !== null) clearTimeout(timer);
-  };
-  refresh(tracker);
-  return tracker;
-}
-
-/** Records every mounted Instance as it is now, and the current route's context. */
-function refresh(tracker: Tracker): void {
-  const route = currentRoute();
-  for (const instance of registry().instances.values()) {
-    const previous = tracker.sightings.get(instance.id);
-    tracker.sightings.set(instance.id, {
-      id: instance.id,
-      anchor: instance.anchor,
-      hint: instance.hint,
-      component: instance.component,
-      keyPath: instance.keyPath,
-      rendered: "client",
-      current: instance.live().current,
-      writes: instance.writes(),
-      stateProps: instance.stateProps,
-      routes: withRoute(previous?.routes ?? [], route),
-      mounted: true,
-    });
-  }
-  if (typeof window !== "undefined") tracker.routes[route] = routeContext();
-}
-
-function withRoute(routes: readonly string[], route: string): string[] {
-  return [...routes.filter((entry) => entry !== route), route];
-}
-
-/** Light or dark, from the class or attribute a theme switcher sets, else the color scheme in effect. */
-export function pageTheme(root: Element = document.documentElement): "light" | "dark" | null {
-  const classes = root.classList;
-  if (classes.contains("dark")) return "dark";
-  if (classes.contains("light")) return "light";
-  const attribute = root.getAttribute("data-theme") ?? root.getAttribute("data-mode");
-  if (attribute === "dark" || attribute === "light") return attribute;
-  const scheme = getComputedStyle(root).colorScheme;
-  if (scheme === "dark" || scheme === "light") return scheme;
-  if (typeof matchMedia === "function") return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  return null;
-}
-
-function routeContext(): RouteContext {
-  // A hidden tab can report 0×0: no viewport rather than a wrong one.
-  const viewport: [number, number] | null =
-    pageWidth() > 0 && window.innerHeight > 0 ? [pageWidth(), window.innerHeight] : null;
-  return {
-    url: location.href,
-    viewport,
-    dpr: window.devicePixelRatio,
-    theme: pageTheme(),
-    capturedAt: new Date().toISOString(),
-  };
-}
 
 const UNKNOWN_PROJECT: ProposalProject = { repo: null, commit: null, dirty: null, playgroundVersion: null, install: null };
 
@@ -153,7 +53,7 @@ export async function collectProposal(options: ProposalOptions = {}): Promise<Pr
 /** The Proposal, and per change id the record it reads: what the export dialog keeps notes against. */
 export async function collectProposalKeyed(options: ProposalOptions = {}): Promise<{ proposal: Proposal; keys: Record<string, string> }> {
   const tracker = startTracking();
-  refresh(tracker);
+  refreshTracker(tracker);
   const reg = registry();
   const mounted = new Set(reg.instances.keys());
   const route = currentRoute();
