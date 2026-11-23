@@ -18,7 +18,7 @@ import { Highlight } from "./highlight.js";
 import { useInstanceMeta } from "./instance-meta.js";
 import { Launcher } from "./launcher.js";
 import { useLayerStatus } from "./notices.js";
-import { usePageVersion } from "./page.js";
+import { createPageSignal, PageSignalContext, usePageVersion } from "./page-signal.js";
 import { Panel } from "./panel.js";
 import { panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
@@ -281,7 +281,9 @@ function ToolbarOpen({
   onTheme(): void;
 }) {
   const debug = useMemo(debugOf, []);
-  const version = usePageVersion(host);
+  // Awake while the panel is open: collapsed, the Toolbar watches nothing on the page.
+  const signal = useMemo(() => createPageSignal({ doc: document, debug: () => debug, host: () => host }), [debug, host]);
+  const version = usePageVersion(signal);
   const layer = useLayerStatus(version);
   // "Appears on interaction" remembers components across page versions: `panelView()`
   // takes what it returned last time and returns the next.
@@ -321,9 +323,10 @@ function ToolbarOpen({
   useDeselect({ debug, host, ids: selection, active: selected !== null && !picker.picking, onDeselect: () => onSelect(null) });
 
   return (
-    <>
+    <PageSignalContext value={signal}>
       <Highlight
         debug={debug}
+        signal={signal}
         version={version}
         selected={selected}
         selectedLabel={view.outline.label}
@@ -351,6 +354,6 @@ function ToolbarOpen({
         theme={theme}
         onTheme={onTheme}
       />
-    </>
+    </PageSignalContext>
   );
 }
