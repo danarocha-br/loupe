@@ -59,6 +59,9 @@ const STATES = {
 export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObject<HTMLElement | null> }) {
   const [details, setDetails] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  // Which half the last refusal came from. Kept apart from `failure`, which closing clears
+  // before the popover has handed focus back: it is where that focus goes.
+  const [failedFrom, setFailedFrom] = useState<From>("details");
   const [copied, setCopied] = useState<Landed | null>(null);
   const [toast, setToast] = useState<Landed | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,6 +110,7 @@ export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObj
         setDetails(false);
         setCopied(null);
         setToast(null);
+        setFailedFrom(from);
         setFailure({
           reason: error instanceof Error ? error.message : String(error),
           text: error instanceof CopyFailed ? error.proposal : "",
@@ -168,9 +172,9 @@ export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObj
         <PopoverPanel
           label={COPY.notCopied}
           anchor={frame}
-          returnFocus={halfFor(failure?.from ?? "details")}
+          returnFocus={halfFor(failedFrom)}
           initialFocus={retry}
-          caret={failure?.from === "copy" ? "center" : "end"}
+          caret={failedFrom === "copy" ? "center" : "end"}
           className="copy-popover"
         >
           {failure && <NotCopied failure={failure} busy={busy} retry={retry} onRetry={() => run(failure.from, formDetails())} />}

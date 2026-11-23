@@ -4,7 +4,7 @@
 // the toggle, and that hands focus back to what opened it.
 
 import { userEvent } from "@testing-library/user-event";
-import { useRef, useState } from "react";
+import { act, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STYLESHEET } from "../../surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
@@ -59,6 +59,34 @@ describe("Popover", () => {
     expect(dialog.getAttribute("popover")).toBe("manual");
   });
 
+  it("focuses the first thing in it without selecting a field's text", async () => {
+    const user = setup();
+    function FieldFirst() {
+      const [open, setOpen] = useState(false);
+      const footer = useRef<HTMLDivElement>(null);
+      const toggle = useRef<HTMLButtonElement>(null);
+      return (
+        <>
+          <div ref={footer}>
+            <button ref={toggle} type="button" onClick={() => setOpen(true)}>
+              Rename
+            </button>
+          </div>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverPanel label="Rename" anchor={footer} returnFocus={toggle}>
+              <input aria-label="Name" defaultValue="A saved name" />
+            </PopoverPanel>
+          </Popover>
+        </>
+      );
+    }
+    const screen = renderInSurface(<FieldFirst />);
+    await user.click(screen.getByRole("button", { name: "Rename" }));
+    const name = screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement;
+    expect(screen.shadow.activeElement).toBe(name);
+    expect(name.selectionEnd! - name.selectionStart!).toBe(0);
+  });
+
   it("focuses the caller's choice as it opens, without selecting a field's text", async () => {
     const user = setup();
     const screen = renderInSurface(<Harness focusTitle />);
@@ -77,6 +105,20 @@ describe("Popover", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(asked).toHaveBeenLastCalledWith(false);
+    expect(screen.shadow.activeElement).toBe(toggle);
+  });
+
+  it("closes on Escape with focus on its toggle, which counts as inside only for a press or focus", async () => {
+    const user = setup();
+    const screen = renderInSurface(<Harness />);
+    const toggle = screen.getByRole("button", { name: "Details" });
+    await user.click(toggle);
+    // Focus moved from inside to the toggle (Shift+Tab, in a browser): the popover stays open.
+    act(() => toggle.focus());
+    expect(screen.shadow.activeElement).toBe(toggle);
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.shadow.activeElement).toBe(toggle);
   });
 
@@ -149,6 +191,24 @@ describe("Popover", () => {
     const screen = renderInSurface(<Harness />);
     await user.click(screen.getByRole("button", { name: "Details" }));
     expect(await axeViolations(screen.host)).toEqual([]);
+  });
+});
+
+describe("what Popover leaves in the host's document", () => {
+  it("is UI SDK's two documented styles, in its lowest layer, each matching only UI SDK's own parts", async () => {
+    // UI SDK writes these to the document, never a shadow root: they don't reach Loupe's
+    // shadow tree, and in the host they match only `data-slot` elements, at zero specificity.
+    // A new one fails here: a style that reaches the app is a decision, not a side effect.
+    const user = setup();
+    const screen = renderInSurface(<Harness />);
+    await user.click(screen.getByRole("button", { name: "Details" }));
+    const styles = [...document.querySelectorAll<HTMLStyleElement>("style[id^='ui-sdk-']")];
+    const adopted = (document.adoptedStyleSheets ?? []).flatMap((sheet) => [...sheet.cssRules].map((rule) => rule.cssText));
+    const css = [...styles.map((style) => style.textContent ?? ""), ...adopted];
+    expect(styles.map((style) => style.id).sort()).toEqual(["ui-sdk-hidden", "ui-sdk-popover-reset"]);
+    for (const text of css) {
+      expect(text, text).toMatch(/^\s*@layer ui-sdk\s*\{\s*:where\(\[data-slot/);
+    }
   });
 });
 

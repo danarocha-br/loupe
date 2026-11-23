@@ -4,7 +4,7 @@
 // outside), the panel its place, its caret and where focus goes. See popover.md.
 
 import { PopoverContent, Popover as SdkPopover } from "@ui-sdk/react/popover";
-import { createContext, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useState } from "react";
+import { createContext, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DataAttributes } from "../data-attributes.js";
 
 export type PopoverProps = {
@@ -29,7 +29,7 @@ export type PopoverPanelProps = {
   anchor: RefObject<HTMLElement | null>;
   /** Where focus goes back when it closes with focus inside: what opened it. */
   returnFocus: RefObject<HTMLElement | null>;
-  /** Focused as it opens; the first focusable element inside without it. Never selects a field's text. */
+  /** Focused as it opens; the first focusable element inside without it. Either way, a field's text is not selected. */
   initialFocus?: RefObject<HTMLElement | null>;
   caret?: PopoverCaret;
   className?: string;
@@ -53,7 +53,9 @@ export function Popover({ open, onOpenChange, inside, children }: PopoverProps) 
       <SdkPopover
         open={open}
         onOpenChange={(next, details) => {
-          if (!next && on(details.event as Event | undefined, inside?.current ?? null)) return details.cancel();
+          // Escape still closes it from `inside`: only a press or focus there isn't leaving.
+          const leaving = details.reason === "outside-press" || details.reason === "focus-out";
+          if (!next && leaving && on(details.event as Event | undefined, inside?.current ?? null)) return details.cancel();
           onOpenChange(next);
         }}
       >
@@ -71,6 +73,7 @@ export function PopoverPanel({ label, anchor, returnFocus, initialFocus, caret =
   useLayoutEffect(() => {
     if (open) setOver(anchor.current);
   }, [open, anchor]);
+  const box = useRef<HTMLDivElement>(null);
   return (
     <PopoverContent
       {...data}
@@ -78,15 +81,16 @@ export function PopoverPanel({ label, anchor, returnFocus, initialFocus, caret =
       align="center"
       sideOffset={10}
       anchor={over}
-      // UI SDK selects a text field's value as it focuses it; Loupe's caller focuses its own.
-      initialFocus={initialFocus ? "none" : "auto"}
+      // UI SDK selects a text field's value as it focuses it: the panel focuses its own.
+      initialFocus="none"
       finalFocus={() => returnFocus.current}
       aria-label={label}
       className={className}
       data-popover=""
       data-caret={caret}
+      ref={box}
     >
-      {initialFocus && <Focus target={initialFocus} />}
+      <Focus target={initialFocus} box={box} />
       {children}
       <svg data-popover-caret="" width="22" height="12" viewBox="0 0 22 12" aria-hidden="true">
         <path data-caret-fill="" d="M0 0H22L11 11Z" />
@@ -96,8 +100,13 @@ export function PopoverPanel({ label, anchor, returnFocus, initialFocus, caret =
   );
 }
 
-/** Focuses `target` as the panel's content mounts, which is as it opens. */
-function Focus({ target }: { target: RefObject<HTMLElement | null> }) {
-  useEffect(() => target.current?.focus(), [target]);
+const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/** Focuses `target`, else the first focusable thing in the box, else the box, as the content mounts: as it opens. */
+function Focus({ target, box }: { target?: RefObject<HTMLElement | null>; box: RefObject<HTMLDivElement | null> }) {
+  useEffect(() => {
+    const element = target?.current ?? box.current?.querySelector<HTMLElement>(FOCUSABLE) ?? box.current;
+    element?.focus();
+  }, [target, box]);
   return null;
 }

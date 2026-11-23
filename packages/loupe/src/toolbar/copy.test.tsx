@@ -304,6 +304,8 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
       (button("Try again") as HTMLButtonElement).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, composed: true }));
     });
     expect(popover()).toBeNull();
+    // Focus goes back to the half the copy came from, not the chevron.
+    expect(shadow().activeElement).toBe(copy());
     act(() => copy().click());
     await until(() => popover() !== null && field<HTMLTextAreaElement>("The Proposal")?.value !== "");
     act(() => button("Select all")?.click());

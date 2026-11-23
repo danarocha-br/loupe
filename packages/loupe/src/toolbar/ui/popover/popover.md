@@ -14,13 +14,13 @@ A non-modal box over what opened it, pointing at it with a caret: Copy Proposal'
 
 `Popover`, the root:
 - `open` and `onOpenChange(open)`: the caller keeps the state. Escape, a press outside it or focus leaving it ask to close.
-- `inside`: an element that counts as inside, so a press or focus there doesn't close it: the control that toggles it, which closes it itself. Without it, a press on the toggle would close the popover and the toggle's click would open it again.
+- `inside`: an element that counts as inside, so a press or focus there doesn't close it: the control that toggles it, which closes it itself. Without it, a press on the toggle would close the popover and the toggle's click would open it again. Escape still closes it with focus there.
 
 `PopoverPanel`, the box, mounted only while open:
 - `label`: the dialog's name.
 - `anchor`: the element it stands over: 10px above it, as wide as it less 8px a side, centred. Read as it opens. If there's no room above, it flips below and its caret turns over.
-- `returnFocus`: where focus goes when it closes with focus inside it.
-- `initialFocus`: focused as it opens; without it, the first focusable element inside. UI SDK would select a text field's value as it focuses it; this never does.
+- `returnFocus`: where focus goes when it closes with focus inside it. UI SDK reads it after the caller's closing render, so keep it apart from state that closing clears (Copy Proposal keeps which half a refusal came from beside the refusal).
+- `initialFocus`: focused as it opens; without it, the first focusable element inside, else the box. Either way a text field's value isn't selected, as UI SDK's own initial focus would (it is set to `none`, and the panel focuses). Opened by touch, a field still takes focus and the keyboard comes up, as the hand-written popover did.
 - `caret`: `center` (the default) or `end`.
 - `className` and `data-*` pass to the box.
 
@@ -42,6 +42,10 @@ The caret is a 22×12 `card` triangle with a `popover-edge` stroke on its two si
 - **Escape** closes it and returns focus to `returnFocus`, from anywhere on the page. UI SDK takes the key at the document, after the window's capture: Loupe's `escape.ts` claims the popover's layer there while it is open, so the selection beneath never hears the key. The app hears it, already handled.
 - A press outside it closes it and leaves focus where the press put it. A press inside, or on `inside`, doesn't.
 - Focus leaving it closes it, unless it moves to `inside`.
+
+## Outside the shadow root
+
+UI SDK writes two styles into the host's document, never a shadow root, so neither reaches Loupe's shadow tree: `ui-sdk-hidden` (every part, since ChipGroup), which keeps `[data-slot][hidden]` hidden, and `ui-sdk-popover-reset` (Popover), which takes the browser's `[popover]` frame off `[data-slot="popover-content"]`. Both sit in `@layer ui-sdk`, which UI SDK declares first in the page, behind `:where()`, and match only `data-slot` elements, which a host using UI SDK or shadcn has. The reset loses to any rule of the app's. The hidden rule is `!important`, so it wins: a `[data-slot]` element the app marks `hidden` stays hidden whatever its class says, as Tailwind's base rule already makes it. The test fails on a third style. Inside the shadow root, `popover.css` undoes the browser's `[popover]` rules itself.
 
 ## Tests
 
