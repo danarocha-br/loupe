@@ -10,7 +10,7 @@
 // Imported by its own path, never through `patterns/index.js`: the collapsed pill loads no
 // other pattern.
 
-import type { ComponentPropsWithoutRef, Ref } from "react";
+import { type ComponentPropsWithoutRef, type Ref, useId } from "react";
 
 /** The pill's body: always this wide and this tall, ends fully round. The place maths (launcher-place.ts) lays it out. */
 export const PILL = { width: 44, height: 32 } as const;
@@ -96,10 +96,12 @@ const WALLS: Record<PillSide, { x: number; y: number; axis: "x" | "y"; sign: 1 |
  * the same curve (launcher.css). Parked, the view draws them back past where they can join.
  */
 function Goo({ gaps }: { gaps: Record<PillSide, number> }) {
+  // Its own filter id: two pills in one root (the workbench draws three) must not share one.
+  const filter = `loupe-goo-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <svg data-launcher-goo="" width={GOO_W} height={GOO_H} viewBox={`0 0 ${GOO_W} ${GOO_H}`} aria-hidden="true" focusable="false">
       <defs>
-        <filter id="loupe-goo" x="0" y="0" width={GOO_W} height={GOO_H} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+        <filter id={filter} x="0" y="0" width={GOO_W} height={GOO_H} filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
           {/* Cut sharply at half: a straight edge stays where it is drawn, the neck's edge is crisp, and only gaps narrower than ~1 blur fill in. */}
           <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 90 -44.5" result="goo" />
@@ -109,7 +111,7 @@ function Goo({ gaps }: { gaps: Record<PillSide, number> }) {
           </feMerge>
         </filter>
       </defs>
-      <g filter="url(#loupe-goo)">
+      <g filter={`url(#${filter})`}>
         <rect data-launcher-body="" x={GOO_PAD} y={GOO_PAD} width={PILL.width} height={PILL.height} rx={PILL.height / 2} />
         {PILL_SIDES.map((side) => {
           const wall = WALLS[side];

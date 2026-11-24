@@ -669,6 +669,17 @@ export const PILL_HELD = {
   gaps: { left: 478, right: 758, top: 384, bottom: 444 },
 } as const satisfies Omit<LauncherPillProps, "words">;
 
+/**
+ * The pill in a 320 × 88 stage (the workbench's): docked on the left and parked, its sides'
+ * bodies 24px further out than its gaps, so the neck has let go; held 4px off the left side,
+ * each body its real gap away, so the neck fills in; and free in the middle, parked.
+ */
+export const PILL_IN_STAGE = {
+  docked: { edge: "left", dragging: false, settling: false, leaving: false, at: { x: 6, y: 28 }, gaps: { left: 30, right: 294, top: 52, bottom: 52 } },
+  neck: { edge: "free", dragging: true, settling: false, leaving: false, at: { x: 4, y: 28 }, gaps: { left: 4, right: 272, top: 28, bottom: 28 } },
+  free: { edge: "free", dragging: false, settling: false, leaving: false, at: { x: 138, y: 28 }, gaps: { left: 162, right: 162, top: 52, bottom: 52 } },
+} as const satisfies Record<string, Omit<LauncherPillProps, "words">>;
+
 /** The sheet's width in the column the page makes room for: 360px, less 8px either side. */
 export const SHEET_WIDTH = 344;
 

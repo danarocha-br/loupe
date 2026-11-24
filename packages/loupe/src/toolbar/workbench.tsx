@@ -86,6 +86,7 @@ import {
   PAGE_MEMBERS,
   PICK_OUTLINE,
   PICK_TAG,
+  PILL_IN_STAGE,
   PROP_ITEMS,
   REFUSED,
   SECRET_LINE,
@@ -95,7 +96,7 @@ import {
   TYPE_INSPECT_ONLY,
   UNDO_OFFER,
 } from "./patterns/samples.js";
-import { LauncherPill, PILL } from "./patterns/launcher/launcher.js";
+import { LauncherPill } from "./patterns/launcher/launcher.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
   Button,
@@ -981,18 +982,6 @@ function ChromePatternStates() {
   );
 }
 
-/** Parked, the view draws each side's body back this much past the pill's gap (launcher.tsx `PARKED_GAP`). */
-const PARKED = 24;
-
-/** A pill where the view would put it in a stage: its top left, and each side's body as far out as its gap, further once parked. */
-function pillAt(x: number, y: number, parked: boolean, stage = { width: 320, height: 88 }) {
-  const extra = parked ? PARKED : 0;
-  return {
-    at: { x, y },
-    gaps: { left: x + extra, right: stage.width - x - PILL.width + extra, top: y + extra, bottom: stage.height - y - PILL.height + extra },
-  };
-}
-
 function ShellPatternStates() {
   const [last, setLast] = useState("—");
   const [peeking, setPeeking] = useState(false);
@@ -1002,17 +991,17 @@ function ShellPatternStates() {
     <div className="wb-states">
       <Frame title="LauncherPill: docked on the left side, parked: the neck has let go">
         <div className="wb-stage">
-          <LauncherPill edge="left" dragging={false} settling={false} leaving={false} {...pillAt(6, 28, true)} words={words} onClick={open} />
+          <LauncherPill {...PILL_IN_STAGE.docked} words={words} onClick={open} />
         </div>
       </Frame>
       <Frame title="LauncherPill: held 4px off the left side: the neck fills in">
         <div className="wb-stage">
-          <LauncherPill edge="free" dragging settling={false} leaving={false} {...pillAt(4, 28, false)} words={words} onClick={open} />
+          <LauncherPill {...PILL_IN_STAGE.neck} words={words} onClick={open} />
         </div>
       </Frame>
       <Frame title="LauncherPill: free, away from every side; point at it">
         <div className="wb-stage">
-          <LauncherPill edge="free" dragging={false} settling={false} leaving={false} {...pillAt(138, 28, true)} words={words} onClick={open} />
+          <LauncherPill {...PILL_IN_STAGE.free} words={words} onClick={open} />
         </div>
       </Frame>
       <Frame title="Sheet: docked, its header, a card in the middle, its footer; press Peek to see through">

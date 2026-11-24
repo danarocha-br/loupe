@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LAUNCHER_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { atRest, expectPatternCss, forcedColorRules, selectorsOf, styleRules } from "../css.fixture.js";
-import { PILL_DOCKED, PILL_HELD } from "../samples.js";
+import { PILL_DOCKED, PILL_HELD, PILL_IN_STAGE } from "../samples.js";
 import { LauncherPill, type LauncherPillProps, PILL, PILL_SIDES } from "./launcher.js";
 import CSS from "./launcher.css?inline";
 
@@ -68,6 +68,36 @@ describe("LauncherPill", () => {
     for (const svg of pill.querySelectorAll("svg")) expect(svg.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("filters each pill's Goo through its own filter, so several in one root never share one", () => {
+    const screen = renderInSurface(
+      <>
+        {Object.values(PILL_IN_STAGE).map((sample) => (
+          <LauncherPill key={sample.at.x} {...sample} words={WORDS} />
+        ))}
+      </>,
+    );
+    const goos = [...screen.shadow.querySelectorAll("[data-launcher-goo]")];
+    expect(goos).toHaveLength(3);
+    const ids = goos.map((goo) => {
+      const id = goo.querySelector("filter")?.id ?? "";
+      expect(goo.querySelector("g")?.getAttribute("filter")).toBe(`url(#${id})`);
+      return id;
+    });
+    expect(new Set(ids).size).toBe(3);
+  });
+
+  it("is sampled in the workbench's 320 × 88 stage where the view would put it: each side's body its gap away, 24px more once parked", () => {
+    for (const [name, sample] of Object.entries(PILL_IN_STAGE)) {
+      const extra = sample.edge === "free" && sample.dragging ? 0 : 24;
+      expect(sample.gaps, name).toEqual({
+        left: sample.at.x + extra,
+        right: 320 - sample.at.x - PILL.width + extra,
+        top: sample.at.y + extra,
+        bottom: 88 - sample.at.y - PILL.height + extra,
+      });
+    }
+  });
+
   it("has no axe violations, docked and held", async () => {
     const { screen } = draw();
     expect(await axeViolations(screen.host)).toEqual([]);
@@ -105,6 +135,7 @@ describe("LauncherPill's CSS", () => {
     const fills = rules.filter((rule) => !rule.forced && rule.declares.fill).flatMap((rule) => selectorsOf(rule.selector));
     expect(fills).toContain("[data-launcher]:not([data-dragging]):hover [data-launcher-goo] rect");
     for (const selector of fills) expect(forcedFill, selector).toContain(selector);
-    expect(rules.findLastIndex((rule) => rule.forced && rule.declares.fill)).toBeGreaterThan(rules.findLastIndex((rule) => !rule.forced && rule.declares.fill));
+    const lastFill = (forced: boolean) => rules.map((rule) => rule.forced === forced && !!rule.declares.fill).lastIndexOf(true);
+    expect(lastFill(true)).toBeGreaterThan(lastFill(false));
   });
 });
