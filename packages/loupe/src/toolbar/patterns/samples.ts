@@ -480,7 +480,7 @@ export const NOTE = {
 /** The Button's Inspect only, folded: its props named after the title, and the library's two. */
 export const INSPECT_ONLY: InspectOnlyView = {
   title: "Inspect only · 2",
-  names: "type, onClick",
+  names: " · type, onClick",
   meta: null,
   open: false,
   shared: null,
@@ -537,7 +537,7 @@ export const FLAGS: FlagsCardView = {
         { label: "Off", value: false },
         { label: "On", value: true },
       ],
-      checked: -1,
+      checked: null,
       state: "App decides",
       clear: null,
     },

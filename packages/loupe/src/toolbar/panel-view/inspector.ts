@@ -67,9 +67,6 @@ export function inspectorBody(
     return {
       kind: "gone",
       id,
-      component,
-      where,
-      held,
       canReset: recorded,
       identity: {
         component: null,
@@ -178,7 +175,8 @@ export function inspectorBody(
     },
     editable: editableRows,
     inspectOnly: inspectOnlyRows,
-    inspect: inspectOnlyView(inspectOnlyRows, {
+    legend: legendOf(editableRows),
+    inspectFold: inspectOnlyView(inspectOnlyRows, {
       open: editableRows.length === 0,
       meta: page.status.overrides ? null : INSPECT_ONLY_OVERRIDES_OFF,
       injected:
@@ -208,6 +206,21 @@ export function inspectorBody(
   };
 }
 
+/** A true/false prop: it shares one card of switches with the others, under the option rows. */
+export function isSwitch(item: PropItem): boolean {
+  const control = item.control;
+  if (control?.kind !== "options" || control.options.length !== 2) return false;
+  const values = control.options.map((option) => option.value);
+  return values.includes(true) && values.includes(false);
+}
+
+/** The legend under the option rows: when one of them marks a default, and whether one rings the app's value. */
+function legendOf(editable: readonly PropItem[]): InspectorBody["legend"] {
+  const options = editable.filter((item) => !isSwitch(item));
+  const marksDefault = options.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
+  return marksDefault ? { app: options.some((item) => item.change !== null && item.counts === null) } : null;
+}
+
 /**
  * Inspect only, folded to one row (open when nothing else can change). Closed, the row
  * names its props; one cause for them all is said once, under the row, instead of a tag
@@ -219,7 +232,7 @@ function inspectOnlyView(items: PropItem[], rest: Pick<InspectOnlyView, "open" |
   const shared = only ? items.find((item) => item.reason === only) : undefined;
   return {
     title: inspectOnlyTitle(items.length),
-    names: items.length > 0 ? items.map((item) => item.name).join(", ") : null,
+    names: items.length > 0 ? ` · ${items.map((item) => item.name).join(", ")}` : null,
     shared: shared?.reason ? { reason: shared.reason, title: shared.reasonTitle } : null,
     rows: shared ? items.map((item) => ({ ...item, reason: null })) : items,
     empty: TEXT.none,

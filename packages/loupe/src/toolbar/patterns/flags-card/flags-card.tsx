@@ -130,7 +130,7 @@ export function FlagRow({ row, busy, onPreview, onClear }: FlagRowProps) {
           // One of a flag's options, or none while the app decides: a radio group with nothing checked.
           <ChipGroup
             label={row.key}
-            value={row.checked === -1 ? null : String(row.checked)}
+            value={row.checked === null ? null : String(row.checked)}
             busy={busy}
             onChoose={(index) => {
               const option = row.options[Number(index)];

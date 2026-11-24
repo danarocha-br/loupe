@@ -38,6 +38,9 @@ export type InspectOnlyReason = "not-mounted" | "not-generated" | "server" | "ov
 
 export type StatusTag = { kind: "supported" | "inspect-only" | "not-generated"; text: string };
 
+/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. */
+export type StatusText = { kind?: StatusTag["kind"]; text: string };
+
 /** Supported, or Inspect only with one reason, for an Instance or a component. */
 export type Verdict =
   | { supported: true; status: StatusTag }
@@ -71,7 +74,7 @@ export type PanelView = {
    */
   notices: NoticeView[];
   /** What the notices say, for the panel's live regions: a missing or other-format layer is an alert, the rest a status. */
-  said: { alert: string; status: string };
+  announcements: { alert: string; status: string };
   footer: {
     countText: string;
     hasOverrides: boolean;
@@ -197,11 +200,6 @@ export type InstanceItem = {
 export type GoneBody = {
   kind: "gone";
   id: string;
-  /** What it was, from how it last rendered; null when Loupe never saw it render. */
-  component: string | null;
-  /** Its call site's file and line: "member-row-menu.tsx:52". */
-  where: string | null;
-  held: { tag: Tag; values: string[] } | null;
   /** Whether it still holds an Override that "Reset this Instance" can drop. */
   canReset: boolean;
   /** What the identity block says of it: "Not on the page now", where it was written, what it still holds. */
@@ -248,7 +246,12 @@ export type InspectorBody = {
   editable: PropItem[];
   inspectOnly: PropItem[];
   /** The fold of the props it shows but can't change here, as Inspect only draws it. */
-  inspect: InspectOnlyView;
+  inspectFold: InspectOnlyView;
+  /**
+   * What a chip's marks mean, said under the option rows when one of them marks a default;
+   * `app` when a chip rings the app's value. Null otherwise.
+   */
+  legend: { app: boolean } | null;
   /** What the identity block at the card's top says of it. */
   identity: IdentityView;
 };
@@ -263,7 +266,7 @@ export type IdentityView = {
   /** The page, "Billing", after the component; none once the Instance is gone. */
   page: string | null;
   /** Its verdict ("Supported"), or a plain status ("Not on the page now"). */
-  status: StatusTag | { kind?: undefined; text: string } | null;
+  status: StatusText | null;
   /** The numbered changes that reach it. */
   keys: number[];
   /** The headline: its visible name in full, else its component. */
@@ -298,7 +301,7 @@ export type IdentityView = {
 export type InspectOnlyView = {
   /** "Inspect only · 6". */
   title: string;
-  /** Its props by name, said after the title while it is folded: "children, className". Null when it has none. */
+  /** Its props by name, said after the title while it is folded: " · children, className". Null when it has none. */
   names: string | null;
   /** "Overrides off", at the row's right. */
   meta: string | null;
@@ -547,8 +550,8 @@ export type FlagRowView = {
   /** "No options declared: offered as on and off." */
   note: string | null;
   options: { label: string; value: FlagValue }[];
-  /** The option previewed, by its place in `options`; -1 while the app decides. */
-  checked: number;
+  /** The option previewed, by its place in `options`; null while the app decides. */
+  checked: number | null;
   /** "Previewing Pro", "App decides". */
   state: string;
   /** "Clear", while it is previewed. */

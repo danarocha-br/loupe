@@ -74,15 +74,15 @@ function flagRow(
 ): FlagRowView {
   const previewing = Object.hasOwn(overrides, key);
   const value = overrides[key];
-  const checked = previewing ? options.findIndex((option) => sameFlagValue(option.value, value)) : -1;
-  const shown = options[checked];
+  const at = previewing ? options.findIndex((option) => sameFlagValue(option.value, value)) : -1;
+  const shown = options[at];
   return {
     key,
     previewing,
     description,
     note,
     options: options.map((option) => ({ label: option.label ?? formatCurrent(option.value), value: option.value })),
-    checked,
+    checked: at === -1 ? null : at,
     state: previewing ? `Previewing ${shown?.label ?? formatCurrent(value)}` : "App decides",
     clear: previewing ? "Clear" : null,
   };

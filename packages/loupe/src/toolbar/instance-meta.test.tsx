@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // The Toolbar loads `meta/` for an Instance with no Adapter the first time the
 // inspector shows one, and never while the panel is hidden (PER-180).
+import { within } from "@testing-library/dom";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -135,7 +136,7 @@ describe("loading meta/ for an Instance with no Adapter", () => {
     await click(instance(CARD));
     await settle();
     // Every row shares the reason, so the fold says it once rather than on each row.
-    expect(shadow().querySelector("[data-inspect-fold-why]")?.textContent).toContain("UNVERIFIED");
+    expect(within(shadow() as unknown as HTMLElement).getAllByText("UNVERIFIED")).toHaveLength(1);
     expect(shadow().querySelector("[data-prop=children]")?.textContent).not.toContain("UNVERIFIED");
     expect(warn.mock.calls).toEqual([["[loupe] Couldn't read meta/ for Card: Error: restarting"]]);
     warn.mockRestore();

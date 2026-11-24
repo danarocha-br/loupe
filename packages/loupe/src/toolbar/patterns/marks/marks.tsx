@@ -7,7 +7,7 @@
 // what a row names on the page while it is pointed at or focused. See marks.md.
 
 import { Fragment, type ReactNode } from "react";
-import type { InspectorWords, StatusTag, Tag as TagText } from "../../panel-view/index.js";
+import type { InspectorWords, StatusText, Tag as TagText } from "../../panel-view/index.js";
 import { CheckIcon, Delta, Dot, type DotTone, Tag, type TagLook } from "../../ui/index.js";
 
 /**
@@ -51,8 +51,8 @@ export function Keys({ keys, words }: { keys: readonly number[]; words: Pick<Ins
   );
 }
 
-/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. */
-export type Status = { kind?: StatusTag["kind"]; text: string };
+/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. panel-view's `StatusText`. */
+export type Status = StatusText;
 
 /** A verdict in words. Supported is the rule, so the list says only the exceptions; `check` leads Supported with a tick. */
 export function StatusChip({ status, title, check }: { status: Status; title?: string | null; check?: boolean }) {
@@ -99,6 +99,7 @@ export function Meta({ children }: { children: ReactNode }) {
 export function DotTitle({ tone, children }: { tone: DotTone; children: ReactNode }) {
   return (
     <div data-dot-title="">
+      {/* Dot's props are a union, a ring taking no size: each branch names its own. */}
       {tone === "ring" ? <Dot tone="ring" /> : <Dot tone={tone} />}
       {children}
     </div>

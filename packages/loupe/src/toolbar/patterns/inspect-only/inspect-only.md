@@ -10,7 +10,7 @@ The view keys it by the Instance, so another selection starts folded or open afr
 
 ## Interface
 
-- `inspect`: panel-view's `InspectOnlyView`: `title` ("Inspect only · 6"), `names` (said after the title while folded), `meta` ("Overrides off"), `open` (how it first draws), `shared` (`{ reason, title }`, the one reason every prop shares), `rows`, `empty` ("None"), `injected` (`{ summary, rows }`, the library's props).
+- `inspect`: panel-view's `InspectOnlyView`: `title` ("Inspect only · 6"), `names` (said after the title while folded, its " · " included), `meta` ("Overrides off"), `open` (how it first draws), `shared` (`{ reason, title }`, the one reason every prop shares), `rows`, `empty` ("None"), `injected` (`{ summary, rows }`, the library's props).
 - `row(item)`: a prop's row, the view's, so its writes stay the view's: a PropRow `pair`.
 
 ## States

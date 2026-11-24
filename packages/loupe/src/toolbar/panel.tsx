@@ -30,6 +30,7 @@ import {
   type GroupItem,
   type InspectorBody,
   INSPECTOR_WORDS,
+  isSwitch,
   type ListBody,
   LIST_WORDS,
   type PanelView,
@@ -106,8 +107,8 @@ export function Panel(props: PanelProps) {
   const covered = useCoveredDialog(column);
   const notices = view.notices.map((notice) => <Notice key={notice.kind} notice={notice} words={COMMAND_WORDS} onCopy={copyToClipboard} />);
   // The notices' cards come and go with the view; what they say is announced from here.
-  useAnnounceChange(view.said.alert, { politeness: "assertive" });
-  useAnnounceChange(view.said.status);
+  useAnnounceChange(view.announcements.alert, { politeness: "assertive" });
+  useAnnounceChange(view.announcements.status);
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
   // Read while rendering, before React swaps the view: once the row that had focus is
@@ -396,14 +397,6 @@ function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & {
   );
 }
 
-/** A true/false prop: it shares one card of switches with the others. */
-function isSwitch(item: PropItem): boolean {
-  const control = item.control;
-  if (control?.kind !== "options" || control.options.length !== 2) return false;
-  const values = control.options.map((option) => option.value);
-  return values.includes(true) && values.includes(false);
-}
-
 function Inspector({
   debug,
   onSelect,
@@ -422,8 +415,6 @@ function Inspector({
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
-  // The marks' legend: a row of its own under the options, when any of them marks a default.
-  const legend = cards.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
   const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={onSelect} onHover={onHover} />;
   const propRow = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={onSelect} onHover={onHover} />;
   return (
@@ -492,9 +483,9 @@ function Inspector({
           />
         )}
         {cards.map(propRow)}
-        {legend && <Legend words={INSPECTOR_WORDS} app={cards.some((card) => card.change !== null && card.counts === null)} />}
+        {body.legend && <Legend words={INSPECTOR_WORDS} app={body.legend.app} />}
         {switches.map(propRow)}
-        <InspectOnly key={body.id} inspect={body.inspect} row={row} />
+        <InspectOnly key={body.id} inspect={body.inspectFold} row={row} />
       </Card>
     </>
   );

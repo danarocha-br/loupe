@@ -20,7 +20,7 @@ It writes nothing. The view (`flags.tsx`) reads the flags store, asks it to prev
 ## Interface
 
 - `flags`: panel-view's `FlagsCardView` (`flagsCard(view)`): `title`, `meta`, `loading`, `off` (`{ title, why, reason, fix }`), `empty`, `rows`, `error`, `lasts`, `clearAll` (`{ label, enabled }`).
-- Each row, panel-view's `FlagRowView`: `key`, `previewing`, `description`, `note`, `options` (`{ label, value }`), `checked` (its place in `options`, -1 while the app decides), `state`, `clear`.
+- Each row, panel-view's `FlagRowView`: `key`, `previewing`, `description`, `note`, `options` (`{ label, value }`), `checked` (its place in `options`, null while the app decides), `state`, `clear`.
 - `busy`: a write is out; Clear and Clear flag previews are off meanwhile. The options stay on: disabling the one with focus would drop the keyboard.
 - `onPreview(key, value)`, `onClear(key, from)`, `onClearAll(from)`: `from` is the button, so the view can move focus on.
 - `ref`: the card, for the view's focus. `words` and `onCopy`: the fix's command, as CommandLine takes them.

@@ -12,6 +12,7 @@ import { COMMAND_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./p
 import {
   AppearsOnInteraction,
   ChangeList,
+  CommandLine,
   FlagsCard,
   GroupRow,
   HeldForReview,
@@ -784,6 +785,11 @@ function NoticePatternStates() {
       <Frame title="Notice: red, with a command and without">
         <Notice notice={MISSING_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
         <Notice notice={OVERRIDES_OFF_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
+      </Frame>
+      <Frame title="CommandLine: a command with its prompt, a line without, and a copy the clipboard refuses">
+        <CommandLine text="pnpm -C 'apps/Web  App' exec loupe generate" words={COMMAND_WORDS} onCopy={onCopy} />
+        <CommandLine text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} words={COMMAND_WORDS} onCopy={onCopy} />
+        <CommandLine text="pnpm exec loupe doctor" words={COMMAND_WORDS} onCopy={() => Promise.reject(new Error("refused"))} />
       </Frame>
       <Frame title="ChangeList: the last change's Instance isn't mounted">
         <ChangeList changes={CHANGES} words={LIST_WORDS} onSelect={(id) => setLast(`select ${id}`)} onHover={() => {}} />

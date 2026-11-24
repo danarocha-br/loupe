@@ -24,11 +24,11 @@ describe("InspectOnly", () => {
     const screen = renderInSurface(<InspectOnly inspect={INSPECT_ONLY} row={row} />);
     const fold = screen.getByRole("button", { name: /^Inspect only · 2/ });
     expect(fold.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.getByTestId("inspect-only").textContent).toBe("Inspect only · 2 · type, onClick");
+    expect(fold.textContent).toBe("Inspect only · 2 · type, onClick");
     await user.click(fold);
     expect(fold.getAttribute("aria-expanded")).toBe("true");
     // Open, the names are the rows': the title says only the count.
-    expect(screen.getByTestId("inspect-only").textContent).toBe("Inspect only · 2");
+    expect(fold.textContent).toBe("Inspect only · 2");
     expect(screen.shadow.querySelectorAll("[data-inspect-fold-rows] [data-prop]")).toHaveLength(2);
   });
 

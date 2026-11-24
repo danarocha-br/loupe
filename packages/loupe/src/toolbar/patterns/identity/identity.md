@@ -4,17 +4,11 @@ The top of the Inspector card, which says what is selected (DESIGN.md "Identity"
 
 ```tsx
 <Identity
+  identity={body.identity}
   words={INSPECTOR_WORDS}
   onBack={() => select(null)}
-  component="Button"
-  page="Billing"
-  status={body.verdict.status}
-  keys={body.keys}
-  name={body.name ?? body.component}
+  nameLang={appLang()}
   heading={heading}
-  where={body.source}
-  tags={body.tags}
-  crumbs={body.crumbs}
   onCrumb={select}
   actions={<ResetInstance … />}
 />

@@ -28,7 +28,7 @@ export function InspectOnly({ inspect, row }: InspectOnlyProps) {
           </span>
           <span data-inspect-fold-title="" data-testid="inspect-only">
             {inspect.title}
-            {!open && inspect.names && <span data-inspect-fold-names=""> · {inspect.names}</span>}
+            {!open && inspect.names && <span data-inspect-fold-names="">{inspect.names}</span>}
           </span>
           {inspect.meta ? <Meta>{inspect.meta}</Meta> : <span />}
           <FoldChevron />
