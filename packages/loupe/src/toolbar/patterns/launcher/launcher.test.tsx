@@ -8,7 +8,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LAUNCHER_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
-import { atRest, expectPatternCss, forcedColorRules } from "../css.fixture.js";
+import { atRest, expectPatternCss, forcedColorRules, selectorsOf, styleRules } from "../css.fixture.js";
 import { PILL_DOCKED, PILL_HELD } from "../samples.js";
 import { LauncherPill, type LauncherPillProps, PILL, PILL_SIDES } from "./launcher.js";
 import CSS from "./launcher.css?inline";
@@ -87,11 +87,24 @@ describe("LauncherPill's CSS", () => {
   it("keeps its forced colours on the parts it draws: the pill's own colours, in system ones", () => {
     const { pill, screen } = draw();
     const forced = forcedColorRules(CSS);
-    expect(forced.map((rule) => rule.selector)).toEqual(["[data-launcher]", "[data-launcher-goo] rect", "[data-launcher]:focus-visible"]);
+    expect(forced.map((rule) => rule.selector)).toEqual([
+      "[data-launcher]",
+      "[data-launcher-goo] rect, [data-launcher]:not([data-dragging]):hover [data-launcher-goo] rect",
+      "[data-launcher]:focus-visible",
+    ]);
     for (const rule of forced) expect(screen.shadow.querySelector(atRest(rule.selector)), rule.selector).not.toBeNull();
     expect(forced[0]?.declares).toMatchObject({ "forced-color-adjust": "none", color: "ButtonFace", filter: "none" });
     expect(forced[1]?.declares).toMatchObject({ fill: "ButtonText" });
     expect(forced[2]?.declares).toMatchObject({ "outline-color": "Highlight" });
     expect(pill.matches(atRest(forced[2]?.selector ?? ""))).toBe(true);
+  });
+
+  it("keeps the system fill when pointed at: every rule that fills the Goo is named again in the forced block, later, so it loses", () => {
+    const rules = styleRules(CSS);
+    const forcedFill = rules.filter((rule) => rule.forced && rule.declares.fill).flatMap((rule) => selectorsOf(rule.selector));
+    const fills = rules.filter((rule) => !rule.forced && rule.declares.fill).flatMap((rule) => selectorsOf(rule.selector));
+    expect(fills).toContain("[data-launcher]:not([data-dragging]):hover [data-launcher-goo] rect");
+    for (const selector of fills) expect(forcedFill, selector).toContain(selector);
+    expect(rules.findLastIndex((rule) => rule.forced && rule.declares.fill)).toBeGreaterThan(rules.findLastIndex((rule) => !rule.forced && rule.declares.fill));
   });
 });

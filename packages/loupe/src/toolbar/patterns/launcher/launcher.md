@@ -45,7 +45,7 @@ The view (`launcher.tsx`) owns everything that moves it: the pointer and its cap
 | `data-leaving` | Tucking: `--duration-tuck` on `--ease-land`, and no pointer. |
 | `data-launcher-mark`, `data-launcher-glyph` | The L, centred over the Goo, outside the blur, crisp. |
 
-Reduced motion keeps only a fade (`--duration-fade`): no travel, no tuck, no neck. Under forced colours the pill keeps its own colours (`forced-color-adjust: none`), drawn in system ones: the Goo in `ButtonText`, the L in `ButtonFace`, focus in `Highlight`.
+Reduced motion keeps only a fade (`--duration-fade`): no travel, no tuck, no neck. Under forced colours the pill keeps its own colours (`forced-color-adjust: none`), drawn in system ones: the Goo in `ButtonText`, pointed at or not, the L in `ButtonFace`, focus in `Highlight`.
 
 ## ARIA and keys
 

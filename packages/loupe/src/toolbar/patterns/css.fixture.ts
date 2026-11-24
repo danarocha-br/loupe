@@ -21,29 +21,28 @@ export function expectPatternCss(css: string): void {
   expect(body).not.toMatch(/letter-spacing: *-/);
 }
 
-/** A rule inside a `@media (forced-colors: active)` block: its selector, and what it declares. */
-export type ForcedRule = { selector: string; declares: Record<string, string> };
+/** A style rule as the CSSOM parses it: its selector, what it declares, and whether it sits in a `@media (forced-colors: active)` block. */
+export type StyleRule = { selector: string; declares: Record<string, string>; forced: boolean };
 
-/**
- * The rules a CSS string keeps for forced colours, as the CSSOM parses them. jsdom applies
- * no media query, so a test shows they still apply by matching each selector against the
- * parts a pattern drew.
- */
-export function forcedColorRules(css: string): ForcedRule[] {
+/** A rule inside a `@media (forced-colors: active)` block. */
+export type ForcedRule = Omit<StyleRule, "forced">;
+
+/** Every style rule a CSS string holds, in source order, at any depth of `@media`. */
+export function styleRules(css: string): StyleRule[] {
   const style = document.createElement("style");
   style.textContent = css;
   document.head.append(style);
-  const found: ForcedRule[] = [];
+  const found: StyleRule[] = [];
   const visit = (rules: CSSRuleList, forced: boolean) => {
     for (const rule of [...rules]) {
       if (rule instanceof CSSMediaRule) visit(rule.cssRules, forced || rule.media.mediaText.includes("forced-colors: active"));
-      else if (forced && rule instanceof CSSStyleRule) {
+      else if (rule instanceof CSSStyleRule) {
         const declares: Record<string, string> = {};
         for (let i = 0; i < rule.style.length; i++) {
           const property = rule.style[i] as string;
           declares[property] = rule.style.getPropertyValue(property);
         }
-        found.push({ selector: rule.selectorText, declares });
+        found.push({ selector: rule.selectorText, declares, forced });
       }
     }
   };
@@ -51,6 +50,19 @@ export function forcedColorRules(css: string): ForcedRule[] {
   style.remove();
   return found;
 }
+
+/**
+ * The rules a CSS string keeps for forced colours. jsdom applies no media query, so a test
+ * shows they still apply by matching each selector against the parts a pattern drew.
+ */
+export function forcedColorRules(css: string): ForcedRule[] {
+  return styleRules(css)
+    .filter((rule) => rule.forced)
+    .map(({ selector, declares }) => ({ selector, declares }));
+}
+
+/** The selectors of a selector list, one by one. */
+export const selectorsOf = (list: string) => list.split(",").map((selector) => selector.trim());
 
 /** A selector without its user-action pseudo-classes, to match a part that isn't hovered or focused in a test. */
 export const atRest = (selector: string) => selector.replace(/:(hover|focus-visible|focus)\b/g, "");

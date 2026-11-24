@@ -53,9 +53,10 @@
   @starting-style { [data-launcher][data-edge] { transform: none; opacity: 0; } }
 }
 
-/* Forced colours (Windows High Contrast) would drop the Goo's fill: the pill keeps its own colours, drawn in system ones. */
+/* Forced colours (Windows High Contrast) would drop the Goo's fill: the pill keeps its own colours, drawn in system ones.
+   Pointed at too: the hover's fill names the same rects more specifically, so it is named here again, later, to lose to this. */
 @media (forced-colors: active) {
   [data-launcher] { forced-color-adjust: none; color: ButtonFace; filter: none; }
-  [data-launcher-goo] rect { fill: ButtonText; }
+  [data-launcher-goo] rect, [data-launcher]:not([data-dragging]):hover [data-launcher-goo] rect { fill: ButtonText; }
   [data-launcher]:focus-visible { outline-color: Highlight; }
 }
