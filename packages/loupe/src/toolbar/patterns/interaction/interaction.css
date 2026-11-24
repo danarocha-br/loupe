@@ -1,0 +1,9 @@
+/*
+ * AppearsOnInteraction (ADR 0003): written against `[data-interaction]` and its parts
+ * (`[data-interaction-list]`, `[data-interaction-seen]`). Each component is a Row `item`
+ * (ui/row/): the hairline, the 14px inset and the 2px between its name and the line under it
+ * are the Row's. Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+[data-interaction-list] { list-style: none; margin: 0; padding: 0; }
+[data-interaction-seen] { font: var(--font-caption); color: var(--muted); }

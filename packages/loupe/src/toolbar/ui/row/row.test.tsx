@@ -15,7 +15,7 @@ import CSS from "./row.css?inline";
 
 afterEach(cleanup);
 
-const LOOKS: RowLook[] = ["inset", "ruled", "pair"];
+const LOOKS: RowLook[] = ["inset", "ruled", "pair", "item"];
 
 const Glyph = () => (
   <svg width="20" height="20" viewBox="0 0 20 20">
@@ -156,6 +156,10 @@ describe("Row's CSS", () => {
     for (const look of LOOKS.filter((look) => look !== "inset")) expect(body).toContain(`[data-row="${look}"]`);
   });
 
+  it("runs an item edge to edge in a list card, its text 14px in, what is under its line 2px apart", () => {
+    expect(body).toMatch(/\[data-row="item"\] \{ --row-gap: var\(--space-hair\); padding: var\(--space-inset\) var\(--space-gutter\); \}/);
+  });
+
   it("keeps the glyph column a fixed 20px, so the names line up across rows", () => {
     expect(body).toMatch(/\[data-row\]\[data-glyphed\] \{[^}]*grid-template-columns: 20px minmax\(0, 1fr\)/);
     expect(body).toMatch(/\[data-row-glyph\] \{[^}]*height: var\(--row-line\)/);
@@ -167,7 +171,7 @@ describe("Row's CSS", () => {
   });
 
   it("draws its hairline as a border, which forced colours keep", () => {
-    expect(body).toMatch(/\[data-row="ruled"\], \[data-row="pair"\] \{ border-top: 1px solid var\(--rule\); \}/);
+    expect(body).toMatch(/\[data-row="ruled"\], \[data-row="pair"\], \[data-row="item"\] \{ border-top: 1px solid var\(--rule\); \}/);
     expect(body).not.toMatch(/box-shadow/);
   });
 });

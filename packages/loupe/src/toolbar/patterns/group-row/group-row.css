@@ -1,0 +1,61 @@
+/*
+ * GroupRow (ADR 0003): a component's row in "On this page", written against
+ * `[data-group-row]` and its parts (`[data-group-name]`, `[data-group-bar]`,
+ * `[data-group-count]`, `[data-group-notes]`, `[data-group-sites]`, `[data-group-unmounted]`),
+ * with `[data-lit]`, `[data-inspect-only]`, a note's `[data-note]` kind and Fold's
+ * `[data-open]` for its states. `--hue` is Marks' `[data-hue]`. Values from the tokens. In the
+ * stylesheet's `patterns` layer.
+ */
+
+[data-group-row] { position: relative; }
+
+/* The trigger: the name over the bar, the count and the chevron at the right, the notes under all three. */
+[data-group-row] [data-fold-trigger] {
+  display: grid; grid-template-columns: minmax(0, 1fr) 40px 30px; grid-template-areas: "name n go" "bar n go" "sub sub sub";
+  align-items: start; min-height: 44px; padding: var(--space-sheet) var(--space-card) var(--space-row) var(--space-gutter);
+}
+[data-group-row] [data-fold-trigger]:focus-visible { outline-offset: -2px; }
+@media (hover: hover) { [data-group-row] [data-fold-trigger]:hover { background: var(--hover); } }
+/* Lit from the map, or open: the hover wash; open, a 3px bar in its hue at its left edge too. */
+[data-group-row][data-lit] [data-fold-trigger], [data-group-row] [data-fold][data-open] { background: var(--hover); }
+[data-group-row] [data-fold][data-open]::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px;
+  border-radius: 0 var(--radius-edge) var(--radius-edge) 0; background: var(--hue);
+}
+
+/* The name, 13px at 500, breaking only between its words; the eye after it when it is inspect only. */
+[data-group-name] { grid-area: name; display: flex; align-items: center; gap: var(--space-sheet); min-width: 0; overflow-wrap: break-word; font: var(--font-body); font-weight: 500; }
+[data-group-name] [data-icon] { color: var(--muted); }
+
+/* Its share of the most used component: a 4px bar in its hue, 6px open; paler while inspect only. */
+[data-group-bar] { grid-area: bar; position: relative; height: 4px; margin-top: var(--space-sheet); border-radius: var(--radius-pill); background: var(--rule); }
+[data-group-bar] i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--hue); }
+[data-group-row][data-inspect-only] [data-group-bar] i { opacity: 0.55; }
+[data-group-row] [data-fold-trigger][data-open] [data-group-bar] { height: 6px; margin-top: 5px; }
+
+/* Its count, 13px mono at 600; the chevron faint, in ink once open. */
+[data-group-count] { grid-area: n; margin-top: var(--space-sheet); text-align: right; font: var(--font-count); font-variant-numeric: tabular-nums; color: var(--ink); }
+[data-group-row] [data-fold-trigger] > [data-fold-chevron] { grid-area: go; justify-self: end; margin-top: var(--space-inset); color: var(--icon-faint); }
+[data-group-row] [data-fold-trigger][data-open] > [data-fold-chevron] { color: var(--ink); }
+
+/* Under the name, only what is exceptional: 12px, muted; Instances changed in ink at 500, Source changed in amber. */
+[data-group-notes] {
+  grid-area: sub; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-hair) var(--space-row); margin-top: var(--space-sheet);
+  font: var(--font-option); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+[data-group-notes]:empty { display: none; }
+[data-group-notes] span { display: inline-flex; align-items: center; gap: var(--space-sheet); }
+[data-note="overrides"] { color: var(--ink); font-weight: 500; }
+[data-note="stale"] { color: var(--warn-fg); }
+
+/* Opened: "3 call sites · pick one to inspect" over a card per call site, 6px apart. */
+[data-group-sites] { display: flex; flex-direction: column; gap: var(--space-sheet); padding: var(--space-row) var(--space-gutter) var(--space-card); }
+[data-group-sites-head] { padding-bottom: var(--space-hair); font: var(--font-meta); color: var(--faint); }
+
+/* Then the Instances that hold an Override but aren't mounted: their numbers, their call site and key, their tags. */
+[data-group-unmounted] { list-style: none; margin: 0; display: flex; flex-direction: column; gap: var(--space-hair); padding: 0 var(--space-gutter) var(--space-card); }
+[data-group-unmounted] li { display: flex; flex-direction: column; }
+[data-group-unmounted] button { display: flex; align-items: flex-start; gap: var(--space-inset); width: 100%; min-height: 32px; padding: var(--space-sheet) 0; text-align: left; }
+[data-group-site] { flex: 1; min-width: 0; font: var(--font-mono-small); color: var(--muted); overflow-wrap: anywhere; }
+/* What it holds sits on the list's own 2px rhythm: the 6px under held values is for a card's last line. */
+[data-group-unmounted] [data-held-values] { padding-bottom: 0; }

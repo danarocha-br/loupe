@@ -10,8 +10,9 @@ import type { DataAttributes } from "../data-attributes.js";
  * `inset`: padded 14px, for a card with no padding of its own (the divided card, which
  * draws the hairline). `ruled`: a hairline above, padded only above and below, for a
  * padded card. `pair`: ruled and tight, its line a name and a value in two mono columns.
+ * `item`: a hairline above and padded 8px by 14px, for a `list` card, whose rows run edge to edge.
  */
-export type RowLook = "inset" | "ruled" | "pair";
+export type RowLook = "inset" | "ruled" | "pair" | "item";
 
 export type RowProps = {
   look?: RowLook;

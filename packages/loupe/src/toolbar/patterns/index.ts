@@ -8,9 +8,16 @@
 // a pattern.
 // `src/toolbar/ui/layers.test.ts` holds both.
 
+export { GroupRow, type GroupRowProps } from "./group-row/group-row.js";
+export { HeldForReview, type HeldForReviewProps } from "./held-for-review/held-for-review.js";
 export { Identity, type IdentityProps } from "./identity/identity.js";
-export { Breakable, ChangeKey, HeldKey, Keys, type Status, StatusChip, TagChip } from "./marks/marks.js";
+export { AppearsOnInteraction, type AppearsOnInteractionProps } from "./interaction/interaction.js";
+export { Breakable, ChangeKey, HeldKey, HeldValues, Keys, Meta, type Status, StatusChip, TagChip } from "./marks/marks.js";
+export { OnThisPage, type OnThisPageProps } from "./on-this-page/on-this-page.js";
+export { type MapBox, PageMap, type PageMapProps, stepFrom } from "./page-map/page-map.js";
 export { PropRow, type PropRowProps } from "./prop-row/prop-row.js";
 export { METER_MAX, ScopeMoveButton, ScopeSection, type ScopeSectionProps } from "./scope-section/scope-section.js";
+export { SiteCard, type SiteCardProps } from "./site-card/site-card.js";
+export { StartCard, type StartCardProps, ToolPreview } from "./start-card/start-card.js";
 // The CSS is `./styles.js`'s, apart, so the collapsed pill loads none of the components.
 export { PATTERNS_CSS } from "./styles.js";

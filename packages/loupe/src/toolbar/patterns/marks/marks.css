@@ -1,6 +1,7 @@
 /*
- * Marks (ADR 0003): written against `[data-keys]` and `[data-status]` (its kind). Values
- * from the tokens. In the stylesheet's `patterns` layer.
+ * Marks (ADR 0003): written against `[data-keys]`, `[data-status]` (its kind),
+ * `[data-held-values]`, `[data-meta]` and `[data-hue]`. Values from the tokens. In the
+ * stylesheet's `patterns` layer.
  */
 
 /* A row of change deltas: side by side, never shrinking in a line. */
@@ -17,3 +18,21 @@
 }
 [data-status="supported"] { background: var(--ok-bg); color: var(--ok-fg); }
 [data-status="not-generated"] { background: var(--warn-bg); color: var(--warn-fg); }
+
+/* A held record's values: a line each, 11px mono, muted, 6px over what follows. */
+[data-held-values] { list-style: none; margin: 0; padding: 0 0 var(--space-sheet); font: var(--font-mono-small); color: var(--muted); }
+
+/* What counts a card's title: 11px, faint, tabular figures, on one line. */
+[data-meta] { font: var(--font-meta); color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/*
+ * A component's hue, one of the map's seven by its place in the list (`GroupItem.hue`): set
+ * as `--hue` on its row, whose bar, edge and dots take it, and on its blocks on the map.
+ */
+[data-hue="0"] { --hue: var(--map-hue-0); }
+[data-hue="1"] { --hue: var(--map-hue-1); }
+[data-hue="2"] { --hue: var(--map-hue-2); }
+[data-hue="3"] { --hue: var(--map-hue-3); }
+[data-hue="4"] { --hue: var(--map-hue-4); }
+[data-hue="5"] { --hue: var(--map-hue-5); }
+[data-hue="6"] { --hue: var(--map-hue-6); }

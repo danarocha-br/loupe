@@ -78,7 +78,7 @@ it("re-renders the outlines on a row's hover, and not the Panel", async () => {
   await settle();
   await settle();
   const shadow = document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-  const rows = [...shadow.querySelectorAll<HTMLElement>(".group button[aria-expanded]")];
+  const rows = [...shadow.querySelectorAll<HTMLElement>('ul[aria-label="Components on this page"] button[aria-expanded]')];
   expect(rows.length).toBeGreaterThan(1);
 
   const before = { ...renders };

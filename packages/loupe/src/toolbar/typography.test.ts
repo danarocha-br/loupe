@@ -13,9 +13,9 @@ describe("the toolbar's type (typography review 2026-11-20)", () => {
 
   it("keeps mono for evidence and tabular figures for counted numbers", () => {
     const mono = steps.filter(([, style]) => style.family === "mono").map(([role]) => role);
-    expect(mono.sort()).toEqual(["annotation", "chip", "key", "mono", "monoSmall", "proposalText", "tagMono"]);
+    expect(mono.sort()).toEqual(["annotation", "chip", "count", "key", "mono", "monoSmall", "proposalText", "tagMono"]);
     const tabular = steps.filter(([, style]) => "tabular" in style && style.tabular).map(([role]) => role);
-    expect(tabular.sort()).toEqual(["delta", "figure", "meta"]);
+    expect(tabular.sort()).toEqual(["count", "delta", "figure", "meta"]);
   });
 
   it("gives the 9px step to the delta alone, and wraps a paragraph on at least 1.4", () => {

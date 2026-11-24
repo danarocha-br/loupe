@@ -276,6 +276,8 @@ export const TYPE = {
   /** Call sites, change lines, values: what an engineer would paste. */
   mono: { family: "mono", weight: 400, size: 12, lineHeight: 18 },
   monoSmall: { family: "mono", weight: 400, size: 11, lineHeight: 16 },
+  /** A component's count on its row in "On this page": "×7". */
+  count: { family: "mono", weight: 600, size: 13, lineHeight: 18, tabular: true },
   /** A key on the keyboard: Esc, Alt. */
   key: { family: "mono", weight: 500, size: 11, lineHeight: 14 },
   /** A tag that quotes why, in mono: "set by the library". */
@@ -316,6 +318,8 @@ export const SPACE = {
 
 /** Corner radii in px, per DESIGN.md's `rounded`. A pill is any height, fully round. */
 export const RADIUS = {
+  /** The 3px edge in its hue that marks an open row of "On this page", on its outer side. */
+  edge: 2,
   swatch: 3,
   /** The size tag on the page, the map's blocks. */
   "page-tag": 4,
@@ -408,8 +412,9 @@ export const TYPE_PROPERTIES: Record<string, string> = {
 
 /**
  * The host's custom properties for one theme: its colours and shadows. The light block
- * also carries the scales that don't change with the theme (`--space-*`, `--radius-*`,
- * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`): the dark block only overrides the themed ones.
+ * also carries what doesn't change with the theme (`--space-*`, `--radius-*`,
+ * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`, and the map's `--map-hue-*`):
+ * the dark block only overrides the themed ones.
  */
 export function hostDeclarations(theme: Theme): string {
   const themed = declare({ ...COLOR[theme], ...SHADOW[theme] });
@@ -420,6 +425,7 @@ export function hostDeclarations(theme: Theme): string {
     ...prefixed("duration", DURATION, "ms"),
     ...prefixed("ease", EASE),
     ...TYPE_PROPERTIES,
+    ...prefixed("map-hue", Object.fromEntries(MAP_HUES.entries())),
   });
   return `${themed} ${scales}`;
 }

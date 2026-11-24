@@ -8,7 +8,7 @@ import type { NoteKind } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
-import type { InspectOnlyReason, InspectorWords, StatusTag, Tag, ValueText } from "./types.js";
+import type { InspectOnlyReason, InspectorWords, ListWords, StatusTag, Tag, ValueText } from "./types.js";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";
@@ -135,6 +135,32 @@ export const INSPECTOR_WORDS: InspectorWords = {
   serverRendered: "Server-rendered",
   leftOutUnmounted: "Left out, not mounted",
 };
+
+/** The list's patterns' words (types.ts `ListWords`). */
+export const LIST_WORDS: ListWords = {
+  start: { title: TEXT.startTitle, body: TEXT.startBody, tools: "Start selecting" },
+  tools: {
+    one: {
+      label: "Select one",
+      hint: "Click one thing on the page",
+      title: "Select one: click an Instance on the page to change it alone (Esc cancels)",
+    },
+    many: {
+      label: "Select multiple",
+      hint: "Every Instance from one call site",
+      title: "Select multiple: click an Instance on the page to change every one from the same call site (Esc cancels)",
+    },
+  },
+  onPage: { title: "On this page", rows: "Components on this page", map: "Page map" },
+  held: { title: "Held for review", discard: "Discard" },
+  interaction: { title: "Appears on interaction", meta: "Not on screen yet", seen: TEXT.seenNotMounted },
+};
+
+/** A button that inspects what it names: "Inspect Ana Souza". */
+export const inspectText = (what: string) => `Inspect ${what}`;
+
+/** A block on the page map, before what its Instance shows: "Inspect Button 2 of 7, ". */
+export const blockLead = (component: string, nth: number, of: number) => `Inspect ${component} ${nth} of ${of}, `;
 
 /** Where the selection can move from a scope: a call site widens to the page, the page narrows back. */
 export const scopeMoveVerb = (from: "group" | "page") => (from === "group" ? "Widen to" : "Narrow to");

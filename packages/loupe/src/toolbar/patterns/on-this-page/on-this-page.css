@@ -1,0 +1,10 @@
+/*
+ * OnThisPage (ADR 0003): the list's main card, written against `[data-on-this-page]` and its
+ * rows' list, `[data-on-this-page-rows]`. A `list` Card whose parts sit flush: the map takes
+ * its own margins, and the last row reaches the card's foot. Values from the tokens. In the
+ * stylesheet's `patterns` layer.
+ */
+
+[data-card][data-on-this-page] { gap: 0; padding-bottom: 0; }
+[data-on-this-page] > [data-card-head] { align-items: center; padding-bottom: 0; }
+[data-on-this-page-rows] { list-style: none; margin: 0; padding: 0; }

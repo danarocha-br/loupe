@@ -32,7 +32,7 @@ describe("focus under forced colours", () => {
   it("hides no focus outright: a rule for focus that drops the ring keeps an outline forced colours draw", () => {
     const hidden = all.filter((rule) => /:focus(-visible)?$/.test(rule.selector) && /outline: none/.test(rule.body));
     expect(hidden.map((rule) => rule.selector)).toEqual([]);
-    expect(all.find((rule) => rule.selector === ".hero .hero-title:focus")?.body).toMatch(/outline: 2px solid transparent/);
+    expect(all.find((rule) => rule.selector === "[data-start] h2:focus")?.body).toMatch(/outline: 2px solid transparent/);
   });
 });
 

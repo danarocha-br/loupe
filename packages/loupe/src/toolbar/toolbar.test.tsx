@@ -139,6 +139,13 @@ const selectTool = (name: "Select one" | "Select multiple") =>
 /** A start tile: the same two modes, a radio group at the list's start. */
 const startTile = (name: "Select one" | "Select multiple") =>
   within(screen().getByRole("radiogroup", { name: "Start selecting" })).getByRole("radio", { name: new RegExp(`^${name}`) });
+/** "On this page"'s row for a component: the list item whose button starts with its name. */
+const componentRow = (component: string) =>
+  within(screen().getByRole("list", { name: "Components on this page" }))
+    .getAllByRole("listitem")
+    .find((item) => item.querySelector("button[aria-expanded]")?.textContent?.startsWith(`${component} `)) as HTMLElement;
+/** A component's row's own button, which opens it. */
+const componentTrigger = (component: string) => componentRow(component).querySelector("button[aria-expanded]") as HTMLButtonElement;
 /** Whether a select tool is armed: a state of the page, said by the status strip, not by the button. */
 /** The status strip shows how to pick (and the announcer says it): read from the strip, not the announcer's region. */
 const armed = () => screen().queryAllByText(/^Click an Instance/, { ignore: "[role=status], script, style" }).length > 0;
@@ -161,8 +168,7 @@ describe("the Toolbar", () => {
     await settle();
     expect(panelText()).toContain("MenuItem ×1");
     // A component's name is never cut short: it may break only where its words meet, "Menu·Item".
-    const menuItem = [...shadow().querySelectorAll(".group button[aria-expanded] .cname")].find((name) => name.textContent === "MenuItem");
-    expect(menuItem?.querySelectorAll("wbr")).toHaveLength(1);
+    expect(componentTrigger("MenuItem").querySelectorAll("wbr")).toHaveLength(1);
 
     act(() => pageButton("Menu").click());
     await settle();
@@ -210,7 +216,7 @@ describe("the Toolbar", () => {
     expect(startTile("Select multiple").getAttribute("aria-checked")).toBe("true");
     expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     // Nothing says armed on the button: `aria-pressed` is gone from both groups.
-    expect(shadow().querySelector(".hero-tools [aria-pressed], .select-tools [aria-pressed]")).toBeNull();
+    for (const name of ["Start selecting", "Select"]) expect(screen().getByRole("radiogroup", { name }).querySelector("[aria-pressed]")).toBeNull();
     // The checked tool pressed again while armed stops picking.
     await clickInPanel(selectTool("Select multiple"));
     expect(armed()).toBe(false);
@@ -330,7 +336,7 @@ describe("the Toolbar", () => {
       act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true, relatedTarget: pageButton("ana") })));
       await settle();
     };
-    const buttonRow = [...shadow().querySelectorAll("button[aria-expanded]")].find((row) => row.querySelector(".cname")?.textContent === "Button");
+    const buttonRow = componentTrigger("Button");
     await fromPage(buttonRow as HTMLElement);
     expect(ringKinds()).toEqual(["hover", "hover", "hover", "hover", "hover"]);
     await leave(buttonRow as HTMLElement);
@@ -1150,41 +1156,43 @@ describe("On this page: the page map over its rows", () => {
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
   });
 
-  const section = () => shadow().querySelector(".on-page") as HTMLElement;
-  const blocks = () => [...shadow().querySelectorAll<HTMLButtonElement>(".map-sheet .blk")];
+  /** The card "On this page" heads. */
+  const section = () => screen().getByRole("heading", { level: 3, name: "On this page" }).closest("[data-card]") as HTMLElement;
+  const map = () => screen().queryByRole("toolbar", { name: "Page map" });
+  const blocks = () => within(map() as HTMLElement).getAllByRole("button");
   const buttonBlocks = () => blocks().filter((block) => block.textContent?.startsWith("Inspect Button "));
-  const groupRow = (component: string) =>
-    [...shadow().querySelectorAll<HTMLElement>("li.group")].find((item) => item.querySelector(".cname")?.textContent === component) as HTMLElement;
+  const lit = (elements: HTMLElement[]) => elements.filter((element) => element.hasAttribute("data-lit"));
 
   it("is one section: its counts in the head, the map, then the rows as the map's legend", async () => {
     await mount();
-    expect(shadow().querySelectorAll(".map-sheet")).toHaveLength(1);
-    expect(section().querySelector(".map-sheet")).not.toBeNull();
+    expect(screen().getAllByRole("toolbar", { name: "Page map" })).toHaveLength(1);
+    expect(within(section()).getByRole("toolbar", { name: "Page map" })).toBe(map());
     expect(within(section()).getByRole("heading", { level: 3 }).parentElement?.textContent).toMatch(/^On this page\d+ components · \d+ Instances$/);
-    expect(shadow().querySelector(".map-legend")).toBeNull();
+    expect(within(section()).getByRole("list", { name: "Components on this page" })).toBeTruthy();
     expect(buttonBlocks()).toHaveLength(5);
-    const hue = buttonBlocks()[0]?.classList[1] as string;
-    expect(hue).toMatch(/^hue-\d$/);
-    expect(groupRow("Button").classList.contains(hue)).toBe(true);
+    // A block and its row share their component's hue.
+    const hue = buttonBlocks()[0]?.getAttribute("data-hue");
+    expect(hue).toMatch(/^\d$/);
+    expect(componentRow("Button").getAttribute("data-hue")).toBe(hue);
   });
 
   it("lights a component's blocks and its row from either one, and outlines it on the page", async () => {
     await mount();
     await hover(buttonBlocks()[0] as HTMLButtonElement);
-    expect(shadow().querySelector(".map-sheet")?.hasAttribute("data-lit")).toBe(true);
-    expect(blocks().filter((item) => item.classList.contains("lit"))).toHaveLength(5);
-    expect(groupRow("Button").classList.contains("lit")).toBe(true);
+    expect(map()?.hasAttribute("data-lit")).toBe(true);
+    expect(lit(blocks())).toHaveLength(5);
+    expect(componentRow("Button").hasAttribute("data-lit")).toBe(true);
     expect(ringKinds().length).toBeGreaterThan(0);
 
-    await hover(groupRow("Dialog").querySelector("button[aria-expanded]") as HTMLElement);
-    expect(groupRow("Button").classList.contains("lit")).toBe(false);
-    expect(buttonBlocks().some((item) => item.classList.contains("lit"))).toBe(false);
+    await hover(componentTrigger("Dialog"));
+    expect(componentRow("Button").hasAttribute("data-lit")).toBe(false);
+    expect(lit(buttonBlocks())).toHaveLength(0);
   });
 
   it("inspects the Instance a block stands for", async () => {
     await mount();
     await clickInPanel(buttonBlocks()[0] as HTMLButtonElement);
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).not.toBeNull();
-    expect(shadow().querySelector(".map-sheet")).toBeNull();
+    expect(map()).toBeNull();
   });
 });

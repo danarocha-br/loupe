@@ -1,9 +1,11 @@
 // Marks (ADR 0003, DESIGN.md "Layers"): the small marks the Inspector's patterns and the
 // list share. A change's delta and an Instance's row of them, a held State prop's empty
-// delta, a verdict's status chip, a tag in panel-view's words, and a name that breaks only
-// between its words. Primitives composed: Delta, Tag and the check icon. See marks.md.
+// delta, a verdict's status chip, a tag in panel-view's words, a name that breaks only
+// between its words, a held record's values, and the count beside a card's title. Primitives
+// composed: Delta, Tag and the check icon. A component's hue is CSS alone (`[data-hue]`).
+// See marks.md.
 
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { InspectorWords, StatusTag, Tag as TagText } from "../../panel-view/index.js";
 import { CheckIcon, Delta, Tag, type TagLook } from "../../ui/index.js";
 
@@ -74,4 +76,20 @@ const TAG_LOOK: Record<TagText["kind"], TagLook> = {
 /** One of panel-view's tags, in the look its kind takes: dashed for what isn't there now, amber for out of date. */
 export function TagChip({ tag }: { tag: TagText }) {
   return <Tag look={TAG_LOOK[tag.kind]}>{tag.text}</Tag>;
+}
+
+/** A held record's values, a line each, in small mono: what it would set, beside what the app last showed. */
+export function HeldValues({ values }: { values: readonly string[] }) {
+  return (
+    <ul data-held-values="" data-testid="held-values">
+      {values.map((value, index) => (
+        <li key={index}>{value}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** What counts a card's title, at the head's right: "9 components · 43 Instances", "2 · apply to nothing". */
+export function Meta({ children }: { children: ReactNode }) {
+  return <span data-meta="">{children}</span>;
 }
