@@ -236,7 +236,7 @@ function LitGroupRow({ group, store }: { group: GroupItem; store: ToolbarStore }
 /** The page map, its blocks lit with their row. */
 function LitPageMap({ debug, groups, store }: { debug: LoupeDebug; groups: GroupItem[]; store: ToolbarStore }) {
   const lit = useToolbar((state) => state.lit);
-  return <PageMapView debug={debug} groups={groups} lit={lit} onPoint={store.point} onSelect={(id) => store.select(id)} />;
+  return <PageMapView debug={debug} groups={groups} lit={lit} onPoint={store.point} onSelect={store.select} />;
 }
 
 function ComponentList({
@@ -251,7 +251,7 @@ function ComponentList({
   const store = useToolbarStore();
   // One component pointed at, on the map or on its row, lights both. It goes with the list,
   // as the list's own state did: back from an Instance, nothing is lit.
-  useEffect(() => () => store.light(null), [store]);
+  useEffect(() => () => store.clearLight(), [store]);
   return (
     <>
       <StartCard words={LIST_WORDS} mode={mode} armed={picking} onTool={onTool} headingRef={heading} />

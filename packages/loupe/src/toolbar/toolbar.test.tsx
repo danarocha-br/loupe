@@ -1199,4 +1199,15 @@ describe("On this page: the page map over its rows", () => {
     expect(viewHeading().textContent).toBe(who);
     expect(map()).toBeNull();
   });
+
+  it("outlines nothing it pointed at once the panel is hidden and shown again", async () => {
+    await mount();
+    // A block pointed at, then inspected: it goes with the list, and no leave or blur says so.
+    const block = buttonBlocks()[1] as HTMLButtonElement;
+    await hover(block);
+    await clickInPanel(block);
+    await clickInPanel(panelButton("Hide panel"));
+    await clickInPanel(shadow().querySelector("[data-launcher]") as HTMLButtonElement);
+    expect(ringKinds().filter((kind) => kind === "hover")).toEqual([]);
+  });
 });

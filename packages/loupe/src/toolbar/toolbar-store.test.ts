@@ -79,7 +79,7 @@ describe("the toolbar store", () => {
   it("clears the light alone, leaving the outline as it was", () => {
     const { store } = listening();
     store.point({ component: "Badge", outlineIds: ["badge-1"] });
-    store.light(null);
+    store.clearLight();
     expect(store.get()).toMatchObject({ lit: null, hovered: ["badge-1"] });
   });
 
@@ -89,7 +89,7 @@ describe("the toolbar store", () => {
     const leave = store.subscribe(heard);
     store.select(null);
     store.setScope("instance");
-    store.light(null);
+    store.clearLight();
     store.point(null);
     expect(heard).not.toHaveBeenCalled();
 

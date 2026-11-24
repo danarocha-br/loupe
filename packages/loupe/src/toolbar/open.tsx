@@ -65,6 +65,9 @@ export function ToolbarOpen({ host, column, onHide, closing, theme, onTheme, onS
   const selected = useToolbar((state) => state.selected);
   const mode = useToolbar((state) => state.mode);
   const scope = useToolbar(scopeOf);
+  // What a row or a block pointed at goes with the panel, as this component's own state
+  // did: an element the panel removes says no leave or blur, and the store outlives it.
+  useEffect(() => () => store.hover([]), [store]);
   useEffect(startTrackers, []);
   // After the panel's own effects: its heading is there to take focus.
   useEffect(onShown, [onShown]);

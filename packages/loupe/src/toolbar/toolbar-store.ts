@@ -18,7 +18,7 @@ import { createContext, useContext, useSyncExternalStore } from "react";
 import type { Scope } from "../runtime/store.js";
 import type { SelectMode } from "./picker.js";
 
-export type ToolbarState = {
+type ToolbarState = {
   /** The Instance the panel inspects, or null for the list. */
   selected: string | null;
   /** The header's select tool (2026-11-20): one Instance, or every one from its call site, as Figma selects. Kept across selections for the page load. */
@@ -45,8 +45,8 @@ export type ToolbarStore = {
   hover(ids: readonly string[]): void;
   /** A row or a block pointed at, or left (null): it lights, and its Instances are outlined. */
   point(group: { component: string; outlineIds: readonly string[] } | null): void;
-  /** Light a component, or none, and outline nothing new: the list going clears its light. */
-  light(component: string | null): void;
+  /** Light nothing, and leave the outline as it is: the list going clears its light. */
+  clearLight(): void;
 };
 
 const INITIAL: ToolbarState = { selected: null, mode: "one", widened: false, marksHidden: false, hovered: [], lit: null };
@@ -58,8 +58,8 @@ export function scopeOf(state: Pick<ToolbarState, "mode" | "widened">): Scope {
   return state.mode === "one" ? "instance" : state.widened ? "page" : "group";
 }
 
-export function createToolbarStore(initial: Partial<ToolbarState> = {}): ToolbarStore {
-  let state: ToolbarState = { ...INITIAL, ...initial };
+export function createToolbarStore(): ToolbarStore {
+  let state = INITIAL;
   const listeners = new Set<() => void>();
   const set = (patch: Partial<ToolbarState>) => {
     const next = { ...state, ...patch };
@@ -83,7 +83,7 @@ export function createToolbarStore(initial: Partial<ToolbarState> = {}): Toolbar
       const ids = group ? group.outlineIds : [];
       set({ lit: group?.component ?? null, ...(sameIds(state.hovered, ids) ? {} : { hovered: ids }) });
     },
-    light: (component) => set({ lit: component }),
+    clearLight: () => set({ lit: null }),
   };
 }
 
