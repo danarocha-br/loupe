@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { COLOR, SHADOW } from "./tokens.js";
+import { STYLESHEET } from "./surface/index.js";
+import { COLOR, PAGE, SHADOW } from "./tokens.js";
 
 const LIGHT = COLOR.light;
 const DARK = COLOR.dark;
@@ -46,13 +46,11 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     expect(Object.keys(SHADOW.dark).sort()).toEqual(Object.keys(SHADOW.light).sort());
   });
 
-  it("writes no colour literal in a rule: tokens for the panel, named page values for the marks", () => {
-    // Read the source, where the page's values still show as `${PAGE.…}`: the built string can't tell them apart.
-    const source = readFileSync(new URL("./styles.ts", import.meta.url), "utf8");
-    const rules = source.slice(source.indexOf("export const CSS = `")).split("\n");
-    // Shadows are surfaces' depth, not colour roles.
-    const literal = /#[0-9A-Fa-f]{6}\b|rgba?\(/;
-    const offenders = rules.filter((line) => literal.test(line) && !/shadow:/.test(line));
-    expect(offenders).toEqual([]);
+  it("writes no colour literal in a rule: the panel's and the page's marks' colours are all tokens on the host", () => {
+    // Every rule is a primitive's or a pattern's now (each one's CSS test refuses a literal); the only literals left are the tokens' declarations on the host.
+    const rules = STYLESHEET.replace(/\/\*[\s\S]*?\*\//g, "").replace(/:host(\([^)]*\))? \{[^}]*\}/g, "");
+    expect(rules.match(/#[0-9A-Fa-f]{6}\b|rgba?\(/g)).toBeNull();
+    // The page's marks keep their fixed values, declared once for both panel themes.
+    for (const [name, value] of Object.entries(PAGE)) expect(STYLESHEET).toContain(`--page-${name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}: ${value};`);
   });
 });

@@ -1,0 +1,42 @@
+/*
+ * Sheet (ADR 0003): written against `[data-sheet]` and its states (`[data-overlay]`,
+ * `[data-peek]`, `[data-closing]`), and its part, `[data-sheet-middle]`. Values from the
+ * tokens. In the stylesheet's `patterns` layer. The drawer's curves are the ones it was
+ * tuned with (2026-11-22).
+ */
+
+/* A grey sheet in the column the page makes room for (dock.ts), 8px in from its top and foot, white cards on it.
+   Its text is the panel's base: Body in `--ink`; paragraphs keep their last word company, headings balance instead. */
+[data-sheet] {
+  position: fixed; top: var(--space-inset); right: 0; bottom: var(--space-inset); z-index: 2147483647; width: 344px;
+  display: flex; flex-direction: column; overflow: hidden; background: var(--ground);
+  border-radius: var(--radius-sheet) 0 0 var(--radius-sheet); box-shadow: 0 0 0 1px var(--edge), 0 8px 24px var(--edge);
+  font: var(--font-body); color: var(--ink); overflow-wrap: break-word; text-wrap: pretty;
+  transition: opacity var(--duration-hover) var(--ease-out), translate var(--duration-open) var(--ease-drawer);
+}
+/* The drawer: it slides out of the window's right edge as the pill tucks away, and back into it on Hide, quicker. */
+@starting-style { [data-sheet] { translate: calc(100% + 8px) 0; } }
+[data-sheet][data-closing] { translate: calc(100% + 8px) 0; pointer-events: none; transition: translate var(--duration-close) var(--ease-land); }
+@media (prefers-reduced-motion: reduce) {
+  [data-sheet] { transition: opacity var(--duration-fade) var(--ease-out); }
+  @starting-style { [data-sheet] { translate: none; opacity: 0; } }
+  [data-sheet][data-closing] { translate: none; opacity: 0; transition: opacity var(--duration-fade) var(--ease-out); }
+}
+
+/* Over the page, where the window is too narrow for a column: it lifts off what it covers. */
+[data-sheet][data-overlay] { box-shadow: 0 0 0 1px var(--edge), var(--overlay-shadow); }
+/* Alt held: see through to what runs under the column, such as an app's own dialog. */
+[data-sheet][data-peek] { opacity: 0.08; pointer-events: none; }
+
+/* The middle scrolls between the header and the footer, its cards 6px apart and 6px in. */
+[data-sheet-middle] {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: var(--space-sheet); padding: var(--space-sheet);
+  scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent;
+}
+/* Cards keep their height and the middle scrolls: a card that clips its overflow would otherwise shrink to nothing. */
+[data-sheet-middle] > * { flex: none; }
+
+/* Forced colours drop the shadow that edges the sheet: it keeps a border they draw. */
+@media (forced-colors: active) {
+  [data-sheet] { border: 1px solid transparent; }
+}

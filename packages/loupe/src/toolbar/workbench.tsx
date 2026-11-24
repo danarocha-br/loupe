@@ -8,10 +8,23 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
-import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode, stripParts } from "./panel-view/index.js";
+import {
+  COMMAND_WORDS,
+  COPY_WORDS,
+  FOOTER_WORDS,
+  HEADER_WORDS,
+  INSPECTOR_WORDS,
+  LAUNCHER_WORDS,
+  LIST_WORDS,
+  OUTLINE_WORDS,
+  type SelectMode,
+  SHEET_WORDS,
+  stripParts,
+} from "./panel-view/index.js";
 import {
   AppearsOnInteraction,
   ChangeList,
+  ChangeOutline,
   CommandLine,
   CopySplit,
   type CopyState,
@@ -23,22 +36,27 @@ import {
   Identity,
   InspectOnly,
   InstanceNote,
+  LauncherPill,
   Legend,
   NoGroup,
   NotCopied,
   Notice,
   OnThisPage,
   PageMap,
+  PageOutline,
   PanelFooter,
   PanelHeader,
+  PickTag,
   PropRow,
   ScopeSection,
+  Sheet,
   SiteCard,
   StartCard,
   StatusStrip,
 } from "./patterns/index.js";
 import {
   BUTTON_GROUP,
+  CHANGE_OUTLINE,
   CHANGES,
   COPIED_TITLE,
   FLAGS,
@@ -64,11 +82,15 @@ import {
   NOT_GENERATED_NOTICE,
   COMMAND,
   NOTE,
+  OUTLINES,
   OVERRIDES_OFF_NOTICE,
   PAGE_MEMBERS,
+  PICK_OUTLINE,
+  PICK_TAG,
   PROP_ITEMS,
   REFUSED,
   SECRET_LINE,
+  SHEET_WIDTH,
   STALE_NOTICE,
   TONE_AT_SCOPE,
   TYPE_INSPECT_ONLY,
@@ -959,6 +981,98 @@ function ChromePatternStates() {
   );
 }
 
+/** A pill where the view would put it in a stage: its top left, and each side's body as far out as its gap, 24px more once parked. */
+function pillAt(x: number, y: number, parked: boolean, stage = { width: 320, height: 88 }) {
+  const extra = parked ? 24 : 0;
+  return {
+    at: { x, y },
+    gaps: { left: x + extra, right: stage.width - x - 44 + extra, top: y + extra, bottom: stage.height - y - 32 + extra },
+  };
+}
+
+function ShellPatternStates() {
+  const [last, setLast] = useState("—");
+  const [peeking, setPeeking] = useState(false);
+  const words = { label: LAUNCHER_WORDS.label, title: LAUNCHER_WORDS.title("⌘.") };
+  const open = () => setLast("open");
+  return (
+    <div className="wb-states">
+      <Frame title="LauncherPill: docked on the left side, parked: the neck has let go">
+        <div className="wb-stage">
+          <LauncherPill edge="left" dragging={false} settling={false} leaving={false} {...pillAt(6, 28, true)} words={words} onClick={open} />
+        </div>
+      </Frame>
+      <Frame title="LauncherPill: held 4px off the left side: the neck fills in">
+        <div className="wb-stage">
+          <LauncherPill edge="free" dragging settling={false} leaving={false} {...pillAt(4, 28, false)} words={words} onClick={open} />
+        </div>
+      </Frame>
+      <Frame title="LauncherPill: free, away from every side; point at it">
+        <div className="wb-stage">
+          <LauncherPill edge="free" dragging={false} settling={false} leaving={false} {...pillAt(138, 28, true)} words={words} onClick={open} />
+        </div>
+      </Frame>
+      <Frame title="Sheet: docked, its header, a card in the middle, its footer; press Peek to see through">
+        <div className="wb-line">
+          <Button size="small" onClick={() => setPeeking(!peeking)}>
+            {peeking ? "Stop peeking" : "Peek"}
+          </Button>
+        </div>
+        <div className="wb-stage wb-stage-sheet">
+          <Sheet
+            docked
+            peeking={peeking}
+            closing={false}
+            width={SHEET_WIDTH - 40}
+            words={SHEET_WORDS}
+            header={
+              <>
+                <PanelHeader page={HEADER_PAGE} mode="one" armed={false} marksHidden={false} words={HEADER_WORDS} onTool={() => {}} onMarks={() => {}} onHide={() => setLast("hide")} />
+                <StatusStrip parts={HEADER_WORDS.strip.marksHidden} />
+              </>
+            }
+            footer={<PanelFooter footer={FOOTER_EMPTY} words={FOOTER_WORDS} undo={null} theme="light" onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} copy={null} />}
+          >
+            <Card>
+              <CardHead>
+                <h3>A card</h3>
+              </CardHead>
+            </Card>
+          </Sheet>
+        </div>
+      </Frame>
+      <Frame title="Sheet: over the page, where the window is too narrow for a column">
+        <div className="wb-stage wb-stage-sheet">
+          <Sheet docked={false} peeking={false} closing={false} width={SHEET_WIDTH - 40} words={SHEET_WORDS} header={<StatusStrip parts={HEADER_WORDS.strip.covered} />} footer={null}>
+            <Card>
+              <CardHead>
+                <h3>A card</h3>
+              </CardHead>
+            </Card>
+          </Sheet>
+        </div>
+      </Frame>
+      <Frame title="The page's marks: the selection tagged with its size, two it reaches, one left out">
+        <div className="wb-stage wb-stage-page">
+          {OUTLINES.map(({ key, ...outline }) => (
+            <PageOutline key={key} {...outline} box={{ ...outline.box, left: 180 }} />
+          ))}
+        </div>
+      </Frame>
+      <Frame title="The page's marks: picking, with its tag; a change's outline; the size tag below and from the start">
+        <div className="wb-stage wb-stage-page">
+          <PageOutline {...PICK_OUTLINE} box={{ ...PICK_OUTLINE.box, top: 44 }} />
+          <PickTag {...PICK_TAG} place={{ top: 18, left: 24 }} words={OUTLINE_WORDS} />
+          <ChangeOutline {...CHANGE_OUTLINE} box={{ ...CHANGE_OUTLINE.box, top: 120 }} quiet={false} />
+          <PageOutline kind="ring" box={{ top: 6, left: 210, width: 38, height: 38 }} quiet={false} tag={{ text: "Button · 32 × 32", below: true, start: false }} />
+          <PageOutline kind="ring" box={{ top: 150, left: 6, width: 38, height: 38 }} quiet={false} tag={{ text: "Button · 32 × 32", below: false, start: true }} />
+        </div>
+      </Frame>
+      <p className="wb-note">Last: {last}</p>
+    </div>
+  );
+}
+
 function Frame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -997,6 +1111,10 @@ const FRAME_CSS = `
 .wb-fold-body { padding: 4px 0 4px 12px; font: var(--font-paragraph); color: var(--muted); }
 .wb-popover { padding: var(--space-gutter); border-radius: var(--radius-card); background: var(--card); box-shadow: var(--popover-shadow); }
 .wb-toast-room { padding-top: 64px; }
+/* A stage stands in for the window: \`contain\` makes it the box a fixed pill, sheet or outline is placed in. */
+.wb-stage { position: relative; height: 88px; overflow: hidden; contain: layout paint; border-radius: var(--radius-well); background: var(--well); box-shadow: inset 0 0 0 1px var(--hairline); }
+.wb-stage-sheet { height: 360px; }
+.wb-stage-page { height: 248px; background: var(--card); }
 `;
 
 function FrameView({ frame }: { frame: Frame }) {
@@ -1066,6 +1184,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <section className="wb-bare">
             <h2>Patterns: the header, the footer and Copy Proposal</h2>
             <ChromePatternStates />
+          </section>
+          <section className="wb-bare">
+            <h2>Patterns: the pill, the sheet and the page's marks</h2>
+            <ShellPatternStates />
           </section>
         </div>
       </Surface>

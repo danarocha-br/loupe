@@ -7,15 +7,17 @@
 // Pure geometry, so it can be tested without a layout: a place is kept in fractions
 // of the viewport, so it holds across a resize, and laid out in px for the viewport there is.
 
-export type Edge = "top" | "right" | "bottom" | "left";
+import { PILL, PILL_SIDES, type PillSide } from "./patterns/launcher/launcher.js";
+
+export type Edge = PillSide;
 
 /** Glued to a side at `at` (0–1 along it), or free with its centre at `x`, `y` (0–1 of the viewport). */
 export type Place = { edge: Edge; at: number } | { edge: null; x: number; y: number };
 
 export type Viewport = { width: number; height: number };
 
-/** The pill's body: always this wide and this tall, ends fully round. */
-export const BODY = { width: 44, height: 32 } as const;
+/** The pill's body: always this wide and this tall, ends fully round, as its pattern draws it. */
+export const BODY = PILL;
 /** Within this of a side, the held pill shows where it would dock, and let go, docks there. */
 export const REACH = 56;
 /** How far a free pill, or a glued one's ends, keep from the window's edges and corners. */
@@ -83,7 +85,7 @@ export function gapTo(edge: Edge, x: number, y: number, viewport: Viewport): num
   }
 }
 
-export const EDGES: readonly Edge[] = ["left", "right", "top", "bottom"];
+export const EDGES: readonly Edge[] = PILL_SIDES;
 
 /** The side the body is closest to, and how close. */
 export function nearestEdge(x: number, y: number, viewport: Viewport): { edge: Edge; gap: number } {

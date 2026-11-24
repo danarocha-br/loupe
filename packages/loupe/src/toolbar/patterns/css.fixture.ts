@@ -20,3 +20,37 @@ export function expectPatternCss(css: string): void {
   expect(body).not.toMatch(/border-radius: *\d+px/);
   expect(body).not.toMatch(/letter-spacing: *-/);
 }
+
+/** A rule inside a `@media (forced-colors: active)` block: its selector, and what it declares. */
+export type ForcedRule = { selector: string; declares: Record<string, string> };
+
+/**
+ * The rules a CSS string keeps for forced colours, as the CSSOM parses them. jsdom applies
+ * no media query, so a test shows they still apply by matching each selector against the
+ * parts a pattern drew.
+ */
+export function forcedColorRules(css: string): ForcedRule[] {
+  const style = document.createElement("style");
+  style.textContent = css;
+  document.head.append(style);
+  const found: ForcedRule[] = [];
+  const visit = (rules: CSSRuleList, forced: boolean) => {
+    for (const rule of [...rules]) {
+      if (rule instanceof CSSMediaRule) visit(rule.cssRules, forced || rule.media.mediaText.includes("forced-colors: active"));
+      else if (forced && rule instanceof CSSStyleRule) {
+        const declares: Record<string, string> = {};
+        for (let i = 0; i < rule.style.length; i++) {
+          const property = rule.style[i] as string;
+          declares[property] = rule.style.getPropertyValue(property);
+        }
+        found.push({ selector: rule.selectorText, declares });
+      }
+    }
+  };
+  visit(style.sheet?.cssRules ?? ([] as unknown as CSSRuleList), false);
+  style.remove();
+  return found;
+}
+
+/** A selector without its user-action pseudo-classes, to match a part that isn't hovered or focused in a test. */
+export const atRest = (selector: string) => selector.replace(/:(hover|focus-visible|focus)\b/g, "");

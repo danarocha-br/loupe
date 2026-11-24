@@ -26,7 +26,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const pill = () => container.querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
+const pill = () => container.querySelector<HTMLButtonElement>("[data-launcher]") as HTMLButtonElement;
 
 const fire = (type: string, at: { clientX: number; clientY: number }) =>
   act(() => {
@@ -51,7 +51,7 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
   it("starts glued to the right side, the L on a pill named for what it does", () => {
     expect(pill().dataset.edge).toBe("right");
     expect(pill().getAttribute("aria-label")).toBe("Show Loupe");
-    expect(pill().querySelector(".mark svg")).not.toBeNull();
+    expect(pill().querySelector("[data-launcher-mark] svg")).not.toBeNull();
   });
 
   it("opens the panel on a click", () => {
@@ -89,14 +89,14 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     fire("pointerdown", { clientX: x0 + 10, clientY: y0 + 10 });
     const [x, y] = [window.innerWidth / 2, window.innerHeight - 16 - 30];
     fire("pointermove", { clientX: x, clientY: y });
-    expect(pill().classList.contains("dragging")).toBe(true);
+    expect(pill().hasAttribute("data-dragging")).toBe(true);
     expect(pill().style.translate).toBe(`${x - 10}px ${y - 10}px`);
   });
 
   it("draws no copy of itself while held: nothing but the pill, and the edge's goo", () => {
     pressAndMove(window.innerWidth / 2, window.innerHeight - 16 - 30 - 6);
     expect(container.querySelector(".dock-ghost")).toBeNull();
-    expect(container.querySelectorAll(".launcher").length).toBe(1);
+    expect(container.querySelectorAll("[data-launcher]").length).toBe(1);
   });
 
   it("docks on the side it is let go in reach of", () => {
@@ -105,8 +105,8 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     fire("pointermove", { clientX: window.innerWidth / 2, clientY: pointerY });
     fire("pointerup", { clientX: window.innerWidth / 2, clientY: pointerY });
     expect(pill().dataset.edge).toBe("bottom");
-    expect(pill().classList.contains("dragging")).toBe(false);
-    expect(pill().classList.contains("settling")).toBe(true);
+    expect(pill().hasAttribute("data-dragging")).toBe(false);
+    expect(pill().hasAttribute("data-settling")).toBe(true);
   });
 
   it("carries on as far as a flick would coast, and docks on the side that takes it there", () => {
@@ -144,7 +144,7 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
   });
 
   it("draws a body for each side of the window as far out as the pill's gap to it, so the two run together only close to (2026-11-23)", () => {
-    const wall = (index: number) => pill().querySelectorAll<SVGRectElement>(".goo .wall")[index] as SVGRectElement;
+    const wall = (index: number) => pill().querySelectorAll<SVGRectElement>("[data-launcher-wall]")[index] as SVGRectElement;
     // Parked on the right, 6px off it: the right side's body (EDGES order: left, right, top, bottom) is drawn back 24px more, so no neck.
     expect(wall(1).style.translate).toBe("30px 0px");
     // Held: every side's body is the pill's real gap away, so they join once it is close.
@@ -153,7 +153,7 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     expect(wall(1).style.translate).toBe(`${window.innerWidth - (x as number) - 44}px 0px`);
     expect(wall(0).style.translate).toBe(`${-(x as number)}px 0px`);
     // The L stays outside the blur, crisp.
-    expect(pill().querySelector(".goo .mark")).toBeNull();
+    expect(pill().querySelector("[data-launcher-goo] [data-launcher-mark]")).toBeNull();
   });
 
   it("is placed by translate, so its travel stays off layout", () => {
@@ -163,7 +163,7 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
 
   it("tucks away as the panel opens, and can't be pressed while it does", () => {
     act(() => root.render(<Launcher onOpen={opened} leaving />));
-    expect(pill().classList.contains("leaving")).toBe(true);
+    expect(pill().hasAttribute("data-leaving")).toBe(true);
     act(() => pill().click());
     expect(opened).not.toHaveBeenCalled();
   });

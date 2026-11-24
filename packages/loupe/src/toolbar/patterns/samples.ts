@@ -24,7 +24,9 @@ import type {
   Tag,
   Write,
 } from "../panel-view/index.js";
+import type { LauncherPillProps } from "./launcher/launcher.js";
 import type { MapBox } from "./page-map/page-map.js";
+import type { OutlineBox, PageOutlineProps } from "./page-marks/page-marks.js";
 
 const ID = "app/billing/member-row-menu.tsx › MemberRowMenu › Button[1]#caio";
 const write = (prop: string, scope: Write["scope"] = "instance"): Write => ({ id: ID, prop, scope });
@@ -646,3 +648,51 @@ export const REFUSED = {
   reason: "Document is not focused.",
   text: "# Button variant in MemberRowMenu\n\nDesigner: Dana\n\n## Change 1\nButton variant \"ghost\" → \"outline\"",
 } as const;
+
+/** What the pill draws from, without its words: docked on the right of a 1280 × 860 window, low, parked (its sides' bodies 24px further out than its gaps). */
+export const PILL_DOCKED = {
+  edge: "right",
+  dragging: false,
+  settling: false,
+  leaving: false,
+  at: { x: 1230, y: 384 },
+  gaps: { left: 1254, right: 30, top: 408, bottom: 468 },
+} as const satisfies Omit<LauncherPillProps, "words">;
+
+/** The pill held under the pointer in the middle of the same window: free, each side's body its real gap away. */
+export const PILL_HELD = {
+  edge: "free",
+  dragging: true,
+  settling: false,
+  leaving: false,
+  at: { x: 478, y: 384 },
+  gaps: { left: 478, right: 758, top: 384, bottom: 444 },
+} as const satisfies Omit<LauncherPillProps, "words">;
+
+/** The sheet's width in the column the page makes room for: 360px, less 8px either side. */
+export const SHEET_WIDTH = 344;
+
+/** An Instance's box on the page, stood off by 3px: a 32px menu button. */
+const box = (top: number, left = 24, width = 38, height = 38): OutlineBox => ({ top, left, width, height });
+
+/**
+ * Select multiple on a MemberRowMenu Button at its call site: the one picked, solid and
+ * tagged with its size; two more it reaches, dashed; one left out, dashed grey.
+ */
+export const OUTLINES: readonly (PageOutlineProps & { key: string })[] = [
+  { key: "caio", kind: "ring", box: box(40), quiet: false, tag: { text: "Button · 32 × 32", below: false, start: true } },
+  { key: "ana", kind: "member", box: box(92), quiet: false, tag: null },
+  { key: "bruno", kind: "member", box: box(144), quiet: false, tag: null },
+  { key: "dora", kind: "out", box: box(196), quiet: false, tag: null },
+];
+
+/** A row of the panel pointed at, and picking: what a click would select, washed. */
+export const HOVER_OUTLINE: PageOutlineProps = { kind: "hover", box: box(40, 24, 90, 38), quiet: false, tag: null };
+export const PICK_OUTLINE: PageOutlineProps = { kind: "pick", box: box(40, 24, 90, 38), quiet: false, tag: null };
+
+/** An Instance two changes reach, numbered as in the Proposal, and its box. */
+export const CHANGE_OUTLINE = { keys: "1 2", box: box(40, 24, 64, 38) } as const;
+
+/** The pick tag on the Instance under the pointer in Select multiple, and in Select one where no Override reaches. */
+export const PICK_TAG = { id: ID, name: "Button", detail: "4 from this call site", place: { top: 14, left: 24 } } as const;
+export const PICK_TAG_INSPECT_ONLY = { id: ID, name: "Badge", detail: "Inspect only", place: { top: 14, left: 24 } } as const;

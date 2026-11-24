@@ -5,7 +5,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CSS as VIEWS_CSS, GROUND_CSS } from "../styles.js";
+import { GROUND_CSS } from "../styles.js";
 import { PATTERNS_CSS } from "../patterns/styles.js";
 import { PRIMITIVES_CSS } from "../ui/index.js";
 import { LAYERS, STYLESHEET, Surface } from "./index.js";
@@ -31,9 +31,8 @@ describe("the surface's stylesheet", () => {
     expect(patterns).toBeGreaterThan(primitives);
     expect(GROUND_CSS).toContain(":host { all: initial;");
     expect(GROUND_CSS).toContain("button { font: inherit;");
-    // The views' rules come last, outside every layer, until they move into patterns.
-    expect(STYLESHEET.endsWith(VIEWS_CSS)).toBe(true);
-    expect(VIEWS_CSS).not.toContain(":host {");
+    // Every rule is in a layer: no view writes one of its own, so the patterns' layer ends the sheet.
+    expect(STYLESHEET.endsWith(`@layer patterns {\n${PATTERNS_CSS}\n}`)).toBe(true);
   });
 
   it("is in the shadow root, which says Loupe's words are English", () => {

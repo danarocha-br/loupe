@@ -41,7 +41,7 @@ describe("Tag", () => {
       const tag = screen.getByTestId(look);
       expect([tag.getAttribute("data-tag-look"), tag.title, tag.textContent]).toEqual([look, `${look} title`, look]);
     }
-    // `data-tag` is the page's pick tag's: a Tag never carries it.
+    // A Tag carries its look, never a bare `data-tag`, which a page mark or a pattern might mistake for its own.
     expect(screen.shadow.querySelector("[data-tag]")).toBeNull();
   });
 

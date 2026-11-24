@@ -21,6 +21,7 @@ import { Launcher } from "./launcher.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import type { SelectMode } from "./picker.js";
 import { useFocusShortcut } from "./shortcut.js";
+import { DURATION } from "./tokens.js";
 import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
 import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
 import { Announcer } from "./ui/announcer/announcer.js";
@@ -94,9 +95,9 @@ class PanelBoundary extends Component<{ onFail(error: unknown): void; children: 
   }
 }
 
-/** The drawer's close and the handle's tuck (styles.ts `.panel.closing`, `.launcher.leaving`). */
-const CLOSE_MS = 220;
-const TUCK_MS = 160;
+/** The drawer's close and the handle's tuck, as their patterns' CSS times them (sheet.css `[data-closing]`, launcher.css `[data-leaving]`). */
+const CLOSE_MS = DURATION.close;
+const TUCK_MS = DURATION.tuck;
 
 /** Whether the page can play the open and close: none in a test's DOM, where they would only wait. */
 function animates(): boolean {
@@ -151,7 +152,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     }
     // Mid-open, the panel's slide turns round from where it is (a transition, not a timeline).
     setClosing(true);
-    const panel = host.shadowRoot?.querySelector<HTMLElement>(".panel") ?? null;
+    const panel = host.shadowRoot?.querySelector<HTMLElement>("[data-sheet]") ?? null;
     let finished = false;
     const finish = () => {
       if (finished) return;
@@ -176,7 +177,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
   // the page, so a change can be judged as it will ship. Kept for the page load.
   const [marksHidden, setMarksHidden] = useState(false);
-  const [theme, toggleTheme] = useTheme(host, ".panel");
+  const [theme, toggleTheme] = useTheme(host, "[data-sheet]");
   const column = useColumn(!hidden);
   // Hide and Show swap the panel for its tab: focus goes with them when it was on the one
   // pressed, so a keyboard isn't dropped on the page (review 2026-11-20).
@@ -184,7 +185,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   useEffect(() => {
     if (!hidden || !focusSwap.current) return;
     focusSwap.current = false;
-    host.shadowRoot?.querySelector<HTMLElement>(".launcher")?.focus();
+    host.shadowRoot?.querySelector<HTMLElement>("[data-launcher]")?.focus();
   }, [hidden, host]);
   // To the heading once the panel is there: on the click itself, or once its module has loaded.
   const shown = useCallback(() => {
@@ -213,7 +214,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   useFocusShortcut(host, () => {
     if (closing) return;
     const inside = host.shadowRoot;
-    const target = hidden ? inside?.querySelector<HTMLElement>(".launcher") : inside?.querySelector<HTMLElement>("h2");
+    const target = hidden ? inside?.querySelector<HTMLElement>("[data-launcher]") : inside?.querySelector<HTMLElement>("h2");
     if (target) target.focus();
     // The panel's module is still loading: `shown` takes focus to its heading once it is there.
     else if (!hidden) focusSwap.current = true;
