@@ -39,8 +39,6 @@ export type LauncherPillProps = Omit<ComponentPropsWithoutRef<"button">, "classN
   ref?: Ref<HTMLButtonElement>;
 };
 
-const flag = (on: boolean) => (on ? "" : undefined);
-
 export function LauncherPill({ edge, dragging, settling, leaving, at, gaps, words, ref, ...rest }: LauncherPillProps) {
   return (
     <button
@@ -49,9 +47,9 @@ export function LauncherPill({ edge, dragging, settling, leaving, at, gaps, word
       type="button"
       data-launcher=""
       data-edge={edge}
-      data-dragging={flag(dragging)}
-      data-settling={flag(settling)}
-      data-leaving={flag(leaving)}
+      data-dragging={dragging ? "" : undefined}
+      data-settling={settling ? "" : undefined}
+      data-leaving={leaving ? "" : undefined}
       style={{ translate: `${at.x}px ${at.y}px` }}
       aria-label={words.label}
       title={words.title}

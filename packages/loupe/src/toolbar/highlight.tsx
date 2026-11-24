@@ -30,12 +30,10 @@ import { type Hovered, NOT_PICKING, type PickPreview, pickPreview, type SelectMo
 import { ChangeOutline, type OutlineKind, PageOutline, PickTag } from "./patterns/index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
-/** What an outline marks (page-marks.tsx `OutlineKind`): the selection, a member, one left out, a hovered row's, a pick. */
-type Kind = OutlineKind;
 type Tag = Pick<PickPreview, "name" | "detail">;
-type Target = { id: string; label: string | null; kind: Kind; tag: Tag | null };
+type Target = { id: string; label: string | null; kind: OutlineKind; tag: Tag | null };
 type Box = { top: number; left: number; width: number; height: number };
-type Ring = Box & { key: string; id: string; label: string | null; kind: Kind; tag: Tag | null };
+type Ring = Box & { key: string; id: string; label: string | null; kind: OutlineKind; tag: Tag | null };
 /** An Instance a change reaches, where it shows. */
 type Mark = Box & { key: string; id: string; text: string };
 
@@ -182,8 +180,8 @@ export function Highlight({
   useLayoutEffect(() => {
     const hoveredIds = hoveredKey.split("\n").filter((id) => id !== "");
     const scoped = membersKey === null ? null : membersKey.split("\n").filter((entry) => entry !== "");
-    const target = (id: string, kind: Kind, label: string | null, tag: Tag | null = null): Target => ({ id, label, kind, tag });
-    const reached = (id: string, out: boolean): Kind => (out ? "out" : id === selected ? "ring" : "member");
+    const target = (id: string, kind: OutlineKind, label: string | null, tag: Tag | null = null): Target => ({ id, label, kind, tag });
+    const reached = (id: string, out: boolean): OutlineKind => (out ? "out" : id === selected ? "ring" : "member");
     let targets: Target[];
     if (preview !== null) {
       // Picking, over an Instance: what a click would select stands in for the selection.

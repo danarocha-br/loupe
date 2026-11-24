@@ -5,10 +5,11 @@
  * tuned with (2026-11-22).
  */
 
-/* A grey sheet in the column the page makes room for (dock.ts), 8px in from its top and foot, white cards on it.
+/* A grey sheet in the column the page makes room for (dock.ts), 8px in from its top and foot, white cards on it;
+   its width is the column's, which the view measures and sets.
    Its text is the panel's base: Body in `--ink`; paragraphs keep their last word company, headings balance instead. */
 [data-sheet] {
-  position: fixed; top: var(--space-inset); right: 0; bottom: var(--space-inset); z-index: 2147483647; width: 344px;
+  position: fixed; top: var(--space-inset); right: 0; bottom: var(--space-inset); z-index: 2147483647;
   display: flex; flex-direction: column; overflow: hidden; background: var(--ground);
   border-radius: var(--radius-sheet) 0 0 var(--radius-sheet); box-shadow: 0 0 0 1px var(--edge), 0 8px 24px var(--edge);
   font: var(--font-body); color: var(--ink); overflow-wrap: break-word; text-wrap: pretty;

@@ -25,8 +25,6 @@ export type OutlineBox = { top: number; left: number; width: number; height: num
 /** The selected Instance's size tag: its words, under the outline near the window's top, from its start near the left edge. */
 export type SizeTag = { text: string; below: boolean; start: boolean };
 
-const flag = (on: boolean) => (on ? "" : undefined);
-
 export type PageOutlineProps = {
   kind: OutlineKind;
   box: OutlineBox;
@@ -38,9 +36,9 @@ export type PageOutlineProps = {
 
 export function PageOutline({ kind, box, quiet, tag }: PageOutlineProps) {
   return (
-    <div data-ring={kind} data-quiet={flag(quiet)} style={box} aria-hidden="true">
+    <div data-ring={kind} data-quiet={quiet ? "" : undefined} style={box} aria-hidden="true">
       {tag && (
-        <span data-ring-label="" data-below={flag(tag.below)} data-at-start={flag(tag.start)}>
+        <span data-ring-label="" data-below={tag.below ? "" : undefined} data-at-start={tag.start ? "" : undefined}>
           {tag.text}
         </span>
       )}
@@ -56,7 +54,7 @@ export type ChangeOutlineProps = {
 };
 
 export function ChangeOutline({ keys, box, quiet }: ChangeOutlineProps) {
-  return <div data-mark={keys} data-quiet={flag(quiet)} style={box} aria-hidden="true" />;
+  return <div data-mark={keys} data-quiet={quiet ? "" : undefined} style={box} aria-hidden="true" />;
 }
 
 export type PickTagProps = {

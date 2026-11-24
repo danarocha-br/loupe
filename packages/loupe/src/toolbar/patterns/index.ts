@@ -51,8 +51,7 @@ export { METER_MAX, ScopeMoveButton, ScopeSection, type ScopeSectionProps } from
 export { Sheet, type SheetProps } from "./sheet/sheet.js";
 export { SiteCard, type SiteCardProps } from "./site-card/site-card.js";
 export { StartCard, type StartCardProps, ToolPreview } from "./start-card/start-card.js";
-// The pill (LauncherPill) is imported by its own path, `./launcher/launcher.js`, never from here:
-// the collapsed pill loads no other pattern. Its CSS is `./styles.js`'s, with every pattern's.
-export { LauncherPill, type LauncherPillProps, LoupeL, PILL, PILL_SIDES, type PillSide } from "./launcher/launcher.js";
+// The pill (LauncherPill) is not here: it is imported by its own path, `./launcher/launcher.js`,
+// so the collapsed Toolbar loads no other pattern. Its CSS is `./styles.js`'s, with every pattern's.
 // The CSS is `./styles.js`'s, apart, so the collapsed pill loads none of the components.
 export { PATTERNS_CSS } from "./styles.js";

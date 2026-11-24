@@ -31,15 +31,13 @@ export type SheetProps = {
   children: ReactNode;
 };
 
-const flag = (on: boolean) => (on ? "" : undefined);
-
 export function Sheet({ docked, peeking, closing, width, words, middleRef, header, footer, children }: SheetProps) {
   return (
     <section
       data-sheet=""
-      data-overlay={flag(!docked)}
-      data-peek={flag(peeking)}
-      data-closing={flag(closing)}
+      data-overlay={!docked ? "" : undefined}
+      data-peek={peeking ? "" : undefined}
+      data-closing={closing ? "" : undefined}
       aria-label={words.label}
       inert={closing || undefined}
       style={{ width }}

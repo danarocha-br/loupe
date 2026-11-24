@@ -36,7 +36,6 @@ import {
   Identity,
   InspectOnly,
   InstanceNote,
-  LauncherPill,
   Legend,
   NoGroup,
   NotCopied,
@@ -96,6 +95,7 @@ import {
   TYPE_INSPECT_ONLY,
   UNDO_OFFER,
 } from "./patterns/samples.js";
+import { LauncherPill, PILL } from "./patterns/launcher/launcher.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
   Button,
@@ -981,12 +981,15 @@ function ChromePatternStates() {
   );
 }
 
-/** A pill where the view would put it in a stage: its top left, and each side's body as far out as its gap, 24px more once parked. */
+/** Parked, the view draws each side's body back this much past the pill's gap (launcher.tsx `PARKED_GAP`). */
+const PARKED = 24;
+
+/** A pill where the view would put it in a stage: its top left, and each side's body as far out as its gap, further once parked. */
 function pillAt(x: number, y: number, parked: boolean, stage = { width: 320, height: 88 }) {
-  const extra = parked ? 24 : 0;
+  const extra = parked ? PARKED : 0;
   return {
     at: { x, y },
-    gaps: { left: x + extra, right: stage.width - x - 44 + extra, top: y + extra, bottom: stage.height - y - 32 + extra },
+    gaps: { left: x + extra, right: stage.width - x - PILL.width + extra, top: y + extra, bottom: stage.height - y - PILL.height + extra },
   };
 }
 
