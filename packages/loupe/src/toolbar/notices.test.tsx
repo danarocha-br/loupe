@@ -84,7 +84,7 @@ afterEach(() => {
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-const panelText = () => shadow().querySelector(".panel")?.textContent ?? "";
+const panelText = () => shadow().querySelector("[data-sheet]")?.textContent ?? "";
 // The missing-layer card. Its words reach a screen reader through the toolbar's announcer.
 const missingNotice = () => shadow().querySelector("[data-testid=missing-notice]");
 /** What the toolbar's announcer has said since it mounted. */

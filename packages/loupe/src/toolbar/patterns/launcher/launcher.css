@@ -1,0 +1,62 @@
+/*
+ * LauncherPill (ADR 0003): written against `[data-launcher]` and its state attributes
+ * (`[data-edge]`, `[data-dragging]`, `[data-settling]`, `[data-leaving]`), and its parts
+ * (`[data-launcher-goo]` with `[data-launcher-body]` and `[data-launcher-wall]`,
+ * `[data-launcher-mark]`, `[data-launcher-glyph]`). Values from the tokens. In the
+ * stylesheet's `patterns` layer. The motion was tuned by hand (2026-11-22 and 23): every
+ * curve and duration here is the one it was tuned with.
+ */
+
+/* A flat dark pill with the L, free, or docked a few px off a side. Its body is drawn in the Goo, where
+   it runs together with the window's edge while it glues, and lets go once parked. The button is only its box. */
+[data-launcher] {
+  position: fixed; left: 0; top: 0; z-index: 2147483647; display: block; width: 44px; height: 32px; padding: 0;
+  border-radius: var(--radius-pill); background: none; color: var(--on-band);
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; filter: var(--launcher-edge);
+  transition: transform var(--duration-untuck) var(--ease-land), opacity var(--duration-fold) var(--ease-out);
+}
+/* The body and a body for each side of the window, through one blur and threshold (launcher.tsx, Goo). */
+[data-launcher-goo] { position: absolute; left: -32px; top: -32px; display: block; overflow: visible; pointer-events: none; }
+[data-launcher-goo] rect { fill: var(--band); transition: fill var(--duration-hover) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) { [data-launcher]:not([data-dragging]):hover [data-launcher-goo] rect { fill: var(--band-hover); } }
+/* Travelling, each side's body moves by the opposite of the pill's travel on the same curve, so it holds still on the window's edge. */
+[data-launcher][data-settling] [data-launcher-wall] { transition: fill var(--duration-hover) var(--ease-out), translate var(--duration-settle) var(--ease-land); }
+/* Landed: the edge draws back slowly at first, so the neck visibly thins and pinches (~115ms), then
+   fast, so the stubs pull back once it breaks, as a liquid neck does. Held, they follow at once. */
+[data-launcher]:not([data-settling]):not([data-dragging]) [data-launcher-wall] { transition: fill var(--duration-hover) var(--ease-out), translate var(--duration-release) var(--ease-in-out); }
+[data-launcher-mark] { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; transform: translate(-50%, -50%); pointer-events: none; }
+[data-launcher-glyph] { display: block; }
+[data-launcher][data-dragging] { cursor: grabbing; }
+/* After a drop, a dock or a key: it travels to its place, quick out and a soft landing. */
+[data-launcher][data-settling] { transition: translate var(--duration-settle) var(--ease-land), transform var(--duration-untuck) var(--ease-land), opacity var(--duration-fold) var(--ease-out); }
+[data-launcher]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The handle: as the panel opens it tucks into its side (free, it settles away), and as the
+   panel closes it slides back out of its side; docked 6px off the side, it travels that much further.
+   A transform, apart from the translate that places it. Its fade is as quick as a press. */
+[data-launcher][data-leaving] { pointer-events: none; transition: transform var(--duration-tuck) var(--ease-land), opacity var(--duration-hover) var(--ease-out); }
+[data-launcher][data-leaving][data-edge="right"] { transform: translateX(calc(100% + 6px)); }
+[data-launcher][data-leaving][data-edge="left"] { transform: translateX(calc(-100% - 6px)); }
+[data-launcher][data-leaving][data-edge="top"] { transform: translateY(calc(-100% - 6px)); }
+[data-launcher][data-leaving][data-edge="bottom"] { transform: translateY(calc(100% + 6px)); }
+[data-launcher][data-leaving][data-edge="free"] { transform: scale(0.9); opacity: 0; }
+@starting-style {
+  [data-launcher][data-edge="right"] { transform: translateX(calc(100% + 6px)); }
+  [data-launcher][data-edge="left"] { transform: translateX(calc(-100% - 6px)); }
+  [data-launcher][data-edge="top"] { transform: translateY(calc(-100% - 6px)); }
+  [data-launcher][data-edge="bottom"] { transform: translateY(calc(100% + 6px)); }
+  [data-launcher][data-edge="free"] { transform: scale(0.9); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-launcher], [data-launcher][data-settling], [data-launcher][data-leaving] { transition: opacity var(--duration-fade) var(--ease-out); }
+  [data-launcher][data-settling] [data-launcher-wall], [data-launcher]:not([data-settling]):not([data-dragging]) [data-launcher-wall] { transition: none; }
+  [data-launcher][data-leaving][data-edge] { transform: none; opacity: 0; }
+  @starting-style { [data-launcher][data-edge] { transform: none; opacity: 0; } }
+}
+
+/* Forced colours (Windows High Contrast) would drop the Goo's fill: the pill keeps its own colours, drawn in system ones.
+   Pointed at too: the hover's fill names the same rects more specifically, so it is named here again, later, to lose to this. */
+@media (forced-colors: active) {
+  [data-launcher] { forced-color-adjust: none; color: ButtonFace; filter: none; }
+  [data-launcher-goo] rect, [data-launcher]:not([data-dragging]):hover [data-launcher-goo] rect { fill: ButtonText; }
+  [data-launcher]:focus-visible { outline-color: Highlight; }
+}

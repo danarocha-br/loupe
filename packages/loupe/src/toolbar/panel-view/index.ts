@@ -13,6 +13,7 @@ import { layerNotice, noticesSaid, overridesOffNotice } from "./notices.js";
 import { changesWord, footerCount, headerView, heldChip } from "./words.js";
 
 export type * from "./types.js";
+export { LAUNCHER_WORDS, OUTLINE_WORDS, SHEET_WORDS } from "./chrome.js";
 export { flagsCard } from "./flags.js";
 export { isSwitch } from "./inspector.js";
 export {

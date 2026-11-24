@@ -198,12 +198,21 @@ export const PAGE = {
   band: "#1B2220",
   /** Not applied: a left-out or hovered Instance's grey dashes. */
   hover: "#6F7472",
-  /** Text on `ink` (the size tag) and on `band` (the pick tag), and the pick tag's detail. */
-  onInk: "#FFFFFF",
+  /**
+   * The size tag's figures on `ink`: the band's near-black, 4.7:1. White was 3.4:1 (PER-245).
+   */
+  onInk: "#1B2220",
+  /** The pick tag's name on `band`, and its detail. */
   onBand: "#F0F0F0",
   onBandMuted: "rgba(240, 240, 240, 0.62)",
   /** The white keyline that lifts the selection's outline off any page. */
   halo: "rgba(255, 255, 255, 0.85)",
+} as const;
+
+/** The page's tags' lift, fixed like the marks' colours: the size tag's, and the pick tag's, a touch deeper. */
+export const PAGE_SHADOW = {
+  tag: "0 1px 2px rgba(27, 34, 32, 0.2)",
+  pick: "0 1px 2px rgba(27, 34, 32, 0.24)",
 } as const;
 
 /**
@@ -357,10 +366,12 @@ export const DURATION = {
   fold: 160,
   /** The toast's entrance, the switch's thumb. */
   toast: 180,
+  /** The pill tucking into its side as the panel opens. */
+  tuck: 160,
   /** The drawer closing on Hide, quicker than it opens. */
   close: 220,
-  /** The pill tucking into its side. */
-  tuck: 240,
+  /** The pill sliding back out of its side once the panel has gone, and a transform's turn otherwise. */
+  untuck: 240,
   /** The pill travelling to its place. */
   settle: 260,
   /** The drawer sliding out of the window's edge. */
@@ -413,7 +424,8 @@ export const TYPE_PROPERTIES: Record<string, string> = {
 /**
  * The host's custom properties for one theme: its colours and shadows. The light block
  * also carries what doesn't change with the theme (`--space-*`, `--radius-*`,
- * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`, and the map's `--map-hue-*`):
+ * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`, the map's `--map-hue-*`, and
+ * the page's marks, `--page-*` and `--page-*-shadow`, which sit on the app in its light):
  * the dark block only overrides the themed ones.
  */
 export function hostDeclarations(theme: Theme): string {
@@ -426,6 +438,8 @@ export function hostDeclarations(theme: Theme): string {
     ...prefixed("ease", EASE),
     ...TYPE_PROPERTIES,
     ...prefixed("map-hue", Object.fromEntries(MAP_HUES.entries())),
+    ...prefixed("page", Object.fromEntries(Object.entries(PAGE).map(([name, value]) => [kebab(name), value]))),
+    ...Object.fromEntries(Object.entries(PAGE_SHADOW).map(([name, value]) => [`page-${name}-shadow`, value])),
   });
   return `${themed} ${scales}`;
 }

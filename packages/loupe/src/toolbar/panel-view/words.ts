@@ -135,6 +135,8 @@ export const INSPECTOR_WORDS: InspectorWords = {
   serverRendered: "Server-rendered",
   leftOutUnmounted: "Left out, not mounted",
   legend: { shown: "Shows now", app: "App’s value", default: "Default" },
+  hold: { off: (prop) => `Hold ${prop}`, on: (prop) => `Holding ${prop} · Release` },
+  resetInstance: "Reset this Instance",
 };
 
 /** The list's patterns' words (types.ts `ListWords`). */
@@ -203,6 +205,7 @@ export const stripText = (parts: readonly StripPart[] | null) => (parts ? parts.
 export const FOOTER_WORDS: FooterWords = {
   resetAll: "Reset all",
   undo: "Undo",
+  offer: { reset: (count) => `Reset ${plural(count, "Override")}`, discard: (count) => `Discarded ${plural(count, "held Override")}` },
   theme: { label: "Dark theme", toLight: "Switch to light", toDark: "Switch to dark" },
 };
 

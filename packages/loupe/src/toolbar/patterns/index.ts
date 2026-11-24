@@ -34,10 +34,24 @@ export { Breakable, ChangeKey, DotTitle, HeldKey, HeldValues, hovering, Keys, Me
 export { NoGroup, type NoGroupProps } from "./no-group/no-group.js";
 export { InstanceNote, type InstanceNoteProps, Notice, type NoticeProps } from "./notice/notice.js";
 export { OnThisPage, type OnThisPageProps } from "./on-this-page/on-this-page.js";
+export {
+  ChangeOutline,
+  type ChangeOutlineProps,
+  type OutlineBox,
+  type OutlineKind,
+  PageOutline,
+  type PageOutlineProps,
+  PickTag,
+  type PickTagProps,
+  type SizeTag,
+} from "./page-marks/page-marks.js";
 export { type MapBox, PageMap, type PageMapProps, stepFrom } from "./page-map/page-map.js";
 export { PropRow, type PropRowProps } from "./prop-row/prop-row.js";
 export { METER_MAX, ScopeMoveButton, ScopeSection, type ScopeSectionProps } from "./scope-section/scope-section.js";
+export { Sheet, type SheetProps } from "./sheet/sheet.js";
 export { SiteCard, type SiteCardProps } from "./site-card/site-card.js";
 export { StartCard, type StartCardProps, ToolPreview } from "./start-card/start-card.js";
+// The pill (LauncherPill) is not here: it is imported by its own path, `./launcher/launcher.js`,
+// so the collapsed Toolbar loads no other pattern. Its CSS is `./styles.js`'s, with every pattern's.
 // The CSS is `./styles.js`'s, apart, so the collapsed pill loads none of the components.
 export { PATTERNS_CSS } from "./styles.js";

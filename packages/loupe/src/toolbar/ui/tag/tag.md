@@ -27,7 +27,7 @@ A few words that qualify what they sit beside, as a pill: "State prop" on a prop
 | --- | --- |
 | `data-tag-look` | The look above. Every look is a full pill (`--radius-pill`), 1px by 8px of padding, with a 1px outline inside its edge: transparent unless the look colours or dashes it. |
 
-`data-tag` is not Tag's: the page's pick tag (`highlight.tsx`) carries it.
+Tag carries no bare `data-tag`, so no page mark or pattern can mistake it for its own (the page's pick tag is `data-pick-tag`, patterns/page-marks).
 
 Under forced colours the fills drop and the outline, transparent or not, is drawn in `CanvasText`, so every tag keeps its pill. That is why the ring is an outline and not an inset shadow, which forced colours drop.
 

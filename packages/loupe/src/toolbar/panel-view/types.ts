@@ -411,6 +411,8 @@ export type FooterWords = {
   resetAll: string;
   /** The undo offer's button, after what a reset dropped. */
   undo: string;
+  /** What the undo offer says was dropped: "Reset 2 Overrides" (Reset all, a scope's or an Instance's reset), "Discarded 1 held Override". */
+  offer: { reset(count: number): string; discard(count: number): string };
   /** Light or dark: its name, and its tooltip in each theme. */
   theme: { label: string; toLight: string; toDark: string };
 };
@@ -494,6 +496,10 @@ export type InspectorWords = {
   leftOutUnmounted: string;
   /** What a chip's marks mean, said once under the options. */
   legend: { shown: string; app: string; default: string };
+  /** At a wider scope, the button that holds a State prop: "Hold open", and once held "Holding open · Release". */
+  hold: { off(prop: string): string; on(prop: string): string };
+  /** Drops the selected Instance's own Overrides. */
+  resetInstance: string;
 };
 
 export type ScopeOption = { scope: Scope; label: string; enabled: boolean; pressed: boolean; title: string | null };
@@ -641,3 +647,12 @@ export type FlagRowView = {
   /** "Clear", while it is previewed. */
   clear: string | null;
 };
+
+/** The collapsed pill's words (DESIGN.md "Collapsed"): its name, and its tooltip, which names the focus shortcut. */
+export type LauncherWords = { label: string; title(shortcut: string): string };
+
+/** The sheet's name: the panel is a region of the page called this. */
+export type SheetWords = { label: string };
+
+/** The page's marks' words (DESIGN.md "On the page"): the selected Instance's size tag, and what leads the pick tag's detail. */
+export type OutlineWords = { size(name: string, width: number, height: number): string; detailLead: string };

@@ -24,21 +24,16 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { pageWidth } from "./dock.js";
-import type { Member } from "./panel-view/index.js";
+import { type Member, OUTLINE_WORDS } from "./panel-view/index.js";
 import { inView, type PageSignal } from "./page-signal.js";
 import { type Hovered, NOT_PICKING, type PickPreview, pickPreview, type SelectMode, useHovered } from "./picker.js";
+import { ChangeOutline, type OutlineKind, PageOutline, PickTag } from "./patterns/index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
-/**
- * `ring`: the selected Instance, solid and tagged; `member`: another Instance the
- * selection reaches, dashed; `out`: left out of the scope, dashed grey; `hover`:
- * named by a row of the panel, dashed grey; `pick`: what a click on the page would select.
- */
-type Kind = "ring" | "member" | "out" | "hover" | "pick";
 type Tag = Pick<PickPreview, "name" | "detail">;
-type Target = { id: string; label: string | null; kind: Kind; tag: Tag | null };
+type Target = { id: string; label: string | null; kind: OutlineKind; tag: Tag | null };
 type Box = { top: number; left: number; width: number; height: number };
-type Ring = Box & { key: string; id: string; label: string | null; kind: Kind; tag: Tag | null };
+type Ring = Box & { key: string; id: string; label: string | null; kind: OutlineKind; tag: Tag | null };
 /** An Instance a change reaches, where it shows. */
 type Mark = Box & { key: string; id: string; text: string };
 
@@ -56,9 +51,9 @@ const TAG_EDGE = 6;
 const LABEL_CHAR = 6.7;
 const LABEL_PAD = 12;
 
-/** "Button · 32 × 32": the selected Instance's name and rendered size. */
+/** "Button · 32 × 32": the selected Instance's name and rendered size, in panel-view's words. */
 export function labelText(ring: Box & { label: string | null }): string {
-  return `${ring.label} · ${Math.round(ring.width)} × ${Math.round(ring.height)}`;
+  return OUTLINE_WORDS.size(ring.label ?? "", Math.round(ring.width), Math.round(ring.height));
 }
 
 /**
@@ -66,12 +61,9 @@ export function labelText(ring: Box & { label: string | null }): string {
  * from the outline's left where ending at its right would run it off the left edge
  * (a small Instance at the page's left, or in an RTL layout).
  */
-export function labelClass(ring: Box & { label: string | null }): string {
-  const classes = ["label"];
-  if (ring.top - RING_GAP < TAG_ROOM) classes.push("below");
+export function labelPlace(ring: Box & { label: string | null }): { below: boolean; start: boolean } {
   const right = ring.left + ring.width + RING_GAP + 2;
-  if (right < labelText(ring).length * LABEL_CHAR + LABEL_PAD) classes.push("start");
-  return classes.join(" ");
+  return { below: ring.top - RING_GAP < TAG_ROOM, start: right < labelText(ring).length * LABEL_CHAR + LABEL_PAD };
 }
 
 /**
@@ -188,8 +180,8 @@ export function Highlight({
   useLayoutEffect(() => {
     const hoveredIds = hoveredKey.split("\n").filter((id) => id !== "");
     const scoped = membersKey === null ? null : membersKey.split("\n").filter((entry) => entry !== "");
-    const target = (id: string, kind: Kind, label: string | null, tag: Tag | null = null): Target => ({ id, label, kind, tag });
-    const reached = (id: string, out: boolean): Kind => (out ? "out" : id === selected ? "ring" : "member");
+    const target = (id: string, kind: OutlineKind, label: string | null, tag: Tag | null = null): Target => ({ id, label, kind, tag });
+    const reached = (id: string, out: boolean): OutlineKind => (out ? "out" : id === selected ? "ring" : "member");
     let targets: Target[];
     if (preview !== null) {
       // Picking, over an Instance: what a click would select stands in for the selection.
@@ -296,44 +288,29 @@ export function Highlight({
         if (ring.kind === "hover" && changed.has(ring.id)) return null;
         const steps = (ring.kind === "ring" || ring.kind === "member") && quiet(ring.id);
         return (
-          <div
+          <PageOutline
             key={ring.key}
-            className={`${ring.kind === "ring" ? "ring" : `ring ${ring.kind}`}${steps ? " quiet" : ""}`}
-            data-ring={ring.kind}
-            style={outline(ring)}
-            // Marks on the page for the eye: the panel says what is selected and what a change reached.
-            aria-hidden="true"
-          >
-            {ring.label && (
-              <span className={labelClass(ring)}>
-                {labelText(ring)}
-              </span>
-            )}
-          </div>
+            kind={ring.kind}
+            box={outline(ring)}
+            quiet={steps}
+            tag={ring.label ? { text: labelText(ring), ...labelPlace(ring) } : null}
+          />
         );
       })}
       {tagged?.tag && (
-        <div
+        <PickTag
           ref={tagRef}
-          className="pick-tag"
-          data-tag={tagged.id}
-          aria-hidden="true"
-          style={tagPlace(outline(tagged), tagSize, { width: pageWidth() || window.innerWidth, height: window.innerHeight })}
-        >
-          {tagged.tag.name}
-          {tagged.tag.detail && <span className="detail"> · {tagged.tag.detail}</span>}
-        </div>
+          id={tagged.id}
+          name={tagged.tag.name}
+          detail={tagged.tag.detail}
+          words={OUTLINE_WORDS}
+          place={tagPlace(outline(tagged), tagSize, { width: pageWidth() || window.innerWidth, height: window.innerHeight })}
+        />
       )}
       {pins
         .filter((pin) => !selectionOutlined.has(pin.id))
         .map((pin) => (
-          <div
-            key={pin.key}
-            className={quiet(pin.id) ? "mark quiet" : "mark"}
-            data-mark={pin.text}
-            style={outline(pin)}
-            aria-hidden="true"
-          />
+          <ChangeOutline key={pin.key} keys={pin.text} box={outline(pin)} quiet={quiet(pin.id)} />
         ))}
     </>
   );

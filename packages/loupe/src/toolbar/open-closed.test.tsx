@@ -103,8 +103,8 @@ async function reload() {
 }
 
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-const pill = () => shadow().querySelector<HTMLButtonElement>(".launcher");
-const panel = () => shadow().querySelector(".panel");
+const pill = () => shadow().querySelector<HTMLButtonElement>("[data-launcher]");
+const panel = () => shadow().querySelector("[data-sheet]");
 const heading = () => shadow().querySelector<HTMLElement>("h2");
 const click = async (element: Element) => {
   act(() => element.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true })));

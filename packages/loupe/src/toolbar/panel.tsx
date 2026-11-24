@@ -22,7 +22,6 @@ import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
 import { Button, Card, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
-import { plural } from "./format.js";
 import {
   COMMAND_WORDS,
   FOOTER_WORDS,
@@ -36,6 +35,7 @@ import {
   LIST_WORDS,
   type PanelView,
   type PropItem,
+  SHEET_WORDS,
   stripParts,
   stripText,
 } from "./panel-view/index.js";
@@ -55,6 +55,7 @@ import {
   PanelFooter,
   PanelHeader,
   ScopeSection,
+  Sheet,
   StartCard,
   StatusStrip,
 } from "./patterns/index.js";
@@ -84,7 +85,7 @@ type PanelProps = {
   onTheme(): void;
 };
 
-/** The sheet stands this far inside its column on every side, as `.panel` sets it. */
+/** The sheet stands this far inside its column, as its pattern sets it (sheet.css). */
 const PANEL_INSET = 8;
 
 /**
@@ -125,35 +126,39 @@ export function Panel(props: PanelProps) {
   const strip = stripParts({ picking: props.picking, mode: props.mode, covered, marksHidden: props.marksHidden });
   useAnnounceChange(stripText(strip));
   return (
-    <section
-      className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
-      aria-label="Loupe"
-      inert={props.closing || undefined}
-      style={{ width: column.width - PANEL_INSET * 2 }}
+    <Sheet
+      docked={column.docked}
+      peeking={peeking}
+      closing={props.closing === true}
+      width={column.width - PANEL_INSET * 2}
+      words={SHEET_WORDS}
+      middleRef={middle}
+      header={
+        <>
+          <PanelHeader
+            // The page, while nothing is selected: an Instance's identity names it beside the component instead.
+            page={body.kind === "list" ? { name: view.header.page, title: view.header.title } : null}
+            mode={props.mode}
+            armed={props.picking}
+            marksHidden={props.marksHidden}
+            words={HEADER_WORDS}
+            onTool={props.onTool}
+            onMarks={props.onMarks}
+            onHide={props.onHide}
+          />
+          <StatusStrip parts={strip} />
+        </>
+      }
+      footer={<Footer debug={props.debug} footer={view.footer} theme={props.theme} onTheme={props.onTheme} />}
     >
-      <PanelHeader
-        // The page, while nothing is selected: an Instance's identity names it beside the component instead.
-        page={body.kind === "list" ? { name: view.header.page, title: view.header.title } : null}
-        mode={props.mode}
-        armed={props.picking}
-        marksHidden={props.marksHidden}
-        words={HEADER_WORDS}
-        onTool={props.onTool}
-        onMarks={props.onMarks}
-        onHide={props.onHide}
-      />
-      <StatusStrip parts={strip} />
-      <div className="middle" ref={middle}>
-        {body.kind === "list" ? (
-          <ComponentList {...props} body={body} notices={notices} heading={heading} />
-        ) : body.kind === "gone" ? (
-          <Gone {...props} body={body} notices={notices} heading={heading} />
-        ) : (
-          <Inspector {...props} body={body} notices={notices} heading={heading} />
-        )}
-      </div>
-      <Footer debug={props.debug} footer={view.footer} theme={props.theme} onTheme={props.onTheme} />
-    </section>
+      {body.kind === "list" ? (
+        <ComponentList {...props} body={body} notices={notices} heading={heading} />
+      ) : body.kind === "gone" ? (
+        <Gone {...props} body={body} notices={notices} heading={heading} />
+      ) : (
+        <Inspector {...props} body={body} notices={notices} heading={heading} />
+      )}
+    </Sheet>
   );
 }
 
@@ -224,7 +229,7 @@ function ComponentList({
         meta={body.suspendedMeta}
         words={LIST_WORDS}
         onDiscard={(target) => {
-          dropUndoably(debug, target, (count) => `Discarded ${plural(count, "held Override")}`);
+          dropUndoably(debug, target, FOOTER_WORDS.offer.discard);
           // The card may go with its last record: the keyboard stays in the panel, on the view's heading.
           heading.current?.focus();
         }}
@@ -289,9 +294,6 @@ function useFooterAnnouncements(offer: UndoOffer | null, count: string): void {
   });
 }
 
-/** "Reset 2 Overrides": what the footer's undo offer says a reset dropped. */
-const resetText = (count: number) => `Reset ${plural(count, "Override")}`;
-
 /**
  * Drops one record and offers to put it back. Nothing in the panel asks before it
  * drops a designer's work, so every reset and Discard is undoable, as Reset all is.
@@ -317,11 +319,11 @@ function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; 
       disabled={!enabled}
       onClick={(event) => {
         const button = event.currentTarget;
-        dropUndoably(debug, { scope: "instance", id }, resetText);
+        dropUndoably(debug, { scope: "instance", id }, FOOTER_WORDS.offer.reset);
         focusHeading(button);
       }}
     >
-      Reset this Instance
+      {INSPECTOR_WORDS.resetInstance}
     </Button>
   );
 }
@@ -390,7 +392,7 @@ function Inspector({
                       )
                     }
                   >
-                    {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
+                    {holdButton.held ? INSPECTOR_WORDS.hold.on(holdButton.prop) : INSPECTOR_WORDS.hold.off(holdButton.prop)}
                   </Toggle>
                 )}
                 {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
@@ -419,7 +421,7 @@ function Inspector({
             nameLang={appLang()}
             onScope={onScope}
             onReset={(target) => {
-              dropUndoably(debug, target, resetText);
+              dropUndoably(debug, target, FOOTER_WORDS.offer.reset);
               heading.current?.focus();
             }}
             onToggle={(action, ids) => {
@@ -491,7 +493,7 @@ function Footer({
         const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
         for (const target of footer.resetAll) debug.discard(target);
         focusUndo.current = true;
-        offerUndo(resetText(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
+        offerUndo(FOOTER_WORDS.offer.reset(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
       }}
       onUndo={() => {
         focusResetAll.current = true;

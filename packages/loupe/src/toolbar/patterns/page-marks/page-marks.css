@@ -1,0 +1,33 @@
+/*
+ * The page's marks (ADR 0003): written against `[data-ring]` (its kind as its value) with
+ * `[data-quiet]` and its `[data-ring-label]` (`[data-below]`, `[data-at-start]`), `[data-mark]`,
+ * and `[data-pick-tag]` with `[data-pick-detail]`. They sit on the app, not on the panel: their
+ * colours are the page's fixed tokens (`--page-*`), the same in either panel theme. In the
+ * stylesheet's `patterns` layer.
+ */
+
+/* On the page: the selected Instance solid and tagged with its size, the others it reaches
+   dashed, left-out and hovered ones dashed grey; a change's outlines fade once it has landed. */
+[data-ring], [data-mark] { position: fixed; pointer-events: none; z-index: 2147483646; border-radius: var(--radius-ring); transition: opacity var(--duration-fold) var(--ease-out); }
+[data-ring] { border: 2px solid var(--page-ink); box-shadow: 0 0 0 1px var(--page-halo); }
+[data-ring="member"], [data-mark] { border: 1.5px dashed var(--page-line); box-shadow: none; }
+[data-ring="out"], [data-ring="hover"] { border: 1.5px dashed var(--page-hover); box-shadow: none; }
+/* The size tag: 18px high on the outline's top right, Label in tabular figures. */
+[data-ring-label] {
+  position: absolute; bottom: calc(100% + 2px); right: -2px; display: flex; align-items: center; height: 18px; padding: 0 8px;
+  border-radius: var(--radius-page-tag); background: var(--page-ink); color: var(--page-on-ink); font: var(--font-label);
+  white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: var(--page-tag-shadow);
+}
+[data-ring-label][data-below] { bottom: auto; top: calc(100% + 2px); }
+[data-ring-label][data-at-start] { right: auto; left: -2px; }
+[data-mark] { animation: loupe-mark-in var(--duration-fold) var(--ease-out); }
+[data-ring][data-quiet], [data-mark][data-quiet] { opacity: 0; transition: opacity var(--duration-quiet) var(--ease-in); }
+/* Picking: what a click would select, washed so it shows at a glance, and its tag, a band pill in Label on a 17px line. */
+[data-ring="pick"] { border: 1.5px solid var(--page-ink); background: var(--page-fill); }
+[data-pick-tag] {
+  position: fixed; pointer-events: none; z-index: 2147483646; padding: 2px 9px; border-radius: var(--radius-pill);
+  background: var(--page-band); color: var(--page-on-band); font: var(--font-label); line-height: 1.5455; white-space: nowrap; box-shadow: var(--page-pick-shadow);
+}
+[data-pick-detail] { color: var(--page-on-band-muted); font-weight: 400; }
+@keyframes loupe-mark-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { [data-ring], [data-mark], [data-ring][data-quiet], [data-mark][data-quiet] { animation: none; transition: none; } }

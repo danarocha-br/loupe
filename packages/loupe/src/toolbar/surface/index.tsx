@@ -10,7 +10,7 @@
 
 import { Component, type CSSProperties, type ErrorInfo, type ReactNode, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { CSS as VIEWS_CSS, GROUND_CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "../styles.js";
+import { GROUND_CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "../styles.js";
 // The announcer's own module, not `ui/index.js`: the collapsed pill loads no primitive's component.
 import { Announcer } from "../ui/announcer/announcer.js";
 import { PRIMITIVES_CSS } from "../ui/styles.js";
@@ -25,16 +25,14 @@ export const LAYERS = ["tokens", "primitives", "patterns"] as const;
 export const SURFACE_ATTRIBUTE = "data-loupe-surface";
 
 /**
- * The one stylesheet every surface adopts. The views' rules are not in a layer yet,
- * so they come after every layer and may still adjust a primitive or a pattern while
- * they move into patterns; nothing else is written outside one.
+ * The one stylesheet every surface adopts, every rule in a layer: the ground, then the
+ * primitives, then the patterns. No view writes a rule of its own.
  */
 export const STYLESHEET: string = [
   `@layer ${LAYERS.join(", ")};`,
   `@layer tokens {${GROUND_CSS}}`,
   `@layer primitives {\n${PRIMITIVES_CSS}\n}`,
   `@layer patterns {\n${PATTERNS_CSS}\n}`,
-  VIEWS_CSS,
 ].join("\n");
 
 /** One constructed sheet per document, shared by every surface in it. */

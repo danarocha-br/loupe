@@ -84,7 +84,7 @@ async function saidTimes(text: string, politeness: "polite" | "assertive" = "pol
 }
 
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-const panelText = () => shadow().querySelector(".panel")?.textContent ?? "";
+const panelText = () => shadow().querySelector("[data-sheet]")?.textContent ?? "";
 const instanceButtons = () => [...shadow().querySelectorAll<HTMLButtonElement>("button[data-instance]")];
 const clickInPanel = async (element: Element) => {
   act(() => element.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true })));
@@ -155,7 +155,7 @@ const escape = async () => {
   await settle();
 };
 const member = (id: string) => shadow().querySelector<HTMLInputElement>(`input[data-member="${id}"]`) as HTMLInputElement;
-const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>(".ring")].map((ring) => ring.dataset.ring);
+const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>("[data-ring]")].map((ring) => ring.dataset.ring);
 const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
 
 describe("the Toolbar", () => {
@@ -238,7 +238,7 @@ describe("the Toolbar", () => {
     await clickInPanel(button("Hide panel"));
     act(() => pageButton("bia").click());
     expect(clicked).toEqual(["ana", "bia"]);
-    expect(shadow().querySelector(".panel")).toBeNull();
+    expect(shadow().querySelector("[data-sheet]")).toBeNull();
   });
 
   it("shows the Overrides-off banner and turns Reset all off when the React self-check fails", async () => {
@@ -306,7 +306,7 @@ describe("the Toolbar", () => {
       loupe.set(ANA, "variant", "outline");
     });
     await settle();
-    const marks = [...shadow().querySelectorAll<HTMLElement>(".mark")];
+    const marks = [...shadow().querySelectorAll<HTMLElement>("[data-mark]")];
     expect(marks.map((mark) => mark.dataset.mark)).toEqual(["1"]);
     expect([marks[0]?.style.top, marks[0]?.style.left, marks[0]?.style.width, marks[0]?.style.height]).toEqual(["7px", "17px", "86px", "30px"]);
     // No number on the page: it is on the change's row.
@@ -318,7 +318,7 @@ describe("the Toolbar", () => {
     await mount();
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ top: 10, left: 20, width: 80, height: 24 } as DOMRect);
     await clickInPanel(instanceButtons()[0] as HTMLButtonElement);
-    const ring = shadow().querySelector<HTMLElement>(".ring");
+    const ring = shadow().querySelector<HTMLElement>("[data-ring]");
     expect(ring?.style.top).toBe("7px");
     // Tagged with its component and the size of its box.
     expect(ring?.textContent).toBe("Button · 80 × 24");
@@ -608,7 +608,7 @@ describe("hovering the page while a select tool is armed", () => {
     act(() => element.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, composed: true })));
     await settle();
   };
-  const tag = () => shadow().querySelector<HTMLElement>(".pick-tag");
+  const tag = () => shadow().querySelector<HTMLElement>("[data-pick-tag]");
   const CAIO = "app/members.tsx › Members › Button[1]#caio";
 
   it("outlines and tags the Instance under the pointer, in place of the selection, until the pointer leaves the page", async () => {
@@ -620,14 +620,14 @@ describe("hovering the page while a select tool is armed", () => {
     await pointTo(pageButton("caio"));
     expect(ringKinds()).toEqual(["pick"]);
     expect(tag()?.textContent).toBe("Button");
-    expect(tag()?.dataset.tag).toBe(CAIO);
+    expect(tag()?.dataset.pickTag).toBe(CAIO);
     // Marks on the page are for the eye: the panel and its status strip say what they show.
     expect(tag()?.getAttribute("aria-hidden")).toBe("true");
-    expect([...shadow().querySelectorAll(".ring")].map((ring) => ring.getAttribute("aria-hidden"))).toEqual(["true"]);
+    expect([...shadow().querySelectorAll("[data-ring]")].map((ring) => ring.getAttribute("aria-hidden"))).toEqual(["true"]);
 
     // Onto another one, then onto the panel: nothing on the page is hovered there.
     await pointTo(pageButton("Menu"));
-    expect(tag()?.dataset.tag).toBe(MENU);
+    expect(tag()?.dataset.pickTag).toBe(MENU);
     await pointTo(selectTool("Select one"));
     expect(ringKinds()).toEqual(["ring"]);
     expect(tag()).toBeNull();
@@ -650,12 +650,12 @@ describe("hovering the page while a select tool is armed", () => {
     await pointTo(pageButton("caio"));
     expect(ringKinds()).toEqual(["pick", "pick", "pick", "pick"]);
     expect(tag()?.textContent).toBe("Button · 4 from this call site");
-    expect(tag()?.dataset.tag).toBe(CAIO);
+    expect(tag()?.dataset.pickTag).toBe(CAIO);
 
     // Along the same call site, the outlines stay and the tag moves.
     await pointTo(pageButton("ana"));
     expect(ringKinds()).toEqual(["pick", "pick", "pick", "pick"]);
-    expect(tag()?.dataset.tag).toBe(ANA);
+    expect(tag()?.dataset.pickTag).toBe(ANA);
 
     // The Menu's call site has one.
     await pointTo(pageButton("Menu"));
@@ -694,7 +694,7 @@ describe("hovering the page while a select tool is armed", () => {
     await pointTo(pageButton("caio"));
     expect(ringKinds()).toEqual(["pick"]);
     expect(tag()?.textContent).toBe("Button · Inspect only");
-    expect(tag()?.querySelector(".detail")?.textContent).toBe(" · Inspect only");
+    expect(tag()?.querySelector("[data-pick-detail]")?.textContent).toBe(" · Inspect only");
   });
 });
 
@@ -714,7 +714,7 @@ describe("leaving a selection, and hiding the marks", () => {
     await settle();
   };
   const hideMarks = () => shadow().querySelector<HTMLButtonElement>("button[data-marks]") as HTMLButtonElement;
-  const changeOutlines = () => shadow().querySelectorAll(".mark").length;
+  const changeOutlines = () => shadow().querySelectorAll("[data-mark]").length;
   const status = () => shadow().querySelector("[data-strip]")?.textContent ?? "";
 
   it("goes back to the list on Esc, and the app still gets the key", async () => {
@@ -778,7 +778,7 @@ describe("leaving a selection, and hiding the marks", () => {
     await mount((member) => clicked.push(member));
     await select(BIA);
     await press(pageButton("bia"));
-    await press(shadow().querySelector(".panel") as HTMLElement);
+    await press(shadow().querySelector("[data-sheet]") as HTMLElement);
     act(() => pageButton("ana").click());
     await settle();
     expect(clicked).toEqual(["bia", "ana"]);
@@ -846,7 +846,7 @@ describe("a change landing on the page", () => {
   const linger = async () => {
     for (let i = 0; i < 4; i++) await settle();
   };
-  const quiet = () => [...shadow().querySelectorAll<HTMLElement>(".ring, .mark")].map((outline) => outline.classList.contains("quiet"));
+  const quiet = () => [...shadow().querySelectorAll<HTMLElement>("[data-ring], [data-mark]")].map((outline) => outline.hasAttribute("data-quiet"));
   const changeRow = () => within(screen().getByRole("list", { name: "Changes" })).getAllByRole("button")[0] as HTMLButtonElement;
   const leave = async (element: Element) => {
     act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
@@ -883,7 +883,7 @@ describe("a change landing on the page", () => {
     await clickInPanel(pill("variant", '"default"'));
     await backToList();
     await linger();
-    expect(shadow().querySelectorAll(".mark").length).toBe(4);
+    expect(shadow().querySelectorAll("[data-mark]").length).toBe(4);
     expect(quiet()).toEqual([true, true, true, true]);
 
     // Its own dashed outline, not a grey hover one; and pointed at straight from the app's page.
@@ -1103,7 +1103,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     await mount();
     focusIn(panelButton("Hide panel"));
     await clickInPanel(panelButton("Hide panel"));
-    const tab = shadow().querySelector<HTMLButtonElement>(".launcher") as HTMLButtonElement;
+    const tab = shadow().querySelector<HTMLButtonElement>("[data-launcher]") as HTMLButtonElement;
     expect(tab.getAttribute("aria-label")).toBe("Show Loupe");
     expect(shadow().activeElement).toBe(tab);
     await clickInPanel(tab);
