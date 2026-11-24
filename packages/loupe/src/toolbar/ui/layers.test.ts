@@ -144,6 +144,8 @@ describe("the layers' import rule", () => {
       'import{Popover}from"@ui-sdk/react";',
       'const x = 1; export { attempt } from "../../controls.js";',
       'import type{Write}from"../../panel-view/types.js";',
+      // Patterns read no store: the view reads the Toolbar's store and passes props down (ADR 0009).
+      'import { useToolbar } from "../../toolbar-store.js";',
     ].join("\n");
     expect(patternOffenders(file, code).map((offender) => offender.split(" → ")[1])).toEqual([
       "../../panel-view/index.js",
@@ -155,6 +157,7 @@ describe("the layers' import rule", () => {
       "../../panel-view/index.js",
       "@ui-sdk/react",
       "../../controls.js",
+      "../../toolbar-store.js",
       // Dynamic imports are read after the statements.
       "../../panel.js",
     ]);

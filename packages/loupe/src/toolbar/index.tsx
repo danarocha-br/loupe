@@ -15,15 +15,14 @@
 
 import { Component, lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
-import type { Scope } from "../runtime/store.js";
 import { columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.js";
 import { Launcher } from "./launcher.js";
 import { OPEN_KEY } from "./launcher-place.js";
-import type { SelectMode } from "./picker.js";
 import { useFocusShortcut } from "./shortcut.js";
 import { DURATION } from "./tokens.js";
 import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
 import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
+import { createToolbarStore, ToolbarStoreContext } from "./toolbar-store.js";
 import { Announcer } from "./ui/announcer/announcer.js";
 
 export type { Theme } from "./surface/index.js";
@@ -108,13 +107,9 @@ function animates(): boolean {
 const preload = () => void loadPanel().catch(() => {});
 
 function ToolbarBody({ host }: { host: HTMLElement }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  // The header's select tool (2026-11-20): one Instance, or every Instance from its
-  // call site, as Figma selects. It stays as chosen across selections for the page load.
-  const [mode, setMode] = useState<SelectMode>("one");
-  // Select multiple, widened to every Instance of the component on the page. A new selection starts at its call site again.
-  const [widened, setWidened] = useState(false);
-  const scope: Scope = mode === "one" ? "instance" : widened ? "page" : "group";
+  // The selection, its tool, Hide marks and what the panel points at (toolbar-store.ts):
+  // one store for this Toolbar, kept while the panel is closed and opened again.
+  const [store] = useState(createToolbarStore);
   const [hidden, setHidden] = useState(() => !storedOpen());
   // A handle and its drawer: opening tucks the pill into its side while the panel slides
   // out of its own; closing slides the panel back out of the window, and once it has gone
@@ -130,6 +125,11 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     },
     [],
   );
+  // Hide and Show swap the panel for its tab: focus goes with them when it was on the one
+  // pressed, so a keyboard isn't dropped on the page (review 2026-11-20).
+  // Declared before the handlers that write it: React Compiler skips a component that
+  // writes a ref its render hasn't reached yet (ADR 0009).
+  const focusSwap = useRef(false);
   const open = () => {
     focusSwap.current = focusIsHere();
     // Before the panel renders: the page map measures the page as it will be beside it.
@@ -174,14 +174,8 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     // In case the end never comes (a hidden tab, a theme switch cancelling transitions).
     closeTimer.current = setTimeout(finish, CLOSE_MS + 80);
   };
-  // Hide marks (2026-11-20): the selection's outlines and the revision clouds come off
-  // the page, so a change can be judged as it will ship. Kept for the page load.
-  const [marksHidden, setMarksHidden] = useState(false);
   const [theme, toggleTheme] = useTheme(host, "[data-sheet]");
   const column = useColumn(!hidden);
-  // Hide and Show swap the panel for its tab: focus goes with them when it was on the one
-  // pressed, so a keyboard isn't dropped on the page (review 2026-11-20).
-  const focusSwap = useRef(false);
   useEffect(() => {
     if (!hidden || !focusSwap.current) return;
     focusSwap.current = false;
@@ -202,7 +196,8 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // comes back, with focus if the panel had it. Open stays kept: a reload tries again.
   const failed = (error: unknown) => {
     console.warn("[loupe] The panel couldn't open; click the Loupe pill to try again.", error);
-    focusSwap.current ||= focusIsHere();
+    // Not `||=`: React Compiler can't lower it, and would skip this component (ADR 0009).
+    if (!focusSwap.current) focusSwap.current = focusIsHere();
     clearTimeout(tuckTimer.current);
     releaseColumn();
     setTucking(false);
@@ -219,17 +214,8 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
     // The panel's module is still loading: `shown` takes focus to its heading once it is there.
     else if (!hidden) focusSwap.current = true;
   });
-  const select = (id: string | null, next?: SelectMode) => {
-    setSelected(id);
-    setWidened(false);
-    if (next) setMode(next);
-  };
-  const changeScope = (next: Scope) => {
-    setMode(next === "instance" ? "one" : "many");
-    setWidened(next === "page");
-  };
   return (
-    <>
+    <ToolbarStoreContext value={store}>
       {(hidden || tucking) && <Launcher leaving={!hidden} onOpen={open} onPreload={preload} />}
       {ToolbarOpen && (
         <PanelBoundary onFail={failed}>
@@ -237,13 +223,6 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
             <ToolbarOpen
               host={host}
               column={column}
-              selected={selected}
-              onSelect={select}
-              mode={mode}
-              scope={scope}
-              onScope={changeScope}
-              marksHidden={marksHidden}
-              onMarks={() => setMarksHidden((was) => !was)}
               onHide={hide}
               closing={closing}
               theme={theme}
@@ -253,6 +232,6 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
           </Suspense>
         </PanelBoundary>
       )}
-    </>
+    </ToolbarStoreContext>
   );
 }
