@@ -9,8 +9,9 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
 import { INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
-import { AppearsOnInteraction, GroupRow, HeldForReview, Identity, OnThisPage, PageMap, PropRow, ScopeSection, StartCard } from "./patterns/index.js";
+import { AppearsOnInteraction, GroupRow, HeldForReview, Identity, OnThisPage, PageMap, PropRow, ScopeSection, SiteCard, StartCard } from "./patterns/index.js";
 import {
+  BUTTON_GROUP,
   GONE,
   HELD,
   HELD_META,
@@ -18,6 +19,7 @@ import {
   INTERACTION,
   LIST_BOXES,
   LIST_GROUPS,
+  LIST_SUMMARY,
   MEMBERS,
   NOT_GENERATED,
   PAGE_MEMBERS,
@@ -524,15 +526,21 @@ function CardRowStates() {
           </div>
         </Card>
       </Frame>
-      <Frame title="List: rows run edge to edge, the head keeps 14px">
+      <Frame title="List, with item rows: edge to edge on their hairline, the text 14px in">
         <Card look="list">
           <CardHead>
             <h3>Appears on interaction</h3>
             <span className="wb-note">Not on screen yet</span>
           </CardHead>
           <ul className="wb-list">
-            <li>Dialog</li>
-            <li>Tooltip</li>
+            <Row as="li" look="item">
+              Dialog
+              <span className="wb-note">A line under the name, 2px apart.</span>
+            </Row>
+            <Row as="li" look="item">
+              Tooltip
+              <span className="wb-note">A line under the name, 2px apart.</span>
+            </Row>
           </ul>
         </Card>
       </Frame>
@@ -676,7 +684,7 @@ function ListPatternStates() {
       <Frame title="OnThisPage: PageMap over a GroupRow per component">
         <OnThisPage
           words={LIST_WORDS}
-          summary="2 components · 7 Instances"
+          summary={LIST_SUMMARY}
           map={<PageMap groups={LIST_GROUPS} boxes={LIST_BOXES} lit={lit} words={LIST_WORDS} onPoint={point} onSelect={(id) => setLast(`select ${id}`)} />}
         >
           {LIST_GROUPS.map((group) => (
@@ -692,6 +700,13 @@ function ListPatternStates() {
             />
           ))}
         </OnThisPage>
+      </Frame>
+      <Frame title="SiteCard: a call site, lifted on an opened row's wash">
+        <div className="wb-site" data-hue={BUTTON_GROUP.hue}>
+          {BUTTON_GROUP.sites.map((site) => (
+            <SiteCard key={site.anchor} site={site} onSite={(picked) => setLast(`select ${picked.label}`)} onInstance={(id) => setLast(`select ${id}`)} onHover={() => {}} />
+          ))}
+        </div>
       </Frame>
       <Frame title="AppearsOnInteraction">
         <AppearsOnInteraction components={INTERACTION} words={LIST_WORDS} />
@@ -717,7 +732,7 @@ const FRAME_CSS = `
 .wb-row > h3 { font: var(--font-label); color: var(--muted); }
 .wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
 .wb-list { list-style: none; margin: 0; padding: 0; }
-.wb-list > li:not([data-row]) { padding: var(--space-inset) var(--space-gutter); border-top: 1px solid var(--rule); }
+.wb-site { display: flex; flex-direction: column; gap: var(--space-sheet); padding: var(--space-row) var(--space-gutter) var(--space-card); border-radius: var(--radius-card); background: var(--hover); }
 .wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
 .wb-note-text { display: flex; flex-direction: column; gap: var(--space-xs); }
 .wb-note-text p { font: var(--font-paragraph); color: var(--muted); }

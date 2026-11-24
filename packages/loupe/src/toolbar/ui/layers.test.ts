@@ -161,7 +161,8 @@ describe("the layers' import rule", () => {
   });
 
   it("keeps the patterns' tests off runtime/ and the views", () => {
-    const allowed = [ui, patterns, panelView, path.join(toolbar, "surface"), tokens];
+    // The tokens as the source names them (`tokens.js`) or as they sit on disk.
+    const allowed = [ui, patterns, panelView, path.join(toolbar, "surface"), tokens, tokens.replace(/\.ts$/, ".js")];
     const offenders = sources(patterns)
       .filter(isTest)
       .flatMap((file) =>

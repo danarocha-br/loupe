@@ -139,13 +139,13 @@ const selectTool = (name: "Select one" | "Select multiple") =>
 /** A start tile: the same two modes, a radio group at the list's start. */
 const startTile = (name: "Select one" | "Select multiple") =>
   within(screen().getByRole("radiogroup", { name: "Start selecting" })).getByRole("radio", { name: new RegExp(`^${name}`) });
-/** "On this page"'s row for a component: the list item whose button starts with its name. */
-const componentRow = (component: string) =>
-  within(screen().getByRole("list", { name: "Components on this page" }))
-    .getAllByRole("listitem")
-    .find((item) => item.querySelector("button[aria-expanded]")?.textContent?.startsWith(`${component} `)) as HTMLElement;
-/** A component's row's own button, which opens it. */
-const componentTrigger = (component: string) => componentRow(component).querySelector("button[aria-expanded]") as HTMLButtonElement;
+/** "On this page"'s row for a component, and its own button, which opens it: named by the component and its count. */
+const componentTrigger = (component: string) =>
+  within(screen().getByRole("list", { name: "Components on this page" })).getByRole("button", {
+    // A name breaks where its words meet, which a screen reader hears as a space: "Menu Item ×1".
+    name: (name) => name.replaceAll(" ", "").startsWith(`${component}×`),
+  });
+const componentRow = (component: string) => componentTrigger(component).closest("li") as HTMLElement;
 /** Whether a select tool is armed: a state of the page, said by the status strip, not by the button. */
 /** The status strip shows how to pick (and the announcer says it): read from the strip, not the announcer's region. */
 const armed = () => screen().queryAllByText(/^Click an Instance/, { ignore: "[role=status], script, style" }).length > 0;
@@ -998,12 +998,12 @@ describe("held for review", () => {
     await mount(() => {}, { confirmTotal: 4 });
     act(() => pageButton("Abrir").click());
     await settle();
-    const review = shadow().querySelector("[data-testid=held-for-review]") as HTMLElement;
+    const review = screen().getByRole("heading", { level: 3, name: "Held for review" }).closest("[data-card]") as HTMLElement;
     expect(review.textContent).toContain("Code changed here");
     const held = loupe.records();
-    await clickInPanel([...review.querySelectorAll("button")].find((button) => button.textContent === "Discard") as HTMLButtonElement);
+    await clickInPanel(within(review).getByRole("button", { name: "Discard" }));
     expect(loupe.records()).toEqual([]);
-    expect(shadow().querySelector("[data-testid=held-for-review]")).toBeNull();
+    expect(screen().queryByRole("heading", { level: 3, name: "Held for review" })).toBeNull();
 
     // Discard asks nothing either: the footer offers the held record back, still held.
     expect(shadow().querySelector(".undo")?.textContent).toBe("Discarded 1 held OverrideUndo");

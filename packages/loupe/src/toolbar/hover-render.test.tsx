@@ -3,6 +3,7 @@
 // React Compiler runs on toolbar/). Panel and Highlight are wrapped to count their renders;
 // everything inside them is the real code, compiled as in `dist`.
 
+import { within } from "@testing-library/dom";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
@@ -78,7 +79,7 @@ it("re-renders the outlines on a row's hover, and not the Panel", async () => {
   await settle();
   await settle();
   const shadow = document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
-  const rows = [...shadow.querySelectorAll<HTMLElement>('ul[aria-label="Components on this page"] button[aria-expanded]')];
+  const rows = within(within(shadow as unknown as HTMLElement).getByRole("list", { name: "Components on this page" })).getAllByRole("button", { expanded: false });
   expect(rows.length).toBeGreaterThan(1);
 
   const before = { ...renders };

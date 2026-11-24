@@ -3,11 +3,13 @@
 // value then action, its glyph hidden in a column of its own, a list item in a list,
 // and the line's controls reached by their own roles.
 
+import { within } from "@testing-library/dom";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STYLESHEET } from "../../surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { Button } from "../button/button.js";
+import { Card } from "../card/card.js";
 import { Switch } from "../switch/switch.js";
 import { Tag } from "../tag/tag.js";
 import { Row, RowAction, RowLine, type RowLook, RowName, RowValue } from "./row.js";
@@ -95,6 +97,26 @@ describe("Row", () => {
     );
     expect(screen.getByRole("note").textContent).toBe("Rendered on the server" + "Its props can't change here.");
     expect(screen.getByRole("heading", { level: 3 }).textContent).toBe("Rendered on the server");
+  });
+
+  it("runs as the list items of a list card, each its words in order", () => {
+    const screen = renderInSurface(
+      <Card look="list">
+        <ul aria-label="Seen, not mounted">
+          {["Dialog", "Tooltip"].map((name) => (
+            <Row key={name} as="li" look="item">
+              {name}
+              <span>Open it on the page to inspect it.</span>
+            </Row>
+          ))}
+        </ul>
+      </Card>,
+    );
+    const items = within(screen.getByRole("list", { name: "Seen, not mounted" })).getAllByRole("listitem");
+    expect(items.map((item) => [item.getAttribute("data-row"), item.textContent])).toEqual([
+      ["item", "Dialog" + "Open it on the page to inspect it."],
+      ["item", "Tooltip" + "Open it on the page to inspect it."],
+    ]);
   });
 
   it("draws its look through an attribute, sets a name in mono, and passes class and data-* through", () => {

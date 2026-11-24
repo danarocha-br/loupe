@@ -23,7 +23,7 @@ export type HeldForReviewProps = {
 export function HeldForReview({ items, meta, words, onDiscard }: HeldForReviewProps) {
   if (items.length === 0) return null;
   return (
-    <Card look="list" data-held-for-review="" data-testid="held-for-review">
+    <Card look="list" data-held-for-review="">
       <CardHead>
         <div data-held-title="">
           <Dot tone="ring" />

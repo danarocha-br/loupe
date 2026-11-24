@@ -72,19 +72,20 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
     }),
   );
   if (blocks.length === 0) return null;
+  // The page's shape: as far right and down as its Instances reach, with the margin before the first kept on the far side too.
   const all = blocks.map((b) => b.box);
   const minLeft = Math.max(0, Math.min(...all.map((b) => b.left)));
   const minTop = Math.max(0, Math.min(...all.map((b) => b.top)));
-  const W = Math.max(...all.map((b) => b.left + b.width)) + minLeft;
-  const H = Math.max(...all.map((b) => b.top + b.height)) + minTop;
+  const pageWidth = Math.max(...all.map((b) => b.left + b.width)) + minLeft;
+  const pageHeight = Math.max(...all.map((b) => b.top + b.height)) + minTop;
   const order = [...blocks].sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left).map((b) => b.id);
-  const stop = current !== null && order.includes(current) ? current : order[0];
+  const tabStop = current !== null && order.includes(current) ? current : order[0];
   // The largest first, so a small block inside a large one stays on top to be pointed at.
   blocks.sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
   return (
     <div data-page-map="" role="toolbar" aria-label={words.onPage.map} data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
       {/* The page's shape, fit into the well: blocks sit at their place in it. */}
-      <div data-map-fit="" style={{ "--ratio": W / H } as CSSProperties}>
+      <div data-map-fit="" style={{ "--ratio": pageWidth / pageHeight } as CSSProperties}>
         {blocks.map((b) => (
           <button
             key={`${b.group.component}:${b.id}`}
@@ -96,9 +97,9 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
             data-map-block=""
             data-hue={b.group.hue}
             data-lit={lit === b.group.component ? "" : undefined}
-            style={{ left: `${(b.box.left / W) * 100}%`, top: `${(b.box.top / H) * 100}%`, width: `${(b.box.width / W) * 100}%`, height: `${(b.box.height / H) * 100}%` }}
+            style={{ left: `${(b.box.left / pageWidth) * 100}%`, top: `${(b.box.top / pageHeight) * 100}%`, width: `${(b.box.width / pageWidth) * 100}%`, height: `${(b.box.height / pageHeight) * 100}%` }}
             title={b.group.mapTitle}
-            tabIndex={b.id === stop ? 0 : -1}
+            tabIndex={b.id === tabStop ? 0 : -1}
             onMouseOver={() => onPoint(b.group)}
             onFocus={() => {
               setCurrent(b.id);

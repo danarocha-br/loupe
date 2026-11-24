@@ -8,7 +8,7 @@ import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fi
 import { expectPatternCss } from "../css.fixture.js";
 import { GroupRow } from "../group-row/group-row.js";
 import { PageMap } from "../page-map/page-map.js";
-import { LIST_BOXES, LIST_GROUPS } from "../samples.js";
+import { LIST_BOXES, LIST_GROUPS, LIST_SUMMARY } from "../samples.js";
 import { OnThisPage } from "./on-this-page.js";
 import CSS from "./on-this-page.css?inline";
 
@@ -20,7 +20,7 @@ function draw() {
   return renderInSurface(
     <OnThisPage
       words={LIST_WORDS}
-      summary="2 components · 7 Instances"
+      summary={LIST_SUMMARY}
       map={<PageMap groups={LIST_GROUPS} boxes={LIST_BOXES} lit={null} words={LIST_WORDS} onPoint={none} onSelect={none} />}
     >
       {LIST_GROUPS.map((group) => (

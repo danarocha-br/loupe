@@ -332,6 +332,9 @@ export const MENU_ITEM_GROUP: GroupItem = {
   mapTitle: "DropdownMenuItem ×1",
 };
 
+/** The card's count: "2 components · 7 Instances". */
+export const LIST_SUMMARY = "2 components · 7 Instances";
+
 /** Every component on /billing, most used first. */
 export const LIST_GROUPS: readonly GroupItem[] = [BUTTON_GROUP, MENU_ITEM_GROUP];
 
