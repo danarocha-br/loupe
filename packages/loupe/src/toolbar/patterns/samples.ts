@@ -1,6 +1,6 @@
 // Sample panel-view data for the patterns: what `panelView()` would hand them for a
 // MemberRowMenu Button on /billing, at This instance and at its call site, and for the
-// list of /billing with nothing selected. The patterns' tests draw it, and so does the
+// list of /billing with nothing selected, and for the panel's chrome around them. The patterns' tests draw it, and so does the
 // fixture's `/workbench` page, beside the words (panel-view's `INSPECTOR_WORDS` and
 // `LIST_WORDS`, which the caller passes). Data only: no words a pattern would draw by
 // itself, and nothing that writes.
@@ -17,6 +17,7 @@ import type {
   MembersView,
   NoGroupView,
   NoticeView,
+  PanelView,
   PropItem,
   StatusTag,
   Tag,
@@ -584,3 +585,39 @@ export const FLAGS_OFF: FlagsCardView = {
   lasts: null,
   clearAll: null,
 };
+
+// ── The chrome: the header, the footer and Copy Proposal ─────────────────────
+
+/** The header's page while nothing is selected, and its tooltip. */
+export const HEADER_PAGE = { name: "Billing", title: "Billing · 2 changes · 1 state shown · /org/acme/settings/billing" } as const;
+
+/** The footer with two numbered changes and a State prop held open: Reset all reaches both records. */
+export const FOOTER: Pick<PanelView["footer"], "countText" | "changes" | "states" | "resetAll"> = {
+  countText: "2 changes · 1 state shown",
+  changes: { count: 2, word: "changes" },
+  states: { chip: "1 held", title: "open held at true · Actions for Ana Souza" },
+  resetAll: [
+    { scope: "instance", id: ID },
+    { scope: "group", anchor: "app/billing/member-row-menu.tsx › MemberRowMenu › Button[1]" },
+  ],
+};
+
+/** The footer with nothing changed: Reset all off, nothing to copy. */
+export const FOOTER_EMPTY: Pick<PanelView["footer"], "countText" | "changes" | "states" | "resetAll"> = {
+  countText: "0 changes",
+  changes: { count: 0, word: "changes" },
+  states: { chip: null, title: "" },
+  resetAll: [],
+};
+
+/** What the footer's undo offer says after Reset all. */
+export const UNDO_OFFER = "Reset 3 Overrides";
+
+/** The title a copy went under, as the toast shows it. */
+export const COPIED_TITLE = "Button variant in MemberRowMenu";
+
+/** A copy the clipboard refused, and the Proposal's text it held for copying by hand. */
+export const REFUSED = {
+  reason: "Document is not focused.",
+  text: "# Button variant in MemberRowMenu\n\nDesigner: Dana\n\n## Change 1\nButton variant \"ghost\" → \"outline\"",
+} as const;

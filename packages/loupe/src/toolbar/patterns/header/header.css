@@ -1,0 +1,43 @@
+/*
+ * PanelHeader and StatusStrip (ADR 0003): written against `[data-header]` and its parts
+ * (`[data-header-brand]` with the wordmark, `[data-header-page]`, `[data-header-tools]`,
+ * `[data-select-tools]` with each `[data-select-tool]` and its `[data-armed]`,
+ * `[data-header-divider]`), and `[data-strip-region]` with `[data-strip]`. The tools are
+ * Button's and Toggle's `tool` look (ui/button/, ui/toggle/). Values from the tokens. In
+ * the stylesheet's `patterns` layer.
+ */
+
+/* The header card: 40px high, 4px under the sheet's top and 6px in from its sides. */
+[data-header] {
+  flex: none; position: relative; display: flex; align-items: center; justify-content: space-between; gap: var(--space-inset);
+  height: 40px; margin: var(--space-xs) var(--space-sheet) 0; padding: 0 var(--space-inset) 0 var(--space-gutter);
+  border-radius: var(--radius-card); background: var(--card); box-shadow: var(--shadow);
+}
+[data-header-brand] { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; color: var(--ink); }
+[data-header-brand] [data-wordmark] { display: block; flex: none; }
+/* The page, in Annotation capitals, 4px down so it sits on the wordmark's baseline. */
+[data-header-page] {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-top: var(--space-xs);
+  font: var(--font-annotation); letter-spacing: var(--tracking-annotation); text-transform: uppercase; color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The tools: the select tools in their wash, a rule, Hide marks and Hide, 2px apart. */
+[data-header-tools] { flex: none; display: flex; align-items: center; gap: var(--space-hair); }
+[data-select-tools] { display: flex; gap: var(--space-hair); padding: var(--space-hair); border-radius: var(--radius-pill); background: var(--tools-wash); }
+/* Checked, or armed while it picks: lifted out of the wash. */
+[data-select-tool][data-checked], [data-select-tool][data-armed] { background: var(--card); color: var(--primary); box-shadow: var(--raised-shadow); }
+[data-header-divider] { flex: none; width: 1px; height: 16px; margin: 0 var(--space-hair) 0 11px; border-radius: var(--radius-pill); background: var(--divider); }
+
+/* The strip: a salmon well 6px under the header, in Caption. */
+[data-strip-region] { flex: none; }
+[data-strip] {
+  flex: none; margin: var(--space-sheet) var(--space-sheet) 0; padding: var(--space-inset) var(--space-gutter);
+  border-radius: var(--radius-status); background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge);
+  font: var(--font-caption);
+}
+
+/* Forced colours drop the shadow that edges the card: it keeps a border they draw. */
+@media (forced-colors: active) {
+  [data-header] { border: 1px solid transparent; }
+}

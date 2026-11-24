@@ -163,7 +163,7 @@ export const LockIcon = () => (
 
 /** The wordmark, as the header draws it (Paper, "Redraw · Inspector as property rows"). In `currentColor`. */
 export const Wordmark = () => (
-  <svg className="wordmark" width="54" height="23.34" viewBox="261 112.828 54 23.344" fill="currentColor" role="img" aria-label="Loupe" focusable="false">
+  <svg data-wordmark="" width="54" height="23.34" viewBox="261 112.828 54 23.344" fill="currentColor" role="img" aria-label="Loupe" focusable="false">
     <path
       fillRule="evenodd"
       clipRule="evenodd"

@@ -87,7 +87,7 @@ const LoupeMount = devMount(Toolbar);
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
 const footerButton = (text: string) =>
-  [...shadow().querySelectorAll<HTMLButtonElement>(".footer button")].find((button) => button.textContent === text);
+  [...shadow().querySelectorAll<HTMLButtonElement>("[data-footer] button")].find((button) => button.textContent === text);
 
 // The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
 beforeAll(async () => {

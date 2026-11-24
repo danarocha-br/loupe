@@ -12,7 +12,7 @@ import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { BLOCKED } from "./copy.js";
-import { TITLE_MISSING } from "./copy-flow.js";
+import { COPY_WORDS } from "./panel-view/index.js";
 import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import { loadPanel } from "./start.js";
@@ -72,7 +72,7 @@ const shadow = () => document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot a
 const screen = () => within(shadow() as unknown as HTMLElement);
 /** The popover over the footer: the details to copy with, or why a copy failed. */
 const popover = () => screen().queryByRole("dialog");
-const toast = () => shadow().querySelector<HTMLElement>(".copy-toast");
+const toast = () => shadow().querySelector<HTMLElement>("[data-copy-toast]");
 /** What a screen reader hears from the toolbar's announcer, since the toolbar mounted. */
 let heard: Heard;
 /** The copies the announcer said, apart from the count's changes. */
@@ -170,7 +170,7 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(copiedProposal().title).toBe("Button variant in MemberRow");
     expect(copyForm().title).toBeNull();
     expect(copy().textContent).toBe("Copied");
-    expect(shadow().querySelector(".split")?.getAttribute("data-state")).toBe("copied");
+    expect(shadow().querySelector("[data-copy-split]")?.getAttribute("data-state")).toBe("copied");
     expect(toast()?.textContent).toBe("Copied “Button variant in MemberRow”Paste it into your coding agent");
     // The toast is for the eye: the announcer says it, once.
     // The footer's count may have been said before it ("1 change"): the copy is said once.
@@ -236,14 +236,14 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(copies).toEqual([]);
     expect(popover()).not.toBeNull();
     expect(title.getAttribute("aria-invalid")).toBe("true");
-    expect(popover()?.querySelector(`#${title.getAttribute("aria-describedby")}`)?.textContent).toBe(TITLE_MISSING);
+    expect(popover()?.querySelector(`#${title.getAttribute("aria-describedby")}`)?.textContent).toBe(COPY_WORDS.titleMissing);
     expect(shadow().activeElement).toBe(title);
     // Focus was in the field already (Enter there, as far as focus goes): nothing moved to read it, so it is said.
     await until(() => heard.assertive.length === 1);
-    expect(heard.assertive).toEqual([TITLE_MISSING]);
+    expect(heard.assertive).toEqual([COPY_WORDS.titleMissing]);
     type(title, "Calmer rows");
     expect(title.hasAttribute("aria-invalid")).toBe(false);
-    expect(within(popover() as HTMLElement).queryByText(TITLE_MISSING)).toBeNull();
+    expect(within(popover() as HTMLElement).queryByText(COPY_WORDS.titleMissing)).toBeNull();
     // Empty, it says the same in the page: the browser's own bubble would sit outside Loupe.
     type(title, "");
     // Pressed from the button, focus moves to the field, whose description reads the error: not said twice.
@@ -253,9 +253,9 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await settle();
     expect(copies).toEqual([]);
     expect(shadow().activeElement).toBe(title);
-    expect(within(popover() as HTMLElement).getByText(TITLE_MISSING)).toBeDefined();
-    expect(heard.assertive).toEqual([TITLE_MISSING]);
-    expect(heard.polite).not.toContain(TITLE_MISSING);
+    expect(within(popover() as HTMLElement).getByText(COPY_WORDS.titleMissing)).toBeDefined();
+    expect(heard.assertive).toEqual([COPY_WORDS.titleMissing]);
+    expect(heard.polite).not.toContain(COPY_WORDS.titleMissing);
   });
 
   it("moves focus to an empty title only once its error describes it, from the button the first time", async () => {
@@ -276,7 +276,7 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await settle();
     expect(shadow().activeElement).toBe(title);
     expect(title.getAttribute("aria-invalid")).toBe("true");
-    expect(readOnFocus).toBe(TITLE_MISSING);
+    expect(readOnFocus).toBe(COPY_WORDS.titleMissing);
     // Focus moved and read it: the announcer says nothing more.
     expect(heard.assertive).toEqual([]);
   });
@@ -336,7 +336,7 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     await until(() => popover() !== null && field<HTMLTextAreaElement>("The Proposal")?.value !== "");
 
     expect(copy().textContent).toBe("Not copied");
-    expect(shadow().querySelector(".split")?.getAttribute("data-state")).toBe("failed");
+    expect(shadow().querySelector("[data-copy-split]")?.getAttribute("data-state")).toBe("failed");
     // From the button, the caret sits under the popover's middle; from the details, near its end, at the chevron.
     expect(popover()?.getAttribute("data-caret")).toBe("center");
     expect(popover()).toBe(screen().getByRole("dialog", { name: "Couldn’t copy automatically" }));

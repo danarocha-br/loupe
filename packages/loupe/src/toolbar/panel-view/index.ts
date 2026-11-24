@@ -10,12 +10,12 @@ import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
 import type { PanelInput, PanelView } from "./types.js";
 import { layerNotice, noticesSaid, overridesOffNotice } from "./notices.js";
-import { changesWord, footerCount, headerReport, heldChip, pageName } from "./words.js";
+import { changesWord, footerCount, headerView, heldChip } from "./words.js";
 
 export type * from "./types.js";
 export { flagsCard } from "./flags.js";
 export { isSwitch } from "./inspector.js";
-export { COMMAND_WORDS, INSPECTOR_WORDS, isolate, LIST_WORDS, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
+export { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, isolate, LIST_WORDS, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
 
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides
@@ -52,7 +52,7 @@ export function panelView(input: PanelInput): PanelView {
     },
     instanceCount: page.instanceCount,
     marks: keys.marks,
-    header: { route: page.route, page: pageName(page.route), report: headerReport(page.route, changes.length, states.length) },
+    header: headerView(page.route, changes.length, states.length),
     notices: [layer, overridesOff].filter((notice) => notice !== null),
     announcements: noticesSaid(layer, overridesOff),
     footer: {

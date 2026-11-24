@@ -8,11 +8,15 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
-import { COMMAND_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
+import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
 import {
   AppearsOnInteraction,
   ChangeList,
   CommandLine,
+  CopySplit,
+  type CopyState,
+  CopyToast,
+  DetailsForm,
   FlagsCard,
   GroupRow,
   HeldForReview,
@@ -21,20 +25,28 @@ import {
   InstanceNote,
   Legend,
   NoGroup,
+  NotCopied,
   Notice,
   OnThisPage,
   PageMap,
+  PanelFooter,
+  PanelHeader,
   PropRow,
   ScopeSection,
   SiteCard,
   StartCard,
+  StatusStrip,
 } from "./patterns/index.js";
 import {
   BUTTON_GROUP,
   CHANGES,
+  COPIED_TITLE,
   FLAGS,
   FLAGS_OFF,
+  FOOTER,
+  FOOTER_EMPTY,
   GONE,
+  HEADER_PAGE,
   HELD,
   HELD_META,
   IDENTITY,
@@ -54,10 +66,12 @@ import {
   OVERRIDES_OFF_NOTICE,
   PAGE_MEMBERS,
   PROP_ITEMS,
+  REFUSED,
   SECRET_LINE,
   STALE_NOTICE,
   TONE_AT_SCOPE,
   TYPE_INSPECT_ONLY,
+  UNDO_OFFER,
 } from "./patterns/samples.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
@@ -815,6 +829,124 @@ function NoticePatternStates() {
   );
 }
 
+/**
+ * The panel's chrome with sample panel-view data: the header and its strip, the footer,
+ * and Copy Proposal's parts. The tools, the theme and the halves work; what they would do
+ * is said under the cards rather than done. The popovers' bodies stand in a card as the
+ * popover draws them, without the popover.
+ */
+function ChromePatternStates() {
+  const [last, setLast] = useState("—");
+  const [mode, setMode] = useState<SelectMode>("one");
+  const [armed, setArmed] = useState(false);
+  const [marksHidden, setMarksHidden] = useState(false);
+  const [dark, setDark] = useState(false);
+  const [undo, setUndo] = useState<string | null>(UNDO_OFFER);
+  const [title, setTitle] = useState("");
+  const [designer, setDesigner] = useState("");
+  const [missing, setMissing] = useState(true);
+  const split = (state: CopyState, disabled = false) => (
+    <CopySplit
+      state={state}
+      busy={false}
+      disabled={disabled}
+      expanded={false}
+      words={COPY_WORDS}
+      onCopy={() => setLast(`copy (${state})`)}
+      onDetails={() => setLast("details")}
+    />
+  );
+  const strip = armed ? HEADER_WORDS.strip.pick[mode] : marksHidden ? HEADER_WORDS.strip.marksHidden : null;
+  return (
+    <div className="wb-states">
+      <Frame title="PanelHeader and StatusStrip: pick a tool, press it again to arm it, hide the marks">
+        <PanelHeader
+          page={HEADER_PAGE}
+          mode={mode}
+          armed={armed}
+          marksHidden={marksHidden}
+          words={HEADER_WORDS}
+          onTool={(next) => {
+            setArmed(next === mode ? !armed : true);
+            setMode(next);
+          }}
+          onMarks={() => setMarksHidden(!marksHidden)}
+          onHide={() => setLast("hide")}
+        />
+        <StatusStrip parts={strip} />
+      </Frame>
+      <Frame title="PanelHeader: an Instance selected (no page), the strip with a key">
+        <PanelHeader page={null} mode="many" armed marksHidden={false} words={HEADER_WORDS} onTool={() => {}} onMarks={() => {}} onHide={() => {}} />
+        <StatusStrip parts={HEADER_WORDS.strip.covered} />
+      </Frame>
+      <Frame title="PanelFooter: two changes, a held state, the undo offer after Reset all">
+        <PanelFooter
+          footer={FOOTER}
+          words={FOOTER_WORDS}
+          undo={undo}
+          theme={dark ? "dark" : "light"}
+          onResetAll={() => setUndo(UNDO_OFFER)}
+          onUndo={() => setUndo(null)}
+          onTheme={() => setDark(!dark)}
+          copy={split("idle")}
+        />
+      </Frame>
+      <Frame title="PanelFooter: nothing changed, nothing to copy">
+        <PanelFooter footer={FOOTER_EMPTY} words={FOOTER_WORDS} undo={null} theme="light" onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} copy={split("idle", true)} />
+      </Frame>
+      <Frame title="CopySplit: copied and refused">
+        <div className="wb-line">{split("copied")}</div>
+        <div className="wb-line">{split("failed")}</div>
+      </Frame>
+      <Frame title="CopyToast: over the footer as a copy lands">
+        <div className="wb-toast-room">
+          <PanelFooter
+            footer={FOOTER}
+            words={FOOTER_WORDS}
+            undo={null}
+            theme="light"
+            onResetAll={() => {}}
+            onUndo={() => {}}
+            onTheme={() => {}}
+            copy={
+              <>
+                {split("copied")}
+                <CopyToast title={COPIED_TITLE} words={COPY_WORDS} />
+              </>
+            }
+          />
+        </div>
+      </Frame>
+      <Frame title="DetailsForm: copied with no title, until one is typed">
+        <div className="wb-popover">
+          <DetailsForm
+            title={title}
+            designer={designer}
+            missing={missing}
+            busy={false}
+            words={COPY_WORDS}
+            onTitle={(next) => {
+              setTitle(next);
+              if (next.trim() !== "") setMissing(false);
+            }}
+            onDesigner={setDesigner}
+            onSubmit={() => (title.trim() === "" ? setMissing(true) : setLast(`copy "${title}" by ${designer || "—"}`))}
+          />
+        </div>
+      </Frame>
+      <Frame title="NotCopied: with the Proposal's text, and without">
+        <div className="wb-popover">
+          <NotCopied said={COPY_WORDS.notCopiedText(REFUSED.reason, true)} text={REFUSED.text} busy={false} words={COPY_WORDS} onRetry={() => setLast("try again")} />
+        </div>
+        <div className="wb-popover">
+          <NotCopied said={REFUSED.reason} text="" busy={false} words={COPY_WORDS} onRetry={() => setLast("try again")} />
+        </div>
+      </Frame>
+      <p className="wb-note">Last: {last}</p>
+    </div>
+  );
+}
+
 function Frame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -851,6 +983,8 @@ const FRAME_CSS = `
 .wb-mark { display: inline-flex; align-items: center; gap: 6px; font: var(--font-control); color: var(--ink); }
 .wb-status { padding: 8px 14px; border-radius: var(--radius-status); background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); font: var(--font-caption); }
 .wb-fold-body { padding: 4px 0 4px 12px; font: var(--font-paragraph); color: var(--muted); }
+.wb-popover { padding: var(--space-gutter); border-radius: var(--radius-card); background: var(--card); box-shadow: var(--popover-shadow); }
+.wb-toast-room { padding-top: 64px; }
 `;
 
 function FrameView({ frame }: { frame: Frame }) {
@@ -916,6 +1050,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <section className="wb-bare">
             <h2>Patterns: notices, changes and flags</h2>
             <NoticePatternStates />
+          </section>
+          <section className="wb-bare">
+            <h2>Patterns: the header, the footer and Copy Proposal</h2>
+            <ChromePatternStates />
           </section>
         </div>
       </Surface>

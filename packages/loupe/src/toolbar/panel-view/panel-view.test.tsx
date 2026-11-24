@@ -278,7 +278,7 @@ describe("the list", () => {
     });
     click("Menu");
     const shown = view();
-    expect(shown.header).toEqual({ route: "/", page: "Home", report: "Home · 2 changes" });
+    expect(shown.header).toEqual({ route: "/", page: "Home", report: "Home · 2 changes", title: "Home · 2 changes · /" });
     expect(shown.footer).toMatchObject({ countText: "2 changes", changes: { count: 2, word: "changes" }, hasOverrides: true, copyEnabled: true, states: { chip: null } });
     expect(shown.footer.resetAll).toEqual(
       expect.arrayContaining([

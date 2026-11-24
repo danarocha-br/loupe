@@ -8,7 +8,7 @@ import type { NoteKind } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
-import type { CommandWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, Tag, ValueText } from "./types.js";
+import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, Tag, ValueText } from "./types.js";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";
@@ -168,6 +168,58 @@ export const COMMAND_WORDS: CommandWords = {
   refused: "Couldn’t reach the clipboard. Select the command and copy it.",
 };
 
+/** The header's words and its status strip's (types.ts `HeaderWords`). */
+export const HEADER_WORDS: HeaderWords = {
+  pageLead: "/ ",
+  tools: LIST_WORDS.tools,
+  select: "Select",
+  marks: {
+    label: "Hide marks",
+    hide: "Hide marks: take Loupe’s outlines off the page, to judge the change as it will ship. The selection stays.",
+    show: "Show marks: outline the selection on the page again",
+  },
+  hide: { label: "Hide panel", title: "Hide the panel" },
+  strip: {
+    pick: {
+      one: ["Click an Instance on the page", " · ", { key: "Esc" }, " cancels"],
+      many: ["Click an Instance: every one from its call site is selected", " · ", { key: "Esc" }, " cancels"],
+    },
+    covered: ["A dialog on the page runs under the panel · hold ", { key: "Alt" }, " to see through"],
+    marksHidden: ["Outlines are hidden on the page"],
+  },
+};
+
+/** The footer's words beside its count (types.ts `FooterWords`). */
+export const FOOTER_WORDS: FooterWords = {
+  resetAll: "Reset all",
+  undo: "Undo",
+  theme: { label: "Dark theme", toLight: "Switch to light", toDark: "Switch to dark" },
+};
+
+/** Copy Proposal's words (types.ts `CopyWords`). */
+export const COPY_WORDS: CopyWords = {
+  idle: "Copy Proposal",
+  copied: "Copied",
+  failed: "Not copied",
+  mainTitle: "Copy the Proposal for your coding agent or an engineer",
+  detailsTitle: "Copy with a title and a designer",
+  details: "Copy with details",
+  title: "Title",
+  designer: "Designer",
+  optional: "optional",
+  designerHint: "Who is asking for this?",
+  copyWith: "Copy with these details",
+  titleMissing: "Give the Proposal a title: it heads the text your coding agent reads.",
+  notCopied: "Couldn’t copy automatically",
+  selectAll: "Select all",
+  retry: "Try again",
+  proposal: "The Proposal",
+  pasteIt: "Paste it into your coding agent",
+  quote: { open: " “", close: "”" },
+  copiedText: (title) => `Copied “${title}”. Paste it into your coding agent.`,
+  notCopiedText: (reason, withText) => (withText ? `${reason} Your Proposal is below.` : reason),
+};
+
 /** A button that inspects what it names: "Inspect Ana Souza". */
 export const inspectText = (what: string) => `Inspect ${what}`;
 
@@ -283,6 +335,12 @@ export function headerReport(route: string, changes: number, states: number): st
   if (changes > 0) parts.push(plural(changes, "change"));
   if (states > 0) parts.push(statesShown(states));
   return parts.join(" · ");
+}
+
+/** The header's page: its name after the wordmark, the report, and both with the route for its tooltip. */
+export function headerView(route: string, changes: number, states: number) {
+  const report = headerReport(route, changes, states);
+  return { route, page: pageName(route), report, title: `${report} · ${route}` };
 }
 
 /**
