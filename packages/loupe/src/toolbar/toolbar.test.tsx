@@ -1191,8 +1191,12 @@ describe("On this page: the page map over its rows", () => {
 
   it("inspects the Instance a block stands for", async () => {
     await mount();
-    await clickInPanel(buttonBlocks()[0] as HTMLButtonElement);
+    // Each block is named for its own Instance: the one it inspects shows that name as its headline.
+    const block = buttonBlocks()[1] as HTMLButtonElement;
+    const who = block.querySelector('[dir="auto"]')?.textContent;
+    await clickInPanel(block);
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).not.toBeNull();
+    expect(viewHeading().textContent).toBe(who);
     expect(map()).toBeNull();
   });
 });
