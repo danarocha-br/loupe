@@ -36,8 +36,13 @@ export type PropRowProps = {
   look?: RowLook;
   /** A chip chosen, or a switch turned: the value to write. */
   onSet(write: Write, value: unknown): void;
-  /** Label text typed, as the field holds it: the view keeps it to one line. */
+  /** Label text typed, already kept to one line by `oneLine`. */
   onText(write: Write, text: string): void;
+  /**
+   * Keeps label text to one line as it is typed or pasted: the field shows, and `onText`
+   * gets, the same text. The view's rule (a line break becomes a space); none by default.
+   */
+  oneLine?(text: string): string;
   onReset(write: Write): void;
   /** "1 of 4 keeps its own value": select the one it names. */
   onSelect(id: string): void;
@@ -80,7 +85,7 @@ function EmptyTag({ words }: { words: InspectorWords }) {
   );
 }
 
-export function PropRow({ item, words, look = "inset", onSet, onText, onReset, onSelect, onHover }: PropRowProps) {
+export function PropRow({ item, words, look = "inset", onSet, onText, oneLine, onReset, onSelect, onHover }: PropRowProps) {
   const { reset, keeping } = item;
   // The app pushing back on a held value is news while the row is in view: said as it lands.
   useAnnounceChange(item.held?.text ?? "");
@@ -169,6 +174,7 @@ export function PropRow({ item, words, look = "inset", onSet, onText, onReset, o
           words={words}
           onSet={onSet}
           onText={onText}
+          oneLine={oneLine}
         />
       )}
       {item.current && !item.change && (
@@ -213,6 +219,7 @@ function ControlView({
   words,
   onSet,
   onText,
+  oneLine,
 }: {
   control: Control;
   label: string;
@@ -220,6 +227,7 @@ function ControlView({
   words: InspectorWords;
   onSet: PropRowProps["onSet"];
   onText: PropRowProps["onText"];
+  oneLine: PropRowProps["oneLine"];
 }) {
   if (control.kind === "refused") {
     return (
@@ -230,7 +238,7 @@ function ControlView({
     );
   }
   const { write } = control;
-  if (control.kind === "text") return <TextField label={label} value={control.value} set={(text) => onText(write, text)} />;
+  if (control.kind === "text") return <TextField label={label} value={control.value} oneLine={oneLine} set={(text) => onText(write, text)} />;
   // Chips take string values: each option by its type and value, which tells `1` from `"1"`.
   const keyOf = (value: unknown) => `${typeof value}:${String(value)}`;
   const checked = control.options.find((option) => option.pressed);
@@ -250,7 +258,7 @@ function ControlView({
           <Chip
             key={keyOf(option.value)}
             value={keyOf(option.value)}
-            tag={isApp ? "app" : undefined}
+            tag={isApp ? words.appTag : undefined}
             dot={option.isDefault}
             count={option.count}
             description={notes || undefined}
@@ -271,11 +279,11 @@ function ControlView({
  * It wraps and grows to its text rather than scrolling. The row shows the prop's name:
  * the field says it to a screen reader.
  */
-function TextField({ label, value, set }: { label: string; value: string; set(next: string): void }) {
+function TextField({ label, value, oneLine, set }: { label: string; value: string; oneLine?(text: string): string; set(next: string): void }) {
   // The Toolbar redraws once a frame, so the field keeps its own text while it has focus,
   // with the value that text was typed over.
   const [draft, setDraft] = useState<{ text: string; from: string } | null>(null);
-  // Something else moved the value (a reset, another scope, a pasted line break made a space): drop the draft.
+  // Something else moved the value (a reset, another scope): drop the draft.
   const stale = draft !== null && value !== draft.from && value !== draft.text;
   if (stale) setDraft(null);
   const text = draft === null || stale ? value : draft.text;
@@ -292,8 +300,10 @@ function TextField({ label, value, set }: { label: string; value: string; set(ne
         if (event.key === "Enter") event.preventDefault();
       }}
       onValueChange={(typed) => {
-        setDraft({ text: typed, from: value });
-        set(typed);
+        // The field shows what is written: a pasted line break is a space here as well.
+        const next = oneLine ? oneLine(typed) : typed;
+        setDraft({ text: next, from: value });
+        set(next);
       }}
       onBlur={() => setDraft(null)}
     />

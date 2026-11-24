@@ -39,8 +39,10 @@ function specifiers(file: string): string[] {
  */
 function imports(code: string): { specifier: string; typeOnly: boolean }[] {
   const found: { specifier: string; typeOnly: boolean }[] = [];
-  // A statement: `import … from "x"`, `export … from "x"`, or a bare `import "x"`.
-  for (const match of code.matchAll(/^\s*(import|export)\s+(type\s+)?(?:[^;"']*?\bfrom\s*)?["']([^"']+)["']/gm)) {
+  // A statement: `import … from "x"`, `export … from "x"`, or a bare `import "x"`, wherever it
+  // starts (after another statement on the line too) and however tightly it is written
+  // (`import{X}from"x"`). A comment that reads like one counts: a false alarm is safer.
+  for (const match of code.matchAll(/\b(import|export)\b(\s*type\b)?(?:[^;"'`()]*?\bfrom)?\s*["']([^"']+)["']/g)) {
     found.push({ specifier: match[3] as string, typeOnly: match[2] !== undefined });
   }
   for (const match of code.matchAll(/\bimport\s*\(\s*["']([^"']+)["']/g)) found.push({ specifier: match[1] as string, typeOnly: false });
@@ -139,6 +141,9 @@ describe("the layers' import rule", () => {
       'import { FileIcon } from "../../icons.js";',
       'export { panelView } from "../../panel-view/index.js";',
       'const lazy = () => import("../../panel.js");',
+      'import{Popover}from"@ui-sdk/react";',
+      'const x = 1; export { attempt } from "../../controls.js";',
+      'import type{Write}from"../../panel-view/types.js";',
     ].join("\n");
     expect(patternOffenders(file, code).map((offender) => offender.split(" → ")[1])).toEqual([
       "../../panel-view/index.js",
@@ -148,6 +153,9 @@ describe("the layers' import rule", () => {
       "../../controls.js",
       "../../icons.js",
       "../../panel-view/index.js",
+      "@ui-sdk/react",
+      "../../controls.js",
+      // Dynamic imports are read after the statements.
       "../../panel.js",
     ]);
   });

@@ -5,6 +5,7 @@
 // the holding notice; and who keeps their own value.
 
 import { userEvent } from "@testing-library/user-event";
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { INSPECTOR_WORDS, type PropItem } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
@@ -84,6 +85,19 @@ describe("PropRow", () => {
     await user.keyboard("Hi{Enter}");
     expect(onText).toHaveBeenLastCalledWith(expect.objectContaining({ prop: "children" }), "Hi");
     expect((field as HTMLTextAreaElement).value).toBe("Hi");
+  });
+
+  it("keeps label text to one line in the field itself, as the view's rule writes it", async () => {
+    const { screen, onText } = draw(CHILDREN, { oneLine: (text) => text.replace(/\r\n|\r|\n/g, " ") });
+    const field = screen.getByRole("textbox", { name: "Text" }) as HTMLTextAreaElement;
+    act(() => field.focus());
+    // A paste: the browser puts the text in, line break and all, then says so.
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(field, "Bianca\nSouza");
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(onText).toHaveBeenLastCalledWith(expect.objectContaining({ prop: "children" }), "Bianca Souza");
+    expect(field.value).toBe("Bianca Souza");
   });
 
   it("says why a held State prop can't change here, holds its notice, and puts Reset in it", async () => {

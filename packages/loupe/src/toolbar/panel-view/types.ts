@@ -254,6 +254,8 @@ export type InspectorWords = {
   current: string;
   /** A value that is the component's default, for its tooltip. */
   defaultTitle: string;
+  /** The tag on the app's own value's chip, once an Override replaces it. */
+  appTag: string;
   /** A chip's marks, said to a screen reader and in its tooltip. */
   appValue: string;
   designDefault: string;

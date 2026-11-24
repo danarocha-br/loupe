@@ -122,6 +122,7 @@ export const INSPECTOR_WORDS: InspectorWords = {
   state: TEXT.state,
   current: TEXT.current,
   defaultTitle: "The component’s default: the call site doesn’t set it",
+  appTag: "app",
   appValue: "the app’s value",
   designDefault: "the design system’s default",
   back: { label: "All components", title: "Back to every component on this page (Esc)" },

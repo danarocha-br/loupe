@@ -947,6 +947,8 @@ describe("the Text row (PER-137)", () => {
     expect(enter.defaultPrevented).toBe(true);
     await type(textField(), "Bianca\nSouza");
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca Souza" });
+    // The field shows what was written, still focused: no second line waits for a blur.
+    expect(textField().value).toBe("Bianca Souza");
 
     await type(textField(), "");
     expect(loupe.props(BIA).overrides).toEqual({ children: "" });
