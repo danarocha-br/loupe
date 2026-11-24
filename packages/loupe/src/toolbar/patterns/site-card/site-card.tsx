@@ -8,6 +8,7 @@
 
 import type { CallSiteItem } from "../../panel-view/index.js";
 import { ChevronIcon, EyeIcon } from "../../ui/index.js";
+import { hovering } from "../marks/marks.js";
 
 export type SiteCardProps = {
   site: CallSiteItem;
@@ -18,16 +19,6 @@ export type SiteCardProps = {
   /** Outline these Instances on the page while the pointer or focus is on what names them; none clears. */
   onHover(ids: string[]): void;
 };
-
-/** Pointing at or focusing something outlines `ids` on the page, and leaving it clears them. */
-function hovering(onHover: SiteCardProps["onHover"], ids: string[]) {
-  return {
-    onMouseOver: () => onHover(ids),
-    onMouseLeave: () => onHover([]),
-    onFocus: () => onHover(ids),
-    onBlur: () => onHover([]),
-  };
-}
 
 export function SiteCard({ site, onSite, onInstance, onHover }: SiteCardProps) {
   return (

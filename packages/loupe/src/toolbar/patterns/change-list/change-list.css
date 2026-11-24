@@ -1,0 +1,22 @@
+/*
+ * ChangeList (ADR 0003): written against `[data-change-list]` and its parts
+ * (`[data-change-items]`, `[data-change]`, `[data-change-what]`, `[data-change-where]`). The
+ * card is Card `list`'s (ui/card/). Each row is the button itself, so its hover and focus
+ * reach the card's edges: Row draws a line, not a control, so it isn't one here. Values
+ * from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+[data-change-items] { list-style: none; margin: 0; padding: 0; }
+
+/* A row on its hairline, its text 14px in: the delta in a column of its own, what changed over what it reaches. */
+[data-change] {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "key what" "key where"; column-gap: var(--space-row);
+  width: 100%; padding: var(--space-inset) var(--space-gutter); border-top: 1px solid var(--rule); text-align: left;
+}
+@media (hover: hover) { [data-change]:not(:disabled):hover { background: var(--hover); } }
+[data-change]:focus-visible { outline-offset: -2px; }
+[data-change] [data-delta] { grid-area: key; align-self: start; margin-top: 0; }
+
+/* What it changes, from and to, in 12px mono; what it reaches under it, 12px, muted. */
+[data-change-what] { grid-area: what; font: var(--font-mono); overflow-wrap: anywhere; }
+[data-change-where] { grid-area: where; min-width: 0; overflow-wrap: break-word; font: var(--font-option); color: var(--muted); }

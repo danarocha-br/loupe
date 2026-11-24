@@ -185,6 +185,19 @@ describe("the layers' import rule", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("keeps the Server Actions out of panel-view: the flags store and its actions for types only", () => {
+    // panel-view is what the workbench draws its samples with; it must not pull a request in.
+    const actions = ["flags-store", "flags-server"].flatMap((name) => [path.join(toolbar, `${name}.ts`), path.join(toolbar, `${name}.js`)]);
+    const offenders = sources(panelView)
+      .filter((file) => !isTest(file))
+      .flatMap((file) =>
+        imports(readFileSync(file, "utf8"))
+          .filter((found) => !found.typeOnly && actions.includes(resolved(file, found.specifier)))
+          .map((found) => `${path.relative(src, file)} → ${found.specifier}`),
+      );
+    expect(offenders).toEqual([]);
+  });
+
   it("pins UI SDK to an exact version, as a dependency the host never imports", () => {
     const manifest = JSON.parse(readFileSync(path.join(pkg, "package.json"), "utf8"));
     for (const name of ["@ui-sdk/react", "@ui-sdk/core"]) {

@@ -11,7 +11,7 @@ import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
 import { type Editing, instanceProp, scopeProp } from "./rows.js";
 import { fallbacks, labelsOf, membersView, scopeChips, type ScopeView, scopeView } from "./scopes.js";
-import type { GoneBody, InspectorBody, NoGroupView, ScopeOption, Tag } from "./types.js";
+import type { GoneBody, InspectOnlyView, InspectorBody, NoGroupView, PropItem, ScopeOption, Tag } from "./types.js";
 import { instanceVerdict } from "./verdict.js";
 import {
   callSiteText,
@@ -19,15 +19,18 @@ import {
   heldValues,
   INSPECT_ONLY_OVERRIDES_OFF,
   injectedSummary,
+  inspectOnlyTitle,
   NO_CALL_SITE,
   NO_EDITABLE_NOTE,
   NO_GROUP,
   NOT_GENERATED,
   NOTES,
   ONLY_THIS_INSTANCE,
+  pageName,
   scopeMoveLabel,
   scopeMoveVerb,
   TAGS,
+  TEXT,
   unmountedTag,
   whereText,
 } from "./words.js";
@@ -57,14 +60,32 @@ export function inspectorBody(
   if (inspection === null) {
     const seen = reads.lastSeen(id);
     const site = seen ? parseHint(seen.hint) : null;
+    // How it last rendered, else what its id names, when the id is a call site's.
+    const component = seen?.component ?? (isUnanchored(id) ? null : callSiteLabels(id).component || null);
+    const where = site ? `${site.path.split("/").at(-1)}:${site.line}` : null;
+    const held = record && holds ? { tag: unmountedTag(record.suspended !== null), values: heldValues(record.values, seen) } : null;
     return {
       kind: "gone",
       id,
-      // How it last rendered, else what its id names, when the id is a call site's.
-      component: seen?.component ?? (isUnanchored(id) ? null : callSiteLabels(id).component || null),
-      where: site ? `${site.path.split("/").at(-1)}:${site.line}` : null,
-      held: record && holds ? { tag: unmountedTag(record.suspended !== null), values: heldValues(record.values, seen) } : null,
       canReset: recorded,
+      identity: {
+        component: null,
+        page: null,
+        status: component ? { text: TEXT.notOnPage } : null,
+        keys: [],
+        name: component ?? TEXT.notOnPage,
+        nameTitle: id,
+        ownName: false,
+        where,
+        whereTitle: id,
+        id: null,
+        note: TEXT.showsWhenMounted,
+        tags: held ? [held.tag] : [],
+        chips: [],
+        held: held?.values ?? null,
+        notGenerated: null,
+        crumbs: [],
+      },
     };
   }
   // Null for a server-rendered Instance, one with no Adapter, or while Overrides are off: no controls then.
@@ -110,24 +131,38 @@ export function inspectorBody(
   const site = inspection.callSite;
   const { editable, inspectOnly } = inspection.coverage;
   const scopes = editing && row ? scopeOptions(page, row, scoping.scope) : null;
+  const name = reads.name(id);
+  const source = {
+    ...sourceParts(site ? callSiteText(site, inspection.anchor).text : whereText(inspection.component, site), inspection.component),
+    title: site ? `${callSiteText(site, inspection.anchor).title}\n${inspection.id}` : inspection.id,
+  };
+  const instanceKeys = keys.marks.find((mark) => mark.id === id)?.keys ?? [];
+  const chips = row ? scopeChips(page.records, row, labels) : [];
+  const crumbs = reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor }));
+  const members = scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined, scopes) : null;
+  const coverageNotGenerated = notGenerated ? { tag: NOT_GENERATED, command: page.command } : null;
+  const editableRows = inspection.rows
+    .filter((candidate) => candidate.editable)
+    .map((candidate) =>
+      scoped ? scopeProp(candidate, id, scoped, reads, scoped.record ? keys.of(scoped.record.target) : null) : instanceProp(candidate, editing),
+    );
+  // At a wider scope, inspect-only rows show the app's value alone.
+  const inspectOnlyRows = inspection.rows.filter((candidate) => !candidate.editable).map((candidate) => instanceProp(candidate, scoped ? null : editing));
   return {
     kind: "inspector",
     id: inspection.id,
     component: inspection.component,
-    name: reads.name(id),
+    name,
     where: whereText(inspection.component, site),
-    source: {
-      ...sourceParts(site ? callSiteText(site, inspection.anchor).text : whereText(inspection.component, site), inspection.component),
-      title: site ? `${callSiteText(site, inspection.anchor).title}\n${inspection.id}` : inspection.id,
-    },
-    keys: keys.marks.find((mark) => mark.id === id)?.keys ?? [],
+    source,
+    keys: instanceKeys,
     hold,
     verdict,
     tags,
-    chips: row ? scopeChips(page.records, row, labels) : [],
-    crumbs: reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor })),
+    chips,
+    crumbs,
     editing: editing ? { resetInstanceEnabled: recorded, scopes, noGroup: scopes && noGroupOf(scopes) } : null,
-    members: scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined, scopes) : null,
+    members,
     note,
     coverage: {
       editable,
@@ -136,22 +171,72 @@ export function inspectorBody(
       callSite: site ? callSiteText(site, inspection.anchor) : null,
       noCallSite: NO_CALL_SITE,
       segmented: editable + inspectOnly <= MAX_SEGMENTS,
-      notGenerated: notGenerated ? { tag: NOT_GENERATED, command: page.command } : null,
+      notGenerated: coverageNotGenerated,
     },
-    editable: inspection.rows
-      .filter((candidate) => candidate.editable)
-      .map((candidate) =>
-        scoped
-          ? scopeProp(candidate, id, scoped, reads, scoped.record ? keys.of(scoped.record.target) : null)
-          : instanceProp(candidate, editing),
-      ),
-    // At a wider scope, inspect-only rows show the app's value alone.
-    inspectOnly: inspection.rows.filter((candidate) => !candidate.editable).map((candidate) => instanceProp(candidate, scoped ? null : editing)),
-    inspectOnlyMeta: page.status.overrides ? null : INSPECT_ONLY_OVERRIDES_OFF,
-    injected:
-      injected.length > 0
-        ? { summary: injectedSummary(injected.length), rows: injected.map(([name, value]) => ({ name, value: formatCurrent(value) })) }
-        : null,
+    editable: editableRows,
+    inspectOnly: inspectOnlyRows,
+    legend: legendOf(editableRows),
+    inspectFold: inspectOnlyView(inspectOnlyRows, {
+      open: editableRows.length === 0,
+      meta: page.status.overrides ? null : INSPECT_ONLY_OVERRIDES_OFF,
+      injected:
+        injected.length > 0
+          ? { summary: injectedSummary(injected.length), rows: injected.map(([prop, value]) => ({ name: prop, value: formatCurrent(value) })) }
+          : null,
+    }),
+    identity: {
+      component: name !== null ? inspection.component : null,
+      page: pageName(page.route),
+      status: verdict.status,
+      keys: instanceKeys,
+      name: name ?? inspection.component,
+      nameTitle: name ?? inspection.component,
+      ownName: name !== null,
+      where: { file: source.file, line: source.line },
+      whereTitle: source.title,
+      id: inspection.id,
+      note: null,
+      tags,
+      // The scope's own section names the scopes acting on it.
+      chips: members ? [] : chips,
+      held: null,
+      notGenerated: coverageNotGenerated,
+      crumbs,
+    },
+  };
+}
+
+/** A true/false prop: it shares one card of switches with the others, under the option rows. */
+export function isSwitch(item: PropItem): boolean {
+  const control = item.control;
+  if (control?.kind !== "options" || control.options.length !== 2) return false;
+  const values = control.options.map((option) => option.value);
+  return values.includes(true) && values.includes(false);
+}
+
+/** The legend under the option rows: when one of them marks a default, and whether one rings the app's value. */
+function legendOf(editable: readonly PropItem[]): InspectorBody["legend"] {
+  const options = editable.filter((item) => !isSwitch(item));
+  const marksDefault = options.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
+  return marksDefault ? { app: options.some((item) => item.change !== null && item.counts === null) } : null;
+}
+
+/**
+ * Inspect only, folded to one row (open when nothing else can change). Closed, the row
+ * names its props; one cause for them all is said once, under the row, instead of a tag
+ * on every row.
+ */
+function inspectOnlyView(items: PropItem[], rest: Pick<InspectOnlyView, "open" | "meta" | "injected">): InspectOnlyView {
+  const reasons = new Set(items.map((item) => item.reason));
+  const [only] = reasons.size === 1 ? [...reasons] : [];
+  const shared = only ? items.find((item) => item.reason === only) : undefined;
+  return {
+    title: inspectOnlyTitle(items.length),
+    names: items.length > 0 ? ` · ${items.map((item) => item.name).join(", ")}` : null,
+    shared: shared?.reason ? { reason: shared.reason, title: shared.reasonTitle } : null,
+    rows: shared ? items.map((item) => ({ ...item, reason: null })) : items,
+    empty: TEXT.none,
+    ...rest,
   };
 }
 

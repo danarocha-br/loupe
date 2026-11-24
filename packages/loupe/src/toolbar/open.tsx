@@ -133,7 +133,6 @@ export function ToolbarOpen({
       <Panel
         debug={debug}
         view={view}
-        layer={layer}
         column={column}
         mode={mode}
         picking={picker.picking}

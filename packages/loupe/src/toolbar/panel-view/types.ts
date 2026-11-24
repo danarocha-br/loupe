@@ -7,10 +7,11 @@ import type { OptionValue } from "../../meta/types.js";
 import type { LoupeDebug } from "../../runtime/debug.js";
 import type { NoteKind } from "../../runtime/inspect.js";
 import type { Scope, ScopeTarget } from "../../runtime/store.js";
+import type { FlagValue } from "../flags-preview.js";
 import type { SelectMode } from "../picker.js";
 
-// The runtime's scope words, and the select tools' modes, as the panel's data speaks them: a pattern takes them from here.
-export type { Scope, ScopeTarget, SelectMode };
+// The runtime's scope words, the select tools' modes and a flag's value, as the panel's data speaks them: a pattern takes them from here.
+export type { FlagValue, Scope, ScopeTarget, SelectMode };
 
 /** Components seen on a route so far, for "Appears on interaction". */
 export type SeenComponents = { readonly route: string; readonly components: ReadonlySet<string> };
@@ -36,6 +37,9 @@ export type Write = { id: string; prop: string; scope: Scope };
 export type InspectOnlyReason = "not-mounted" | "not-generated" | "server" | "overrides-off" | "no-adapter" | "no-editable";
 
 export type StatusTag = { kind: "supported" | "inspect-only" | "not-generated"; text: string };
+
+/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. */
+export type StatusText = { kind?: StatusTag["kind"]; text: string };
 
 /** Supported, or Inspect only with one reason, for an Instance or a component. */
 export type Verdict =
@@ -64,8 +68,13 @@ export type PanelView = {
   marks: { id: string; keys: number[]; stamp: string }[];
   /** The report line names the page and counts its changes. */
   header: { route: string; /** The page's name alone: "Home". */ page: string; report: string };
-  /** "Overrides are off" across the panel, while the React self-check fails. */
-  banner: { title: string; body: string } | null;
+  /**
+   * The notices over the panel's content: the Product layer's (missing, another format, or
+   * sources changed since `generate`), then "Overrides are off" while the React self-check fails.
+   */
+  notices: NoticeView[];
+  /** What the notices say, for the panel's live regions: a missing or other-format layer is an alert, the rest a status. */
+  announcements: { alert: string; status: string };
   footer: {
     countText: string;
     hasOverrides: boolean;
@@ -84,7 +93,8 @@ export type PanelView = {
 export type ListBody = {
   kind: "list";
   page: { name: string; route: string };
-  notGenerated: { names: string[]; command: string } | null;
+  /** "Not generated yet": the components on this page `generate` hasn't read, and the command that would. */
+  notGenerated: NoticeView | null;
   /** The records Suspended for review: "Held for review", with what each holds. */
   suspended: { target: ScopeTarget; label: string; why: string; values: string[] }[];
   /** "2 · apply to nothing". */
@@ -190,13 +200,10 @@ export type InstanceItem = {
 export type GoneBody = {
   kind: "gone";
   id: string;
-  /** What it was, from how it last rendered; null when Loupe never saw it render. */
-  component: string | null;
-  /** Its call site's file and line: "member-row-menu.tsx:52". */
-  where: string | null;
-  held: { tag: Tag; values: string[] } | null;
   /** Whether it still holds an Override that "Reset this Instance" can drop. */
   canReset: boolean;
+  /** What the identity block says of it: "Not on the page now", where it was written, what it still holds. */
+  identity: IdentityView;
 };
 
 export type InspectorBody = {
@@ -238,9 +245,108 @@ export type InspectorBody = {
   };
   editable: PropItem[];
   inspectOnly: PropItem[];
-  /** "Overrides off" beside the Inspect only heading. */
-  inspectOnlyMeta: string | null;
+  /** The fold of the props it shows but can't change here, as Inspect only draws it. */
+  inspectFold: InspectOnlyView;
+  /**
+   * What a chip's marks mean, said under the option rows when one of them marks a default;
+   * `app` when a chip rings the app's value. Null otherwise.
+   */
+  legend: { app: boolean } | null;
+  /** What the identity block at the card's top says of it. */
+  identity: IdentityView;
+};
+
+/**
+ * The identity block at the top of the Inspector's card, and of "Not on the page now"
+ * (DESIGN.md "Identity"): what is selected, where it is written, and only the exceptions.
+ */
+export type IdentityView = {
+  /** The component, muted after Back; null when the headline is the component already. */
+  component: string | null;
+  /** The page, "Billing", after the component; none once the Instance is gone. */
+  page: string | null;
+  /** Its verdict ("Supported"), or a plain status ("Not on the page now"). */
+  status: StatusText | null;
+  /** The numbered changes that reach it. */
+  keys: number[];
+  /** The headline: its visible name in full, else its component. */
+  name: string;
+  /** The headline's tooltip. */
+  nameTitle: string;
+  /** The headline is the app's own words, in whatever script it writes: the view gives it the app's language. */
+  ownName: boolean;
+  /** Where it is written: a file and its line, set apart; or one line of words. */
+  where: { file: string; line: string } | string | null;
+  /** The full path and key, on hover. */
+  whereTitle: string;
+  /** Its id, on the where line, for the view's own queries; null once it is gone. */
+  id: string | null;
+  /** What it says once it is gone. */
+  note: string | null;
+  tags: Tag[];
+  /** The scopes acting on it, and the ones it was left out of; none while the scope's own section names them. */
+  chips: string[];
+  /** What a gone Instance still holds. */
+  held: string[] | null;
+  /** Its component isn't generated yet: the tag, and the command that would read it. */
+  notGenerated: { tag: StatusTag; command: string } | null;
+  /** The adapted Instances around it, nearest first. */
+  crumbs: { id: string; label: string }[];
+};
+
+/**
+ * Inspect only (DESIGN.md "Inspect only"): the props an Instance shows but can't change
+ * here, folded to one row. One cause for them all is said once, under the row.
+ */
+export type InspectOnlyView = {
+  /** "Inspect only · 6". */
+  title: string;
+  /** Its props by name, said after the title while it is folded: " · children, className". Null when it has none. */
+  names: string | null;
+  /** "Overrides off", at the row's right. */
+  meta: string | null;
+  /** Open as it first draws: nothing else on the Instance can change. */
+  open: boolean;
+  /** The one reason every prop shares, said once under the row; its rows then carry none. */
+  shared: { reason: string; title: string | null } | null;
+  rows: PropItem[];
+  /** Said in place of the rows when it has none. */
+  empty: string;
+  /** The props the library sets, folded under the rest: "2 set by the library". */
   injected: { summary: string; rows: { name: string; value: string }[] } | null;
+};
+
+/**
+ * A notice card (DESIGN.md "Notices and status"): something about the page or the panel
+ * the reader should know before they change anything, and the command that fixes it.
+ */
+export type NoticeView = {
+  /** Which notice; its look follows its `tone`. */
+  kind: "overrides-off" | "missing" | "format" | "stale" | "not-generated";
+  /** Red for what stops Loupe working, amber for what may be out of date. */
+  tone: "alert" | "amber";
+  title: string;
+  /** What counts it at the head's right: "2 components", "Format 0 ≠ 1". */
+  meta: string | null;
+  body: string;
+  /**
+   * A line each: the components, and for a changed module its file at the right, its changed
+   * files in the tooltip. `key` tells the lines apart: a changed module's full source path.
+   */
+  rows: { key: string; text: string; value: string | null; valueTitle: string | null }[];
+  /** The command that would fix it: Loupe names it and never runs it. */
+  command: string | null;
+};
+
+/** A command's Copy button and what it says (DESIGN.md "Notices and status"). */
+export type CommandWords = {
+  /** Before the command, for the eye only. */
+  prompt: string;
+  copy: string;
+  copied: string;
+  failed: string;
+  /** Said under the command, and by the announcer, when the clipboard refuses it. */
+  refused: string;
 };
 
 /**
@@ -258,6 +364,10 @@ export type ListWords = {
   held: { title: string; discard: string };
   /** "Appears on interaction": its title, what it counts, and what each row says under its name. */
   interaction: { title: string; meta: string; seen: string };
+  /** The change list: its title, and what it says of its numbers. */
+  changes: { title: string; meta: string };
+  /** A change's delta: "Change 1", and its tooltip, as the Inspector says it. */
+  change: InspectorWords["change"];
 };
 
 /** Select multiple on an Instance with no call site to group by: why, and the way to the page when that scope applies. */
@@ -301,6 +411,8 @@ export type InspectorWords = {
   resetScope: string;
   serverRendered: string;
   leftOutUnmounted: string;
+  /** What a chip's marks mean, said once under the options. */
+  legend: { shown: string; app: string; default: string };
 };
 
 export type ScopeOption = { scope: Scope; label: string; enabled: boolean; pressed: boolean; title: string | null };
@@ -408,3 +520,43 @@ export type Control =
   | { kind: "text"; key: string; write: Write; value: string }
   /** A prop this scope can't change: `refusal` says which rule, `text` says it. */
   | { kind: "refused"; refusal: "state-only" | "per-call-site"; text: string };
+
+/**
+ * The Feature flags card (DESIGN.md "Notices and status"), from the flags store: the app's
+ * flags, each one's options and whether it is previewed. The card writes nothing: its
+ * callbacks ask the store, in the view.
+ */
+export type FlagsCardView = {
+  title: string;
+  /** "3 declared · 1 previewing", or "Unavailable". */
+  meta: string | null;
+  /** Reading the app's flags: what the card says meanwhile. Null once it has read them. */
+  loading: string | null;
+  /** Previews are off: one line until it is opened, then why, and the one fix made in a file. */
+  off: { title: string; why: string; reason: string; fix: { text: string; copy: string } | null } | null;
+  /** Ready: said when the app declares no flag. */
+  empty: string | null;
+  rows: FlagRowView[];
+  /** The last write the dev server refused, said under the flags. */
+  error: string | null;
+  /** How long a preview lasts, and where it is kept. Null until the flags are read. */
+  lasts: string | null;
+  /** Clears every preview; off while nothing is previewed. Null until the flags are read. */
+  clearAll: { label: string; enabled: boolean } | null;
+};
+
+/** One flag: its key, what it does, its options as one radio group, and what shows now. */
+export type FlagRowView = {
+  key: string;
+  previewing: boolean;
+  description: string | null;
+  /** "No options declared: offered as on and off." */
+  note: string | null;
+  options: { label: string; value: FlagValue }[];
+  /** The option previewed, by its place in `options`; null while the app decides. */
+  checked: number | null;
+  /** "Previewing Pro", "App decides". */
+  state: string;
+  /** "Clear", while it is previewed. */
+  clear: string | null;
+};

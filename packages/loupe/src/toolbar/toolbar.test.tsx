@@ -248,7 +248,7 @@ describe("the Toolbar", () => {
     });
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
     await settle();
-    expect(shadow().querySelector(".banner")?.textContent).toContain("Everything is inspect-only");
+    expect(screen().getByTestId("overrides-off-notice").textContent).toContain("Everything is inspect-only");
     expect(panelButton("Reset all").disabled).toBe(true);
   });
 
@@ -311,7 +311,7 @@ describe("the Toolbar", () => {
     expect([marks[0]?.style.top, marks[0]?.style.left, marks[0]?.style.width, marks[0]?.style.height]).toEqual(["7px", "17px", "86px", "30px"]);
     // No number on the page: it is on the change's row.
     expect(marks[0]?.textContent).toBe("");
-    expect(shadow().querySelector(".keylist")?.textContent).toContain("1variant");
+    expect(screen().getByRole("list", { name: "Changes" }).textContent).toContain("1variant");
   });
 
   it("rings the selected Instance on the page", async () => {
@@ -847,7 +847,7 @@ describe("a change landing on the page", () => {
     for (let i = 0; i < 4; i++) await settle();
   };
   const quiet = () => [...shadow().querySelectorAll<HTMLElement>(".ring, .mark")].map((outline) => outline.classList.contains("quiet"));
-  const changeRow = () => shadow().querySelector<HTMLButtonElement>(".keylist button") as HTMLButtonElement;
+  const changeRow = () => within(screen().getByRole("list", { name: "Changes" })).getAllByRole("button")[0] as HTMLButtonElement;
   const leave = async (element: Element) => {
     act(() => element.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, composed: true })));
     await settle();

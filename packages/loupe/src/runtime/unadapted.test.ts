@@ -312,7 +312,7 @@ describe("anchored client Instances without an Adapter", () => {
     expect(card?.inspectOnly).toBe(true);
     expect(card?.notes).toEqual([]);
     expect(card?.statusTitle).toBe("pnpm exec loupe generate");
-    expect(list.notGenerated).toEqual({ names: ["NewCard"], command: "pnpm exec loupe generate" });
+    expect(list.notGenerated).toMatchObject({ kind: "not-generated", rows: [{ text: "NewCard" }], command: "pnpm exec loupe generate" });
 
     const body = panelView({ debug: loupe, layer, selected: at("NewCard"), scope: "instance", seen: NONE_SEEN }).body as InspectorBody;
     expect(body.verdict).toMatchObject({ reason: "not-generated", status: { kind: "not-generated", text: "Not generated yet" } });

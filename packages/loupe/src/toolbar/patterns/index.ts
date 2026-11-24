@@ -8,11 +8,18 @@
 // a pattern.
 // `src/toolbar/ui/layers.test.ts` holds both.
 
+export { ChangeList, type ChangeListProps } from "./change-list/change-list.js";
+export { CommandLine, type CommandLineProps } from "./command/command.js";
+export { FlagRow, type FlagRowProps, FlagsCard, type FlagsCardProps } from "./flags-card/flags-card.js";
 export { GroupRow, type GroupRowProps } from "./group-row/group-row.js";
 export { HeldForReview, type HeldForReviewProps } from "./held-for-review/held-for-review.js";
 export { Identity, type IdentityProps } from "./identity/identity.js";
+export { InspectOnly, type InspectOnlyProps } from "./inspect-only/inspect-only.js";
 export { AppearsOnInteraction, type AppearsOnInteractionProps } from "./interaction/interaction.js";
-export { Breakable, ChangeKey, HeldKey, HeldValues, Keys, Meta, type Status, StatusChip, TagChip } from "./marks/marks.js";
+export { Legend, type LegendProps } from "./legend/legend.js";
+export { Breakable, ChangeKey, DotTitle, HeldKey, HeldValues, hovering, Keys, Meta, type Status, StatusChip, TagChip } from "./marks/marks.js";
+export { NoGroup, type NoGroupProps } from "./no-group/no-group.js";
+export { InstanceNote, type InstanceNoteProps, Notice, type NoticeProps } from "./notice/notice.js";
 export { OnThisPage, type OnThisPageProps } from "./on-this-page/on-this-page.js";
 export { type MapBox, PageMap, type PageMapProps, stepFrom } from "./page-map/page-map.js";
 export { PropRow, type PropRowProps } from "./prop-row/prop-row.js";

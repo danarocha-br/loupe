@@ -64,12 +64,7 @@ export const CSS = `
 }
 /* Paragraphs keep their last word company; headings balance instead. */
 .panel { overflow-wrap: break-word; text-wrap: pretty; }
-.mono { font-family: ${MONO}; font-weight: 400; font-size: ${size(12)}; }
-.verbatim { white-space: pre-wrap; }
-.muted { color: var(--muted); font-weight: 400; }
-.meta { font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .label { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
-.body { font: 400 ${size(13)}/1.4615 ${SANS}; color: var(--muted); margin: 0; }
 
 /* Controls: Button and Toggle (ui/button/, ui/toggle/). A view that sets a button's background restates its hover:
    the views' rules come after the primitives' layer, so a background here would win over the layer's hover. */
@@ -205,74 +200,6 @@ export const CSS = `
   @starting-style { .launcher[data-edge] { transform: none; opacity: 0; } }
 }
 
-/* Cards on the sheet */
-/* Card (ui/card/): every card's surface and its looks. A title that leads with a dot: */
-[data-card-head] .title { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; font-weight: 500; }
-
-/* Select multiple on an Instance with no call site: why, and Widen to the page (ScopeSection's move, patterns/). */
-.selection { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 10px; font-size: ${size(12)}; line-height: 1.4167; }
-
-/* Notices: the Product layer's, Overrides off, and an Instance's note */
-.notice-card { gap: var(--space-inset); }
-.notice-rows { list-style: none; margin: 0; padding: 0; }
-.command { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--well); font: 400 ${size(12)}/1.3333 ${MONO}; color: var(--ink); }
-.command .copy { height: 28px; padding: 0 10px; background: var(--card); }
-@media (hover: hover) { .command .copy:hover { background: var(--sunk-hover); } }
-.command-refused { font-size: ${size(12)}; line-height: 1.4167; }
-.command-refused:not(:empty) { margin-top: 6px; }
-/* An Instance's note: a Row (ui/row/) with the info glyph, its title over its paragraph. */
-.note .text { display: flex; flex-direction: column; gap: var(--space-xs); }
-.warn { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); font: 400 ${size(12)}/1.4167 ${SANS}; }
-.warn [data-dot] { margin-top: 5px; }
-
-/* The change list: each change by its delta */
-.keylist { list-style: none; margin: 0; padding: 0; }
-.keylist button {
-  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "key what" "key where"; column-gap: 10px;
-  width: 100%; padding: 8px 14px; border-top: 1px solid var(--rule); text-align: left;
-}
-@media (hover: hover) { .keylist button:not(:disabled):hover { background: var(--hover); } }
-.keylist button:focus-visible, .inspect > [data-fold] > [data-fold-trigger]:focus-visible { outline-offset: -2px; }
-.keylist [data-delta] { grid-area: key; align-self: start; margin-top: 0; }
-.keylist .what { grid-area: what; font: 400 ${size(12)}/1.5 ${MONO}; overflow-wrap: anywhere; }
-.keylist .where { grid-area: where; min-width: 0; overflow-wrap: break-word; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
-
-/* What the chips' marks mean, said once on a row of its own. */
-.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 34px; padding: 10px 14px 10px 42px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
-.legend span { display: inline-flex; align-items: center; gap: 4px; }
-.legend i { flex: none; width: 10px; height: 10px; border-radius: 3px; }
-.legend .shown { background: var(--shown); }
-.legend .app { box-shadow: inset 0 0 0 1px var(--field-edge); }
-.legend .is-default { width: 4px; height: 4px; margin: 0 2px 0 4px; border-radius: 2px; background: var(--faint); }
-
-/* Inspect only: the props this Instance shows but can't change here, folded to one row */
-.inspect { overflow: hidden; }
-.inspect > [data-fold] > [data-fold-trigger] { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto 16px; align-items: center; column-gap: 8px; min-height: 44px; padding: 12px 14px; }
-@media (hover: hover) { .inspect > [data-fold] > [data-fold-trigger]:hover { background: var(--hover); } }
-.inspect [data-fold-trigger] > .glyph { color: var(--ink); }
-.inspect > [data-fold] > [data-fold-trigger] > [data-fold-chevron] { color: var(--muted); }
-.inspect .summary-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--font-title); letter-spacing: -0.01em; }
-.inspect .summary-text .muted { font-size: ${size(12)}; letter-spacing: 0; }
-.inspect .why { padding: 0 14px 8px 42px; font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--muted); }
-.inspect-rows { display: flex; flex-direction: column; padding: 0 14px 8px 42px; }
-.inspect .injected { padding: 0 14px 12px 42px; }
-.inspect .injected > [data-fold-trigger] { display: flex; align-items: center; gap: 6px; min-height: 28px; color: var(--muted); font-size: ${size(12)}; }
-
-/* Feature flags */
-.flag [data-chip-group] { flex-wrap: nowrap; }
-.flag [data-chip] { flex: 1; }
-.flag .foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-.flag .state { margin-left: auto; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--muted); white-space: nowrap; padding-bottom: 6px; }
-.flag.overridden .state { color: var(--ink); }
-.flags .lasts { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--rule); color: var(--muted); font-size: ${size(12)}; line-height: 1.4167; }
-.flags .lasts .icon { margin-top: 1px; }
-.flags .clear { align-self: flex-start; }
-.flags .off { padding: 8px 12px; border-radius: var(--radius-well); background: var(--well); }
-.flags .off > [data-fold-trigger] { display: flex; align-items: center; gap: 8px; min-height: 24px; font-weight: 500; }
-.flags .off .why { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
-.flags .off .why > .muted { line-height: 1.4615; }
-.flags .off [data-fold-chevron] { margin-left: auto; color: var(--muted); }
-
 /* On the page: the selected Instance solid and tagged with its size, the others it reaches
    dashed, left-out and hovered ones dashed grey; a change's outlines fade once it has landed */
 .ring[data-ring], .mark[data-mark] { position: fixed; pointer-events: none; z-index: 2147483646; border-radius: 8px; transition: opacity 160ms ease-out; }
@@ -297,6 +224,5 @@ export const CSS = `
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
-  .legend i { forced-color-adjust: none; background: CanvasText; }
 }
 `;

@@ -8,22 +8,54 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
-import { INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
-import { AppearsOnInteraction, GroupRow, HeldForReview, Identity, OnThisPage, PageMap, PropRow, ScopeSection, SiteCard, StartCard } from "./patterns/index.js";
+import { COMMAND_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
+import {
+  AppearsOnInteraction,
+  ChangeList,
+  CommandLine,
+  FlagsCard,
+  GroupRow,
+  HeldForReview,
+  Identity,
+  InspectOnly,
+  InstanceNote,
+  Legend,
+  NoGroup,
+  Notice,
+  OnThisPage,
+  PageMap,
+  PropRow,
+  ScopeSection,
+  SiteCard,
+  StartCard,
+} from "./patterns/index.js";
 import {
   BUTTON_GROUP,
+  CHANGES,
+  FLAGS,
+  FLAGS_OFF,
   GONE,
   HELD,
   HELD_META,
   IDENTITY,
+  INSPECT_ONLY,
+  INSPECT_ONLY_SHARED,
   INTERACTION,
   LIST_BOXES,
   LIST_GROUPS,
   LIST_SUMMARY,
   MEMBERS,
+  MISSING_NOTICE,
+  NO_GROUP,
   NOT_GENERATED,
+  NOT_GENERATED_NOTICE,
+  COMMAND,
+  NOTE,
+  OVERRIDES_OFF_NOTICE,
   PAGE_MEMBERS,
   PROP_ITEMS,
+  SECRET_LINE,
+  STALE_NOTICE,
   TONE_AT_SCOPE,
   TYPE_INSPECT_ONLY,
 } from "./patterns/samples.js";
@@ -600,36 +632,55 @@ function PatternStates() {
     onHover: () => {},
   };
   const selected = MEMBERS.members[2]?.id ?? "";
+  const pairRow = (item: (typeof INSPECT_ONLY.rows)[number]) => <PropRow key={item.name} item={item} look="pair" words={INSPECTOR_WORDS} {...rowCalls} />;
   return (
     <div className="wb-states">
       <Frame title="The Inspector: Identity, ScopeSection, then a PropRow per prop">
         <Card look="divided">
-          <Identity words={INSPECTOR_WORDS} onBack={said("back")} onCrumb={(id) => setLast(`select ${id}`)} {...IDENTITY} />
+          <Identity identity={IDENTITY} words={INSPECTOR_WORDS} onBack={said("back")} onCrumb={(id) => setLast(`select ${id}`)} />
           <ScopeSection members={MEMBERS} selected={selected} words={INSPECTOR_WORDS} {...scopeCalls} />
           {PROP_ITEMS.map((item) => (
             <PropRow key={item.name} item={item} words={INSPECTOR_WORDS} {...rowCalls} />
           ))}
+          <Legend words={INSPECTOR_WORDS} app />
+          <InspectOnly inspect={INSPECT_ONLY} row={pairRow} />
+        </Card>
+      </Frame>
+      <Frame title="An Instance nothing can change: its note, and Inspect only open with the one reason">
+        <Card look="divided">
+          <Identity identity={{ ...IDENTITY, keys: [], tags: [], chips: [], crumbs: [] }} words={INSPECTOR_WORDS} onBack={said("back")} />
+          <InstanceNote note={NOTE} />
+          <InspectOnly inspect={INSPECT_ONLY_SHARED} row={pairRow} />
+        </Card>
+      </Frame>
+      <Frame title="NoGroup: Select multiple on an Instance with no call site">
+        <Card look="divided">
+          <Identity identity={{ ...IDENTITY, keys: [], tags: [], chips: [], crumbs: [] }} words={INSPECTOR_WORDS} onBack={said("back")}>
+            <NoGroup noGroup={NO_GROUP} onScope={(scope) => setLast(`scope ${scope}`)} />
+          </Identity>
         </Card>
       </Frame>
       <Frame title="Identity: not generated yet, and gone">
         <Card look="divided">
           <Identity
+            identity={{
+              ...IDENTITY,
+              status: NOT_GENERATED,
+              keys: [],
+              tags: [],
+              chips: [],
+              crumbs: [],
+              notGenerated: { tag: NOT_GENERATED, command: "npx loupe generate" },
+            }}
             words={INSPECTOR_WORDS}
             onBack={said("back")}
-            {...IDENTITY}
-            status={NOT_GENERATED}
-            keys={[]}
-            tags={[]}
-            chips={[]}
-            crumbs={[]}
-            notGenerated={{ tag: NOT_GENERATED, command: "npx loupe generate" }}
           />
         </Card>
         <Card look="divided">
           <Identity
+            identity={GONE}
             words={INSPECTOR_WORDS}
             onBack={said("back")}
-            {...GONE}
             actions={
               <Button size="small" onClick={said("reset this Instance")}>
                 Reset this Instance
@@ -710,6 +761,54 @@ function ListPatternStates() {
       </Frame>
       <Frame title="AppearsOnInteraction">
         <AppearsOnInteraction components={INTERACTION} words={LIST_WORDS} />
+      </Frame>
+      <p className="wb-note">Last: {last}</p>
+    </div>
+  );
+}
+
+/**
+ * The notices, the change list and the Feature flags card with sample panel-view data, as
+ * the list draws them. Copy and every write are said under the cards rather than made; a
+ * copy refused here is a copy that rejects.
+ */
+function NoticePatternStates() {
+  const [last, setLast] = useState("—");
+  const onCopy = (text: string) => {
+    setLast(`copy ${text}`);
+    return Promise.resolve();
+  };
+  return (
+    <div className="wb-states">
+      <Frame title="Notice: amber, with rows and the command">
+        <Notice notice={STALE_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
+        <Notice notice={NOT_GENERATED_NOTICE} words={COMMAND_WORDS} onCopy={() => Promise.reject(new Error("refused"))} />
+      </Frame>
+      <Frame title="Notice: red, with a command and without">
+        <Notice notice={MISSING_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
+        <Notice notice={OVERRIDES_OFF_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
+      </Frame>
+      <Frame title="CommandLine: a command with its prompt, a line without, and a copy the clipboard refuses">
+        <CommandLine text={COMMAND} words={COMMAND_WORDS} onCopy={onCopy} />
+        <CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={COMMAND_WORDS} onCopy={onCopy} />
+        <CommandLine text={COMMAND} words={COMMAND_WORDS} onCopy={() => Promise.reject(new Error("refused"))} />
+      </Frame>
+      <Frame title="ChangeList: the last change's Instance isn't mounted">
+        <ChangeList changes={CHANGES} words={LIST_WORDS} onSelect={(id) => setLast(`select ${id}`)} onHover={() => {}} />
+      </Frame>
+      <Frame title="FlagsCard: one previewed, a write refused">
+        <FlagsCard
+          flags={FLAGS}
+          busy={false}
+          onPreview={(key, value) => setLast(`preview ${key} ${JSON.stringify(value)}`)}
+          onClear={(key) => setLast(`clear ${key}`)}
+          onClearAll={() => setLast("clear all")}
+          words={COMMAND_WORDS}
+          onCopy={onCopy}
+        />
+      </Frame>
+      <Frame title="FlagsCard: previews off, folded to one line (open it for why)">
+        <FlagsCard flags={FLAGS_OFF} busy={false} onPreview={() => {}} onClear={() => {}} onClearAll={() => {}} words={COMMAND_WORDS} onCopy={onCopy} />
       </Frame>
       <p className="wb-note">Last: {last}</p>
     </div>
@@ -813,6 +912,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <section className="wb-bare">
             <h2>Patterns: the list</h2>
             <ListPatternStates />
+          </section>
+          <section className="wb-bare">
+            <h2>Patterns: notices, changes and flags</h2>
+            <NoticePatternStates />
           </section>
         </div>
       </Surface>

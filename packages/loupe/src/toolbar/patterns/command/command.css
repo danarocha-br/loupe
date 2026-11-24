@@ -1,0 +1,20 @@
+/*
+ * CommandLine (ADR 0003): written against `[data-command-block]` and its parts
+ * (`[data-command]`, `[data-command-text]`, `[data-command-copy]`, `[data-command-refused]`).
+ * Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* The command in a well, 38px at least: 12px mono on a 16px line, Copy on the card's white at the right. */
+[data-command] {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-inset); min-height: 38px;
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-card); border-radius: var(--radius-well);
+  background: var(--well); font: var(--font-mono); line-height: 1.3333; color: var(--ink);
+}
+/* Its spaces as the shell reads them: a quoted path's run of spaces stays. */
+[data-command-text] { white-space: pre-wrap; }
+[data-command-copy] { height: 28px; padding: 0 var(--space-row); background: var(--card); }
+@media (hover: hover) { [data-command-copy]:hover { background: var(--sunk-hover); } }
+
+/* What to do when the clipboard refuses it: 12px, muted, 6px under the well; nothing while it is empty. */
+[data-command-refused] { font: var(--font-caption); color: var(--muted); }
+[data-command-refused]:not(:empty) { margin-top: var(--space-sheet); }

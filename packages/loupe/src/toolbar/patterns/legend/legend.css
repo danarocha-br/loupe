@@ -1,0 +1,20 @@
+/*
+ * Legend (ADR 0003): written against `[data-legend]` and `[data-legend-mark]` (which mark).
+ * Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* A row 34px at least, its words 42px in, under the prop rows' names: 11px, faint, wrapping 8px apart. */
+[data-legend] {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-hair) var(--space-inset); min-height: 34px;
+  padding: var(--space-row) var(--space-gutter) var(--space-row) 42px; font: var(--font-meta); color: var(--faint);
+}
+[data-legend] > span { display: inline-flex; align-items: center; gap: var(--space-xs); }
+
+/* Each mark as the chips draw it: a 10px swatch of what shows now, a ring for the app's value, a 4px dot for the default. */
+[data-legend-mark] { flex: none; width: 10px; height: 10px; border-radius: var(--radius-swatch); }
+[data-legend-mark="shown"] { background: var(--shown); }
+[data-legend-mark="app"] { box-shadow: inset 0 0 0 1px var(--field-edge); }
+[data-legend-mark="default"] { width: 4px; height: 4px; margin: 0 var(--space-hair) 0 var(--space-xs); border-radius: var(--radius-edge); background: var(--faint); }
+
+/* Forced colours drop the fill and the ring: each mark is drawn in the text's colour. */
+@media (forced-colors: active) { [data-legend-mark] { forced-color-adjust: none; background: CanvasText; } }

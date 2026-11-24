@@ -1,6 +1,6 @@
 /*
  * Marks (ADR 0003): written against `[data-keys]`, `[data-status]` (its kind),
- * `[data-held-values]`, `[data-meta]` and `[data-hue]`. Values from the tokens. In the
+ * `[data-held-values]`, `[data-dot-title]`, `[data-meta]` and `[data-hue]`. Values from the tokens. In the
  * stylesheet's `patterns` layer.
  */
 
@@ -21,6 +21,9 @@
 
 /* A held record's values: a line each, 11px mono, muted, 6px over what follows. */
 [data-held-values] { list-style: none; margin: 0; padding: 0 0 var(--space-sheet); font: var(--font-mono-small); color: var(--muted); }
+
+/* A card's title that leads with a dot, 8px before its words, at 500. */
+[data-dot-title] { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; font-weight: 500; }
 
 /* What counts a card's title: 11px, faint, tabular figures, on one line. */
 [data-meta] { font: var(--font-meta); color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }

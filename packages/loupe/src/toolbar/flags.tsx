@@ -1,22 +1,16 @@
-// Feature-flag preview (PER-132): the Feature flags card. Feature flags are the
+// Feature-flag preview (PER-132): the Feature flags card's view. Feature flags are the
 // MVP's only rule preview (PER-92). What it shows, and what the Proposal reads, is
-// `flags-store.ts`'s (PER-216); the card only renders the store and asks it to
-// preview or clear.
+// `flags-store.ts`'s (PER-216); what it says is panel-view's (`flagsCard()`), and the card
+// is patterns/flags-card/'s. This view asks the store to preview or clear, one write at a
+// time, says a refused write, and keeps the keyboard in the card as Clear goes.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { formatCurrent } from "./format.js";
-import type { FlagDefinition, FlagOption, FlagOverrides, FlagValue } from "./flags-preview.js";
-import { PREVIEW_HOURS } from "./flags-lifetime.js";
-import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
-import { ClockIcon, ResetIcon } from "./ui/icon/icon.js";
-import { Command } from "./command.js";
-import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Row, RowAction, RowLine, RowName, useAnnounceChange } from "./ui/index.js";
-
-/** A flag with no declared options is offered as on and off. */
-const ON_OFF: FlagOption[] = [
-  { value: false, label: "Off" },
-  { value: true, label: "On" },
-];
+import { copyToClipboard } from "./clipboard.js";
+import type { FlagOverrides } from "./flags-preview.js";
+import { flagsView, loadFlags, onFlagsChange, previewFlags } from "./flags-store.js";
+import { COMMAND_WORDS, flagsCard } from "./panel-view/index.js";
+import { FlagsCard as FlagsCardPattern } from "./patterns/index.js";
+import { useAnnounceChange } from "./ui/index.js";
 
 /** A flag's options are one radio group, one Tab stop: the radio that holds it. */
 const TAB_STOP = '[role="radio"][tabindex="0"]';
@@ -61,151 +55,16 @@ export function FlagsCard() {
     });
   };
 
-  const meta =
-    current.status === "ready"
-      ? `${current.definitions.length} declared · ${Object.keys(current.overrides).length} previewing`
-      : current.status === "unavailable"
-        ? "Unavailable"
-        : null;
   return (
-    <Card className="flags" ref={card}>
-      <CardHead>
-        <h3>Feature flags</h3>
-        {meta && <span className="meta">{meta}</span>}
-      </CardHead>
-      {current.status === "loading" && <div className="muted">Reading the app’s flags…</div>}
-      {current.status === "unavailable" && (
-        // One line until it's opened: the fix is an engineer's, and the list comes first.
-        <Fold className="off">
-          <FoldTrigger>
-            <Dot tone="amber" small />
-            Flag previews are off
-            <span className="muted"> · why</span>
-            <FoldChevron />
-          </FoldTrigger>
-          <FoldPanel>
-            <div className="why">
-              <div className="muted">{current.reason}</div>
-              {/* The one fix the reader makes in a file: say which and where. */}
-              {current.reason.startsWith("FLAGS_SECRET isn't set") && <Command text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} />}
-            </div>
-          </FoldPanel>
-        </Fold>
-      )}
-      {current.status === "ready" && (
-        <>
-          {current.definitions.length === 0 && <div className="muted">The app declares no flags.</div>}
-          {current.definitions.map((definition) => (
-            <FlagRow
-              key={definition.key}
-              definition={definition}
-              overrides={current.overrides}
-              busy={busy}
-              onPreview={(value) => void run({ [definition.key]: value }, [])}
-              onClear={(from) => clearing(from, run({}, [definition.key]))}
-            />
-          ))}
-          {Object.keys(current.overrides)
-            .filter((key) => !current.definitions.some((definition) => definition.key === key))
-            .map((key) => (
-              <FlagRow
-                key={key}
-                definition={{ key, description: "Not declared by the app’s discovery endpoint." }}
-                overrides={current.overrides}
-                busy={busy}
-                undeclared
-                onPreview={() => {}}
-                onClear={(from) => clearing(from, run({}, [key]))}
-              />
-            ))}
-          {current.error && (
-            <div className="warn">
-              <Dot tone="amber" />
-              {current.error}
-            </div>
-          )}
-          <div className="lasts">
-            <ClockIcon />
-            <span>
-              A preview lasts {PREVIEW_HOURS} hours, in a cookie every app on localhost shares. Clear it before
-              switching projects.
-            </span>
-          </div>
-          <Button
-            className="clear"
-            disabled={busy || Object.keys(current.overrides).length === 0}
-            onClick={(event) => clearing(event.currentTarget, run({}, "all"))}
-          >
-            <ResetIcon />
-            Clear flag previews
-          </Button>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function FlagRow({
-  definition,
-  overrides,
-  busy,
-  undeclared = false,
-  onPreview,
-  onClear,
-}: {
-  definition: FlagDefinition;
-  overrides: FlagOverrides;
-  busy: boolean;
-  undeclared?: boolean;
-  onPreview(value: FlagValue): void;
-  /** Given the Clear button, so focus can move on once it has gone. */
-  onClear(from: HTMLElement): void;
-}) {
-  const previewing = Object.hasOwn(overrides, definition.key);
-  const value = overrides[definition.key];
-  const options = definition.options ?? (undeclared ? [] : ON_OFF);
-  // Chips take string values: each option by its place in the list.
-  const checked = previewing ? options.findIndex((option) => sameFlagValue(option.value, value)) : -1;
-  const shown = options[checked];
-  return (
-    <Row look="ruled" className={previewing ? "flag overridden" : "flag"} data-flag={definition.key}>
-      <RowLine>
-        <Dot tone={previewing ? "lilac" : "hollow"} small />
-        <RowName mono>{definition.key}</RowName>
-        {previewing && (
-          <RowAction>
-            <Button size="small" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>
-              <ResetIcon />
-              Clear
-            </Button>
-          </RowAction>
-        )}
-      </RowLine>
-      {definition.description && <div className="muted">{definition.description}</div>}
-      {!definition.options && !undeclared && <div className="muted">No options declared: offered as on and off.</div>}
-      <div className="foot">
-        {options.length > 0 && (
-          // One of a flag's options, or none while the app decides: a radio group with nothing checked.
-          <ChipGroup
-            label={definition.key}
-            value={checked === -1 ? null : String(checked)}
-            busy={busy}
-            onChoose={(index) => {
-              const option = options[Number(index)];
-              if (option) onPreview(option.value);
-            }}
-          >
-            {options.map((option, index) => (
-              <Chip key={JSON.stringify(option.value)} value={String(index)}>
-                {option.label ?? formatCurrent(option.value)}
-              </Chip>
-            ))}
-          </ChipGroup>
-        )}
-        <div className="state">
-          {previewing ? `Previewing ${shown?.label ?? formatCurrent(value)}` : "App decides"}
-        </div>
-      </div>
-    </Row>
+    <FlagsCardPattern
+      ref={card}
+      flags={flagsCard(current)}
+      busy={busy}
+      onPreview={(key, value) => void run({ [key]: value }, [])}
+      onClear={(key, from) => clearing(from, run({}, [key]))}
+      onClearAll={(from) => clearing(from, run({}, "all"))}
+      words={COMMAND_WORDS}
+      onCopy={copyToClipboard}
+    />
   );
 }

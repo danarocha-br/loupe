@@ -8,7 +8,7 @@ import type { NoteKind } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
-import type { InspectOnlyReason, InspectorWords, ListWords, StatusTag, Tag, ValueText } from "./types.js";
+import type { CommandWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, Tag, ValueText } from "./types.js";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";
@@ -134,6 +134,7 @@ export const INSPECTOR_WORDS: InspectorWords = {
   resetScope: "Reset this scope",
   serverRendered: "Server-rendered",
   leftOutUnmounted: "Left out, not mounted",
+  legend: { shown: "Shows now", app: "App’s value", default: "Default" },
 };
 
 /** The list's patterns' words (types.ts `ListWords`). */
@@ -154,6 +155,17 @@ export const LIST_WORDS: ListWords = {
   onPage: { title: "On this page", rows: "Components on this page", map: "Page map" },
   held: { title: "Held for review", discard: "Discard" },
   interaction: { title: "Appears on interaction", meta: "Not on screen yet", seen: TEXT.seenNotMounted },
+  changes: { title: "Changes", meta: "numbered as in the Proposal" },
+  change: INSPECTOR_WORDS.change,
+};
+
+/** A command's Copy button (types.ts `CommandWords`). */
+export const COMMAND_WORDS: CommandWords = {
+  prompt: "$ ",
+  copy: "Copy",
+  copied: "Copied",
+  failed: "Copy failed",
+  refused: "Couldn’t reach the clipboard. Select the command and copy it.",
 };
 
 /** A button that inspects what it names: "Inspect Ana Souza". */
@@ -428,5 +440,3 @@ export const NO_EDITABLE_NOTE = {
   text: "None of its props has a set of values or label text to try, so Loupe can show them but not change them.",
 } as const;
 
-/** The legend under the first table that marks a default: what its marks mean, said once. */
-export const LEGEND = { shown: "Shows now", app: "App’s value", default: "Default" } as const;

@@ -1,13 +1,14 @@
 // Marks (ADR 0003, DESIGN.md "Layers"): the small marks the Inspector's patterns and the
 // list share. A change's delta and an Instance's row of them, a held State prop's empty
 // delta, a verdict's status chip, a tag in panel-view's words, a name that breaks only
-// between its words, a held record's values, and the count beside a card's title. Primitives
-// composed: Delta, Tag and the check icon. A component's hue is CSS alone (`[data-hue]`).
-// See marks.md.
+// between its words, a held record's values, a card title that leads with a dot, and the
+// count beside a card's title. Primitives composed: Delta, Dot, Tag and the check icon. A
+// component's hue is CSS alone (`[data-hue]`). And `hovering()`, the handlers that outline
+// what a row names on the page while it is pointed at or focused. See marks.md.
 
 import { Fragment, type ReactNode } from "react";
-import type { InspectorWords, StatusTag, Tag as TagText } from "../../panel-view/index.js";
-import { CheckIcon, Delta, Tag, type TagLook } from "../../ui/index.js";
+import type { InspectorWords, StatusText, Tag as TagText } from "../../panel-view/index.js";
+import { CheckIcon, Delta, Dot, type DotTone, Tag, type TagLook } from "../../ui/index.js";
 
 /**
  * A prop's or a component's name, free to break only where its words meet:
@@ -50,8 +51,8 @@ export function Keys({ keys, words }: { keys: readonly number[]; words: Pick<Ins
   );
 }
 
-/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. */
-export type Status = { kind?: StatusTag["kind"]; text: string };
+/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. panel-view's `StatusText`. */
+export type Status = StatusText;
 
 /** A verdict in words. Supported is the rule, so the list says only the exceptions; `check` leads Supported with a tick. */
 export function StatusChip({ status, title, check }: { status: Status; title?: string | null; check?: boolean }) {
@@ -92,4 +93,29 @@ export function HeldValues({ values }: { values: readonly string[] }) {
 /** What counts a card's title, at the head's right: "9 components · 43 Instances", "2 · apply to nothing". */
 export function Meta({ children }: { children: ReactNode }) {
   return <span data-meta="">{children}</span>;
+}
+
+/** A card's title that leads with a dot: the notice's tone, the held record's ring. Its words may be a heading. */
+export function DotTitle({ tone, children }: { tone: DotTone; children: ReactNode }) {
+  return (
+    <div data-dot-title="">
+      {/* Dot's props are a union, a ring taking no size: each branch names its own. */}
+      {tone === "ring" ? <Dot tone="ring" /> : <Dot tone={tone} />}
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Pointing at or focusing what names some Instances outlines them on the page, and leaving
+ * it clears them. Spread on the element: `onMouseOver`, never `onMouseEnter`, which React
+ * drops for a pointer that comes straight from an App Router page.
+ */
+export function hovering(onHover: (ids: string[]) => void, ids: string[]) {
+  return {
+    onMouseOver: () => onHover(ids),
+    onMouseLeave: () => onHover([]),
+    onFocus: () => onHover(ids),
+    onBlur: () => onHover([]),
+  };
 }

@@ -1,0 +1,15 @@
+/*
+ * Notice and InstanceNote (ADR 0003): written against `[data-notice]` (its kind) and its
+ * parts (`[data-notice-body]`, `[data-notice-rows]`), and `[data-instance-note]`. The card
+ * is Card's (ui/card/), the rows Row `ruled`'s (ui/row/), the title Marks' `DotTitle`, the
+ * command CommandLine's. Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* A notice's parts sit 8px apart, closer than a card's 10px: one message, read top to bottom. */
+[data-notice] { gap: var(--space-inset); }
+/* What it says, 13px on a 19px line, muted. */
+[data-notice-body], [data-instance-note-text] p { font: var(--font-paragraph); color: var(--muted); }
+[data-notice-rows] { list-style: none; margin: 0; padding: 0; }
+
+/* An Instance's note: its title over its paragraph, 4px apart. */
+[data-instance-note-text] { display: flex; flex-direction: column; gap: var(--space-xs); }

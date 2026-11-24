@@ -1,0 +1,31 @@
+/*
+ * InspectOnly (ADR 0003): written against `[data-inspect-fold]` and its parts
+ * (`[data-inspect-fold-glyph]`, `[data-inspect-fold-title]`, `[data-inspect-fold-names]`,
+ * `[data-inspect-fold-why]`, `[data-inspect-fold-rows]`, `[data-inspect-fold-empty]`,
+ * `[data-inspect-fold-injected]`), and Fold's trigger and chevron inside it. Values from the
+ * tokens. In the stylesheet's `patterns` layer.
+ */
+
+[data-inspect-fold] { overflow: hidden; }
+
+/* The folded row, 44px at least, as a prop row: the eye in the 20px glyph column, the title, what counts it, the chevron. */
+[data-inspect-fold] > [data-fold] > [data-fold-trigger] {
+  display: grid; grid-template-columns: 20px minmax(0, 1fr) auto 16px; align-items: center; column-gap: var(--space-inset);
+  min-height: 44px; padding: var(--space-card) var(--space-gutter);
+}
+@media (hover: hover) { [data-inspect-fold] > [data-fold] > [data-fold-trigger]:hover { background: var(--hover); } }
+[data-inspect-fold] > [data-fold] > [data-fold-trigger]:focus-visible { outline-offset: -2px; }
+[data-inspect-fold-glyph] { color: var(--ink); }
+[data-inspect-fold] > [data-fold] > [data-fold-trigger] > [data-fold-chevron] { color: var(--muted); }
+
+/* The title on one line, its props after it while folded, in 12px, muted. */
+[data-inspect-fold-title] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--font-title); letter-spacing: var(--tracking-title); }
+/* Its line height the title's, as it sits on the title's line. */
+[data-inspect-fold-names] { font: var(--font-option); line-height: inherit; letter-spacing: 0; color: var(--muted); }
+
+/* Opened: the one cause, then the props in pairs, then the library's, each 42px in, under the title. */
+[data-inspect-fold-why] { padding: 0 var(--space-gutter) var(--space-inset) 42px; font: var(--font-caption); color: var(--muted); }
+[data-inspect-fold-rows] { display: flex; flex-direction: column; padding: 0 var(--space-gutter) var(--space-inset) 42px; }
+[data-inspect-fold-empty] { color: var(--muted); }
+[data-inspect-fold-injected] { padding: 0 var(--space-gutter) var(--space-card) 42px; }
+[data-inspect-fold-injected] > [data-fold-trigger] { display: flex; align-items: center; gap: var(--space-sheet); min-height: 28px; font: var(--font-option); line-height: inherit; color: var(--muted); }
