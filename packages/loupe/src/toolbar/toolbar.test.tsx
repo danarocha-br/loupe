@@ -131,6 +131,8 @@ const type = async (field: HTMLTextAreaElement, text: string) => {
 const scopeButton = (scope: string) => shadow().querySelector<HTMLButtonElement>(`[data-scope=${scope}]`) as HTMLButtonElement;
 /** The panel, for Testing Library's role queries. */
 const screen = () => within(shadow() as unknown as HTMLElement);
+/** The view's heading: each view has one level-2 heading, its own, where focus goes. */
+const viewHeading = () => screen().getByRole("heading", { level: 2 });
 /** A header select tool: a radio in the "Select" group, checked for the mode. */
 const selectTool = (name: "Select one" | "Select multiple") =>
   within(screen().getByRole("radiogroup", { name: "Select" })).getByRole("radio", { name });
@@ -554,7 +556,7 @@ describe("group and page scopes", () => {
       loupe.set(BIA, "children", "Membro", "group");
     });
     await settle();
-    await clickInPanel(row("children").querySelector(".keeping") as HTMLButtonElement);
+    await clickInPanel(within(row("children")).getByRole("button", { name: /keeps its own value$/ }));
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(ANA);
     expect(selectTool("Select one").getAttribute("aria-checked")).toBe("true");
   });
@@ -945,6 +947,8 @@ describe("the Text row (PER-137)", () => {
     expect(enter.defaultPrevented).toBe(true);
     await type(textField(), "Bianca\nSouza");
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca Souza" });
+    // The field shows what was written, still focused: no second line waits for a blur.
+    expect(textField().value).toBe("Bianca Souza");
 
     await type(textField(), "");
     expect(loupe.props(BIA).overrides).toEqual({ children: "" });
@@ -1012,12 +1016,12 @@ describe("keyboard focus (review 2026-11-20)", () => {
     const bia = instanceButtons().find((button) => button.dataset.instance === BIA) as HTMLButtonElement;
     focusIn(bia);
     await clickInPanel(bia);
-    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    expect(shadow().activeElement).toBe(viewHeading());
     const back = panelButton("All components");
     focusIn(back);
     await clickInPanel(back);
     expect(panelText()).toContain("What do you want to change?");
-    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    expect(shadow().activeElement).toBe(viewHeading());
   });
 
   it("moves focus to the Gone view's heading when the selected Instance unmounts under it", async () => {
@@ -1032,13 +1036,13 @@ describe("keyboard focus (review 2026-11-20)", () => {
     expect(panelText()).toContain("Not on the page now");
     // Still in the shadow root, not dropped to the page's <body>.
     expect(document.activeElement).toBe(document.querySelector(`[${HOST_ATTRIBUTE}]`));
-    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    expect(shadow().activeElement).toBe(viewHeading());
     // And back to the Inspector's heading when it mounts again.
     focusIn(panelButton("All components"));
     act(() => pageButton("Abrir").click());
     await settle();
     expect(shadow().querySelector("[data-testid=instance-id]")?.getAttribute("data-id")).toBe(CONFIRM);
-    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    expect(shadow().activeElement).toBe(viewHeading());
   });
 
   it("moves focus to the heading when Widen widens an Instance with no call site, and takes its button away", async () => {
@@ -1048,12 +1052,12 @@ describe("keyboard focus (review 2026-11-20)", () => {
     await select(loose);
     await clickInPanel(selectTool("Select multiple"));
     await escape();
-    const widen = shadow().querySelector<HTMLButtonElement>("button.widen[data-scope=page]") as HTMLButtonElement;
+    const widen = screen().getByRole("button", { name: /^Widen to All on page/ });
     expect(widen.textContent).toContain("Widen to");
     focusIn(widen);
     await clickInPanel(widen);
-    expect(shadow().querySelector("button.widen")).toBeNull();
-    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    expect(screen().queryByRole("button", { name: /^Widen to/ })).toBeNull();
+    expect(shadow().activeElement).toBe(viewHeading());
   });
 
   it("leaves focus alone when nothing in the panel had it, as after a pick on the page", async () => {
@@ -1083,7 +1087,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
       await mount();
       expect(document.querySelector(`[${HOST_ATTRIBUTE}]`)?.getAttribute("lang")).toBe("en");
       await select(BIA);
-      expect(shadow().querySelector("h2.name")?.getAttribute("lang")).toBe("pt-BR");
+      expect(viewHeading().getAttribute("lang")).toBe("pt-BR");
     } finally {
       document.documentElement.removeAttribute("lang");
     }
@@ -1097,7 +1101,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     expect(tab.getAttribute("aria-label")).toBe("Show Loupe");
     expect(shadow().activeElement).toBe(tab);
     await clickInPanel(tab);
-    expect(shadow().activeElement).toBe(shadow().querySelector("h2.name"));
+    expect(shadow().activeElement).toBe(viewHeading());
   });
 
   it("says the status strip's words through the announcer as they change, once, and the count as it changes", async () => {

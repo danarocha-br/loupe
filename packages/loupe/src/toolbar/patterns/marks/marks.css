@@ -1,0 +1,19 @@
+/*
+ * Marks (ADR 0003): written against `[data-keys]` and `[data-status]` (its kind). Values
+ * from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* A row of change deltas: side by side, never shrinking in a line. */
+[data-keys] { display: inline-flex; gap: var(--space-hair); flex: none; }
+
+/*
+ * A status chip: 16px, a full pill, 10px mono at 500; green for Supported, amber for not
+ * generated. Its transparent outline is drawn by forced colours, which drop the fill.
+ */
+[data-status] {
+  display: inline-flex; align-items: center; gap: var(--space-xs); flex: none; height: 16px; padding: 0 7px 0 6px;
+  border-radius: var(--radius-pill); background: var(--sunk); font: var(--font-chip); color: var(--muted); white-space: nowrap;
+  outline: 1px solid transparent; outline-offset: -1px;
+}
+[data-status="supported"] { background: var(--ok-bg); color: var(--ok-fg); }
+[data-status="not-generated"] { background: var(--warn-bg); color: var(--warn-fg); }

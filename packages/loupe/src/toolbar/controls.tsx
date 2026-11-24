@@ -1,21 +1,15 @@
-// A prop row of the inspector and its control (PER-131, PER-134, PER-137): options
-// for a closed set, a field for label text, the app's own value beside an Override,
-// Reset, and the holding notice for a State prop (PER-96). Since Paper's "Inspector as
-// property rows" (2026-11-22) a closed set is a row of chips with the chosen one in
-// salmon, and a true/false prop is a switch; a row that shows an Override carries its change's
-// revision delta before its name, or an empty dashed delta for a held State prop,
-// which the Proposal shows as a state, not a numbered change.
-//
-// The row comes decided from `panelView()` (PER-214); this file draws it, makes the
-// write its data names, and keeps the Text field's unsent text while it has focus.
+// A prop row's writes (PER-131, PER-134, PER-137): PropRow (patterns/prop-row/) draws the
+// row `panelView()` decided; this file gives it the runtime's calls. A chip or a switch
+// sets its value, label text is kept to one line as it is typed (the runtime's rule, which
+// the field shows too), Reset drops the prop's
+// Override, and "1 of 4 keeps its own value" selects the one it names.
 
-import { Fragment, type ReactNode, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
-import { LockIcon, ResetIcon } from "./icons.js";
-import { type Control, type PropItem, sourceText, TEXT, THIS_INSTANCE, type ValueText } from "./panel-view/index.js";
+import { INSPECTOR_WORDS, type PropItem } from "./panel-view/index.js";
+import { PropRow } from "./patterns/index.js";
 import type { SelectMode } from "./picker.js";
-import { Button, Chip, ChipGroup, Delta, Field, Row, RowAction, RowLine, type RowLook, RowName, RowValue, Switch, Tag, useAnnounceChange } from "./ui/index.js";
+import type { RowLook } from "./ui/index.js";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The
@@ -29,78 +23,9 @@ export function attempt(write: () => void): void {
   }
 }
 
-/** The app's value: written, the metadata's default, or a muted `not set`. Never recased: values are exact. */
-function ValueView({ value }: { value: ValueText }) {
-  if (value.kind === "default") return <span className="default" title="The component’s default: the call site doesn’t set it">{value.text}</span>;
-  if (value.kind === "unset") return <span className="muted">{value.text}</span>;
-  return <>{value.text}</>;
-}
-
-/** One change's revision delta, with the number the page's cloud and the Proposal's change id show. */
-export function Key({ n }: { n: number }) {
-  // Read as "Change 1", not a bare "1": the number means nothing without what it numbers.
-  return <Delta n={n} label={`Change ${n}`} title={`Change ${n} in the Proposal`} />;
-}
-
-/**
- * A prop's or a component's name, free to break only where its words meet:
- * `focusable·When·Disabled`, `AlertDialog·Content`, never mid-word.
- */
-export function Breakable({ text }: { text: string }) {
-  const parts = text.split(/(?<=[a-z0-9])(?=[A-Z])/);
-  return (
-    <>
-      {parts.map((part, index) => (
-        <Fragment key={index}>
-          {index > 0 && <wbr />}
-          {part}
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-/** A held State prop's mark: an empty dashed delta, since the Proposal shows it as a state, not a numbered change. */
-export function HeldKey() {
-  return <Delta title="Held by your Override: shown as a state in the Proposal" />;
-}
-
-/** Before the name: the change's delta, an empty dashed one for a held State prop, or nothing. */
-function KeySlot({ item }: { item: PropItem }) {
-  if (item.key !== null) return <Key n={item.key} />;
-  if (item.dot === "on") return <HeldKey />;
-  return null;
-}
-
-type Options = Extract<Control, { kind: "options" }>;
-
-/** A true/false prop, drawn as a switch rather than two options. */
-function switchOf(control: Control | null): (Options & { on: boolean }) | null {
-  if (control?.kind !== "options" || control.options.length !== 2) return null;
-  const values = control.options.map((option) => option.value);
-  if (!values.includes(true) || !values.includes(false)) return null;
-  // At a scope whose members differ, neither is pressed: it reads off.
-  return { ...control, on: control.options.some((option) => option.value === true && option.pressed) };
-}
-
-/** An option's label in the table: a string without its quotes, which the Proposal and the change line keep. */
-function bare(label: string): string {
-  return /^".+"$/.test(label) ? label.slice(1, -1) : label;
-}
-
-/** Label text left empty: the row says so, as the field shows nothing. */
-function EmptyTag() {
-  return (
-    <Tag look="empty" data-testid="empty">
-      {TEXT.empty}
-    </Tag>
-  );
-}
-
 export function PropRowView({
   item,
-  look = "inset",
-  glyph,
+  look,
   debug,
   onSelect,
   onHover,
@@ -108,223 +33,21 @@ export function PropRowView({
   item: PropItem;
   /** `inset` in the Inspector's card; `pair` under Inspect only, name and value side by side. */
   look?: RowLook;
-  /** What the prop does, in the row's glyph column. */
-  glyph?: ReactNode;
   debug: LoupeDebug;
   onSelect(id: string, mode?: SelectMode): void;
   onHover(ids: string[]): void;
 }) {
-  const { reset } = item;
-  // The app pushing back on a held value is news while the row is in view: said as it lands.
-  useAnnounceChange(item.held?.text ?? "");
-  const toggle = switchOf(item.control);
-  const resetButton = reset && (
-    <Button
-      size="small"
-      iconOnly={toggle !== null}
-      className="reset"
-      title={toggle ? reset.label : undefined}
-      onClick={(event) => {
-        // Reset goes once there is nothing to reset: focus moves to the row's own control, not out of the panel.
-        const control = event.currentTarget
-          .closest("[data-row]")
-          ?.querySelector<HTMLElement>('[role="radio"][tabindex="0"], [role="switch"], textarea');
-        attempt(() => debug.reset(reset.write.id, reset.write.prop, reset.write.scope));
-        control?.focus();
-      }}
-    >
-      <ResetIcon />
-      {toggle ? <span className="sr-only">{reset.label}</span> : reset.label}
-    </Button>
-  );
-  const { keeping } = item;
-  // At a scope a switch speaks for its members while they agree; the counts show only once they differ.
-  const mixed = toggle !== null && toggle.options.filter((option) => (option.count ?? 0) > 0).length > 1;
-  // The table shows the chosen option and the field shows the text: the line keeps the value only for a row without either.
-  const shown = item.control === null || item.control.kind === "refused";
-  // Where a value comes from matters once it comes from a wider scope than the one in view:
-  // at This instance, a group or page Override's; at a scope, the card is that scope already.
-  const wider = item.source !== null && item.counts === null && item.source !== sourceText(THIS_INSTANCE);
   return (
-    <Row look={look} glyph={glyph} className={item.overridden ? "overridden" : undefined} data-prop={item.name}>
-      <div className="head-group">
-        <RowLine>
-          {item.dot && <KeySlot item={item} />}
-          {/* The label and its code name together in the tooltip; the name itself wraps between its words. */}
-          <RowName code={item.codeName ?? undefined} title={item.codeName ? `${item.label} (${item.codeName})` : item.label}>
-            <Breakable text={item.label} />
-          </RowName>
-          {/* Label text left empty sits beside the name at This instance, and after the counts at a scope. */}
-          {item.empty && item.counts === null && <EmptyTag />}
-          {item.state && <Tag>{TEXT.state}</Tag>}
-          {!item.change && shown && item.value && (
-            <RowValue>
-              <ValueView value={item.value} />
-            </RowValue>
-          )}
-          {item.counts !== null && (!toggle || mixed) && <RowValue data-testid="counts">{item.counts}</RowValue>}
-          {item.empty && item.counts !== null && <EmptyTag />}
-          {item.reason && (
-            <Tag look="reason" title={item.reasonTitle ?? undefined}>
-              {item.reason}
-            </Tag>
-          )}
-          {/* The switch shows true or false itself; no word repeats it. */}
-          {((reset && !reset.inNotice) || toggle) && (
-            <RowAction>
-              {reset && !reset.inNotice && resetButton}
-              {toggle && <SwitchView control={toggle} label={item.label} debug={debug} />}
-            </RowAction>
-          )}
-        </RowLine>
-        {item.change && (
-          <div className="change" data-testid="change">
-            <span className="from">{item.change.from}</span>
-            <span className="arrow">
-              {" → "}
-            </span>
-            <span className="to">{item.change.to}</span>
-            {wider && (
-              <span className="from-scope" data-testid="source">
-                {" · "}
-                {item.source}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-      {item.explanation && <div className="explain">{item.explanation}</div>}
-      {item.control && !toggle && (
-        <ControlView
-          key={item.control.kind === "refused" ? "refused" : item.control.key}
-          control={item.control}
-          label={item.label}
-          app={item.change?.from ?? null}
-          debug={debug}
-        />
-      )}
-      {item.current && !item.change && (
-        <div className="current" data-testid="current">
-          <span className="meta">{TEXT.current}</span> <ValueView value={item.current} />
-        </div>
-      )}
-      {item.held && (
-        <div className="notice" data-testid="held">
-          {item.held.before} <code>{item.held.value}</code>
-          {item.held.middle} <code>{item.held.tried}</code>
-          {item.held.after} {reset?.inNotice && resetButton}
-        </div>
-      )}
-      {keeping && (
-        <button
-          type="button"
-          className="keeping"
-          onClick={() => onSelect(keeping.select, "one")}
-          // Over, not Enter, as every row of the panel (`Actions` in panel.tsx); focus outlines the same.
-          onMouseOver={() => onHover(keeping.ids)}
-          onMouseLeave={() => onHover([])}
-          onFocus={() => onHover(keeping.ids)}
-          onBlur={() => onHover([])}
-        >
-          {keeping.text}
-        </button>
-      )}
-    </Row>
-  );
-}
-
-/** A true/false prop's switch: on sets true, off sets false. */
-function SwitchView({ control, label, debug }: { control: Options & { on: boolean }; label: string; debug: LoupeDebug }) {
-  const { write } = control;
-  return <Switch label={label} checked={control.on} onCheckedChange={(on) => attempt(() => debug.set(write.id, write.prop, on, write.scope))} />;
-}
-
-/**
- * A closed set of options as chips: the value that shows now in salmon, the app's
- * own value ringed and tagged under an Override, the design system's default with a
- * dot after it, each with its count at a scope; a field for label text (PER-113); or why neither.
- */
-function ControlView({ control, label, app, debug }: { control: Control; label: string; app: string | null; debug: LoupeDebug }) {
-  if (control.kind === "refused") {
-    return (
-      <div className="refusal" data-testid={control.refusal}>
-        <LockIcon />
-        {control.text}
-      </div>
-    );
-  }
-  const { write } = control;
-  const set = (next: unknown) => attempt(() => debug.set(write.id, write.prop, next, write.scope));
-  if (control.kind === "options") {
-    // Chips take string values: each option by its type and value, which tells `1` from `"1"`.
-    const keyOf = (value: unknown) => `${typeof value}:${String(value)}`;
-    const checked = control.options.find((option) => option.pressed);
-    return (
-      <ChipGroup
-        label={label}
-        value={checked ? keyOf(checked.value) : null}
-        onChoose={(key) => {
-          const option = control.options.find((candidate) => keyOf(candidate.value) === key);
-          if (option) set(option.value);
-        }}
-      >
-        {control.options.map((option) => {
-          const isApp = option.label === app && !option.pressed;
-          const notes = [isApp && "the app’s value", option.isDefault && "the design system’s default"].filter(Boolean).join("; ");
-          return (
-            <Chip
-              key={keyOf(option.value)}
-              value={keyOf(option.value)}
-              tag={isApp ? "app" : undefined}
-              dot={option.isDefault}
-              count={option.count}
-              description={notes || undefined}
-              // The exact value and its marks for a pointer; the cell wraps the value in full.
-              title={notes ? `${option.label}: ${notes}` : option.label}
-              data-option={option.label}
-            >
-              {bare(option.label)}
-            </Chip>
-          );
-        })}
-      </ChipGroup>
-    );
-  }
-  return <TextField label={label} value={control.value} set={set} />;
-}
-
-/**
- * Label text (PER-113): one line, no length limit, applied while typing, and it
- * may be left empty. It wraps and grows to its text rather than scrolling. The row
- * shows the prop's name: the field says it to a screen reader.
- */
-function TextField({ label, value, set }: { label: string; value: string; set(next: string): void }) {
-  // The Toolbar redraws once a frame, so the field keeps its own text while it has focus,
-  // with the value that text was typed over.
-  const [draft, setDraft] = useState<{ text: string; from: string } | null>(null);
-  // Something else moved the value (a reset, another scope): drop the draft.
-  const stale = draft !== null && value !== draft.from && value !== draft.text;
-  if (stale) setDraft(null);
-  const text = draft === null || stale ? value : draft.text;
-  return (
-    <Field
-      label={label}
-      labelHidden
-      look="outline"
-      multiline
-      autoResize
-      rows={1}
-      className="text"
-      value={text}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") event.preventDefault();
-      }}
-      onValueChange={(typed) => {
-        const next = singleLine(typed);
-        setDraft({ text: next, from: value });
-        set(next);
-      }}
-      onBlur={() => setDraft(null)}
+    <PropRow
+      item={item}
+      words={INSPECTOR_WORDS}
+      look={look}
+      onSet={(write, value) => attempt(() => debug.set(write.id, write.prop, value, write.scope))}
+      onText={(write, text) => attempt(() => debug.set(write.id, write.prop, text, write.scope))}
+      oneLine={singleLine}
+      onReset={(write) => attempt(() => debug.reset(write.id, write.prop, write.scope))}
+      onSelect={(id) => onSelect(id, "one")}
+      onHover={onHover}
     />
   );
 }

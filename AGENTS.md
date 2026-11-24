@@ -10,8 +10,9 @@ Read `packages/loupe/DESIGN.md` first, its **Layers** section above all. It sets
 - the four layers (tokens, primitives, patterns, views);
 - the import rule between them:
   - nothing outside `packages/loupe/src/toolbar/ui/` imports UI SDK;
-  - `ui/` imports nothing from `panel-view/`, `runtime/` or the views;
-  - `src/toolbar/ui/layers.test.ts` enforces both;
+  - `ui/` imports nothing from `panel-view/`, `runtime/`, the patterns or the views;
+  - a pattern (`src/toolbar/patterns/`) imports only `ui/`, the tokens, other patterns and `panel-view`'s types;
+  - `src/toolbar/ui/layers.test.ts` enforces all three;
 - the layered stylesheet and the surface every primitive draws in.
 
 When you add or change a primitive:
@@ -19,6 +20,8 @@ When you add or change a primitive:
 - Move its call sites onto it in the same change.
 - Delete a view's test only once the primitive's own test covers the same behaviour.
 - Look at it on the fixture's `/workbench` page (`pnpm --filter @fixture/app dev`, development only).
+
+A pattern works the same way, in `src/toolbar/patterns/<pattern>/`: its `.css` in the `patterns` layer, against its own part attributes; a role-based test with axe in the surface; a `.md`; and sample panel-view data in `patterns/samples.ts` for its test and the workbench. It draws the words `panelView()` decided and builds none, and its callbacks make the writes, in the view.
 
 Primitives are built on UI SDK (`@ui-sdk/react`, `@ui-sdk/core`, pinned to one exact version). Its `ui-sdk` skill is installed at `.claude/skills/ui-sdk/`, copied from `node_modules/@ui-sdk/core/skills/ui-sdk/`. Refresh that copy when the pin moves. The installed docs are in `node_modules/@ui-sdk/react/docs/`; start at `llms.txt`.
 

@@ -8,7 +8,7 @@ import { formatCurrent } from "./format.js";
 import type { FlagDefinition, FlagOption, FlagOverrides, FlagValue } from "./flags-preview.js";
 import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
-import { ClockIcon, ResetIcon } from "./icons.js";
+import { ClockIcon, ResetIcon } from "./ui/icon/icon.js";
 import { Command } from "./command.js";
 import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Row, RowAction, RowLine, RowName, useAnnounceChange } from "./ui/index.js";
 

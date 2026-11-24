@@ -1,6 +1,8 @@
-// The Toolbar's icons, from the 2e sketch (PER-140) and Paper's "Inspector as property
-// rows" boards (2026-11-22). Stroked in `currentColor`, so each takes its colour from the
-// button it sits in, in light and dark. Strokes scale with the icon, as Paper draws them.
+// Icon (ADR 0003): the Toolbar's icons, from the 2e sketch (PER-140) and Paper's "Inspector
+// as property rows" boards (2026-11-22). Stroked in `currentColor`, so each takes its colour
+// from what it sits in, in light and dark. Strokes scale with the icon, as Paper draws them.
+// Always decoration: hidden from assistive technology, the words beside it say what it means.
+// A primitive so that patterns, which import only `ui/`, can draw them. See icon.md.
 
 import type { ReactNode } from "react";
 
@@ -8,6 +10,7 @@ function Icon({ size = 16, stroke = 1.5, children }: { size?: number; stroke?: n
   return (
     <svg
       className="icon"
+      data-icon=""
       width={size}
       height={size}
       viewBox="0 0 24 24"
@@ -72,7 +75,7 @@ export const ChevronIcon = () => (
 
 /** Select one: the arrow, as the Revision Set comp draws it. */
 export const CursorIcon = () => (
-  <svg className="icon" width="18" height="18" viewBox="238 238 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
+  <svg className="icon" data-icon="" width="18" height="18" viewBox="238 238 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" focusable="false">
     <path d="M247.171 248.005l5.315 17.434c0.354 1.16 1.906 1.232 2.341 0.121l2.854-6.582c0.212-0.535 0.675-0.959 1.24-1.09l7.272-1.705c1.17-0.273 1.21-1.928 0.131-2.352l-17.597-7.366c-1.08-0.454-1.866 0.535-1.553 1.544z" />
   </svg>
 );
@@ -81,6 +84,7 @@ export const CursorIcon = () => (
 export const SelectManyIcon = () => (
   <svg
     className="icon"
+    data-icon=""
     width="18"
     height="18"
     viewBox="238 238 36 36"
@@ -99,7 +103,7 @@ export const SelectManyIcon = () => (
 
 /** Light or dark: a half-filled circle. */
 export const ContrastIcon = () => (
-  <svg className="icon" width="16" height="16" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+  <svg className="icon" data-icon="" width="16" height="16" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
     <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
     <path d="M7 1.5A5.5 5.5 0 0 1 7 12.5Z" fill="currentColor" />
   </svg>
@@ -189,7 +193,7 @@ export const FileIcon = () => (
 
 /** The tree's elbow, from a parent to the component inside it. */
 export const ElbowIcon = () => (
-  <svg className="elbow" width="13" height="14" viewBox="0 0 13 14" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true" focusable="false">
+  <svg className="icon" data-icon="" width="13" height="14" viewBox="0 0 13 14" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true" focusable="false">
     <path d="M1 0V8a4 4 0 0 0 4 4H12" />
   </svg>
 );

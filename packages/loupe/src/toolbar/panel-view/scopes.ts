@@ -8,8 +8,25 @@ import { identityOf } from "../../runtime/registry.js";
 import { inScope, PRECEDENCE, reachOf, recordsFor, type Scope, type ScopeTarget, type Source, targetAt } from "../../runtime/store.js";
 import { formatCurrent } from "../format.js";
 import type { AppValue, Reads } from "./reads.js";
-import type { Member, MemberItem, MembersView, SiteItem } from "./types.js";
-import { groupName, keyOf, leftOutChip, moreOnPage, PAGE_LABEL, previewedText, REACHES, scopeLabel, siteLabel, TAGS, THIS_INSTANCE } from "./words.js";
+import type { Member, MemberItem, MembersView, ScopeOption, SiteItem } from "./types.js";
+import {
+  groupName,
+  instancesText,
+  keyOf,
+  leftOutChip,
+  moreOnPage,
+  PAGE_LABEL,
+  previewedText,
+  REACHES,
+  reachCount,
+  scopeLabel,
+  scopeMoveLabel,
+  scopeMoveVerb,
+  scopeTitle,
+  siteLabel,
+  TAGS,
+  THIS_INSTANCE,
+} from "./words.js";
 
 /** What each scope is called: "This instance", "All in MemberRowMenu", "All on page". Null: no group. */
 export type ScopeLabels = Record<Scope, string | null>;
@@ -161,6 +178,8 @@ export function membersView(
   name: (id: string) => string | null = () => null,
   /** The component's Instances the page scope reaches; the scope's own size when unknown. */
   pageSize: number = view.members.length + view.server.length,
+  /** The Inspector's scope options: the scope's name, and where the selection can move from it. */
+  options: readonly ScopeOption[] | null = null,
 ): MembersView {
   const { scope } = view;
   if (scope === "instance") throw new Error("[loupe] This instance has no members to list.");
@@ -198,10 +217,24 @@ export function membersView(
   const included = members.filter((member) => !member.out).length;
   // Server-rendered ones are counted but never changed: the page beyond the scope starts after them.
   const reached = members.length + view.server.length;
+  const current = options?.find((option) => option.scope === scope) ?? null;
+  // At a call site, widen to the page; at the page, narrow back to the call site.
+  const other = options?.find((option) => option.scope === (scope === "group" ? "page" : "group") && option.enabled) ?? null;
   return {
     scope,
+    name: scopeTitle(current?.label ?? null),
+    nameTitle: current?.title ?? null,
+    instancesText: instancesText(members.length),
+    widen: other && { scope: other.scope, text: `${scopeMoveVerb(scope)} ${scopeMoveLabel(other.label)}`, title: other.title ?? other.label },
     countText: previewedText(included, members.length),
-    reach: { lead: REACHES, included, total: members.length, page: Math.max(pageSize, reached), moreText: moreOnPage(pageSize - reached) },
+    reach: {
+      lead: REACHES,
+      included,
+      total: members.length,
+      page: Math.max(pageSize, reached),
+      moreText: moreOnPage(pageSize - reached),
+      countText: reachCount(included, members.length),
+    },
     suspended: isSuspended(view),
     members,
     sites,

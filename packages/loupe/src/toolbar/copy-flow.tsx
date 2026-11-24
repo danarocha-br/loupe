@@ -9,7 +9,7 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
-import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./icons.js";
+import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./ui/icon/icon.js";
 import { Button, Field, focusField, Popover, PopoverPanel, useAnnounce } from "./ui/index.js";
 
 /** Every word the flow shows, beside the component that shows it. */

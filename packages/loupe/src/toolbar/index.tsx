@@ -190,7 +190,8 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   const shown = useCallback(() => {
     if (!focusSwap.current) return;
     focusSwap.current = false;
-    host.shadowRoot?.querySelector<HTMLElement>("h2.name")?.focus();
+    // Each view has one level-2 heading, its own.
+    host.shadowRoot?.querySelector<HTMLElement>("h2")?.focus();
   }, [host]);
   // While collapsed, the panel's module loads when the page is idle, so opening doesn't wait for it.
   useEffect(() => (hidden ? preloadPanelWhenIdle() : undefined), [hidden]);
@@ -212,7 +213,7 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   useFocusShortcut(host, () => {
     if (closing) return;
     const inside = host.shadowRoot;
-    const target = hidden ? inside?.querySelector<HTMLElement>(".launcher") : inside?.querySelector<HTMLElement>("h2.name");
+    const target = hidden ? inside?.querySelector<HTMLElement>(".launcher") : inside?.querySelector<HTMLElement>("h2");
     if (target) target.focus();
     // The panel's module is still loading: `shown` takes focus to its heading once it is there.
     else if (!hidden) focusSwap.current = true;

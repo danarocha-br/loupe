@@ -18,32 +18,26 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState } from "rea
 import type { LayerStatus } from "../layer-status.js";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope, ScopeTarget } from "../runtime/store.js";
-import { attempt, Breakable, Key, PropRowView } from "./controls.js";
+import { attempt, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Row, RowLine, RowName, RowValue, Tag, type TagLook, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
+import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Row, RowLine, RowName, RowValue, Tag, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
-  BackIcon,
-  CheckIcon,
   ChevronIcon,
   ContrastIcon,
   CursorIcon,
-  ElbowIcon,
   EyeIcon,
-  FileIcon,
   InfoIcon,
-  LayersIcon,
   MarksHiddenIcon,
   MarksIcon,
   PanelIcon,
   PROP_ICONS,
   ResetIcon,
   SelectManyIcon,
-  WidenIcon,
   Wordmark,
-} from "./icons.js";
+} from "./ui/icon/icon.js";
 import { layerAnnouncement, LayerNotices, NotGeneratedNotice } from "./notices.js";
 import {
   type CallSiteItem,
@@ -51,17 +45,16 @@ import {
   type GroupItem,
   type InspectorBody,
   type ListBody,
-  type MembersView,
   type PanelView,
   type PropItem,
-  type ScopeOption,
-  type StatusTag,
-  type Tag as TagText,
+  type NoGroupView,
+  INSPECTOR_WORDS,
   inspectOnlyTitle,
   LEGEND,
   TEXT,
 } from "./panel-view/index.js";
 import { appLang } from "./app-lang.js";
+import { Breakable, ChangeKey, Identity, Keys, ScopeMoveButton, ScopeSection, StatusChip, TagChip } from "./patterns/index.js";
 import { hueOf, PageMap } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
 import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndoOffer } from "./undo.js";
@@ -300,36 +293,6 @@ function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) 
   );
 }
 
-const TAG_LOOK: Record<TagText["kind"], TagLook> = {
-  server: "plain",
-  suspended: "ring",
-  "not-mounted": "dashed",
-  stale: "amber",
-  "left-out": "plain",
-  "left-out-unmounted": "dashed",
-  "not-visible": "dashed",
-};
-
-function TagView({ tag }: { tag: TagText }) {
-  return <Tag look={TAG_LOOK[tag.kind]}>{tag.text}</Tag>;
-}
-
-const STATUS_CLASS: Record<StatusTag["kind"], string> = {
-  supported: "status supported",
-  "inspect-only": "status",
-  "not-generated": "status stale",
-};
-
-/** A verdict in words. Supported is the rule, so the list says only the exceptions. */
-function StatusView({ status, title, check }: { status: StatusTag; title?: string | null; check?: boolean }) {
-  return (
-    <span className={STATUS_CLASS[status.kind]} title={title ?? undefined}>
-      {check && status.kind === "supported" && <CheckIcon />}
-      {status.text}
-    </span>
-  );
-}
-
 function HeldValues({ values }: { values: readonly string[] }) {
   return (
     <ul className="list held-values" data-testid="held-values">
@@ -337,18 +300,6 @@ function HeldValues({ values }: { values: readonly string[] }) {
         <li key={index}>{value}</li>
       ))}
     </ul>
-  );
-}
-
-/** The plot key's numbers for one Instance or row. */
-function Keys({ keys }: { keys: readonly number[] }) {
-  if (keys.length === 0) return null;
-  return (
-    <span className="keys">
-      {keys.map((n) => (
-        <Key key={n} n={n} />
-      ))}
-    </span>
   );
 }
 
@@ -374,8 +325,8 @@ function ComponentList({
   return (
     <>
       <Card className="hero">
-        {/* `name` with the other views' headings: focus finds each view's by `h2.name`. */}
-        <h2 className="name hero-title" tabIndex={-1} ref={heading}>
+        {/* Each view has one level-2 heading, its own: focus finds it as the view's `h2`. */}
+        <h2 className="hero-title" tabIndex={-1} ref={heading}>
           {TEXT.startTitle}
         </h2>
         <p className="body">{TEXT.startBody}</p>
@@ -415,7 +366,7 @@ function ComponentList({
                   onFocus={() => onHover(change.reached)}
                   onBlur={() => onHover([])}
                 >
-                  <Key n={change.n} />
+                  <ChangeKey n={change.n} words={INSPECTOR_WORDS} />
                   <span className="what">{change.detail}</span>
                   <span className="where">{change.where}</span>
                 </button>
@@ -511,7 +462,7 @@ function GroupRow({
           <span className="times">{group.count}</span>
           <span className="sub">
             {/* No board draws it, but it says what to run: the one verdict the row keeps in words. */}
-            {group.verdict.status?.kind === "not-generated" && <StatusView status={group.verdict.status} title={group.statusTitle} />}
+            {group.verdict.status?.kind === "not-generated" && <StatusChip status={group.verdict.status} title={group.statusTitle} />}
             {group.notes.map((note) =>
               note.kind === "overrides" ? (
                 <span key={note.kind} className="changed">
@@ -543,12 +494,12 @@ function GroupRow({
             {unmounted.map((item) => (
               <li key={item.id}>
                 <button type="button" data-instance={item.id} onClick={() => onSelect(item.id)}>
-                  <Keys keys={item.keys} />
+                  <Keys keys={item.keys} words={INSPECTOR_WORDS} />
                   <span className="who">
                     <span className="site">{item.label}</span>
                   </span>
                   {item.tags.map((tag) => (
-                    <TagView key={tag.kind} tag={tag} />
+                    <TagChip key={tag.kind} tag={tag} />
                   ))}
                 </button>
                 {item.values.length > 0 && <HeldValues values={item.values} />}
@@ -650,22 +601,13 @@ function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: L
   );
 }
 
-function BackButton({ onSelect }: Pick<Actions, "onSelect">) {
-  return (
-    <Button iconOnly className="back" onClick={() => onSelect(null)} title="Back to every component on this page (Esc)">
-      <BackIcon />
-      <span className="sr-only">All components</span>
-    </Button>
-  );
-}
-
 /**
  * A button that goes once it has done its job (a Reset with nothing left to reset)
  * hands focus to the heading, so a keyboard doesn't fall out of the panel.
  */
 function focusHeading(from: HTMLElement) {
   const root = from.getRootNode();
-  if (root instanceof ShadowRoot) root.querySelector<HTMLElement>("h2.name")?.focus();
+  if (root instanceof ShadowRoot) root.querySelector<HTMLElement>("h2")?.focus();
 }
 
 /** A piece of the status strip: its words, or a key drawn in `kbd`. */
@@ -742,31 +684,22 @@ function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; 
 function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & { body: GoneBody; notices: ReactNode }) {
   return (
     <>
-      <Card className="identity">
-        <div className="title-line">
-          <BackButton onSelect={onSelect} />
-          {body.component && <span className="status">{TEXT.notOnPage}</span>}
-        </div>
-        <h2 className="name" tabIndex={-1} ref={heading} title={body.id}>
-          {body.component ?? TEXT.notOnPage}
-        </h2>
-        {body.where && (
-          <div className="id" title={body.id}>
-            {body.where}
-          </div>
-        )}
-        <p className="body">{TEXT.showsWhenMounted}</p>
-        {body.held && (
-          <div className="verdicts">
-            <TagView tag={body.held.tag} />
-          </div>
-        )}
-        {body.held && <HeldValues values={body.held.values} />}
-        {body.canReset && (
-          <div className="actions">
-            <ResetInstance debug={debug} id={body.id} enabled />
-          </div>
-        )}
+      <Card look="divided">
+        <Identity
+          words={INSPECTOR_WORDS}
+          onBack={() => onSelect(null)}
+          component={null}
+          status={body.component ? { text: TEXT.notOnPage } : null}
+          name={body.component ?? TEXT.notOnPage}
+          nameTitle={body.id}
+          heading={heading}
+          where={body.where}
+          whereTitle={body.id}
+          note={TEXT.showsWhenMounted}
+          tags={body.held ? [body.held.tag] : []}
+          held={body.held?.values}
+          actions={body.canReset ? <ResetInstance debug={debug} id={body.id} enabled /> : undefined}
+        />
       </Card>
       {notices}
     </>
@@ -797,7 +730,6 @@ function Inspector({
   const switches = body.editable.filter(isSwitch).sort((a, b) => Number(b.state) - Number(a.state));
   const cards = body.editable.filter((item) => !isSwitch(item));
   const named = body.name !== null;
-  const site = body.coverage.callSite;
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
@@ -806,97 +738,56 @@ function Inspector({
   // The marks' legend: a row of its own under the options, when any of them marks a default.
   const legend = cards.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
   const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={onSelect} onHover={onHover} />;
-  const propRow = (item: PropItem) => (
-    <PropRowView key={item.name} item={item} glyph={PROP_ICONS[item.glyph]} debug={debug} onSelect={onSelect} onHover={onHover} />
-  );
+  const propRow = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={onSelect} onHover={onHover} />;
   return (
     <>
       {notices}
       <Card look="divided">
-        <div className="identity">
-          <div className="title-line">
-            <div className="lead">
-              <BackButton onSelect={onSelect} />
-              {named && (
-                <span className="component">
-                  <Breakable text={body.component} />
-                </span>
-              )}
-              <span className="report route">/ {view.header.page}</span>
-            </div>
-            {body.verdict.status && <StatusView status={body.verdict.status} check />}
-            <Keys keys={body.keys} />
-          </div>
-          {/* The app's own words, in whatever script it writes: `dir="auto"` lays them out their way. */}
-          <h2 className="name" tabIndex={-1} ref={heading} title={body.name ?? body.component} dir="auto" lang={body.name ? appLang() : undefined}>
-            {body.name ?? body.component}
-          </h2>
-          {/* Where it is written, and which of that call site's Instances it is; the full path and key in the tooltip. */}
-          <div className="id" data-testid="instance-id" data-id={body.id} title={site ? `${site.title}\n${body.id}` : body.id}>
-            <FileIcon />
-            {/* The file names the place, the line finds it: set apart, lighter. */}
-            <span>
-              {body.source.file}
-              <span className="line">{body.source.line}</span>
-            </span>
-          </div>
-          {(body.tags.length > 0 || chips.length > 0) && (
-            <div className="verdicts" data-testid="chips">
-              {body.tags.map((tag) => (
-                <TagView key={tag.kind} tag={tag} />
-              ))}
-              {chips.map((chip) => (
-                <Tag key={chip}>{chip}</Tag>
-              ))}
-            </div>
-          )}
-          {body.coverage.notGenerated && (
-            <div className="warn" data-testid="not-generated">
-              <Dot tone="amber" />
-              <span>
-                <StatusView status={body.coverage.notGenerated.tag} /> {TEXT.run}{" "}
-                <span className="mono verbatim">{body.coverage.notGenerated.command}</span> {TEXT.fromRootToReadProps}
-              </span>
-            </div>
-          )}
-          {(holdButton || resetInstance) && (
-            <div className="actions">
-              {holdButton && (
-                <Toggle
-                  size="small"
-                  pressed={holdButton.held}
-                  data-hold={holdButton.prop}
-                  onPressedChange={(hold) =>
-                    attempt(() =>
-                      hold
-                        ? debug.set(holdButton.write.id, holdButton.write.prop, true, "instance")
-                        : debug.reset(holdButton.write.id, holdButton.write.prop, "instance"),
-                    )
-                  }
-                >
-                  {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
-                </Toggle>
-              )}
-              {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
-            </div>
-          )}
-          {mode === "many" && body.editing?.scopes && view.scope === "instance" && <NoGroup options={body.editing.scopes} onScope={onScope} />}
-          {body.crumbs.length > 0 && (
-            <div className="inside" data-testid="inside">
-              <span className="inside-label">Inside</span>
-              <ol>
-                {[...body.crumbs].reverse().map((crumb, index) => (
-                  <li key={crumb.id} style={{ paddingLeft: index === 0 ? 0 : (index - 1) * 18 }}>
-                    {index > 0 && <ElbowIcon />}
-                    <button type="button" onClick={() => onSelect(crumb.id)}>
-                      {crumb.label}
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-        </div>
+        <Identity
+          words={INSPECTOR_WORDS}
+          onBack={() => onSelect(null)}
+          component={named ? body.component : null}
+          page={view.header.page}
+          status={body.verdict.status}
+          keys={body.keys}
+          name={body.name ?? body.component}
+          nameTitle={body.name ?? body.component}
+          nameLang={body.name ? appLang() : undefined}
+          heading={heading}
+          where={body.source}
+          whereTitle={body.source.title}
+          id={body.id}
+          tags={body.tags}
+          chips={chips}
+          notGenerated={body.coverage.notGenerated}
+          actions={
+            holdButton || resetInstance ? (
+              <>
+                {holdButton && (
+                  <Toggle
+                    size="small"
+                    pressed={holdButton.held}
+                    data-hold={holdButton.prop}
+                    onPressedChange={(hold) =>
+                      attempt(() =>
+                        hold
+                          ? debug.set(holdButton.write.id, holdButton.write.prop, true, "instance")
+                          : debug.reset(holdButton.write.id, holdButton.write.prop, "instance"),
+                      )
+                    }
+                  >
+                    {holdButton.held ? `Holding ${holdButton.prop} · Release` : `Hold ${holdButton.prop}`}
+                  </Toggle>
+                )}
+                {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
+              </>
+            ) : undefined
+          }
+          crumbs={body.crumbs}
+          onCrumb={(id) => onSelect(id)}
+        >
+          {mode === "many" && body.editing?.noGroup && view.scope === "instance" && <NoGroup noGroup={body.editing.noGroup} onScope={onScope} heading={heading} />}
+        </Identity>
         {body.note && (
           <Row glyph={<InfoIcon />} role="note" className="note">
             <div className="text">
@@ -907,11 +798,19 @@ function Inspector({
         )}
         {body.members && (
           <ScopeSection
-            debug={debug}
             members={body.members}
-            options={body.editing?.scopes ?? null}
             selected={body.id}
+            words={INSPECTOR_WORDS}
+            nameLang={appLang()}
             onScope={onScope}
+            onReset={(target) => {
+              dropUndoably(debug, target, resetText);
+              heading.current?.focus();
+            }}
+            onToggle={(action, ids) => {
+              const scope = body.members?.scope;
+              if (scope) for (const id of ids) attempt(() => (action === "include" ? debug.include(id, scope) : debug.exclude(id, scope)));
+            }}
             onHover={onHover}
           />
         )}
@@ -1007,196 +906,24 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
 }
 
 /**
- * Select multiple, on an Instance with no call site to group by: it is selected
- * alone, and the page is still one click away when that scope applies.
+ * Select multiple, on an Instance with no call site to group by: it is selected alone,
+ * and the page is still one click away when that scope applies. Widened, this goes, and
+ * the page scope has no call site to narrow back to: focus goes to the heading.
  */
-function NoGroup({ options, onScope }: { options: ScopeOption[]; onScope(scope: Scope): void }) {
-  const group = options.find((option) => option.scope === "group");
-  const page = options.find((option) => option.scope === "page");
+function NoGroup({ noGroup, onScope, heading }: Heading & { noGroup: NoGroupView; onScope(scope: Scope): void }) {
   return (
     <div className="selection">
-      <span className="muted">{group?.title ?? "Only this Instance can be selected here."}</span>
-      {/* Widened, this goes, and the page scope has no call site to narrow back to: its button goes with it. */}
-      {page?.enabled && <WidenButton option={page} verb="Widen to" onScope={onScope} goes />}
+      <span className="muted">{noGroup.text}</span>
+      {noGroup.widen && (
+        <ScopeMoveButton
+          move={noGroup.widen}
+          onScope={(scope) => {
+            onScope(scope);
+            heading.current?.focus();
+          }}
+        />
+      )}
     </div>
-  );
-}
-
-/**
- * Widens a call site's selection to the page, or narrows it back: "Widen to All on page · 7".
- * One that `goes` once pressed hands focus to the heading, as a spent Reset does.
- */
-function WidenButton({ option, verb, onScope, goes = false }: { option: ScopeOption; verb: string; onScope(scope: Scope): void; goes?: boolean }) {
-  return (
-    <Button
-      className="widen"
-      data-scope={option.scope}
-      title={option.title ?? option.label}
-      onClick={(event) => {
-        const button = event.currentTarget;
-        onScope(option.scope);
-        if (goes) focusHeading(button);
-      }}
-    >
-      <WidenIcon />
-      {/* What it can't change stays in the tooltip: "(1 server-rendered, inspect only)". */}
-      {verb} {option.label.replace(/ \(.*\)$/, "")}
-    </Button>
-  );
-}
-
-/** As many dots as a scope's meter can show: past this, the words alone say how far it reaches. */
-const METER_MAX = 12;
-
-/**
- * Select multiple's scope: who a group or page change reaches, a dot for each of the
- * component's Instances on the page, the way to widen or narrow it, and its Instances
- * folded behind their count, each with a box to leave it out. A page scope groups them
- * by call site, so one box leaves a whole call site out.
- */
-function ScopeSection({
-  debug,
-  members,
-  options,
-  selected,
-  onScope,
-  onHover,
-}: Pick<Actions, "debug" | "onHover" | "onScope"> & { members: MembersView; options: ScopeOption[] | null; selected: string }) {
-  const { scope, reach } = members;
-  const current = options?.find((option) => option.scope === scope) ?? null;
-  // At a call site, widen to the page; at the page, narrow back to the call site.
-  const other = options?.find((option) => option.scope === (scope === "group" ? "page" : "group") && option.enabled) ?? null;
-  // Open while one is left out, as Figma keeps layers out of the properties until asked.
-  const leftOut = members.members.some((member) => member.out);
-  const toggle = (action: "include" | "exclude", id: string) =>
-    attempt(() => (action === "include" ? debug.include(id, scope) : debug.exclude(id, scope)));
-  const memberItem = (member: MembersView["members"][number]) => {
-    const picked = member.id === selected;
-    return (
-      <li key={member.id} {...hoverProps(onHover, [member.id])}>
-        <label>
-          <input
-            type="checkbox"
-            data-member={member.id}
-            checked={!member.out}
-            disabled={members.suspended}
-            onChange={() => toggle(member.toggle, member.id)}
-          />
-          {/* By name only: the key that tells Instances apart is for engineers, in the tooltip. */}
-          <span className={`who${member.out ? " out" : ""}${picked ? " picked" : ""}`} title={member.id}>
-            <span className="screen-name" dir="auto" lang={member.name ? appLang() : undefined}>
-              {member.name ?? member.label}
-            </span>
-          </span>
-          {member.tag && <TagView tag={member.tag} />}
-          {picked && <Tag look="picked">{TEXT.picked}</Tag>}
-        </label>
-      </li>
-    );
-  };
-  const name = current ? current.label.replace(/ · \d+.*$/, "") : "Instances";
-  return (
-    <Fold defaultOpen={leftOut} className="scope-fold">
-      <div className="scope" data-testid="members">
-        <div className="scope-title">
-          <div className="lead">
-            <LayersIcon />
-            <h3 title={current?.title ?? undefined}>
-              <Breakable text={name} />
-            </h3>
-          </div>
-          {reach.page <= METER_MAX && (
-            <span className="meter" aria-hidden="true">
-              {Array.from({ length: reach.page }, (_, index) => (
-                <i key={index} className={index < reach.included ? "in" : undefined} />
-              ))}
-            </span>
-          )}
-        </div>
-        <p className="reach">
-          {reach.lead}{" "}
-          <b>
-            {reach.included} of {reach.total}
-          </b>
-          {reach.moreText && <> · {reach.moreText}</>}
-        </p>
-        <div className="scope-actions">
-          {other && <WidenButton option={other} verb={scope === "group" ? "Widen to" : "Narrow to"} onScope={onScope} />}
-          {members.reset.enabled && (
-            <Button
-              size="small"
-              onClick={(event) => {
-                const button = event.currentTarget;
-                dropUndoably(debug, members.reset.target, resetText);
-                focusHeading(button);
-              }}
-            >
-              <ResetIcon />
-              Reset this scope
-            </Button>
-          )}
-          <FoldTrigger inline className="count-toggle">
-            {plural(members.members.length, "Instance")}
-            <FoldChevron />
-          </FoldTrigger>
-        </div>
-      </div>
-      <FoldPanel>
-      <div className="members">
-        <p className="hint">{TEXT.untick}</p>
-        {members.sites === null ? (
-          <ul className="list">{members.members.map(memberItem)}</ul>
-        ) : (
-          members.sites.map((site) => (
-            <fieldset key={site.anchor} className="site">
-              <legend>
-                <label onMouseOver={() => onHover(site.members.map((member) => member.id))} onMouseLeave={() => onHover([])}>
-                  <input
-                    type="checkbox"
-                    data-site={site.anchor}
-                    checked={site.allIn}
-                    disabled={members.suspended}
-                    onFocus={() => onHover(site.members.map((member) => member.id))}
-                    onBlur={() => onHover([])}
-                    onChange={() => {
-                      for (const id of site.toggle.ids) toggle(site.toggle.action, id);
-                    }}
-                  />
-                  <span className="who">
-                    <span className="screen-name" title={site.anchor}>
-                      {site.label} <span className="muted">· {site.count}</span>
-                    </span>
-                  </span>
-                </label>
-              </legend>
-              <ul className="list">{site.members.map(memberItem)}</ul>
-            </fieldset>
-          ))
-        )}
-        {members.server.length > 0 && (
-          <ul className="list" aria-label="Server-rendered">
-            {members.server.map((server) => (
-              <li key={server.id}>
-                <span className="server-name" title={server.id}>
-                  {server.label}
-                </span>
-                <TagView tag={server.tag} />
-              </li>
-            ))}
-          </ul>
-        )}
-        {members.outUnmounted.length > 0 && (
-          <ul className="list" aria-label="Left out, not mounted">
-            {members.outUnmounted.map((out) => (
-              <li key={out.id}>
-                <span className="mono muted">{out.id}</span> <TagView tag={out.tag} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      </FoldPanel>
-    </Fold>
   );
 }
 

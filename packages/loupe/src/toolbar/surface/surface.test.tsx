@@ -6,6 +6,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CSS as VIEWS_CSS, GROUND_CSS } from "../styles.js";
+import { PATTERNS_CSS } from "../patterns/styles.js";
 import { PRIMITIVES_CSS } from "../ui/index.js";
 import { LAYERS, STYLESHEET, Surface } from "./index.js";
 import { cleanup, renderInSurface } from "./render.fixture.js";
@@ -21,11 +22,13 @@ describe("the surface's stylesheet", () => {
     expect(STYLESHEET.split("\n")[0]).toBe("@layer tokens, primitives, patterns;");
   });
 
-  it("puts the host's tokens and the elements' defaults in the tokens layer, below the primitives", () => {
+  it("puts the host's tokens and the elements' defaults in the tokens layer, below the primitives, then the patterns", () => {
     const tokens = STYLESHEET.indexOf(`@layer tokens {${GROUND_CSS}}`);
     const primitives = STYLESHEET.indexOf(`@layer primitives {\n${PRIMITIVES_CSS}\n}`);
+    const patterns = STYLESHEET.indexOf(`@layer patterns {\n${PATTERNS_CSS}\n}`);
     expect(tokens).toBeGreaterThan(0);
     expect(primitives).toBeGreaterThan(tokens);
+    expect(patterns).toBeGreaterThan(primitives);
     expect(GROUND_CSS).toContain(":host { all: initial;");
     expect(GROUND_CSS).toContain("button { font: inherit;");
     // The views' rules come last, outside every layer, until they move into patterns.

@@ -8,6 +8,9 @@ import type { LoupeDebug } from "../../runtime/debug.js";
 import type { NoteKind } from "../../runtime/inspect.js";
 import type { Scope, ScopeTarget } from "../../runtime/store.js";
 
+// The runtime's scope words, as the panel's data speaks them: a pattern takes them from here.
+export type { Scope, ScopeTarget };
+
 /** Components seen on a route so far, for "Appears on interaction". */
 export type SeenComponents = { readonly route: string; readonly components: ReadonlySet<string> };
 
@@ -192,8 +195,8 @@ export type InspectorBody = {
   name: string | null;
   /** The component and its call site's file and line: "Button · member-row-menu.tsx:37". */
   where: string;
-  /** Where it is written, set apart where the line starts: "member-row-menu.tsx" and ":37 · use 1 of 2". */
-  source: { file: string; line: string };
+  /** Where it is written, set apart where the line starts: "member-row-menu.tsx" and ":37 · use 1 of 2"; its full path and key, for the tooltip. */
+  source: { file: string; line: string; title: string };
   /** The numbered changes that reach it. */
   keys: number[];
   /** "Hold open": a State prop with a true/false choice, held at true from one button. */
@@ -205,7 +208,7 @@ export type InspectorBody = {
   /** The adapted Instances around it, nearest first. */
   crumbs: { id: string; label: string }[];
   /** Null while nothing here can be edited: on the server, with no Adapter, or with Overrides off. */
-  editing: { resetInstanceEnabled: boolean; scopes: ScopeOption[] | null } | null;
+  editing: { resetInstanceEnabled: boolean; scopes: ScopeOption[] | null; noGroup: NoGroupView | null } | null;
   members: MembersView | null;
   /** Why nothing here can change, said once; `no-editable` is the Toolbar's own, for an adapted Instance with no Editable prop. */
   note: { kind: NoteKind | "no-editable"; title: string; body: string } | null;
@@ -228,14 +231,64 @@ export type InspectorBody = {
   injected: { summary: string; rows: { name: string; value: string }[] } | null;
 };
 
+/** Select multiple on an Instance with no call site to group by: why, and the way to the page when that scope applies. */
+export type NoGroupView = { text: string; widen: ScopeMove | null };
+
+/** A button that moves the selection to another scope: what it says, and what it can't change, for its tooltip. */
+export type ScopeMove = { scope: Scope; text: string; title: string };
+
+/**
+ * The words the Inspector's patterns draw whatever is on the page (DESIGN.md "Layers"):
+ * decided here, so a pattern builds none.
+ */
+export type InspectorWords = {
+  /** A change's delta: "Change 1", and its tooltip. */
+  change(n: number): { label: string; title: string };
+  /** A held State prop's empty delta: its tooltip. */
+  heldTitle: string;
+  /** Label text left empty. */
+  empty: string;
+  /** The tag on a State prop's row. */
+  state: string;
+  /** Before the app's own value under an Override. */
+  current: string;
+  /** A value that is the component's default, for its tooltip. */
+  defaultTitle: string;
+  /** The tag on the app's own value's chip, once an Override replaces it. */
+  appTag: string;
+  /** A chip's marks, said to a screen reader and in its tooltip. */
+  appValue: string;
+  designDefault: string;
+  /** The identity's back button. */
+  back: { label: string; title: string };
+  /** Before the adapted Instances around it. */
+  inside: string;
+  /** "Run `loupe generate` from the repo root to read its props." */
+  run: string;
+  fromRootToReadProps: string;
+  /** The scope's Instances, opened. */
+  untick: string;
+  picked: string;
+  resetScope: string;
+  serverRendered: string;
+  leftOutUnmounted: string;
+};
+
 export type ScopeOption = { scope: Scope; label: string; enabled: boolean; pressed: boolean; title: string | null };
 
 export type MembersView = {
   scope: "group" | "page";
+  /** The scope's name, "All in MemberRowMenu", and what it can't change, for its tooltip. */
+  name: string;
+  nameTitle: string | null;
+  /** "4 Instances": the fold's trigger. */
+  instancesText: string;
+  /** Widen a call site to the page, or narrow the page back to it: "Widen to All on page · 7". */
+  widen: ScopeMove | null;
   /** "3 of 4 previewed". */
   countText: string;
   /** How far the scope reaches: "Reaches", its members in and in all, the component's on the page, and the rest said. */
-  reach: { lead: string; included: number; total: number; page: number; moreText: string | null };
+  reach: { lead: string; included: number; total: number; page: number; moreText: string | null; countText: string };
   /** The scope's record is Suspended: shown, never changed. */
   suspended: boolean;
   members: MemberItem[];
@@ -300,6 +353,8 @@ export type PropItem = {
   change: { from: string; to: string } | null;
   /** "from All in Members". */
   source: string | null;
+  /** The value comes from a wider scope than the one in view: the change line names `source`. */
+  wider: boolean;
   control: Control | null;
   /** "Current:" with the app's own value, under a row an Override holds. */
   current: ValueText | null;

@@ -1,0 +1,41 @@
+/*
+ * PropRow (ADR 0003): a Row with what qualifies its prop, written against `[data-prop]`,
+ * `[data-overridden]`, the parts it marks (`[data-prop-head]`, `[data-prop-change]`, …)
+ * and `[data-value]`. Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* The head and the change line under it sit tight; the control sits apart (the Row's gap). */
+[data-prop-head] { display: flex; flex-direction: column; gap: var(--space-hair); min-width: 0; }
+
+/* A value that is the component's default (in the option style), or not set: muted; on the row's line it takes the line's mono. */
+[data-value] { color: var(--muted); font-weight: 400; }
+[data-value="default"] { font: var(--font-option); }
+[data-row-value] [data-value] { font: inherit; }
+
+/* The change line: `"ghost" → "outline"`, the arrow faint, the new value in ink at 600, then where it comes from. */
+[data-prop-change] { font: var(--font-mono-small); color: var(--muted); overflow-wrap: anywhere; }
+[data-prop-arrow] { font: var(--font-tag); color: var(--faint); }
+[data-prop-to] { color: var(--ink); font-weight: 600; }
+[data-prop-source] { font: var(--font-tag); color: var(--muted); }
+
+/* Under the control: the app's own value, why the prop can change no further here, and the lock on a refused one. */
+[data-prop-current] { font: var(--font-mono); line-height: 1.3333; color: var(--ink); }
+[data-prop-lead] { margin-right: var(--space-xs); font: var(--font-meta); font-variant-numeric: tabular-nums; color: var(--faint); white-space: nowrap; }
+[data-prop-explain] { font: var(--font-caption); color: var(--muted); }
+[data-prop-refusal] { display: flex; align-items: center; gap: var(--space-sheet); font: var(--font-caption); color: var(--muted); }
+
+/* The holding notice of a State prop: a well, its two values in mono, Reset on the card's white. */
+[data-prop-held] { padding: var(--space-row) var(--space-card); border-radius: var(--radius-well); background: var(--well); font: var(--font-caption); line-height: 1.5; }
+[data-prop-held] code { font: var(--font-mono); font-weight: 600; color: var(--ink); }
+[data-prop-held] [data-prop-reset] { margin-top: var(--space-inset); background: var(--card); }
+@media (hover: hover) { [data-prop-held] [data-prop-reset]:not(:disabled):hover { background: var(--sunk-hover); } }
+
+/* "1 of 4 keeps its own value": a navy link that selects them. */
+[data-prop-keeping] {
+  align-self: flex-start; min-height: 24px; font: var(--font-control); color: var(--link);
+  text-decoration: underline; text-decoration-color: var(--link-edge); text-underline-offset: 3px;
+}
+@media (hover: hover) { [data-prop-keeping]:hover { text-decoration-color: currentColor; } }
+
+/* A text prop: Field's outline look, its edge salmon once the prop is changed here. */
+[data-prop][data-overridden] [data-field-control] { border-color: var(--shown-edge); }

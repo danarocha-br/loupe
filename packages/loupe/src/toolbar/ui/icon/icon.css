@@ -1,0 +1,5 @@
+/*
+ * Icon (ADR 0003): every icon, written against `[data-icon]`. In the stylesheet's
+ * `primitives` layer. Its colour is what it sits in (`currentColor`).
+ */
+[data-icon] { display: block; flex: none; }

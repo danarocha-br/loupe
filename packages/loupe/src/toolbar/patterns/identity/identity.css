@@ -1,0 +1,64 @@
+/*
+ * Identity (ADR 0003): the top of the Inspector card, written against `[data-identity]`
+ * and its parts (`[data-identity-title]`, `[data-identity-name]`, …). Values from the
+ * tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* Padded on its own, 10px over the back button and 10px to its left; flush at its foot once Inside closes it. */
+[data-identity] { display: flex; flex-direction: column; padding: var(--space-row) var(--space-gutter) var(--space-gutter) var(--space-row); }
+[data-identity][data-inside] { padding-bottom: 0; }
+
+/* The title line: back, the component and its page, then its verdict and deltas at the right. */
+[data-identity-title] { display: flex; align-items: center; justify-content: space-between; gap: var(--space-inset); min-width: 0; min-height: 28px; }
+[data-identity-lead] { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; }
+[data-identity-back] { width: 28px; height: 28px; background: var(--ground); }
+@media (hover: hover) { [data-identity-back]:hover { background: var(--sunk-hover); } }
+[data-identity-component] { min-width: 0; overflow-wrap: break-word; font: var(--font-body); font-weight: 500; color: var(--muted); }
+[data-identity-page] {
+  flex: none; min-width: 0; margin-left: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: var(--font-annotation); letter-spacing: var(--tracking-annotation); text-transform: uppercase; color: var(--faint); font-variant-numeric: tabular-nums;
+}
+[data-identity-title] [data-keys] { margin-left: auto; }
+
+/* The whole name, however long: the headline is the one place it is read in full. */
+[data-identity-name] {
+  min-width: 0; margin: var(--space-inset) 0 0 var(--space-xs); overflow-wrap: anywhere; text-wrap: balance; outline-offset: 4px;
+  font: var(--font-headline); letter-spacing: var(--tracking-headline); color: var(--ink);
+}
+
+/* Where it is written: the file in muted mono, its line set apart in `line-faint`. */
+[data-identity-where] {
+  display: flex; align-items: center; gap: var(--space-xs); margin: var(--space-xs) 0 0 var(--space-xs); overflow-wrap: anywhere;
+  font: var(--font-mono-small); line-height: 1.6364; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+[data-identity-where] [data-icon] { color: var(--faint); }
+[data-identity-line] { color: var(--line-faint); }
+
+/* Once it is gone: what it says, as a paragraph. */
+[data-identity-note] { margin: 0; padding: var(--space-sheet) 0 0 var(--space-xs); font: var(--font-paragraph); color: var(--muted); }
+
+/* The exceptions, and the actions that can act: each a wrapping line 10px under what is above. */
+[data-identity-tags], [data-identity-actions] { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sheet); padding: var(--space-row) 0 0 var(--space-xs); }
+[data-identity-held] { list-style: none; margin: 0; padding: var(--space-sheet) 0 0 var(--space-xs); font: var(--font-mono-small); color: var(--muted); }
+
+/* Not generated yet: an amber well with the command that would read it. */
+[data-identity-warn] {
+  display: flex; gap: var(--space-row); margin: var(--space-row) 0 0 var(--space-xs); padding: var(--space-row) var(--space-card);
+  border-radius: var(--radius-well); background: var(--warn-bg); color: var(--warn-fg); font: var(--font-caption);
+}
+[data-identity-warn] [data-dot] { margin-top: 5px; }
+[data-identity-command] { font: var(--font-mono); line-height: inherit; white-space: pre-wrap; }
+
+/* Inside: the adapted Instances around it, outermost first, each a step in from the last, edge to edge in the hover wash. */
+[data-identity-inside] {
+  position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr);
+  margin: var(--space-row) calc(-1 * var(--space-gutter)) 0 calc(-1 * var(--space-row)); padding: var(--space-row) var(--space-gutter) 9px; background: var(--hover);
+}
+[data-identity-inside-label] { padding-top: var(--space-hair); font: var(--font-label); line-height: 1.4545; letter-spacing: 0.01em; color: var(--faint); }
+[data-identity-inside] ol { list-style: none; margin: 0; padding: 0; }
+[data-identity-inside] li { display: flex; align-items: flex-start; min-height: 20px; }
+[data-identity-inside] svg { flex: none; margin: -2px 2px 0 3px; color: var(--tree); }
+[data-identity-inside] button { min-height: 20px; font: var(--font-option); line-height: 1.6667; color: var(--faint); text-align: left; overflow-wrap: anywhere; }
+[data-identity-inside] li:nth-last-child(2) button { color: var(--tree-ink); }
+[data-identity-inside] li:last-child button { color: var(--ink); font-weight: 500; }
+@media (hover: hover) { [data-identity-inside] button:hover { text-decoration: underline; text-underline-offset: 3px; } }

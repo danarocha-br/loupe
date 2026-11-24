@@ -11,7 +11,7 @@ import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
 import { type Editing, instanceProp, scopeProp } from "./rows.js";
 import { fallbacks, labelsOf, membersView, scopeChips, type ScopeView, scopeView } from "./scopes.js";
-import type { GoneBody, InspectorBody, ScopeOption, Tag } from "./types.js";
+import type { GoneBody, InspectorBody, NoGroupView, ScopeOption, Tag } from "./types.js";
 import { instanceVerdict } from "./verdict.js";
 import {
   callSiteText,
@@ -24,6 +24,9 @@ import {
   NO_GROUP,
   NOT_GENERATED,
   NOTES,
+  ONLY_THIS_INSTANCE,
+  scopeMoveLabel,
+  scopeMoveVerb,
   TAGS,
   unmountedTag,
   whereText,
@@ -106,21 +109,25 @@ export function inspectorBody(
   const injected = Object.entries(inspection.injected);
   const site = inspection.callSite;
   const { editable, inspectOnly } = inspection.coverage;
+  const scopes = editing && row ? scopeOptions(page, row, scoping.scope) : null;
   return {
     kind: "inspector",
     id: inspection.id,
     component: inspection.component,
     name: reads.name(id),
     where: whereText(inspection.component, site),
-    source: sourceParts(site ? callSiteText(site, inspection.anchor).text : whereText(inspection.component, site), inspection.component),
+    source: {
+      ...sourceParts(site ? callSiteText(site, inspection.anchor).text : whereText(inspection.component, site), inspection.component),
+      title: site ? `${callSiteText(site, inspection.anchor).title}\n${inspection.id}` : inspection.id,
+    },
     keys: keys.marks.find((mark) => mark.id === id)?.keys ?? [],
     hold,
     verdict,
     tags,
     chips: row ? scopeChips(page.records, row, labels) : [],
     crumbs: reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor })),
-    editing: editing ? { resetInstanceEnabled: recorded, scopes: row ? scopeOptions(page, row, scoping.scope) : null } : null,
-    members: scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined) : null,
+    editing: editing ? { resetInstanceEnabled: recorded, scopes, noGroup: scopes && noGroupOf(scopes) } : null,
+    members: scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined, scopes) : null,
     note,
     coverage: {
       editable,
@@ -173,6 +180,16 @@ function scopeOptions(page: Page, row: InstanceRow, applied: Scope): ScopeOption
       title: view === null ? NO_GROUP.title : null,
     };
   });
+}
+
+/** Select multiple with no call site: why it selects this Instance alone, and Widen to the page while that applies. */
+function noGroupOf(scopes: readonly ScopeOption[]): NoGroupView {
+  const group = scopes.find((option) => option.scope === "group");
+  const page = scopes.find((option) => option.scope === "page");
+  return {
+    text: group?.title ?? ONLY_THIS_INSTANCE,
+    widen: page?.enabled ? { scope: page.scope, text: `${scopeMoveVerb("group")} ${scopeMoveLabel(page.label)}`, title: page.title ?? page.label } : null,
+  };
 }
 
 /**
