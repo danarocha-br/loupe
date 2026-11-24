@@ -25,6 +25,11 @@ export type PanelInput = {
   scope: Scope;
   /** The memory the last call returned. */
   seen: SeenComponents;
+  /**
+   * The view the last call returned. Every part of the new view deeply equal to its
+   * part is that same object, so a pattern given it can skip its render (`share.ts`).
+   */
+  previous?: PanelView | null;
 };
 
 /** An Instance a scope reaches, and whether it was left out of it. */

@@ -836,3 +836,58 @@ describe("the chrome's words", () => {
     expect(COPY_WORDS.notCopiedText("The clipboard needs localhost or HTTPS.", false)).toBe("The clipboard needs localhost or HTTPS.");
   });
 });
+
+describe("structural sharing across calls", () => {
+  /** A call given the last view, as the Toolbar makes it (`open.tsx`). */
+  const after = (previous: PanelView, selected: string | null = null, scope: Scope = "instance") =>
+    panelView({ debug: loupe, layer: null, selected, scope, seen: previous.seen, previous });
+
+  it("hands back the last view itself when nothing it shows changed", () => {
+    render();
+    const list = view();
+    expect(after(list)).toBe(list);
+    const inspected = view(BIA, "group");
+    expect(after(inspected, BIA, "group")).toBe(inspected);
+  });
+
+  it("keeps every group and Instance of the list that an Override elsewhere didn't touch", () => {
+    render();
+    const first = view();
+    act(() => {
+      loupe.set(ANA, "variant", "ghost");
+    });
+    const next = after(first);
+    const [before, now] = [listOf(first), listOf(next)];
+    // Ana's group changed: it holds an Override now, and Ana is numbered on the plot key.
+    expect(group(now, "Button")).not.toBe(group(before, "Button"));
+    expect(group(now, "Button")?.instances[0]?.keys).toEqual([1]);
+    // Everything else in it, and the other component, is the last call's own object.
+    expect(group(now, "Dialog")).toBe(group(before, "Dialog"));
+    expect(group(now, "Button")?.instances[1]).toBe(group(before, "Button")?.instances[1]);
+    expect(group(now, "Button")?.sites).toBe(group(before, "Button")?.sites);
+    expect(now.page).toBe(before.page);
+  });
+
+  it("keeps the rows a scope switch doesn't change, and makes new the ones it does", () => {
+    render();
+    const one = view(BIA);
+    const many = after(one, BIA, "group");
+    expect(many.scope).toBe("group");
+    // At the group, the Editable rows count the call site's four members: new rows.
+    expect(prop(inspector(many), "variant")).not.toBe(prop(inspector(one), "variant"));
+    // The Inspect only row reads the app's value at either scope: the same object.
+    expect(prop(inspector(many), "render")).toBe(prop(inspector(one), "render"));
+    expect(inspector(many).identity.crumbs).toBe(inspector(one).identity.crumbs);
+  });
+
+  it("keeps the selected Instance's rows when something else on the page changes", () => {
+    render();
+    const first = view(BIA);
+    click("Menu");
+    const next = after(first, BIA);
+    // The page did move: a MenuItem mounted.
+    expect(next.instanceCount).toBe(first.instanceCount + 1);
+    expect(inspector(next).editable).toBe(inspector(first).editable);
+    expect(inspector(next).inspectOnly).toBe(inspector(first).inspectOnly);
+  });
+});

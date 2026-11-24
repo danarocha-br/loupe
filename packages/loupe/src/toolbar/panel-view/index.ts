@@ -8,6 +8,7 @@ import { changeKeys } from "./keys.js";
 import { changeItems, listBody, stateItems } from "./list.js";
 import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
+import { share } from "./share.js";
 import type { PanelInput, PanelView } from "./types.js";
 import { layerNotice, noticesSaid, overridesOffNotice } from "./notices.js";
 import { changesWord, footerCount, headerView, heldChip } from "./words.js";
@@ -34,9 +35,15 @@ export {
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides
  * what the panel shows. It writes nothing, and never throws because an Instance
- * has gone: the selected one then reads "Not on the page now".
+ * has gone: the selected one then reads "Not on the page now". Given the last
+ * view as `input.previous`, it hands back that view's objects wherever nothing in
+ * them changed, and that view itself when nothing did.
  */
 export function panelView(input: PanelInput): PanelView {
+  return share(input.previous ?? null, decide(input));
+}
+
+function decide(input: PanelInput): PanelView {
   const { selected } = input;
   const reads = createReads(input.debug);
   const page = readPage(input.debug, input.seen, input.layer);
