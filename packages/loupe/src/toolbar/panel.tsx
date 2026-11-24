@@ -16,7 +16,7 @@
 
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
-import type { Scope, ScopeTarget } from "../runtime/store.js";
+import type { ScopeTarget } from "../runtime/store.js";
 import { attempt, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
@@ -62,22 +62,21 @@ import {
 import { copyToClipboard } from "./clipboard.js";
 import { PageMapView } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
+import { type ToolbarStore, useToolbar, useToolbarStore } from "./toolbar-store.js";
 import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndoOffer } from "./undo.js";
 
+/**
+ * What the panel draws, and the Toolbar's writes it can't make itself. The selection, its
+ * tool, Hide marks and what a row points at are the Toolbar's store's (toolbar-store.ts):
+ * the panel's views read the slice they draw and write to it, so a row's hover renders
+ * the rows it lights and the outlines, not the panel (ADR 0009).
+ */
 type PanelProps = {
   debug: LoupeDebug;
   view: PanelView;
   column: Column;
-  /** The select tool: one Instance, or every one from its call site. */
-  mode: SelectMode;
   picking: boolean;
   onTool(mode: SelectMode): void;
-  onSelect(id: string | null, mode?: SelectMode): void;
-  onScope(scope: Scope): void;
-  onHover(ids: string[]): void;
-  /** Hide marks: the selection's outlines and the revision clouds are off the page. */
-  marksHidden: boolean;
-  onMarks(): void;
   onHide(): void;
   /** Hide was pressed: the panel slides back out of the window, and goes once it has. */
   closing?: boolean;
@@ -89,16 +88,23 @@ type PanelProps = {
 const PANEL_INSET = 8;
 
 /**
- * What the panel asks of the Toolbar. A row names its Instances to `onHover` on
- * `onMouseOver`, never `onMouseEnter`: React drops an enter that comes straight
- * from the app's page when the app renders `<body>` itself, as the App Router
- * does, so a row reached from the page would outline nothing. A repeat as the
- * pointer crosses the row's children changes nothing (`ToolbarOpen` keeps the ids).
+ * Whether focus was in the panel as this render began. Read while rendering, before React
+ * swaps the view: once the row that had focus is gone, nothing after the commit can tell
+ * that focus was in the panel (review 2026-11-20). A hook of its own because it reads a
+ * ref in render: React Compiler skips this hook rather than `Panel`, whose memoised parts
+ * keep a peek or Hide marks from re-rendering the list (ADR 0009, as `usePanelView`).
  */
-type Actions = Pick<PanelProps, "debug" | "onSelect" | "onScope" | "onHover">;
+function useFocusWasHere(middle: RefObject<HTMLDivElement | null>): RefObject<boolean> {
+  const was = useRef(false);
+  const root = middle.current?.getRootNode();
+  was.current = root instanceof ShadowRoot && root.activeElement !== null;
+  return was;
+}
 
-export function Panel(props: PanelProps) {
-  const { view, column } = props;
+export function Panel({ debug, view, column, picking, onTool, onHide, closing, theme, onTheme }: PanelProps) {
+  const store = useToolbarStore();
+  const mode = useToolbar((state) => state.mode);
+  const marksHidden = useToolbar((state) => state.marksHidden);
   const middle = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const peeking = usePeek();
@@ -109,11 +115,7 @@ export function Panel(props: PanelProps) {
   useAnnounceChange(view.announcements.status);
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
-  // Read while rendering, before React swaps the view: once the row that had focus is
-  // gone, nothing after the commit can tell that focus was in the panel (review 2026-11-20).
-  const focusWasHere = useRef(false);
-  const root = middle.current?.getRootNode();
-  focusWasHere.current = root instanceof ShadowRoot && root.activeElement !== null;
+  const focusWasHere = useFocusWasHere(middle);
   // A new selection, or back to the list, opens at the top. Focus follows it when it
   // was in the panel: a pick on the page leaves the app's focus where it is. The same
   // selection changing kind counts too: an Instance that unmounts swaps the Inspector
@@ -123,13 +125,13 @@ export function Panel(props: PanelProps) {
     if (focusWasHere.current) heading.current?.focus();
   }, [opened, body.kind]);
   // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer as they change.
-  const strip = stripParts({ picking: props.picking, mode: props.mode, covered, marksHidden: props.marksHidden });
+  const strip = stripParts({ picking, mode, covered, marksHidden });
   useAnnounceChange(stripText(strip));
   return (
     <Sheet
       docked={column.docked}
       peeking={peeking}
-      closing={props.closing === true}
+      closing={closing === true}
       width={column.width - PANEL_INSET * 2}
       words={SHEET_WORDS}
       middleRef={middle}
@@ -138,25 +140,25 @@ export function Panel(props: PanelProps) {
           <PanelHeader
             // The page, while nothing is selected: an Instance's identity names it beside the component instead.
             page={body.kind === "list" ? { name: view.header.page, title: view.header.title } : null}
-            mode={props.mode}
-            armed={props.picking}
-            marksHidden={props.marksHidden}
+            mode={mode}
+            armed={picking}
+            marksHidden={marksHidden}
             words={HEADER_WORDS}
-            onTool={props.onTool}
-            onMarks={props.onMarks}
-            onHide={props.onHide}
+            onTool={onTool}
+            onMarks={store.toggleMarks}
+            onHide={onHide}
           />
           <StatusStrip parts={strip} />
         </>
       }
-      footer={<Footer debug={props.debug} footer={view.footer} theme={props.theme} onTheme={props.onTheme} />}
+      footer={<Footer debug={debug} footer={view.footer} theme={theme} onTheme={onTheme} />}
     >
       {body.kind === "list" ? (
-        <ComponentList {...props} body={body} notices={notices} heading={heading} />
+        <ComponentList debug={debug} body={body} notices={notices} heading={heading} onTool={onTool} mode={mode} picking={picking} />
       ) : body.kind === "gone" ? (
-        <Gone {...props} body={body} notices={notices} heading={heading} />
+        <Gone debug={debug} body={body} notices={notices} heading={heading} />
       ) : (
-        <Inspector {...props} body={body} notices={notices} heading={heading} />
+        <Inspector debug={debug} view={view} mode={mode} body={body} notices={notices} heading={heading} />
       )}
     </Sheet>
   );
@@ -201,29 +203,61 @@ function useCoveredDialog(column: Column): boolean {
 
 type Heading = { heading: RefObject<HTMLHeadingElement | null> };
 
+/**
+ * A view's part: the Toolbar's debug handle, the body it draws, the notices above it and its heading.
+ * A row names its Instances to the store's `hover` on `onMouseOver`, never `onMouseEnter`:
+ * React drops an enter that comes straight from the app's page when the app renders
+ * `<body>` itself, as the App Router does, so a row reached from the page would outline
+ * nothing. A repeat as the pointer crosses the row's children changes nothing (`hover` keeps the ids).
+ */
+type Part<Body> = Heading & { debug: LoupeDebug; body: Body; notices: ReactNode };
+
+/**
+ * One component's row, lit while it or its blocks on the map are pointed at. Each row reads
+ * its own light from the store, so pointing renders the two rows whose light changes, not
+ * the list (ADR 0009). GroupRow, a pattern, takes it as a prop.
+ */
+function LitGroupRow({ group, store }: { group: GroupItem; store: ToolbarStore }) {
+  const lit = useToolbar((state) => state.lit === group.component);
+  return (
+    <GroupRow
+      group={group}
+      lit={lit}
+      words={INSPECTOR_WORDS}
+      onPoint={store.point}
+      // Every Instance from the call site at once, as Select multiple picks them; one alone as Select one.
+      onSite={(site) => store.select(site.select, site.ids.length > 1 ? "many" : undefined)}
+      onInstance={(id) => store.select(id)}
+      onHover={store.hover}
+    />
+  );
+}
+
+/** The page map, its blocks lit with their row. */
+function LitPageMap({ debug, groups, store }: { debug: LoupeDebug; groups: GroupItem[]; store: ToolbarStore }) {
+  const lit = useToolbar((state) => state.lit);
+  return <PageMapView debug={debug} groups={groups} lit={lit} onPoint={store.point} onSelect={store.select} />;
+}
+
 function ComponentList({
   debug,
-  onSelect,
-  onHover,
   body,
   notices,
   heading,
   onTool,
   mode,
   picking,
-}: Actions & Heading & Pick<PanelProps, "onTool" | "mode" | "picking"> & { body: ListBody; notices: ReactNode }) {
-  // One component pointed at, on the map or on its row: both light it, and the page outlines it.
-  const [lit, setLit] = useState<string | null>(null);
-  const point = (group: GroupItem | null) => {
-    setLit(group?.component ?? null);
-    onHover(group ? group.outlineIds : []);
-  };
+}: Part<ListBody> & Pick<PanelProps, "onTool" | "picking"> & { mode: SelectMode }) {
+  const store = useToolbarStore();
+  // One component pointed at, on the map or on its row, lights both. It goes with the list,
+  // as the list's own state did: back from an Instance, nothing is lit.
+  useEffect(() => () => store.clearLight(), [store]);
   return (
     <>
       <StartCard words={LIST_WORDS} mode={mode} armed={picking} onTool={onTool} headingRef={heading} />
       {notices}
       {body.notGenerated && <Notice notice={body.notGenerated} words={COMMAND_WORDS} onCopy={copyToClipboard} />}
-      <ChangeList changes={body.changes} words={LIST_WORDS} onSelect={(id) => onSelect(id)} onHover={onHover} />
+      <ChangeList changes={body.changes} words={LIST_WORDS} onSelect={(id) => store.select(id)} onHover={store.hover} />
       <HeldForReview
         items={body.suspended}
         meta={body.suspendedMeta}
@@ -234,19 +268,9 @@ function ComponentList({
           heading.current?.focus();
         }}
       />
-      <OnThisPage words={LIST_WORDS} summary={body.summary} map={<PageMapView debug={debug} groups={body.groups} lit={lit} onPoint={point} onSelect={onSelect} />}>
+      <OnThisPage words={LIST_WORDS} summary={body.summary} map={<LitPageMap debug={debug} groups={body.groups} store={store} />}>
         {body.groups.map((group) => (
-          <GroupRow
-            key={group.component}
-            group={group}
-            lit={lit === group.component}
-            words={INSPECTOR_WORDS}
-            onPoint={point}
-            // Every Instance from the call site at once, as Select multiple picks them; one alone as Select one.
-            onSite={(site) => onSelect(site.select, site.ids.length > 1 ? "many" : undefined)}
-            onInstance={(id) => onSelect(id)}
-            onHover={onHover}
-          />
+          <LitGroupRow key={group.component} group={group} store={store} />
         ))}
       </OnThisPage>
       <AppearsOnInteraction components={body.interaction} words={LIST_WORDS} />
@@ -329,14 +353,15 @@ function ResetInstance({ debug, id, enabled }: { debug: LoupeDebug; id: string; 
 }
 
 /** "Not on the page now": what it was and where it is written, why it may be gone, and what it still holds. */
-function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & { body: GoneBody; notices: ReactNode }) {
+function Gone({ debug, body, notices, heading }: Part<GoneBody>) {
+  const store = useToolbarStore();
   return (
     <>
       <Card look="divided">
         <Identity
           identity={body.identity}
           words={INSPECTOR_WORDS}
-          onBack={() => onSelect(null)}
+          onBack={() => store.select(null)}
           heading={heading}
           actions={body.canReset ? <ResetInstance debug={debug} id={body.id} enabled /> : undefined}
         />
@@ -346,17 +371,8 @@ function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & {
   );
 }
 
-function Inspector({
-  debug,
-  onSelect,
-  onScope,
-  onHover,
-  mode,
-  view,
-  body,
-  notices,
-  heading,
-}: Actions & Heading & Pick<PanelProps, "mode" | "view"> & { body: InspectorBody; notices: ReactNode }) {
+function Inspector({ debug, mode, view, body, notices, heading }: Part<InspectorBody> & Pick<PanelProps, "view"> & { mode: SelectMode }) {
+  const store = useToolbarStore();
   const { hold } = body;
   // State props first: a menu's `open` is the switch a designer reaches for.
   const switches = body.editable.filter(isSwitch).sort((a, b) => Number(b.state) - Number(a.state));
@@ -364,8 +380,8 @@ function Inspector({
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
-  const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={onSelect} onHover={onHover} />;
-  const propRow = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={onSelect} onHover={onHover} />;
+  const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={store.select} onHover={store.hover} />;
+  const propRow = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={store.select} onHover={store.hover} />;
   return (
     <>
       {notices}
@@ -373,7 +389,7 @@ function Inspector({
         <Identity
           identity={body.identity}
           words={INSPECTOR_WORDS}
-          onBack={() => onSelect(null)}
+          onBack={() => store.select(null)}
           nameLang={appLang()}
           heading={heading}
           actions={
@@ -399,14 +415,14 @@ function Inspector({
               </>
             ) : undefined
           }
-          onCrumb={(id) => onSelect(id)}
+          onCrumb={(id) => store.select(id)}
         >
           {mode === "many" && body.editing?.noGroup && view.scope === "instance" && (
             <NoGroup
               noGroup={body.editing.noGroup}
               // Widened, this goes, and the page scope has no call site to narrow back to: focus goes to the heading.
               onScope={(scope) => {
-                onScope(scope);
+                store.setScope(scope);
                 heading.current?.focus();
               }}
             />
@@ -419,7 +435,7 @@ function Inspector({
             selected={body.id}
             words={INSPECTOR_WORDS}
             nameLang={appLang()}
-            onScope={onScope}
+            onScope={store.setScope}
             onReset={(target) => {
               dropUndoably(debug, target, FOOTER_WORDS.offer.reset);
               heading.current?.focus();
@@ -428,7 +444,7 @@ function Inspector({
               const scope = body.members?.scope;
               if (scope) for (const id of ids) attempt(() => (action === "include" ? debug.include(id, scope) : debug.exclude(id, scope)));
             }}
-            onHover={onHover}
+            onHover={store.hover}
           />
         )}
         {cards.map(propRow)}
@@ -444,12 +460,7 @@ function Inspector({
  * The footer: how many changes the Proposal will list and the states it shows, Reset
  * all, the undo offer after a reset, light or dark, and Copy Proposal.
  */
-function Footer({
-  debug,
-  footer,
-  theme,
-  onTheme,
-}: Pick<Actions, "debug"> & Pick<PanelProps, "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
+function Footer({ debug, footer, theme, onTheme }: Pick<PanelProps, "debug" | "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
   useFooterAnnouncements(offer, footer.countText);
   // The offer stays until the Overrides move on from what the drop left (undo.ts).

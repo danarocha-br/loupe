@@ -9,7 +9,7 @@
 // The trackers the Proposal reads (`tracker.ts`, `numbers.ts`) start on the first open
 // here, unless the first change made through `__loupe` started them already (`start.ts`).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { LayerStatus } from "../layer-status.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import type { Scope } from "../runtime/store.js";
@@ -24,19 +24,13 @@ import { Panel } from "./panel.js";
 import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startTrackers } from "./start.js";
+import { scopeOf, useToolbar, useToolbarStore } from "./toolbar-store.js";
 
 export { collectProposal, collectProposalText } from "./proposal.js";
 
 export type ToolbarOpenProps = {
   host: Element;
   column: Column;
-  selected: string | null;
-  onSelect(id: string | null, mode?: SelectMode): void;
-  mode: SelectMode;
-  scope: Scope;
-  onScope(scope: Scope): void;
-  marksHidden: boolean;
-  onMarks(): void;
   onHide(): void;
   closing: boolean;
   theme: Theme;
@@ -61,23 +55,19 @@ function usePanelView(debug: LoupeDebug, layer: LayerStatus | null, selected: st
   return view;
 }
 
-/** Everything that watches the page, mounted only while the panel is open. */
-export function ToolbarOpen({
-  host,
-  column,
-  selected,
-  onSelect,
-  mode,
-  scope,
-  onScope,
-  marksHidden,
-  onMarks,
-  onHide,
-  closing,
-  theme,
-  onTheme,
-  onShown,
-}: ToolbarOpenProps) {
+/**
+ * Everything that watches the page, mounted only while the panel is open. The selection
+ * and its tool are the Toolbar's store's (toolbar-store.ts); what a row points at goes
+ * from the panel's rows to the outlines through it, not through here.
+ */
+export function ToolbarOpen({ host, column, onHide, closing, theme, onTheme, onShown }: ToolbarOpenProps) {
+  const store = useToolbarStore();
+  const selected = useToolbar((state) => state.selected);
+  const mode = useToolbar((state) => state.mode);
+  const scope = useToolbar(scopeOf);
+  // What a row or a block pointed at goes with the panel, as this component's own state
+  // did: an element the panel removes says no leave or blur, and the store outlives it.
+  useEffect(() => () => store.hover([]), [store]);
   useEffect(startTrackers, []);
   // After the panel's own effects: its heading is there to take focus.
   useEffect(onShown, [onShown]);
@@ -89,15 +79,9 @@ export function ToolbarOpen({
   const layer = useLayerStatus(version);
   const view = usePanelView(debug, layer, selected, scope, version);
   useInstanceMeta(view.metaAnchor);
-  const [hovered, setHovered] = useState<string[]>([]);
-  // A row's hover can repeat as the pointer crosses its children: the same Instances change nothing.
-  const hover = useCallback(
-    (ids: string[]) => setHovered((previous) => (previous.length === ids.length && previous.every((id, i) => id === ids[i]) ? previous : ids)),
-    [],
-  );
   const picker = usePicker(debug, host, (id) => {
-    onSelect(id);
-    setHovered([]);
+    store.select(id);
+    store.hover([]);
   });
   // A select tool sets the scope at once, for the selection there is, and arms picking
   // for the next one; pressed again while picking, it stops.
@@ -106,7 +90,7 @@ export function ToolbarOpen({
       picker.stop();
       return;
     }
-    onScope(next === "one" ? "instance" : "group");
+    store.setScope(next === "one" ? "instance" : "group");
     if (!picker.picking) picker.start();
   };
   // Esc, or a click on the page outside what is selected, goes back to the list.
@@ -114,7 +98,7 @@ export function ToolbarOpen({
     () => (selected === null ? [] : [selected, ...(view.outline.members ?? []).map((member) => member.id)]),
     [selected, view.outline.members],
   );
-  useDeselect({ debug, host, ids: selection, active: selected !== null && !picker.picking, onDeselect: () => onSelect(null) });
+  useDeselect({ debug, host, ids: selection, active: selected !== null && !picker.picking, onDeselect: () => store.select(null) });
 
   return (
     <PageSignalContext value={signal}>
@@ -124,24 +108,16 @@ export function ToolbarOpen({
         version={version}
         selected={selected}
         selectedLabel={view.outline.label}
-        hovered={hovered}
         members={view.outline.members}
         marks={view.marks}
         pick={picker.picking ? { hovered: picker.hovered, mode } : null}
-        marksHidden={marksHidden}
       />
       <Panel
         debug={debug}
         view={view}
         column={column}
-        mode={mode}
         picking={picker.picking}
         onTool={tool}
-        onSelect={onSelect}
-        onScope={onScope}
-        onHover={hover}
-        marksHidden={marksHidden}
-        onMarks={onMarks}
         onHide={onHide}
         closing={closing}
         theme={theme}

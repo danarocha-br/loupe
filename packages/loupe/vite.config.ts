@@ -69,12 +69,15 @@ function nodeSideExternal(): Plugin {
   };
 }
 
+/** React Compiler's options, here and in `toolbar/compiled.test.ts`, which checks what it compiles. */
+export const REACT_COMPILER_OPTIONS = { target: "19" } as const;
+
 /** React Compiler, on `toolbar/` only. `runtime/` reads React internals while it renders. */
 export function reactCompiler(): PluginOption {
   return babel({
     include: [/[\\/]src[\\/]toolbar[\\/][^?]*\.tsx?$/],
     exclude: [/[\\/]node_modules[\\/]/, /\.test\.tsx?$/, /\0/],
-    plugins: [["babel-plugin-react-compiler", { target: "19" }]],
+    plugins: [["babel-plugin-react-compiler", REACT_COMPILER_OPTIONS]],
   });
 }
 

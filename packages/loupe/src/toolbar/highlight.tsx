@@ -29,6 +29,7 @@ import { inView, type PageSignal } from "./page-signal.js";
 import { type Hovered, NOT_PICKING, type PickPreview, pickPreview, type SelectMode, useHovered } from "./picker.js";
 import { ChangeOutline, type OutlineKind, PageOutline, PickTag } from "./patterns/index.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
+import { useToolbar } from "./toolbar-store.js";
 
 type Tag = Pick<PickPreview, "name" | "detail">;
 type Target = { id: string; label: string | null; kind: OutlineKind; tag: Tag | null };
@@ -139,11 +140,9 @@ export function Highlight({
   version,
   selected,
   selectedLabel,
-  hovered,
   members,
   marks,
   pick,
-  marksHidden = false,
 }: {
   debug: LoupeDebug;
   /** The page signal: boxes by id, and when to read them again. */
@@ -151,17 +150,17 @@ export function Highlight({
   version: number;
   selected: string | null;
   selectedLabel: string | null;
-  /** The Instances a row of the panel names, while the pointer is on it. */
-  hovered: readonly string[];
   /** At a group or page scope, every Instance it reaches; null at This instance. */
   members: readonly Member[] | null;
   /** Per Instance a change reaches, its numbers and the stamp of what its changes set. */
   marks: readonly { id: string; keys: readonly number[]; stamp: string }[];
   /** While a select tool is armed: the Instance under the pointer, and the tool. */
   pick: { hovered: Hovered; mode: SelectMode } | null;
-  /** Hide marks: no outline for the selection or the changes, until it is turned off. */
-  marksHidden?: boolean;
 }) {
+  // From the Toolbar's store: the Instances a row of the panel names while the pointer is
+  // on it, and Hide marks (no outline for the selection or the changes until it is off).
+  const hovered = useToolbar((state) => state.hovered);
+  const marksHidden = useToolbar((state) => state.marksHidden);
   const [rings, setRings] = useState<Ring[]>([]);
   const [pins, setPins] = useState<Mark[]>([]);
   const picked = useHovered(pick?.hovered ?? NOT_PICKING);

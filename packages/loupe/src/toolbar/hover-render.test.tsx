@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 // A hover re-renders the outlines, not the whole Panel (ADR 0003's fifth check, ADR 0004:
-// React Compiler runs on toolbar/). Panel and Highlight are wrapped to count their renders;
-// everything inside them is the real code, compiled as in `dist`.
+// React Compiler runs on toolbar/), and the rows whose light changes, not every row (ADR
+// 0009: each row reads its own light from the Toolbar's store). Panel, Highlight and
+// GroupRow are wrapped to count their renders; everything inside them is the real code,
+// compiled as in `dist`.
 
 import { within } from "@testing-library/dom";
 import { act } from "react";
@@ -15,7 +17,7 @@ import { Page } from "./members.fixture.js";
 import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 
-const renders = vi.hoisted(() => ({ Panel: 0, Highlight: 0 }));
+const renders = vi.hoisted(() => ({ Panel: 0, Highlight: 0, GroupRow: 0 }));
 
 vi.mock("./panel.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./panel.js")>();
@@ -25,6 +27,17 @@ vi.mock("./panel.js", async (importOriginal) => {
       renders.Panel++;
 
       return actual.Panel(props);
+    },
+  };
+});
+
+vi.mock("./patterns/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./patterns/index.js")>();
+  return {
+    ...actual,
+    GroupRow(props: Parameters<typeof actual.GroupRow>[0]) {
+      renders.GroupRow++;
+      return actual.GroupRow(props);
     },
   };
 });
@@ -66,7 +79,7 @@ afterEach(() => {
 
 const settle = () => act(async () => await new Promise((resolve) => setTimeout(resolve, 50)));
 
-it("re-renders the outlines on a row's hover, and not the Panel", async () => {
+async function mountOpen(): Promise<ShadowRoot> {
   const LoupeMount = devMount(Toolbar);
   act(() =>
     root.render(
@@ -78,7 +91,11 @@ it("re-renders the outlines on a row's hover, and not the Panel", async () => {
   );
   await settle();
   await settle();
-  const shadow = document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
+  return document.querySelector(`[${HOST_ATTRIBUTE}]`)?.shadowRoot as ShadowRoot;
+}
+
+it("re-renders the outlines and the rows it lights on a row's hover, and not the Panel or the other rows", async () => {
+  const shadow = await mountOpen();
   const rows = within(within(shadow as unknown as HTMLElement).getByRole("list", { name: "Components on this page" })).getAllByRole("button", { expanded: false });
   expect(rows.length).toBeGreaterThan(1);
 
@@ -92,4 +109,17 @@ it("re-renders the outlines on a row's hover, and not the Panel", async () => {
   // The page outlines what the row points at: Highlight drew it.
   expect(renders.Highlight).toBeGreaterThan(before.Highlight);
   expect(renders.Panel).toBe(before.Panel);
+  // Each hover lights one row and each leave puts it out: four changes of light, four row renders.
+  expect(renders.GroupRow - before.GroupRow).toBe(4);
+});
+
+it("re-renders no row when Hide marks is pressed: only the header, the strip and the outlines change", async () => {
+  const shadow = await mountOpen();
+  const marks = within(shadow as unknown as HTMLElement).getByRole("button", { name: /Hide marks/ });
+  const before = { ...renders };
+  act(() => marks.click());
+  await settle();
+  expect(marks.getAttribute("aria-pressed")).toBe("true");
+  expect(renders.Highlight).toBeGreaterThan(before.Highlight);
+  expect(renders.GroupRow).toBe(before.GroupRow);
 });
