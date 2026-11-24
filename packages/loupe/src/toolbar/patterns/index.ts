@@ -2,9 +2,10 @@
 // panel-view's types. Each lives in its own folder: the component, its CSS in the
 // stylesheet's `patterns` layer, its tests and a `.md`.
 //
-// The import rule: a pattern imports only `ui/`, the tokens and `panel-view`'s types (never
-// a value from it), and draws the words panel-view decided; it builds none, and makes no
-// write: its callbacks do, in the view. Nothing in `ui/` imports a pattern.
+// The import rule: a pattern imports only `ui/`, the tokens, other patterns and
+// `panel-view`'s types (never a value from it), and draws the words panel-view decided; it
+// builds none, and makes no write: its callbacks do, in the view. Nothing in `ui/` imports
+// a pattern.
 // `src/toolbar/ui/layers.test.ts` holds both.
 
 export { Identity, type IdentityProps } from "./identity/identity.js";

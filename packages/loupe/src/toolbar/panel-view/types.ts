@@ -195,8 +195,8 @@ export type InspectorBody = {
   name: string | null;
   /** The component and its call site's file and line: "Button · member-row-menu.tsx:37". */
   where: string;
-  /** Where it is written, set apart where the line starts: "member-row-menu.tsx" and ":37 · use 1 of 2". */
-  source: { file: string; line: string };
+  /** Where it is written, set apart where the line starts: "member-row-menu.tsx" and ":37 · use 1 of 2"; its full path and key, for the tooltip. */
+  source: { file: string; line: string; title: string };
   /** The numbered changes that reach it. */
   keys: number[];
   /** "Hold open": a State prop with a true/false choice, held at true from one button. */
@@ -208,7 +208,7 @@ export type InspectorBody = {
   /** The adapted Instances around it, nearest first. */
   crumbs: { id: string; label: string }[];
   /** Null while nothing here can be edited: on the server, with no Adapter, or with Overrides off. */
-  editing: { resetInstanceEnabled: boolean; scopes: ScopeOption[] | null } | null;
+  editing: { resetInstanceEnabled: boolean; scopes: ScopeOption[] | null; noGroup: NoGroupView | null } | null;
   members: MembersView | null;
   /** Why nothing here can change, said once; `no-editable` is the Toolbar's own, for an adapted Instance with no Editable prop. */
   note: { kind: NoteKind | "no-editable"; title: string; body: string } | null;
@@ -230,6 +230,9 @@ export type InspectorBody = {
   inspectOnlyMeta: string | null;
   injected: { summary: string; rows: { name: string; value: string }[] } | null;
 };
+
+/** Select multiple on an Instance with no call site to group by: why, and the way to the page when that scope applies. */
+export type NoGroupView = { text: string; widen: ScopeMove | null };
 
 /** A button that moves the selection to another scope: what it says, and what it can't change, for its tooltip. */
 export type ScopeMove = { scope: Scope; text: string; title: string };

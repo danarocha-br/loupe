@@ -12,7 +12,7 @@
 
 import { act, type ComponentType, type ReactElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { OPEN_KEY } from "./launcher-place.js";
@@ -32,6 +32,13 @@ let start: typeof import("./start.js");
 let idle: (() => void)[] = [];
 /** Whether this Toolbar has loaded the open panel's module. */
 const loaded = () => start.loadedPanel() !== null;
+
+// Vite transforms the panel's module graph once per file; the first test to open the panel
+// would otherwise spend its wait on that, not on the Toolbar. Importing it here only warms
+// the transforms: `vi.resetModules()` gives each test a fresh `start.js`, its panel unloaded.
+beforeAll(async () => {
+  await import("./open.js");
+}, 60_000);
 
 beforeEach(async () => {
   vi.resetModules();

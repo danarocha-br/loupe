@@ -46,6 +46,8 @@ export const GROUND_CSS = `
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 p { margin: 0; }
 h2, h3 { margin: 0; }
+/* A heading's default, in the tokens layer: a primitive's or a pattern's own rule for its heading wins over it. */
+h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(--ink); }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; padding: 0; -webkit-tap-highlight-color: transparent; }
 button:disabled { cursor: default; opacity: 0.45; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -68,7 +70,6 @@ export const CSS = `
 .meta { font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .label { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
 .body { font: 400 ${size(13)}/1.4615 ${SANS}; color: var(--muted); margin: 0; }
-h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(--ink); }
 
 /* Controls: Button and Toggle (ui/button/, ui/toggle/). A view that sets a button's background restates its hover:
    the views' rules come after the primitives' layer, so a background here would win over the layer's hover. */

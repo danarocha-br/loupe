@@ -164,6 +164,18 @@ export const IDENTITY: Omit<IdentityProps, "words" | "onBack"> = {
   ],
 };
 
+/** The same Button once it is gone: its call site, what it still holds, and the view's Reset this Instance. */
+export const GONE: Omit<IdentityProps, "words" | "onBack" | "actions"> = {
+  component: null,
+  status: { text: "Not on the page now" },
+  name: "Button",
+  where: "member-row-menu.tsx:37",
+  whereTitle: ID,
+  note: "It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open.",
+  tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
+  held: ['variant "outline"', 'children ""'],
+};
+
 /** The same Button, never generated: the warning says what to run. */
 export const NOT_GENERATED: StatusTag = { kind: "not-generated", text: "Not generated yet" };
 

@@ -68,6 +68,13 @@ function patternOffenders(file: string, code: string): string[] {
     .map(({ specifier }) => `${path.relative(src, file)} → ${specifier}`);
 }
 
+/** What a file in `ui/` imports from the patterns, types included: none may. */
+function patternImports(file: string, code: string): string[] {
+  return imports(code)
+    .filter(({ specifier }) => specifier.startsWith(".") && inside(patterns, resolved(file, specifier)))
+    .map(({ specifier }) => `${path.relative(src, file)} → ${specifier}`);
+}
+
 describe("the layers' import rule", () => {
   it("keeps UI SDK behind the primitives: nothing outside ui/ imports it", () => {
     const offenders = sources(src)
@@ -90,12 +97,22 @@ describe("the layers' import rule", () => {
   });
 
   it("keeps the patterns out of ui/: no primitive, nor its test, imports a pattern", () => {
-    const offenders = sources(ui).flatMap((file) =>
-      specifiers(file)
-        .filter((s) => s.startsWith(".") && inside(patterns, resolved(file, s)))
-        .map((s) => `${path.relative(src, file)} → ${s}`),
-    );
-    expect(offenders).toEqual([]);
+    expect(sources(ui).flatMap((file) => patternImports(file, readFileSync(file, "utf8")))).toEqual([]);
+  });
+
+  it("would catch a primitive that imports a pattern", () => {
+    const file = path.join(ui, "example", "example.tsx");
+    const code = [
+      'import { Button } from "../button/button.js";',
+      'import { Identity } from "../../patterns/index.js";',
+      'import type { PropRowProps } from "../../patterns/prop-row/prop-row.js";',
+      'const lazy = () => import("../../patterns/marks/marks.js");',
+    ].join("\n");
+    expect(patternImports(file, code).map((offender) => offender.split(" → ")[1])).toEqual([
+      "../../patterns/index.js",
+      "../../patterns/prop-row/prop-row.js",
+      "../../patterns/marks/marks.js",
+    ]);
   });
 
   it("keeps a pattern to ui/, the tokens, other patterns and panel-view's types", () => {

@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
 import { INSPECTOR_WORDS } from "./panel-view/index.js";
 import { Identity, PropRow, ScopeSection } from "./patterns/index.js";
-import { IDENTITY, MEMBERS, NOT_GENERATED, PAGE_MEMBERS, PROP_ITEMS, TONE_AT_SCOPE, TYPE_INSPECT_ONLY } from "./patterns/samples.js";
+import { GONE, IDENTITY, MEMBERS, NOT_GENERATED, PAGE_MEMBERS, PROP_ITEMS, TONE_AT_SCOPE, TYPE_INSPECT_ONLY } from "./patterns/samples.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
   Button,
@@ -607,13 +607,7 @@ function PatternStates() {
           <Identity
             words={INSPECTOR_WORDS}
             onBack={said("back")}
-            component={null}
-            status={{ text: "Not on the page now" }}
-            name="Button"
-            where="member-row-menu.tsx:37"
-            note="It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open."
-            tags={[{ kind: "not-mounted", text: "No Instance mounted" }]}
-            held={['variant: "outline"', 'children: ""']}
+            {...GONE}
             actions={
               <Button size="small" onClick={said("reset this Instance")}>
                 Reset this Instance

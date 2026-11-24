@@ -301,6 +301,8 @@ export const injectedSummary = (count: number) => `${count} set by the library`;
 export const INSPECT_ONLY_OVERRIDES_OFF = "Overrides off";
 
 export const NO_GROUP = { label: "No call site group", title: "No call site was anchored here, so it has no group." };
+/** Select multiple's line when there is no group option at all. */
+export const ONLY_THIS_INSTANCE = "Only this Instance can be selected here.";
 
 // ── The pick tag: what a click on the page would select (2026-11-20) ──────────
 

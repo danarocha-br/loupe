@@ -160,7 +160,7 @@ export function ScopeSection({ members, selected, words, nameLang, onScope, onRe
             <ul data-scope-list="" aria-label={words.leftOutUnmounted}>
               {members.outUnmounted.map((out) => (
                 <li key={out.id}>
-                  <span data-scope-out="">{out.id}</span> 
+                  <span data-scope-out="">{out.id}</span>{" "}
                   <TagChip tag={out.tag} />
                 </li>
               ))}

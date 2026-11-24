@@ -47,11 +47,10 @@ import {
   type ListBody,
   type PanelView,
   type PropItem,
-  type ScopeOption,
+  type NoGroupView,
   INSPECTOR_WORDS,
   inspectOnlyTitle,
   LEGEND,
-  scopeMoveLabel,
   TEXT,
 } from "./panel-view/index.js";
 import { appLang } from "./app-lang.js";
@@ -731,7 +730,6 @@ function Inspector({
   const switches = body.editable.filter(isSwitch).sort((a, b) => Number(b.state) - Number(a.state));
   const cards = body.editable.filter((item) => !isSwitch(item));
   const named = body.name !== null;
-  const site = body.coverage.callSite;
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
@@ -757,7 +755,7 @@ function Inspector({
           nameLang={body.name ? appLang() : undefined}
           heading={heading}
           where={body.source}
-          whereTitle={site ? `${site.title}\n${body.id}` : body.id}
+          whereTitle={body.source.title}
           id={body.id}
           tags={body.tags}
           chips={chips}
@@ -788,7 +786,7 @@ function Inspector({
           crumbs={body.crumbs}
           onCrumb={(id) => onSelect(id)}
         >
-          {mode === "many" && body.editing?.scopes && view.scope === "instance" && <NoGroup options={body.editing.scopes} onScope={onScope} heading={heading} />}
+          {mode === "many" && body.editing?.noGroup && view.scope === "instance" && <NoGroup noGroup={body.editing.noGroup} onScope={onScope} heading={heading} />}
         </Identity>
         {body.note && (
           <Row glyph={<InfoIcon />} role="note" className="note">
@@ -908,19 +906,17 @@ function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): 
 }
 
 /**
- * Select multiple, on an Instance with no call site to group by: it is selected
- * alone, and the page is still one click away when that scope applies. Widened, this
- * goes, and the page scope has no call site to narrow back to: focus goes to the heading.
+ * Select multiple, on an Instance with no call site to group by: it is selected alone,
+ * and the page is still one click away when that scope applies. Widened, this goes, and
+ * the page scope has no call site to narrow back to: focus goes to the heading.
  */
-function NoGroup({ options, onScope, heading }: Heading & { options: ScopeOption[]; onScope(scope: Scope): void }) {
-  const group = options.find((option) => option.scope === "group");
-  const page = options.find((option) => option.scope === "page");
+function NoGroup({ noGroup, onScope, heading }: Heading & { noGroup: NoGroupView; onScope(scope: Scope): void }) {
   return (
     <div className="selection">
-      <span className="muted">{group?.title ?? "Only this Instance can be selected here."}</span>
-      {page?.enabled && (
+      <span className="muted">{noGroup.text}</span>
+      {noGroup.widen && (
         <ScopeMoveButton
-          move={{ scope: page.scope, text: `Widen to ${scopeMoveLabel(page.label)}`, title: page.title ?? page.label }}
+          move={noGroup.widen}
           onScope={(scope) => {
             onScope(scope);
             heading.current?.focus();
