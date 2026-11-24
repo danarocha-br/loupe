@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { COMMAND_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { listen } from "../../ui/announcer/announcer.fixture.js";
+import { COMMAND, SECRET_LINE } from "../samples.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { CommandLine } from "./command.js";
 import CSS from "./command.css?inline";
@@ -17,8 +18,6 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
 });
-
-const COMMAND = "pnpm -C 'apps/Web  App' exec loupe generate";
 
 describe("CommandLine", () => {
   it("shows the command as written after a hidden prompt, and copies it", async () => {
@@ -35,10 +34,10 @@ describe("CommandLine", () => {
   it("copies what it was told to, without a prompt, and steps back from Copied", async () => {
     vi.useFakeTimers();
     const onCopy = vi.fn(() => Promise.resolve());
-    const screen = renderInSurface(<CommandLine text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} words={COMMAND_WORDS} onCopy={onCopy} />);
+    const screen = renderInSurface(<CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={COMMAND_WORDS} onCopy={onCopy} />);
     expect(screen.queryByText("$")).toBeNull();
     await act(async () => screen.getByRole("button", { name: "Copy" }).click());
-    expect(onCopy).toHaveBeenCalledWith("FLAGS_SECRET=");
+    expect(onCopy).toHaveBeenCalledWith(SECRET_LINE.copy);
     expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
     await act(async () => vi.advanceTimersByTime(2000));
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();

@@ -424,6 +424,12 @@ export const INTERACTION: readonly string[] = ["AlertDialogAction", "AlertDialog
 
 // ── Notices, the Inspector's leftovers, the change list and the flags (wave 3) ──
 
+/** A command as `generate` names it: a quoted path with two spaces, which the line keeps as written. */
+export const COMMAND = "pnpm -C 'apps/Web  App' exec loupe generate";
+
+/** A line that isn't a command: what to set, shown without a prompt, its Copy only the name. */
+export const SECRET_LINE = { text: "FLAGS_SECRET=… in .env.local", copy: "FLAGS_SECRET=" } as const;
+
 /** Two of the design system's sources changed since `generate` read them. */
 export const STALE_NOTICE: NoticeView = {
   kind: "stale",
@@ -432,8 +438,8 @@ export const STALE_NOTICE: NoticeView = {
   meta: "3 components",
   body: "3 components changed since the last generate. Their props here may be out of date. Run the command below from the repo root.",
   rows: [
-    { text: "Button, ButtonGroup", value: "ui/button.tsx", valueTitle: "ds/components/ui/button.tsx" },
-    { text: "Badge", value: "ui/badge.tsx", valueTitle: "ds/components/ui/badge.tsx" },
+    { key: "ds/components/ui/button.tsx", text: "Button, ButtonGroup", value: "ui/button.tsx", valueTitle: "ds/components/ui/button.tsx" },
+    { key: "ds/components/ui/badge.tsx", text: "Badge", value: "ui/badge.tsx", valueTitle: "ds/components/ui/badge.tsx" },
   ],
   command: "pnpm -C apps/app exec loupe generate",
 };
@@ -445,7 +451,7 @@ export const NOT_GENERATED_NOTICE: NoticeView = {
   title: "Not generated yet",
   meta: "1 component",
   body: "1 component on this page is not generated yet, so it has no prop metadata and no Adapter. Run the command below from the repo root.",
-  rows: [{ text: "MemberNote", value: null, valueTitle: null }],
+  rows: [{ key: "not-generated", text: "MemberNote", value: null, valueTitle: null }],
   command: "pnpm -C apps/app exec loupe generate",
 };
 

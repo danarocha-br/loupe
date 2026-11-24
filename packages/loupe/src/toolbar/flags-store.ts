@@ -9,6 +9,7 @@
 
 import type { FlagDefinition, FlagOverrides, FlagsResult, FlagValue, OverridesResult } from "./flags-preview.js";
 import { readFlags, writeFlagOverrides } from "./flags-server.js";
+import { sameFlagValue } from "./flags-value.js";
 import { warnOnce } from "./warn-once.js";
 
 export type FlagsView =
@@ -123,10 +124,6 @@ async function ask<T extends object>(
 }
 
 /** Flag values compare by value: an option and an override are the same if they serialise the same. */
-export function sameFlagValue(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

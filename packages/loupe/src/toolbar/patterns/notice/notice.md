@@ -12,7 +12,7 @@ An Instance's note is not a card (One Card Deep): a row of the Inspector's card,
 ## Interface
 
 - `Notice`:
-  - `notice`: panel-view's `NoticeView`: `kind`, `tone` (`alert` or `amber`), `title`, `meta`, `body`, `rows` (`{ text, value, valueTitle }`, a value at the line's right with its tooltip), `command`.
+  - `notice`: panel-view's `NoticeView`: `kind`, `tone` (`alert` or `amber`), `title`, `meta`, `body`, `rows` (`{ key, text, value, valueTitle }`, `key` telling the lines apart, a value at the line's right with its tooltip), `command`.
   - `words` and `onCopy`: the command's, as CommandLine takes them.
 - `InstanceNote`: `note`, panel-view's `{ title, body }`.
 

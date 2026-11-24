@@ -329,8 +329,11 @@ export type NoticeView = {
   /** What counts it at the head's right: "2 components", "Format 0 ≠ 1". */
   meta: string | null;
   body: string;
-  /** A line each: the components, and for a changed module its file at the right, its changed files in the tooltip. */
-  rows: { text: string; value: string | null; valueTitle: string | null }[];
+  /**
+   * A line each: the components, and for a changed module its file at the right, its changed
+   * files in the tooltip. `key` tells the lines apart: a changed module's full source path.
+   */
+  rows: { key: string; text: string; value: string | null; valueTitle: string | null }[];
   /** The command that would fix it: Loupe names it and never runs it. */
   command: string | null;
 };

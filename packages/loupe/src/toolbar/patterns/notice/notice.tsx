@@ -32,7 +32,7 @@ export function Notice({ notice, words, onCopy }: NoticeProps) {
       {notice.rows.length > 0 && (
         <ul data-notice-rows="">
           {notice.rows.map((row) => (
-            <Row as="li" look="ruled" key={`${row.text}|${row.value}|${row.valueTitle}`}>
+            <Row as="li" look="ruled" key={row.key}>
               <RowLine>
                 {row.value === null ? (
                   row.text

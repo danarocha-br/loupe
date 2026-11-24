@@ -53,6 +53,7 @@ export function layerNotice(status: LayerStatus | null): NoticeView | null {
     meta: components(count),
     body: `${components(count)} changed since the last generate. Their props here may be out of date. ${RUN_BELOW}`,
     rows: status.stale.map((module) => ({
+      key: module.source,
       text: module.components.join(", ") || "No components",
       value: module.source.split("/").slice(-2).join("/"),
       valueTitle: module.changed.join("\n"),
@@ -71,7 +72,7 @@ export function notGeneratedNotice(names: readonly string[], command: string): N
     title: "Not generated yet",
     meta: components(names.length),
     body: `${components(names.length)} on this page ${one ? "is" : "are"} not generated yet, so ${one ? "it has" : "they have"} no prop metadata and no Adapter. ${RUN_BELOW}`,
-    rows: [{ text: names.join(", "), value: null, valueTitle: null }],
+    rows: [{ key: "not-generated", text: names.join(", "), value: null, valueTitle: null }],
     command,
   };
 }

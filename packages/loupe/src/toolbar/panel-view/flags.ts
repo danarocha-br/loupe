@@ -4,7 +4,8 @@
 
 import type { FlagOption } from "../flags-preview.js";
 import { PREVIEW_HOURS } from "../flags-lifetime.js";
-import { type FlagsView, sameFlagValue } from "../flags-store.js";
+import type { FlagsView } from "../flags-store.js";
+import { sameFlagValue } from "../flags-value.js";
 import { formatCurrent } from "../format.js";
 import type { FlagRowView, FlagsCardView } from "./types.js";
 
