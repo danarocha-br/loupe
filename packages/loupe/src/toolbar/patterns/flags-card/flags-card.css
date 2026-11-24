@@ -10,8 +10,10 @@
 /* What says more about a flag or the card, muted at 400 wherever it stands. */
 [data-flags-muted] { color: var(--muted); font-weight: 400; }
 
-/* A flag's options share its width, on one line; what shows now at the right, level with their foot. */
-[data-flag] [data-chip-group] { flex-wrap: nowrap; }
+/* A flag's options share its width, on one line; what shows now at the right, level with their foot.
+   The group grows into the foot: sized to its content instead, chips that each start from nothing
+   (flex: 1) squeeze to their narrowest and break their labels mid-word ("Of f"). */
+[data-flag] [data-chip-group] { flex: 1; min-width: 0; flex-wrap: nowrap; }
 [data-flag] [data-chip] { flex: 1; }
 [data-flag-foot] { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
 [data-flag-state] { margin-left: auto; padding-bottom: var(--space-sheet); font: var(--font-meta); color: var(--muted); white-space: nowrap; }

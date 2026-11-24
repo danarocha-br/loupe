@@ -93,4 +93,18 @@ describe("FlagsCard's CSS", () => {
   it("sits in the patterns layer, written against attributes, its values the tokens'", () => {
     expectPatternCss(CSS);
   });
+
+  // jsdom lays nothing out, so the rule is read: a group sized to its content let each chip
+  // (flex: 1, from nothing) squeeze to its narrowest, breaking "Off" into "Of f".
+  it("grows a flag's chip group into the row, so its chips share the width and keep their words whole", () => {
+    const style = document.createElement("style");
+    style.textContent = CSS;
+    document.head.append(style);
+    const rules = [...(style.sheet?.cssRules ?? [])].filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
+    const declared = (selector: string, property: string) => rules.find((rule) => rule.selectorText === selector)?.style.getPropertyValue(property);
+    style.remove();
+    expect(declared("[data-flag] [data-chip-group]", "flex")).toBe("1");
+    expect(declared("[data-flag] [data-chip-group]", "min-width")).toBe("0");
+    expect(declared("[data-flag] [data-chip]", "flex")).toBe("1");
+  });
 });
