@@ -14,6 +14,7 @@ import { CSS as VIEWS_CSS, GROUND_CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHIN
 // The announcer's own module, not `ui/index.js`: the collapsed pill loads no primitive's component.
 import { Announcer } from "../ui/announcer/announcer.js";
 import { PRIMITIVES_CSS } from "../ui/styles.js";
+import { PATTERNS_CSS } from "../patterns/styles.js";
 
 export type Theme = "light" | "dark";
 
@@ -25,15 +26,14 @@ export const SURFACE_ATTRIBUTE = "data-loupe-surface";
 
 /**
  * The one stylesheet every surface adopts. The views' rules are not in a layer yet,
- * so they come after every layer and may still adjust a primitive while they move
- * into patterns; nothing else is written outside one.
+ * so they come after every layer and may still adjust a primitive or a pattern while
+ * they move into patterns; nothing else is written outside one.
  */
 export const STYLESHEET: string = [
   `@layer ${LAYERS.join(", ")};`,
   `@layer tokens {${GROUND_CSS}}`,
   `@layer primitives {\n${PRIMITIVES_CSS}\n}`,
-  // Empty until the first pattern lands (ADR 0003's order of work).
-  "@layer patterns {}",
+  `@layer patterns {\n${PATTERNS_CSS}\n}`,
   VIEWS_CSS,
 ].join("\n");
 

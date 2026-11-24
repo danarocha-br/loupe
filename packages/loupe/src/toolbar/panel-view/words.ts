@@ -8,7 +8,7 @@ import type { NoteKind } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
-import type { InspectOnlyReason, StatusTag, Tag, ValueText } from "./types.js";
+import type { InspectOnlyReason, InspectorWords, StatusTag, Tag, ValueText } from "./types.js";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";
@@ -113,6 +113,39 @@ export const TEXT = {
   run: "Run",
   fromRootToReadProps: "from the repo root to read its props.",
 } as const;
+
+/** The Inspector's patterns' words (types.ts `InspectorWords`). */
+export const INSPECTOR_WORDS: InspectorWords = {
+  change: (n) => ({ label: `Change ${n}`, title: `Change ${n} in the Proposal` }),
+  heldTitle: "Held by your Override: shown as a state in the Proposal",
+  empty: TEXT.empty,
+  state: TEXT.state,
+  current: TEXT.current,
+  defaultTitle: "The component’s default: the call site doesn’t set it",
+  appValue: "the app’s value",
+  designDefault: "the design system’s default",
+  back: { label: "All components", title: "Back to every component on this page (Esc)" },
+  inside: "Inside",
+  run: TEXT.run,
+  fromRootToReadProps: TEXT.fromRootToReadProps,
+  untick: TEXT.untick,
+  picked: TEXT.picked,
+  resetScope: "Reset this scope",
+  serverRendered: "Server-rendered",
+  leftOutUnmounted: "Left out, not mounted",
+};
+
+/** Where the selection can move from a scope: a call site widens to the page, the page narrows back. */
+export const scopeMoveVerb = (from: "group" | "page") => (from === "group" ? "Widen to" : "Narrow to");
+
+/** A scope's name without its count, "All in MemberRowMenu"; "Instances" when it has none. */
+export const scopeTitle = (label: string | null) => (label ? label.replace(/ · \d+.*$/, "") : "Instances");
+
+/** A scope option's label without what it can't change, which its tooltip keeps: "All on page · 7". */
+export const scopeMoveLabel = (label: string) => label.replace(/ \(.*\)$/, "");
+
+export const instancesText = (count: number) => plural(count, "Instance");
+export const reachCount = (included: number, total: number) => `${included} of ${total}`;
 
 // ── The page and its list ───────────────────────────────────────────────────
 

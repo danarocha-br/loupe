@@ -13,6 +13,7 @@ export { Delta, type DeltaProps } from "./delta/delta.js";
 export { Dot, type DotProps, type DotTone } from "./dot/dot.js";
 export { Field, type FieldLook, type FieldProps, focusField } from "./field/field.js";
 export { Fold, FoldChevron, FoldPanel, type FoldPanelProps, type FoldProps, FoldTrigger, type FoldTriggerProps } from "./fold/fold.js";
+export * from "./icon/icon.js";
 export { Kbd, type KbdProps } from "./kbd/kbd.js";
 export { Popover, type PopoverCaret, PopoverPanel, type PopoverPanelProps, type PopoverProps } from "./popover/popover.js";
 export { Row, RowAction, RowLine, type RowLook, RowName, type RowNameProps, type RowProps, RowValue } from "./row/row.js";

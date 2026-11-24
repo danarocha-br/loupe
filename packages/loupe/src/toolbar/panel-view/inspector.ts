@@ -106,6 +106,7 @@ export function inspectorBody(
   const injected = Object.entries(inspection.injected);
   const site = inspection.callSite;
   const { editable, inspectOnly } = inspection.coverage;
+  const scopes = editing && row ? scopeOptions(page, row, scoping.scope) : null;
   return {
     kind: "inspector",
     id: inspection.id,
@@ -119,8 +120,8 @@ export function inspectorBody(
     tags,
     chips: row ? scopeChips(page.records, row, labels) : [],
     crumbs: reads.ancestors(id).map((ancestor) => ({ id: ancestor, label: reads.inspect(ancestor)?.component ?? ancestor })),
-    editing: editing ? { resetInstanceEnabled: recorded, scopes: row ? scopeOptions(page, row, scoping.scope) : null } : null,
-    members: scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined) : null,
+    editing: editing ? { resetInstanceEnabled: recorded, scopes } : null,
+    members: scoped ? membersView(scoped, id, page.rows, reads.name, row ? pageSize(page, row) : undefined, scopes) : null,
     note,
     coverage: {
       editable,

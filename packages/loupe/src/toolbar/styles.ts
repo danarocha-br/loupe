@@ -56,8 +56,6 @@ button:disabled { cursor: default; opacity: 0.45; }
  * so a view can still adjust a primitive while its rules move into patterns and primitives.
  */
 export const CSS = `
-.icon { display: block; flex: none; }
-
 /* Text */
 .panel {
   font: 400 ${size(13)}/1.3846 ${SANS}; color: var(--ink);
@@ -210,83 +208,8 @@ h3 { font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; color: var(-
 /* Card (ui/card/): every card's surface and its looks. A title that leads with a dot: */
 [data-card-head] .title { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; font-weight: 500; }
 
-/* Revision deltas (ui/delta/): a change's numbers, side by side */
-.keys { display: inline-flex; gap: 2px; flex: none; }
-
-/* Words for state: a chip for the verdict, tags only on the exceptions */
-.status { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 16px; padding: 0 7px 0 6px; border-radius: 999px; background: var(--sunk); font: 500 ${size(10)}/1.4 ${MONO}; color: var(--muted); white-space: nowrap; }
-.status.supported { background: var(--ok-bg); color: var(--ok-fg); }
-.status.stale { background: var(--warn-bg); color: var(--warn-fg); }
-.default { font: 400 ${size(12)}/1.3333 ${SANS}; color: var(--muted); }
-
-/* The identity: back, component and route, the verdict; the name; where it is written; what it is inside */
-.identity { display: flex; flex-direction: column; padding: 10px 14px 14px 10px; }
-.identity:has(.inside) { padding-bottom: 0; }
-.identity > .body { padding: 6px 0 0 4px; }
-.back { width: 28px; height: 28px; background: var(--ground); }
-@media (hover: hover) { .back:hover { background: var(--sunk-hover); } }
-.title-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 28px; }
-.title-line .lead { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.title-line .component { min-width: 0; overflow-wrap: break-word; font: 500 ${size(13)}/1.3846 ${SANS}; color: var(--muted); }
-.title-line .route { flex: none; margin-left: 1px; }
-.title-line .keys { margin-left: auto; }
-/* The whole name, however long: the headline is the one place it is read in full. */
-.identity .name {
-  min-width: 0; margin: 8px 0 0 4px; overflow-wrap: anywhere;
-  font: 600 ${size(17)}/1.2941 ${SANS}; letter-spacing: -0.015em; color: var(--ink); text-wrap: balance; outline-offset: 4px;
-}
-.identity .id { display: flex; align-items: center; gap: 4px; margin: 4px 0 0 4px; font: 400 ${size(11)}/1.6364 ${MONO}; color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.identity .id .icon { color: var(--faint); }
-.identity .id .line { color: var(--line-faint); }
-.verdicts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 0 0 4px; }
-.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 0 0 4px; }
-.identity .warn { margin: 10px 0 0 4px; }
-/* Inside: the adapted Instances around it, outermost first, each a step in from the last. */
-.inside { position: relative; display: grid; grid-template-columns: 42px minmax(0, 1fr); margin: 10px -14px 0 -10px; padding: 10px 14px 9px; background: var(--hover); }
-.inside .inside-label { font: 500 ${size(11)}/1.4545 ${SANS}; letter-spacing: 0.01em; color: var(--faint); padding-top: 2px; }
-.inside ol { list-style: none; margin: 0; padding: 0; }
-.inside li { display: flex; align-items: flex-start; min-height: 20px; }
-.inside .elbow { flex: none; margin: -2px 2px 0 3px; color: var(--tree); }
-.inside button { min-height: 20px; font: 400 ${size(12)}/1.6667 ${SANS}; color: var(--faint); text-align: left; overflow-wrap: anywhere; }
-.inside li:nth-last-child(2) button { color: var(--tree-ink); }
-.inside li:last-child button { color: var(--ink); font-weight: 500; }
-@media (hover: hover) { .inside button:hover { text-decoration: underline; text-underline-offset: 3px; } }
-
-/* The scope of Select multiple: who it reaches, how far the page goes, and the Instances it lists */
-.scope { display: flex; flex-direction: column; gap: 6px; padding: 14px; }
-.scope .scope-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
-.scope .scope-title .lead { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.scope h3 { min-width: 0; overflow-wrap: anywhere; font: 500 ${size(14)}/1.2857 ${SANS}; letter-spacing: -0.01em; }
-.meter { display: flex; flex: none; gap: 4px; }
-.meter i { flex: none; width: 8px; height: 8px; border-radius: 4px; box-shadow: inset 0 0 0 1.25px var(--rule-strong); }
-.meter i.in { background: var(--accent); box-shadow: none; }
-.scope .reach { margin-left: 28px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
-.scope .reach b { font-weight: 600; color: var(--ink); }
-.scope .scope-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin: 4px 0 0 28px; }
-/* A soft Button in navy, 28px: its background is the view's, so its hover is too. */
-.widen { height: 28px; padding: 0 11px 0 9px; background: var(--link-wash); box-shadow: inset 0 0 0 1px var(--link-edge); color: var(--link); }
-@media (hover: hover) { .widen:hover { background: var(--link-edge); } }
-.scope .count-toggle { display: inline-flex; align-items: center; gap: 2px; min-height: 28px; margin-left: auto; font: var(--font-control); color: var(--ink); }
-.scope .count-toggle [data-fold-chevron] { color: var(--muted); }
+/* Select multiple on an Instance with no call site: why, and Widen to the page (ScopeSection's move, patterns/). */
 .selection { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding-top: 10px; font-size: ${size(12)}; line-height: 1.4167; }
-
-/* The scope's Instances, opened: a box to leave each one out */
-.members { display: flex; flex-direction: column; padding: 12px 0 10px; border-top: 1px solid var(--rule); background: var(--hover); }
-.members .hint { padding: 0 14px 8px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
-.members .list > li, .members legend > label { display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 0 14px; }
-.members label { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; cursor: pointer; }
-.members .who { flex: 1; min-width: 0; }
-.members .who .screen-name, .members legend .screen-name { min-width: 0; white-space: normal; overflow-wrap: anywhere; font: 400 ${size(13)}/1.3846 ${SANS}; color: var(--ink); }
-.members .who.picked .screen-name { font-weight: 500; }
-.members .server-name { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
-.members input[type="checkbox"] { appearance: none; flex: none; width: 16px; height: 16px; margin: 0; border: 1.5px solid var(--field-edge); border-radius: 5px; display: grid; place-content: center; cursor: pointer; }
-.members input[type="checkbox"]:checked { border-color: var(--accent); background: var(--accent); }
-.members input[type="checkbox"]:checked::after { content: ""; width: 8px; height: 4px; margin-top: -2px; border: solid var(--on-check); border-width: 0 0 2px 2px; transform: rotate(-45deg); }
-.members input:disabled { opacity: 0.45; cursor: default; }
-fieldset.site { border: 0; padding: 0; margin: 0; }
-fieldset.site legend { width: 100%; padding: 0; }
-fieldset.site .list > li { padding-left: 42px; }
-.reset-scope { align-self: flex-start; margin: 6px 0 0 14px; }
 
 /* Notices: the Product layer's, Overrides off, and an Instance's note */
 .notice-card { gap: var(--space-inset); }
@@ -298,10 +221,6 @@ fieldset.site .list > li { padding-left: 42px; }
 .command-refused:not(:empty) { margin-top: 6px; }
 /* An Instance's note: a Row (ui/row/) with the info glyph, its title over its paragraph. */
 .note .text { display: flex; flex-direction: column; gap: var(--space-xs); }
-.notice { padding: 10px 12px; border-radius: 12px; background: var(--well); font: 400 ${size(12)}/1.5 ${SANS}; }
-.notice code { font-family: ${MONO}; font-weight: 600; color: var(--ink); }
-.notice .reset { margin-top: 8px; background: var(--card); }
-@media (hover: hover) { .notice .reset:not(:disabled):hover { background: var(--sunk-hover); } }
 .warn { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn-fg); font: 400 ${size(12)}/1.4167 ${SANS}; }
 .warn [data-dot] { margin-top: 5px; }
 
@@ -316,24 +235,6 @@ fieldset.site .list > li { padding-left: 42px; }
 .keylist .what { grid-area: what; font: 400 ${size(12)}/1.5 ${MONO}; overflow-wrap: anywhere; }
 .keylist .where { grid-area: where; min-width: 0; overflow-wrap: break-word; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
 
-/* A property row (a Row, ui/row/): what qualifies its name, then its chips under the name */
-/* The head and the lines that qualify it sit tight; the control sits apart. */
-[data-prop] .head-group { display: flex; flex-direction: column; gap: var(--space-hair); min-width: 0; }
-[data-row-value] .muted, [data-row-value] .default { font: inherit; }
-[data-prop] .change { font: 400 ${size(11)}/1.4545 ${MONO}; color: var(--muted); overflow-wrap: anywhere; }
-[data-prop] .change .arrow { color: var(--faint); font-family: ${SANS}; }
-[data-prop] .change .to { color: var(--ink); font-weight: 600; }
-[data-prop] .change .from-scope { font-family: ${SANS}; color: var(--muted); }
-[data-prop] .current { font: 400 ${size(12)}/1.3333 ${MONO}; color: var(--ink); }
-[data-prop] .current .meta { font-family: ${SANS}; margin-right: 4px; }
-[data-prop] .explain { font: 400 ${size(12)}/1.4167 ${SANS}; color: var(--muted); }
-[data-prop] .refusal { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: ${size(12)}; line-height: 1.4167; }
-[data-prop] .keeping { align-self: flex-start; min-height: 24px; font: 500 ${size(12)}/1.3333 ${SANS}; color: var(--link); text-decoration: underline; text-decoration-color: var(--link-edge); text-underline-offset: 3px; }
-@media (hover: hover) { [data-prop] .keeping:hover { text-decoration-color: currentColor; } }
-
-/* The options: ChipGroup (ui/chip-group/chip-group.css). */
-/* A text prop: Field's outline look (ui/field), its edge salmon once the prop is changed here. */
-[data-prop].overridden .text [data-field-control] { border-color: var(--shown-edge); }
 /* What the chips' marks mean, said once on a row of its own. */
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-height: 34px; padding: 10px 14px 10px 42px; font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); }
 .legend span { display: inline-flex; align-items: center; gap: 4px; }
@@ -484,8 +385,5 @@ ${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
   .legend i { forced-color-adjust: none; background: CanvasText; }
-  .members input[type="checkbox"]:checked { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
-  .members input[type="checkbox"]:checked::after { border-color: HighlightText; }
-  .meter i.in { forced-color-adjust: none; background: CanvasText; }
 }
 `;

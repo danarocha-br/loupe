@@ -503,7 +503,7 @@ describe("group and page scopes", () => {
     const scoped = inspector(shown).members;
     expect(scoped?.countText).toBe("Reaches 3 of 4");
     // The page has one more Button than the call site: the scope says so, and can widen to it.
-    expect(scoped?.reach).toEqual({ lead: "Reaches", included: 3, total: 4, page: 5, moreText: "1 more on this page" });
+    expect(scoped?.reach).toEqual({ lead: "Reaches", included: 3, total: 4, page: 5, moreText: "1 more on this page", countText: "3 of 4" });
     expect(scoped?.sites).toBeNull();
     expect(scoped?.members.find((member) => member.id === BIA)).toEqual({
       id: BIA,

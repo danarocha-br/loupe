@@ -1,0 +1,64 @@
+/*
+ * ScopeSection (ADR 0003): Select multiple's scope, written against `[data-scope-section]`
+ * and its parts (`[data-scope-title]`, `[data-scope-meter]`, `[data-scope-members]`, …),
+ * with `[data-in]`, `[data-out]` and `[data-picked]` for its states. Values from the
+ * tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* The head: padded 14px, its parts 6px apart. */
+[data-scope-head] { display: flex; flex-direction: column; gap: var(--space-sheet); padding: var(--space-gutter); }
+[data-scope-title] { display: flex; align-items: center; justify-content: space-between; gap: var(--space-inset); min-height: 20px; }
+[data-scope-lead] { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; }
+[data-scope-title] h3 { min-width: 0; overflow-wrap: anywhere; font: var(--font-title); letter-spacing: var(--tracking-title); }
+
+/* The meter: an 8px dot for each of the component's Instances on the page, coral for those it reaches. */
+[data-scope-meter] { display: flex; flex: none; gap: var(--space-xs); }
+[data-scope-meter] i { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.25px var(--rule-strong); }
+[data-scope-meter] i[data-in] { background: var(--accent); box-shadow: none; }
+
+/* "Reaches 4 of 4 · 3 more on this page": faint, the count in ink; set in under the icon, 28px. */
+[data-scope-reach] { margin: 0 0 0 28px; font: var(--font-meta); color: var(--faint); }
+[data-scope-reach] b { font-weight: 600; color: var(--ink); }
+
+/* Widen, Reset this scope, and at the right the count that opens the Instances. */
+[data-scope-actions] { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sheet); margin: var(--space-xs) 0 0 28px; }
+[data-scope-count] { display: inline-flex; align-items: center; gap: var(--space-hair); min-height: 28px; margin-left: auto; font: var(--font-control); color: var(--ink); }
+[data-scope-count] [data-fold-chevron] { color: var(--muted); }
+
+/* Widen or Narrow: a soft Button in navy, 28px. Its background is this pattern's, so its hover is too. */
+[data-scope-move] { height: 28px; padding: 0 11px 0 9px; background: var(--link-wash); box-shadow: inset 0 0 0 1px var(--link-edge); color: var(--link); }
+@media (hover: hover) { [data-scope-move]:hover { background: var(--link-edge); } }
+
+/* Its Instances, opened: on the hover wash, a box to leave each one out. */
+[data-scope-members] { display: flex; flex-direction: column; padding: var(--space-card) 0 var(--space-row); border-top: 1px solid var(--rule); background: var(--hover); }
+[data-scope-hint] { padding: 0 var(--space-gutter) var(--space-inset); font: var(--font-meta); color: var(--faint); }
+[data-scope-list] { list-style: none; margin: 0; padding: 0; }
+[data-scope-list] > li, [data-scope-site] legend > label { display: flex; align-items: center; gap: var(--space-card); min-height: 32px; padding: 0 var(--space-gutter); }
+[data-scope-members] label { display: flex; align-items: center; gap: var(--space-card); flex: 1; min-width: 0; cursor: pointer; }
+[data-scope-who] { flex: 1; min-width: 0; overflow-wrap: anywhere; font: var(--font-body); color: var(--ink); }
+[data-scope-who][data-picked] { font-weight: 500; }
+[data-scope-who][data-out] { color: var(--faint); text-decoration: line-through; }
+[data-scope-count-of] { color: var(--muted); font-weight: 400; }
+[data-scope-server] { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
+[data-scope-out] { font: var(--font-mono); line-height: inherit; color: var(--muted); }
+
+/* A 16px box on a 1.5px `field-edge`, coral when ticked. */
+[data-scope-members] input[type="checkbox"] {
+  appearance: none; flex: none; display: grid; place-content: center; width: 16px; height: 16px; margin: 0;
+  border: 1.5px solid var(--field-edge); border-radius: var(--radius-checkbox); cursor: pointer;
+}
+[data-scope-members] input[type="checkbox"]:checked { border-color: var(--accent); background: var(--accent); }
+[data-scope-members] input[type="checkbox"]:checked::after { content: ""; width: 8px; height: 4px; margin-top: -2px; border: solid var(--on-check); border-width: 0 0 2px 2px; transform: rotate(-45deg); }
+[data-scope-members] input:disabled { opacity: 0.45; cursor: default; }
+
+/* At All on page, by call site: one box for the whole site, its Instances set in under it. */
+[data-scope-site] { border: 0; padding: 0; margin: 0; min-width: 0; }
+[data-scope-site] legend { width: 100%; padding: 0; }
+[data-scope-site] [data-scope-list] > li { padding-left: 42px; }
+
+/* Forced colours drop backgrounds and box-shadows: a ticked box and a reached dot keep their state in system colours. */
+@media (forced-colors: active) {
+  [data-scope-members] input[type="checkbox"]:checked { forced-color-adjust: none; background: Highlight; border-color: Highlight; }
+  [data-scope-members] input[type="checkbox"]:checked::after { border-color: HighlightText; }
+  [data-scope-meter] i[data-in] { forced-color-adjust: none; background: CanvasText; }
+}

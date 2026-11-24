@@ -1,13 +1,16 @@
 "use client";
 
-// The workbench (ADR 0003): each primitive drawn by itself, inside the same shadow-root
-// surface the Toolbar uses, in light and dark, under forced colours, with reduced
-// motion and at a larger text size. `@danarocha/loupe/workbench` exists for the
+// The workbench (ADR 0003): each primitive drawn by itself, and each pattern with sample
+// panel-view data, inside the same shadow-root surface the Toolbar uses, in light and
+// dark, under forced colours, with reduced motion and at a larger text size. `@danarocha/loupe/workbench` exists for the
 // fixture app's `/workbench` page, which loads it in development only, as
 // `<LoupeMount />` loads the Toolbar; a host never imports it.
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { InfoIcon, PROP_ICONS, ResetIcon } from "./icons.js";
+import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
+import { INSPECTOR_WORDS } from "./panel-view/index.js";
+import { Identity, PropRow, ScopeSection } from "./patterns/index.js";
+import { IDENTITY, MEMBERS, NOT_GENERATED, PAGE_MEMBERS, PROP_ITEMS, TONE_AT_SCOPE, TYPE_INSPECT_ONLY } from "./patterns/samples.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
   Button,
@@ -552,6 +555,87 @@ function CardRowStates() {
   );
 }
 
+/**
+ * The Inspector's patterns with sample panel-view data: Identity, ScopeSection and
+ * PropRow in one divided card, as the Inspector draws them; a gone Instance's identity;
+ * the page's scope; and a scope's row beside Inspect only's pairs. Each write is said
+ * under the cards rather than made.
+ */
+function PatternStates() {
+  const [last, setLast] = useState("—");
+  const said = (what: string) => () => setLast(what);
+  const rowCalls = {
+    onSet: (write: { prop: string }, value: unknown) => setLast(`set ${write.prop} to ${JSON.stringify(value)}`),
+    onText: (write: { prop: string }, text: string) => setLast(`typed ${JSON.stringify(text)} in ${write.prop}`),
+    onReset: (write: { prop: string }) => setLast(`reset ${write.prop}`),
+    onSelect: (id: string) => setLast(`select ${id}`),
+    onHover: () => {},
+  };
+  const scopeCalls = {
+    onScope: (scope: string) => setLast(`scope ${scope}`),
+    onReset: said("reset this scope"),
+    onToggle: (action: string, ids: readonly string[]) => setLast(`${action} ${ids.join(", ")}`),
+    onHover: () => {},
+  };
+  const selected = MEMBERS.members[2]?.id ?? "";
+  return (
+    <div className="wb-states">
+      <Frame title="The Inspector: Identity, ScopeSection, then a PropRow per prop">
+        <Card look="divided">
+          <Identity words={INSPECTOR_WORDS} onBack={said("back")} onCrumb={(id) => setLast(`select ${id}`)} {...IDENTITY} />
+          <ScopeSection members={MEMBERS} selected={selected} words={INSPECTOR_WORDS} {...scopeCalls} />
+          {PROP_ITEMS.map((item) => (
+            <PropRow key={item.name} item={item} words={INSPECTOR_WORDS} {...rowCalls} />
+          ))}
+        </Card>
+      </Frame>
+      <Frame title="Identity: not generated yet, and gone">
+        <Card look="divided">
+          <Identity
+            words={INSPECTOR_WORDS}
+            onBack={said("back")}
+            {...IDENTITY}
+            status={NOT_GENERATED}
+            keys={[]}
+            tags={[]}
+            chips={[]}
+            crumbs={[]}
+            notGenerated={{ tag: NOT_GENERATED, command: "npx loupe generate" }}
+          />
+        </Card>
+        <Card look="divided">
+          <Identity
+            words={INSPECTOR_WORDS}
+            onBack={said("back")}
+            component={null}
+            status={{ text: "Not on the page now" }}
+            name="Button"
+            where="member-row-menu.tsx:37"
+            note="It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open."
+            tags={[{ kind: "not-mounted", text: "No Instance mounted" }]}
+            held={['variant: "outline"', 'children: ""']}
+            actions={
+              <Button size="small" onClick={said("reset this Instance")}>
+                Reset this Instance
+              </Button>
+            }
+          />
+        </Card>
+      </Frame>
+      <Frame title="ScopeSection at All on page, by call site">
+        <Card look="divided">
+          <ScopeSection members={PAGE_MEMBERS} selected={selected} words={INSPECTOR_WORDS} {...scopeCalls} />
+          <PropRow item={TONE_AT_SCOPE} words={INSPECTOR_WORDS} {...rowCalls} />
+          <div className="wb-pairs">
+            <PropRow item={TYPE_INSPECT_ONLY} look="pair" words={INSPECTOR_WORDS} {...rowCalls} />
+          </div>
+        </Card>
+      </Frame>
+      <p className="wb-note">Last: {last}</p>
+    </div>
+  );
+}
+
 function Frame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -641,6 +725,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <section className="wb-bare">
             <h2>Card and Row</h2>
             <CardRowStates />
+          </section>
+          <section className="wb-bare">
+            <h2>Patterns: the Inspector</h2>
+            <PatternStates />
           </section>
         </div>
       </Surface>

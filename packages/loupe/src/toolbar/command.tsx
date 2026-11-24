@@ -2,7 +2,7 @@
 // and never runs them (PER-100 §5).
 
 import { useEffect, useState } from "react";
-import { CopyIcon } from "./icons.js";
+import { CopyIcon } from "./ui/icon/icon.js";
 import { Button, useAnnounce } from "./ui/index.js";
 
 /** Said under the command when the clipboard refuses it: what failed, and what to do instead. */

@@ -110,6 +110,8 @@ export function instanceProp(row: PropRow, editing: Editing | null): PropItem {
     value: fromOverride ? null : valueText(row),
     counts: null,
     source: editing && source ? sourceText(scopeName(source, editing.labels)) : null,
+    // At This instance a group or page Override's value is news; at a scope, the card is that scope already.
+    wider: editing !== null && fromOverride && source !== "instance",
     // Keyed by Instance, so another Instance drops the field's unsent text. Not by
     // source: the first keystroke makes an Override, and a remount would take the field's focus.
     control: row.editable && editing && write ? control(row, value, write, editing.id, null) : null,
@@ -154,6 +156,7 @@ export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Read
     // Text with no control here still shows what it says, not only that it matches.
     counts: only && !textRefusal ? sameOnAll(inScope) : countsText(new Map([...counts].map(([label, entry]) => [label, entry.count]))),
     source: sourceText(overridden ? view.name : THE_APP),
+    wider: false,
     control: row.state
       ? { kind: "refused", refusal: "state-only", text: STATE_SCOPE_REASON }
       : textRefusal

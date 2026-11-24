@@ -8,6 +8,9 @@ import type { LoupeDebug } from "../../runtime/debug.js";
 import type { NoteKind } from "../../runtime/inspect.js";
 import type { Scope, ScopeTarget } from "../../runtime/store.js";
 
+// The runtime's scope words, as the panel's data speaks them: a pattern takes them from here.
+export type { Scope, ScopeTarget };
+
 /** Components seen on a route so far, for "Appears on interaction". */
 export type SeenComponents = { readonly route: string; readonly components: ReadonlySet<string> };
 
@@ -228,14 +231,59 @@ export type InspectorBody = {
   injected: { summary: string; rows: { name: string; value: string }[] } | null;
 };
 
+/** A button that moves the selection to another scope: what it says, and what it can't change, for its tooltip. */
+export type ScopeMove = { scope: Scope; text: string; title: string };
+
+/**
+ * The words the Inspector's patterns draw whatever is on the page (DESIGN.md "Layers"):
+ * decided here, so a pattern builds none.
+ */
+export type InspectorWords = {
+  /** A change's delta: "Change 1", and its tooltip. */
+  change(n: number): { label: string; title: string };
+  /** A held State prop's empty delta: its tooltip. */
+  heldTitle: string;
+  /** Label text left empty. */
+  empty: string;
+  /** The tag on a State prop's row. */
+  state: string;
+  /** Before the app's own value under an Override. */
+  current: string;
+  /** A value that is the component's default, for its tooltip. */
+  defaultTitle: string;
+  /** A chip's marks, said to a screen reader and in its tooltip. */
+  appValue: string;
+  designDefault: string;
+  /** The identity's back button. */
+  back: { label: string; title: string };
+  /** Before the adapted Instances around it. */
+  inside: string;
+  /** "Run `loupe generate` from the repo root to read its props." */
+  run: string;
+  fromRootToReadProps: string;
+  /** The scope's Instances, opened. */
+  untick: string;
+  picked: string;
+  resetScope: string;
+  serverRendered: string;
+  leftOutUnmounted: string;
+};
+
 export type ScopeOption = { scope: Scope; label: string; enabled: boolean; pressed: boolean; title: string | null };
 
 export type MembersView = {
   scope: "group" | "page";
+  /** The scope's name, "All in MemberRowMenu", and what it can't change, for its tooltip. */
+  name: string;
+  nameTitle: string | null;
+  /** "4 Instances": the fold's trigger. */
+  instancesText: string;
+  /** Widen a call site to the page, or narrow the page back to it: "Widen to All on page · 7". */
+  widen: ScopeMove | null;
   /** "3 of 4 previewed". */
   countText: string;
   /** How far the scope reaches: "Reaches", its members in and in all, the component's on the page, and the rest said. */
-  reach: { lead: string; included: number; total: number; page: number; moreText: string | null };
+  reach: { lead: string; included: number; total: number; page: number; moreText: string | null; countText: string };
   /** The scope's record is Suspended: shown, never changed. */
   suspended: boolean;
   members: MemberItem[];
@@ -300,6 +348,8 @@ export type PropItem = {
   change: { from: string; to: string } | null;
   /** "from All in Members". */
   source: string | null;
+  /** The value comes from a wider scope than the one in view: the change line names `source`. */
+  wider: boolean;
   control: Control | null;
   /** "Current:" with the app's own value, under a row an Override holds. */
   current: ValueText | null;

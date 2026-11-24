@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { within } from "@testing-library/dom";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +12,7 @@ import { resetLoupe } from "../runtime/slot.js";
 import { COPY_REFUSED } from "./command.js";
 import Toolbar from "./index.js";
 import { OPEN_KEY } from "./launcher-place.js";
+import IDENTITY_CSS from "./patterns/identity/identity.css?inline";
 import { loadPanel } from "./start.js";
 import { CSS, HOST_ATTRIBUTE } from "./styles.js";
 import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
@@ -304,9 +306,12 @@ describe("components that are new since the last generate", () => {
 
   it("shows a quoted path's run of spaces as the shell reads it, in the card and the Inspector", async () => {
     const command = "pnpm -C 'apps/Web  App' exec loupe generate";
-    const shown = (where: string) => shadow().querySelector(`[data-testid=${where}] .mono.verbatim`)?.textContent;
-    // jsdom applies no shadow-root stylesheet, so this reads the rule and the class apart.
+    // The element whose own text is the command, its run of spaces kept as written.
+    const shown = (where: string) =>
+      within(shadow().querySelector(`[data-testid=${where}]`) as HTMLElement).queryByText(command, { normalizer: (text) => text })?.textContent;
+    // jsdom applies no shadow-root stylesheet, so this reads the rules apart: the card's, and Identity's (patterns/identity/).
     expect(CSS).toContain(".verbatim { white-space: pre-wrap; }");
+    expect(IDENTITY_CSS).toMatch(/\[data-identity-command\] \{[^}]*white-space: pre-wrap/);
     server.status = { ...FRESH, command, notGenerated: ["NewCard"] };
     await mountWithNew();
     expect(shown("not-generated-notice")).toBe(command);
