@@ -8,9 +8,25 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
-import { INSPECTOR_WORDS } from "./panel-view/index.js";
-import { Identity, PropRow, ScopeSection } from "./patterns/index.js";
-import { GONE, IDENTITY, MEMBERS, NOT_GENERATED, PAGE_MEMBERS, PROP_ITEMS, TONE_AT_SCOPE, TYPE_INSPECT_ONLY } from "./patterns/samples.js";
+import { INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
+import { AppearsOnInteraction, GroupRow, HeldForReview, Identity, OnThisPage, PageMap, PropRow, ScopeSection, SiteCard, StartCard } from "./patterns/index.js";
+import {
+  BUTTON_GROUP,
+  GONE,
+  HELD,
+  HELD_META,
+  IDENTITY,
+  INTERACTION,
+  LIST_BOXES,
+  LIST_GROUPS,
+  LIST_SUMMARY,
+  MEMBERS,
+  NOT_GENERATED,
+  PAGE_MEMBERS,
+  PROP_ITEMS,
+  TONE_AT_SCOPE,
+  TYPE_INSPECT_ONLY,
+} from "./patterns/samples.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
   Button,
@@ -510,15 +526,21 @@ function CardRowStates() {
           </div>
         </Card>
       </Frame>
-      <Frame title="List: rows run edge to edge, the head keeps 14px">
+      <Frame title="List, with item rows: edge to edge on their hairline, the text 14px in">
         <Card look="list">
           <CardHead>
             <h3>Appears on interaction</h3>
             <span className="wb-note">Not on screen yet</span>
           </CardHead>
           <ul className="wb-list">
-            <li>Dialog</li>
-            <li>Tooltip</li>
+            <Row as="li" look="item">
+              Dialog
+              <span className="wb-note">A line under the name, 2px apart.</span>
+            </Row>
+            <Row as="li" look="item">
+              Tooltip
+              <span className="wb-note">A line under the name, 2px apart.</span>
+            </Row>
           </ul>
         </Card>
       </Frame>
@@ -630,6 +652,70 @@ function PatternStates() {
   );
 }
 
+/**
+ * The list's patterns with sample panel-view data, as the list draws them with nothing
+ * selected: the guided start, Held for review, On this page (the map over its rows, one
+ * opened to its call sites) and Appears on interaction. A choice or a write is said under
+ * the cards rather than made.
+ */
+function ListPatternStates() {
+  const [last, setLast] = useState("—");
+  const [mode, setMode] = useState<SelectMode>("one");
+  const [armed, setArmed] = useState(false);
+  const [lit, setLit] = useState<string | null>(null);
+  const point = (group: { component: string } | null) => setLit(group?.component ?? null);
+  return (
+    <div className="wb-states">
+      <Frame title="StartCard: the mode checked; pressed again, armed">
+        <StartCard
+          words={LIST_WORDS}
+          mode={mode}
+          armed={armed}
+          onTool={(next) => {
+            setArmed(next === mode ? !armed : true);
+            setMode(next);
+            setLast(`tool ${next}`);
+          }}
+        />
+      </Frame>
+      <Frame title="HeldForReview">
+        <HeldForReview items={HELD} meta={HELD_META} words={LIST_WORDS} onDiscard={(target) => setLast(`discard ${JSON.stringify(target)}`)} />
+      </Frame>
+      <Frame title="OnThisPage: PageMap over a GroupRow per component">
+        <OnThisPage
+          words={LIST_WORDS}
+          summary={LIST_SUMMARY}
+          map={<PageMap groups={LIST_GROUPS} boxes={LIST_BOXES} lit={lit} words={LIST_WORDS} onPoint={point} onSelect={(id) => setLast(`select ${id}`)} />}
+        >
+          {LIST_GROUPS.map((group) => (
+            <GroupRow
+              key={group.component}
+              group={group}
+              lit={lit === group.component}
+              words={INSPECTOR_WORDS}
+              onPoint={point}
+              onSite={(site) => setLast(`select ${site.label}`)}
+              onInstance={(id) => setLast(`select ${id}`)}
+              onHover={() => {}}
+            />
+          ))}
+        </OnThisPage>
+      </Frame>
+      <Frame title="SiteCard: a call site, lifted on an opened row's wash">
+        <div className="wb-site" data-hue={BUTTON_GROUP.hue}>
+          {BUTTON_GROUP.sites.map((site) => (
+            <SiteCard key={site.anchor} site={site} onSite={(picked) => setLast(`select ${picked.label}`)} onInstance={(id) => setLast(`select ${id}`)} onHover={() => {}} />
+          ))}
+        </div>
+      </Frame>
+      <Frame title="AppearsOnInteraction">
+        <AppearsOnInteraction components={INTERACTION} words={LIST_WORDS} />
+      </Frame>
+      <p className="wb-note">Last: {last}</p>
+    </div>
+  );
+}
+
 function Frame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
@@ -646,7 +732,7 @@ const FRAME_CSS = `
 .wb-row > h3 { font: var(--font-label); color: var(--muted); }
 .wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
 .wb-list { list-style: none; margin: 0; padding: 0; }
-.wb-list > li:not([data-row]) { padding: var(--space-inset) var(--space-gutter); border-top: 1px solid var(--rule); }
+.wb-site { display: flex; flex-direction: column; gap: var(--space-sheet); padding: var(--space-row) var(--space-gutter) var(--space-card); border-radius: var(--radius-card); background: var(--hover); }
 .wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
 .wb-note-text { display: flex; flex-direction: column; gap: var(--space-xs); }
 .wb-note-text p { font: var(--font-paragraph); color: var(--muted); }
@@ -723,6 +809,10 @@ function FrameView({ frame }: { frame: Frame }) {
           <section className="wb-bare">
             <h2>Patterns: the Inspector</h2>
             <PatternStates />
+          </section>
+          <section className="wb-bare">
+            <h2>Patterns: the list</h2>
+            <ListPatternStates />
           </section>
         </div>
       </Surface>

@@ -1,0 +1,17 @@
+/*
+ * HeldForReview (ADR 0003): the held records' card, written against `[data-held-for-review]`
+ * and its parts (`[data-held-title]`, `[data-held-list]`, `[data-held-item]`,
+ * `[data-held-target]`, `[data-held-why]`). Each record is a Row `item` (ui/row/), the
+ * hairline and the 14px inset its; this card's rhythm is looser, 10px above and below and
+ * its parts 6px apart. Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* The hollow ring before the title: held, applying to nothing. */
+[data-held-title] { display: flex; align-items: center; gap: var(--space-inset); min-width: 0; font-weight: 500; }
+
+[data-held-list] { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+[data-held-item] { --row-gap: var(--space-sheet); padding-block: var(--space-row); }
+
+/* What it names, in 12px mono on a 16px line, and Discard at the right. */
+[data-held-target] { display: flex; align-items: center; justify-content: space-between; gap: var(--space-inset); font: var(--font-mono); line-height: 1.3333; }
+[data-held-why] { font: var(--font-caption); color: var(--muted); }

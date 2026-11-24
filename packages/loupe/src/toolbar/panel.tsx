@@ -25,10 +25,8 @@ import { FlagsCard } from "./flags.js";
 import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Row, RowLine, RowName, RowValue, Tag, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
 import {
-  ChevronIcon,
   ContrastIcon,
   CursorIcon,
-  EyeIcon,
   InfoIcon,
   MarksHiddenIcon,
   MarksIcon,
@@ -40,7 +38,6 @@ import {
 } from "./ui/icon/icon.js";
 import { layerAnnouncement, LayerNotices, NotGeneratedNotice } from "./notices.js";
 import {
-  type CallSiteItem,
   type GoneBody,
   type GroupItem,
   type InspectorBody,
@@ -51,11 +48,22 @@ import {
   INSPECTOR_WORDS,
   inspectOnlyTitle,
   LEGEND,
+  LIST_WORDS,
   TEXT,
 } from "./panel-view/index.js";
 import { appLang } from "./app-lang.js";
-import { Breakable, ChangeKey, Identity, Keys, ScopeMoveButton, ScopeSection, StatusChip, TagChip } from "./patterns/index.js";
-import { hueOf, PageMap } from "./page-map.js";
+import {
+  AppearsOnInteraction,
+  ChangeKey,
+  GroupRow,
+  HeldForReview,
+  Identity,
+  OnThisPage,
+  ScopeMoveButton,
+  ScopeSection,
+  StartCard,
+} from "./patterns/index.js";
+import { PageMapView } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
 import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndoOffer } from "./undo.js";
 
@@ -94,37 +102,13 @@ const PANEL_INSET = 8;
  */
 type Actions = Pick<PanelProps, "debug" | "onSelect" | "onScope" | "onHover">;
 
-/** Pointing at or focusing something outlines `ids` on the page, and leaving it clears them: over, not enter (see above). */
-function hoverProps(onHover: Actions["onHover"], ids: string[]) {
-  return {
-    onMouseOver: () => onHover(ids),
-    onMouseLeave: () => onHover([]),
-    onFocus: () => onHover(ids),
-    onBlur: () => onHover([]),
-  };
-}
-
 /** The header's select tools are chips of a radio group drawn as Button's round tool. */
 const TOOL_LOOK = lookAttributes({ look: "tool", iconOnly: true });
 
-/** The header's two select tools: what each is called, and the scope it opens a selection at. */
-const SELECT_TOOLS: { mode: SelectMode; scope: Scope; label: string; hint: string; title: string; icon: ReactNode }[] = [
-  {
-    mode: "one",
-    scope: "instance",
-    label: "Select one",
-    hint: "Click one thing on the page",
-    title: "Select one: click an Instance on the page to change it alone (Esc cancels)",
-    icon: <CursorIcon />,
-  },
-  {
-    mode: "many",
-    scope: "group",
-    label: "Select multiple",
-    hint: "Every Instance from one call site",
-    title: "Select multiple: click an Instance on the page to change every one from the same call site (Esc cancels)",
-    icon: <SelectManyIcon />,
-  },
+/** The header's two select tools: the scope each opens a selection at, and its icon. Their words are panel-view's. */
+const SELECT_TOOLS: { mode: SelectMode; scope: Scope; icon: ReactNode }[] = [
+  { mode: "one", scope: "instance", icon: <CursorIcon /> },
+  { mode: "many", scope: "group", icon: <SelectManyIcon /> },
 ];
 
 export function Panel(props: PanelProps) {
@@ -197,10 +181,10 @@ export function Panel(props: PanelProps) {
                 className="tool"
                 data-scope={tool.scope}
                 data-armed={props.picking && props.mode === tool.mode ? "" : undefined}
-                title={tool.title}
+                title={LIST_WORDS.tools[tool.mode].title}
               >
                 {tool.icon}
-                <span className="sr-only">{tool.label}</span>
+                <span className="sr-only">{LIST_WORDS.tools[tool.mode].label}</span>
               </Chip>
             ))}
           </ChipGroup>
@@ -293,16 +277,6 @@ function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) 
   );
 }
 
-function HeldValues({ values }: { values: readonly string[] }) {
-  return (
-    <ul className="list held-values" data-testid="held-values">
-      {values.map((value, index) => (
-        <li key={index}>{value}</li>
-      ))}
-    </ul>
-  );
-}
-
 type Heading = { heading: RefObject<HTMLHeadingElement | null> };
 
 function ComponentList({
@@ -324,28 +298,7 @@ function ComponentList({
   };
   return (
     <>
-      <Card className="hero">
-        {/* Each view has one level-2 heading, its own: focus finds it as the view's `h2`. */}
-        <h2 className="hero-title" tabIndex={-1} ref={heading}>
-          {TEXT.startTitle}
-        </h2>
-        <p className="body">{TEXT.startBody}</p>
-        <ChipGroup look="bare" className="hero-tools" label="Start selecting" value={mode} onChoose={(next) => onTool(next as SelectMode)}>
-          {SELECT_TOOLS.map((tool) => (
-            <Chip
-              key={tool.mode}
-              value={tool.mode}
-              className="big-tool"
-              data-armed={picking && mode === tool.mode ? "" : undefined}
-              title={tool.title}
-            >
-              <ToolPreview mode={tool.mode} />
-              <span className="t">{tool.label}</span>
-              <span className="h">{tool.hint}</span>
-            </Chip>
-          ))}
-        </ChipGroup>
-      </Card>
+      <StartCard words={LIST_WORDS} mode={mode} armed={picking} onTool={onTool} headingRef={heading} />
       {notices}
       {body.notGenerated && <NotGeneratedNotice names={body.notGenerated.names} command={body.notGenerated.command} />}
       {body.changes.length > 0 && (
@@ -375,229 +328,34 @@ function ComponentList({
           </ol>
         </Card>
       )}
-      <HeldForReviewCard debug={debug} items={body.suspended} meta={body.suspendedMeta} />
-      <Card look="list" className="on-page">
-        <CardHead>
-          <h3>On this page</h3>
-          <span className="meta">{body.summary}</span>
-        </CardHead>
-        <PageMap debug={debug} groups={body.groups} lit={lit} onPoint={point} onSelect={onSelect} />
-        <ul className="list" aria-label="Components on this page">
-          {body.groups.map((group, index) => (
-            <GroupRow key={group.component} group={group} hue={hueOf(index)} lit={lit === group.component} point={point} onSelect={onSelect} onHover={onHover} />
-          ))}
-        </ul>
-      </Card>
-      {body.interaction.length > 0 && (
-        <Card look="list">
-          <CardHead>
-            <h3>Appears on interaction</h3>
-            <span className="meta">Not on screen yet</span>
-          </CardHead>
-          <ul className="list interaction">
-            {body.interaction.map((component) => (
-              <li key={component}>
-                {component}
-                <span className="muted">{TEXT.seenNotMounted}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      <HeldForReview
+        items={body.suspended}
+        meta={body.suspendedMeta}
+        words={LIST_WORDS}
+        onDiscard={(target) => {
+          dropUndoably(debug, target, (count) => `Discarded ${plural(count, "held Override")}`);
+          // The card may go with its last record: the keyboard stays in the panel, on the view's heading.
+          heading.current?.focus();
+        }}
+      />
+      <OnThisPage words={LIST_WORDS} summary={body.summary} map={<PageMapView debug={debug} groups={body.groups} lit={lit} onPoint={point} onSelect={onSelect} />}>
+        {body.groups.map((group) => (
+          <GroupRow
+            key={group.component}
+            group={group}
+            lit={lit === group.component}
+            words={INSPECTOR_WORDS}
+            onPoint={point}
+            // Every Instance from the call site at once, as Select multiple picks them; one alone as Select one.
+            onSite={(site) => onSelect(site.select, site.ids.length > 1 ? "many" : undefined)}
+            onInstance={(id) => onSelect(id)}
+            onHover={onHover}
+          />
+        ))}
+      </OnThisPage>
+      <AppearsOnInteraction components={body.interaction} words={LIST_WORDS} />
       <FlagsCard />
     </>
-  );
-}
-
-/** What each select tool does, drawn small: three controls, one ringed or every one from a call site. */
-function ToolPreview({ mode }: { mode: SelectMode }) {
-  const many = mode === "many";
-  return (
-    <span className="preview" aria-hidden="true">
-      <span className={many ? "chip dashed" : "chip"} />
-      <span className="chip ringed" />
-      <span className={many ? "chip dashed" : "chip"} />
-      <svg className="pointer" viewBox="238 238 36 36" focusable="false">
-        <path d="M247.171 248.005l5.315 17.434c0.354 1.16 1.906 1.232 2.341 0.121l2.854-6.582c0.212-0.535 0.675-0.959 1.24-1.09l7.272-1.705c1.17-0.273 1.21-1.928 0.131-2.352l-17.597-7.366c-1.08-0.454-1.866 0.535-1.553 1.544z" />
-      </svg>
-    </span>
-  );
-}
-
-/**
- * One component on the page (Rows option B): its name, a bar for how much the page
- * uses it next to the most used, and its count. Opened, its call sites as cards: a
- * card inspects the call site's Instances, a dot one of them.
- */
-function GroupRow({
-  group,
-  hue,
-  lit,
-  point,
-  onSelect,
-  onHover,
-}: Pick<Actions, "onSelect" | "onHover"> & { group: GroupItem; hue: string; lit: boolean; point(group: GroupItem | null): void }) {
-  const { inspectOnly } = group;
-  const unmounted = group.instances.filter((item) => !item.mounted);
-  return (
-    <li className={`group ${hue}${lit ? " lit" : ""}${inspectOnly ? " inspect-only" : ""}`}>
-      <Fold>
-        <FoldTrigger
-          onMouseOver={() => point(group)}
-          onMouseLeave={() => point(null)}
-          onFocus={() => point(group)}
-          onBlur={() => point(null)}
-          title={group.statusTitle ?? undefined}
-        >
-          {/* The whole name, wrapping where its words meet: a long one is never cut short (layout review). */}
-          <span className="cname">
-            <span>
-              <Breakable text={group.component} />
-            </span>
-            {inspectOnly && <EyeIcon />}
-          </span>{" "}
-          <span className="bar" aria-hidden="true">
-            <i style={{ width: `${Math.round(group.share * 1000) / 10}%` }} />
-          </span>
-          <span className="times">{group.count}</span>
-          <span className="sub">
-            {/* No board draws it, but it says what to run: the one verdict the row keeps in words. */}
-            {group.verdict.status?.kind === "not-generated" && <StatusChip status={group.verdict.status} title={group.statusTitle} />}
-            {group.notes.map((note) =>
-              note.kind === "overrides" ? (
-                <span key={note.kind} className="changed">
-                  {note.text}
-                </span>
-              ) : note.kind === "stale" ? (
-                <span key={note.kind} className="stale">
-                  <Dot tone="amber" small />
-                  {note.text}
-                </span>
-              ) : (
-                <span key={note.kind}>{note.text}</span>
-              ),
-            )}
-          </span>
-          <FoldChevron />
-        </FoldTrigger>
-        <FoldPanel>
-        {group.sites.length > 0 && (
-          <div className="sites">
-            <div className="sites-head">{group.sitesText}</div>
-            {group.sites.map((site) => (
-              <SiteCard key={site.anchor} site={site} onSelect={onSelect} onHover={onHover} />
-            ))}
-          </div>
-        )}
-        {unmounted.length > 0 && (
-          <ul className="list unmounted">
-            {unmounted.map((item) => (
-              <li key={item.id}>
-                <button type="button" data-instance={item.id} onClick={() => onSelect(item.id)}>
-                  <Keys keys={item.keys} words={INSPECTOR_WORDS} />
-                  <span className="who">
-                    <span className="site">{item.label}</span>
-                  </span>
-                  {item.tags.map((tag) => (
-                    <TagChip key={tag.kind} tag={tag} />
-                  ))}
-                </button>
-                {item.values.length > 0 && <HeldValues values={item.values} />}
-              </li>
-            ))}
-          </ul>
-        )}
-        </FoldPanel>
-      </Fold>
-    </li>
-  );
-}
-
-/** A call site's card: where it is written and what it shows; its dots are its Instances, each one to pick alone. */
-function SiteCard({ site, onSelect, onHover }: Pick<Actions, "onSelect" | "onHover"> & { site: CallSiteItem }) {
-  const several = site.ids.length > 1;
-  return (
-    <div className="site-card" onMouseOver={() => onHover(site.ids)} onMouseLeave={() => onHover([])}>
-      {/* Every Instance from the call site at once, as Select multiple picks them; one alone as Select one. */}
-      <button
-        type="button"
-        className="open"
-        data-site-card={site.anchor}
-        onClick={() => onSelect(site.select, several ? "many" : undefined)}
-        {...hoverProps(onHover, site.ids)}
-        aria-label={`Inspect ${site.label}: ${site.names}`}
-      />
-      <span className="where">
-        <span className="file">{site.label}</span>
-        <span className="names">
-          <span>{site.names}</span>
-          {!site.supported && <EyeIcon />}
-        </span>
-      </span>
-      <span className="dots">
-        {site.instances.map(({ id, label }) => {
-          const hover = hoverProps(onHover, [id]);
-          return (
-            <button
-              key={id}
-              type="button"
-              data-instance={id}
-              title={label}
-              aria-label={`Inspect ${label}`}
-              onClick={() => onSelect(id)}
-              {...hover}
-              // The card outlines its whole call site: a dot outlines its one Instance.
-              onMouseOver={(event) => {
-                event.stopPropagation();
-                hover.onMouseOver();
-              }}
-            />
-          );
-        })}
-      </span>
-      <ChevronIcon />
-    </div>
-  );
-}
-
-/**
- * Records suspended for review (PER-95): the call site's total changed, or the id
- * names more than one Instance. They apply to nothing until discarded, which the
- * hollow ring says, in pencil (PER-140). Nothing here opens a menu or dialog to reach one.
- */
-function HeldForReviewCard({ debug, items, meta }: { debug: LoupeDebug; items: ListBody["suspended"]; meta: string }) {
-  if (items.length === 0) return null;
-  return (
-    <Card look="list" data-testid="held-for-review">
-      <CardHead>
-        <div className="title">
-          <Dot tone="ring" />
-          <h3>Held for review</h3>
-        </div>
-        <span className="meta">{meta}</span>
-      </CardHead>
-      <ul className="list held-list">
-        {items.map((item) => (
-          <li key={JSON.stringify(item.target)} className="held-item">
-            <div className="target">
-              <span>{item.label}</span>
-              <Button
-                size="small"
-                onClick={(event) => {
-                  const button = event.currentTarget;
-                  dropUndoably(debug, item.target, (count) => `Discarded ${plural(count, "held Override")}`);
-                  focusHeading(button);
-                }}
-              >
-                Discard
-              </Button>
-            </div>
-            <div className="muted">{item.why}</div>
-            <HeldValues values={item.values} />
-          </li>
-        ))}
-      </ul>
-    </Card>
   );
 }
 

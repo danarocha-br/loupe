@@ -1,0 +1,35 @@
+/*
+ * PageMap (ADR 0003): the page map, written against `[data-page-map]` and its parts
+ * (`[data-map-fit]`, `[data-map-block]`, `[data-map-name]`), with `[data-lit]` for the
+ * component pointed at and `[data-hue]` (Marks) for each block's hue. Values from the
+ * tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* A 108px well in the hover wash, a dotted grid every 12px and a hairline ring, set 14px in. */
+[data-page-map] {
+  position: relative; height: 108px; margin: var(--space-card) var(--space-gutter) var(--space-inset); overflow: hidden; container-type: size;
+  border-radius: var(--radius-well); background-color: var(--hover); box-shadow: inset 0 0 0 1px var(--hairline);
+  background-image: radial-gradient(circle at 6px 6px, var(--map-dot) 0.7px, transparent 1.2px); background-size: 12px 12px;
+}
+
+/* The page's own shape, as large as the well lets it be, 8px in, centred. */
+[data-map-fit] {
+  position: absolute; inset: 0; margin: auto;
+  width: min(100cqw - 16px, (100cqh - 16px) * var(--ratio)); height: min(100cqh - 16px, (100cqw - 16px) / var(--ratio));
+}
+
+/* A block where its Instance sits: an 18% fill of its hue and a 1.5px edge, never smaller than 5px. */
+[data-map-block] {
+  position: absolute; min-width: 5px; min-height: 5px; padding: 0; border-radius: var(--radius-page-tag);
+  background: color-mix(in srgb, var(--hue) 18%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 75%, transparent);
+  transition: opacity var(--duration-map) var(--ease-out), background-color var(--duration-map) var(--ease-out), box-shadow var(--duration-map) var(--ease-out);
+}
+
+/* A component pointed at: its blocks stronger, every other one faded to 22%. */
+[data-page-map][data-lit] [data-map-block] { opacity: 0.22; }
+[data-page-map][data-lit] [data-map-block][data-lit] {
+  opacity: 1; background: color-mix(in srgb, var(--hue) 30%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--hue) 95%, transparent);
+}
+
+/* Each block's name: read, not shown. */
+[data-map-name] { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

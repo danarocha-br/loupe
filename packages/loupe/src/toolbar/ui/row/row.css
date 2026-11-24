@@ -42,8 +42,11 @@
 [data-row-line]:has([data-switch]) > [data-row-name] { flex: 0 1 auto; min-width: 0; }
 
 /* Ruled: a hairline above, for a padded card whose padding sets its sides. */
-[data-row="ruled"], [data-row="pair"] { border-top: 1px solid var(--rule); }
+[data-row="ruled"], [data-row="pair"], [data-row="item"] { border-top: 1px solid var(--rule); }
 [data-row="ruled"] { --row-gap: var(--space-inset); padding: var(--space-inset) 0; }
+
+/* An item: a list card's row, edge to edge on its hairline, its text 14px in; what is under the line 2px apart. */
+[data-row="item"] { --row-gap: var(--space-hair); padding: var(--space-inset) var(--space-gutter); }
 
 /* A pair: name and value in two mono columns, tight, the code name left to the tooltip. */
 [data-row="pair"] { --row-gap: var(--space-hair); padding: var(--space-sheet) 0; }

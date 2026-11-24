@@ -11,7 +11,7 @@
 // preference or the footer's toggle. System faces only: a shadow root can't load a
 // web font.
 
-import { FONT, hostDeclarations, MAP_HUES, PAGE, size } from "./tokens.js";
+import { FONT, hostDeclarations, PAGE, size } from "./tokens.js";
 
 export const HOST_ATTRIBUTE = "data-loupe-toolbar";
 
@@ -232,6 +232,7 @@ export const CSS = `
   width: 100%; padding: 8px 14px; border-top: 1px solid var(--rule); text-align: left;
 }
 @media (hover: hover) { .keylist button:not(:disabled):hover { background: var(--hover); } }
+.keylist button:focus-visible, .inspect > [data-fold] > [data-fold-trigger]:focus-visible { outline-offset: -2px; }
 .keylist [data-delta] { grid-area: key; align-self: start; margin-top: 0; }
 .keylist .what { grid-area: what; font: 400 ${size(12)}/1.5 ${MONO}; overflow-wrap: anywhere; }
 .keylist .where { grid-area: where; min-width: 0; overflow-wrap: break-word; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
@@ -256,66 +257,6 @@ export const CSS = `
 .inspect-rows { display: flex; flex-direction: column; padding: 0 14px 8px 42px; }
 .inspect .injected { padding: 0 14px 12px 42px; }
 .inspect .injected > [data-fold-trigger] { display: flex; align-items: center; gap: 6px; min-height: 28px; color: var(--muted); font-size: ${size(12)}; }
-
-/* On this page (Rows option B): the page map over its usage rows, most used first */
-.list { list-style: none; margin: 0; padding: 0; }
-.on-page { gap: 0; padding-bottom: 0; }
-.on-page > [data-card-head] { align-items: center; padding-bottom: 0; }
-.on-page .list { padding-bottom: 0; }
-.group { position: relative; }
-.group [data-fold-trigger] {
-  display: grid; grid-template-columns: minmax(0, 1fr) 40px 30px; grid-template-areas: "name n go" "bar n go" "sub sub sub";
-  align-items: start; min-height: 44px; padding: 6px 12px 10px 14px;
-}
-.group [data-fold][data-open] { background: var(--hover); }
-.group [data-fold][data-open]::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; border-radius: 0 2px 2px 0; background: var(--hue); }
-@media (hover: hover) { .group [data-fold-trigger]:hover { background: var(--hover); } }
-.group [data-fold-trigger] .cname { grid-area: name; display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: break-word; font: var(--font-body); font-weight: 500; }
-.group [data-fold-trigger] .cname .icon { color: var(--muted); }
-.group [data-fold-trigger] .bar { grid-area: bar; position: relative; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--rule); }
-.group [data-fold-trigger] .bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--hue); }
-.group.inspect-only [data-fold-trigger] .bar i { opacity: 0.55; }
-.group [data-fold-trigger][data-open] .bar { height: 6px; margin-top: 5px; border-radius: 3px; }
-.group [data-fold-trigger] .times { grid-area: n; margin-top: 6px; text-align: right; font: 600 ${size(13)}/1.3846 ${MONO}; font-variant-numeric: tabular-nums; color: var(--ink); }
-.group [data-fold-trigger] > [data-fold-chevron] { grid-area: go; justify-self: end; margin-top: 8px; color: var(--icon-faint); }
-.group [data-fold-trigger][data-open] > [data-fold-chevron] { color: var(--ink); }
-.group [data-fold-trigger] .sub { grid-area: sub; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 6px; color: var(--muted); font-size: ${size(12)}; line-height: 1.3333; }
-.group [data-fold-trigger] .sub:empty { display: none; }
-.group [data-fold-trigger] .sub span { display: inline-flex; align-items: center; gap: 6px; }
-.group [data-fold-trigger] .sub .changed { color: var(--ink); font-weight: 500; }
-.group [data-fold-trigger] .sub .stale { color: var(--warn-fg); }
-.group .sites { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px 12px; }
-.group .sites-head { font: 400 ${size(11)}/1.2727 ${SANS}; color: var(--faint); padding-bottom: 2px; }
-.site-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto 16px; align-items: center; column-gap: 8px; min-height: 52px; padding: 8px 10px 8px 12px; border-radius: 12px; background: var(--card); box-shadow: var(--site-shadow); }
-.site-card > .open { position: absolute; inset: 0; border-radius: inherit; }
-.site-card > .open:focus-visible { outline-offset: -2px; }
-@media (hover: hover) { .site-card:has(> .open:hover) { box-shadow: var(--raised-shadow); } }
-.site-card .where { display: flex; flex-direction: column; min-width: 0; pointer-events: none; }
-.site-card .file { font: 600 ${size(11)}/1.4545 ${MONO}; color: var(--ink); overflow-wrap: anywhere; }
-.site-card .names { display: flex; align-items: center; gap: 4px; min-width: 0; font: 400 ${size(12)}/1.3333 ${SANS}; color: var(--muted); }
-.site-card .names > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.site-card .dots { position: relative; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 74px; }
-.site-card .dots button { position: relative; width: 8px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--hue) 22%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 90%, transparent); }
-/* Each dot an Instance: a larger target than it looks. */
-.site-card .dots button::before { content: ""; position: absolute; inset: -6px -2px; }
-.site-card > .icon { color: var(--icon-faint); pointer-events: none; }
-.group .unmounted { display: flex; flex-direction: column; gap: 2px; padding: 0 14px 12px; }
-.group .unmounted li { display: flex; flex-direction: column; }
-.group .unmounted button { display: flex; align-items: flex-start; gap: 8px; width: 100%; min-height: 32px; padding: 6px 0; text-align: left; }
-.group [data-fold-trigger]:focus-visible, .keylist button:focus-visible, .inspect > [data-fold] > [data-fold-trigger]:focus-visible { outline-offset: -2px; }
-.who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.who .screen-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.who .site { font: 400 ${size(11)}/1.4545 ${MONO}; color: var(--muted); overflow-wrap: anywhere; }
-.who.out .screen-name, .who.out .site { color: var(--faint); text-decoration: line-through; }
-.held-values { padding: 0 0 6px; font: 400 ${size(11)}/1.4545 ${MONO}; color: var(--muted); }
-.interaction li { display: flex; flex-direction: column; gap: 2px; padding: 8px 14px; border-top: 1px solid var(--rule); }
-.interaction .muted { font-size: ${size(12)}; line-height: 1.4167; }
-
-/* Held for review: in pencil, applying to nothing */
-.held-list { display: flex; flex-direction: column; }
-.held-item { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--rule); }
-.held-item .target { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: 400 ${size(12)}/1.3333 ${MONO}; }
-.held-item .muted { font-size: ${size(12)}; line-height: 1.4167; }
 
 /* Feature flags */
 .flag [data-chip-group] { flex-wrap: nowrap; }
@@ -350,35 +291,6 @@ export const CSS = `
 @keyframes loupe-mark-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ring[data-ring], .mark[data-mark], .ring[data-ring].quiet, .mark[data-mark].quiet { animation: none; transition: none; } }
 
-/* The page map: every component a tinted block where it sits, one hue each, fit into a dotted well; each row is its legend. */
-${MAP_HUES.map((hue, index) => `.hue-${index} { --hue: ${hue}; }`).join(" ")}
-.map-sheet { position: relative; height: 108px; margin: 12px 14px 8px; border-radius: 12px; background-color: var(--hover); background-image: radial-gradient(circle at 6px 6px, var(--map-dot) 0.7px, transparent 1.2px); background-size: 12px 12px; box-shadow: inset 0 0 0 1px var(--hairline); overflow: hidden; container-type: size; }
-/* The page's own shape, as large as the well lets it be, centred. */
-.map-sheet .fit { position: absolute; inset: 0; margin: auto; width: min(100cqw - 16px, (100cqh - 16px) * var(--ratio)); height: min(100cqh - 16px, (100cqw - 16px) / var(--ratio)); }
-.map-sheet .blk { position: absolute; min-width: 5px; min-height: 5px; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--hue) 18%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 75%, transparent); transition: opacity 140ms ease-out, background-color 140ms ease-out, box-shadow 140ms ease-out; }
-.map-sheet[data-lit] .blk { opacity: 0.22; }
-.map-sheet[data-lit] .blk.lit { opacity: 1; background: color-mix(in srgb, var(--hue) 30%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--hue) 95%, transparent); }
-.group.lit [data-fold-trigger] { background: var(--hover); }
-
-/* The list's start (guided start): what to change, and the two select tools as tiles that show what each does */
-.hero { gap: 0; padding-top: var(--space-hero); }
-.hero .hero-title { font-size: ${size(20)}; line-height: 1.3; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); text-wrap: balance; }
-/* Focus lands on the heading when the list opens: no ring, but an outline forced colours draw. */
-.hero .hero-title:focus { outline: 2px solid transparent; }
-.hero .body { margin-top: 6px; line-height: 1.4615; }
-.hero-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
-.big-tool { display: flex; flex-direction: column; align-items: stretch; padding: 4px 4px 12px; border-radius: 14px; background: var(--card); color: var(--ink); text-align: left; box-shadow: var(--tile-shadow); transition: box-shadow 120ms ease-out; }
-@media (hover: hover) { .big-tool:hover { box-shadow: var(--raised-shadow); } }
-.big-tool[data-checked] { box-shadow: inset 0 0 0 1px var(--field-edge), var(--tile-shadow); }
-.big-tool[data-armed] { box-shadow: inset 0 0 0 1.5px var(--accent), var(--raised-shadow); }
-.big-tool .preview { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; height: 56px; border-radius: 10px; background: var(--sunk); overflow: hidden; }
-.big-tool .preview .chip { position: relative; width: 28px; height: 16px; border-radius: 5px; background: var(--card); box-shadow: 0 0 0 1px var(--divider), 0 1px 1px var(--hairline); }
-.big-tool .preview .chip.ringed::after, .big-tool .preview .chip.dashed::after { content: ""; position: absolute; inset: -3px; border: 1.5px solid var(--accent); border-radius: 8px; }
-.big-tool .preview .chip.dashed::after { border-style: dashed; }
-.big-tool .preview .pointer { position: absolute; left: calc(50% + 8px); top: 32px; width: 14px; height: 14px; }
-.big-tool .preview .pointer path { fill: var(--card); stroke: var(--primary); stroke-width: 2.5; stroke-linejoin: round; }
-.big-tool .t { margin: 10px 8px 0; font: 600 ${size(13)}/1.3846 ${SANS}; }
-.big-tool .h { margin: 2px 8px 0; font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--faint); }
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
   .panel, .footer, .header { border: 1px solid transparent; }

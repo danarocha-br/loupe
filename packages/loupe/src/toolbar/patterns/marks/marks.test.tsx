@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { INSPECTOR_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
+import { MAP_HUES } from "../../tokens.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { Breakable, ChangeKey, HeldKey, Keys, StatusChip, TagChip } from "./marks.js";
 import CSS from "./marks.css?inline";
@@ -78,5 +79,12 @@ describe("Marks' CSS", () => {
     expectPatternCss(CSS);
     expect(CSS).toContain("var(--font-chip)");
     expect(CSS).toContain("var(--radius-pill)");
+  });
+});
+
+describe("Marks' hues", () => {
+  it("gives every map hue a `[data-hue]` rule, and none more", () => {
+    const rules = [...CSS.matchAll(/\[data-hue="(\d+)"\] \{ --hue: var\(--map-hue-(\d+)\); \}/g)].map((match) => [match[1], match[2]]);
+    expect(rules).toEqual(MAP_HUES.map((_, index) => [String(index), String(index)]));
   });
 });

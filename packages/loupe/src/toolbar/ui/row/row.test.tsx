@@ -3,11 +3,13 @@
 // value then action, its glyph hidden in a column of its own, a list item in a list,
 // and the line's controls reached by their own roles.
 
+import { within } from "@testing-library/dom";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STYLESHEET } from "../../surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { Button } from "../button/button.js";
+import { Card } from "../card/card.js";
 import { Switch } from "../switch/switch.js";
 import { Tag } from "../tag/tag.js";
 import { Row, RowAction, RowLine, type RowLook, RowName, RowValue } from "./row.js";
@@ -15,7 +17,7 @@ import CSS from "./row.css?inline";
 
 afterEach(cleanup);
 
-const LOOKS: RowLook[] = ["inset", "ruled", "pair"];
+const LOOKS: RowLook[] = ["inset", "ruled", "pair", "item"];
 
 const Glyph = () => (
   <svg width="20" height="20" viewBox="0 0 20 20">
@@ -97,6 +99,26 @@ describe("Row", () => {
     expect(screen.getByRole("heading", { level: 3 }).textContent).toBe("Rendered on the server");
   });
 
+  it("runs as the list items of a list card, each its words in order", () => {
+    const screen = renderInSurface(
+      <Card look="list">
+        <ul aria-label="Seen, not mounted">
+          {["Dialog", "Tooltip"].map((name) => (
+            <Row key={name} as="li" look="item">
+              {name}
+              <span>Open it on the page to inspect it.</span>
+            </Row>
+          ))}
+        </ul>
+      </Card>,
+    );
+    const items = within(screen.getByRole("list", { name: "Seen, not mounted" })).getAllByRole("listitem");
+    expect(items.map((item) => [item.getAttribute("data-row"), item.textContent])).toEqual([
+      ["item", "Dialog" + "Open it on the page to inspect it."],
+      ["item", "Tooltip" + "Open it on the page to inspect it."],
+    ]);
+  });
+
   it("draws its look through an attribute, sets a name in mono, and passes class and data-* through", () => {
     const screen = renderInSurface(
       <>
@@ -156,6 +178,10 @@ describe("Row's CSS", () => {
     for (const look of LOOKS.filter((look) => look !== "inset")) expect(body).toContain(`[data-row="${look}"]`);
   });
 
+  it("runs an item edge to edge in a list card, its text 14px in, what is under its line 2px apart", () => {
+    expect(body).toMatch(/\[data-row="item"\] \{ --row-gap: var\(--space-hair\); padding: var\(--space-inset\) var\(--space-gutter\); \}/);
+  });
+
   it("keeps the glyph column a fixed 20px, so the names line up across rows", () => {
     expect(body).toMatch(/\[data-row\]\[data-glyphed\] \{[^}]*grid-template-columns: 20px minmax\(0, 1fr\)/);
     expect(body).toMatch(/\[data-row-glyph\] \{[^}]*height: var\(--row-line\)/);
@@ -167,7 +193,7 @@ describe("Row's CSS", () => {
   });
 
   it("draws its hairline as a border, which forced colours keep", () => {
-    expect(body).toMatch(/\[data-row="ruled"\], \[data-row="pair"\] \{ border-top: 1px solid var\(--rule\); \}/);
+    expect(body).toMatch(/\[data-row="ruled"\], \[data-row="pair"\], \[data-row="item"\] \{ border-top: 1px solid var\(--rule\); \}/);
     expect(body).not.toMatch(/box-shadow/);
   });
 });

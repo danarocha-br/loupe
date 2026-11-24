@@ -104,12 +104,35 @@ describe("the list", () => {
         label: "members.tsx:11",
         names: `${isolate("ana")}, ${isolate("bia")} +2`,
         ids: [row("ana"), row("bia"), row("caio"), row("dani")],
-        instances: ["ana", "bia", "caio", "dani"].map((name) => ({ id: row(name), label: name })),
+        // The card and each dot are named for a screen reader as what they inspect.
+        inspect: `Inspect members.tsx:11: ${isolate("ana")}, ${isolate("bia")} +2`,
+        instances: ["ana", "bia", "caio", "dani"].map((name) => ({ id: row(name), label: name, inspect: `Inspect ${name}` })),
         select: row("ana"),
         supported: true,
       },
-      { anchor: MENU, label: "members.tsx:12", names: "Menu", ids: [MENU], instances: [{ id: MENU, label: "Menu" }], select: MENU, supported: true },
+      {
+        anchor: MENU,
+        label: "members.tsx:12",
+        names: "Menu",
+        ids: [MENU],
+        inspect: "Inspect members.tsx:12: Menu",
+        instances: [{ id: MENU, label: "Menu", inspect: "Inspect Menu" }],
+        select: MENU,
+        supported: true,
+      },
     ]);
+  });
+
+  it("gives each component a map hue by its place in the list, and names each mounted Instance's block", () => {
+    render();
+    const body = listOf(view());
+    expect(body.groups.map((item) => item.hue)).toEqual(body.groups.map((_, index) => index % 7));
+    const buttons = group(body, "Button");
+    expect(buttons?.mapTitle).toBe(`Button ${buttons?.count}`);
+    const mounted = buttons?.instances.filter((item) => item.mounted) ?? [];
+    expect(mounted.map((item) => item.block?.lead)).toEqual(mounted.map((_, index) => `Inspect Button ${index + 1} of ${mounted.length}, `));
+    // What it shows on screen is the app's own words; with nothing to show, its call site says which.
+    for (const item of mounted) expect(item.block).toMatchObject(item.name === null ? { who: item.label, own: false } : { who: item.name, own: true });
   });
 
   it("lists a menu's component while it is open, then under Appears on interaction", () => {
@@ -147,6 +170,8 @@ describe("the list", () => {
       mounted: false,
       tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
       values: ['variant "default" · Current "ghost" (last seen)'],
+      // Not on the page: no block on the map.
+      block: null,
     });
     expect(buttons?.notes).toEqual([
       { kind: "overrides", text: "1 Instance changed" },
@@ -156,7 +181,16 @@ describe("the list", () => {
     // Mounted again: one ordinary row, no held one beside it.
     click("Abrir");
     expect(group(listOf(view()), "Button")?.instances.filter((item) => item.id === CONFIRM)).toEqual([
-      { id: CONFIRM, label: "members.tsx:40", name: "Confirmar", keys: [1], mounted: true, tags: [], values: [] },
+      {
+        id: CONFIRM,
+        label: "members.tsx:40",
+        name: "Confirmar",
+        keys: [1],
+        mounted: true,
+        tags: [],
+        values: [],
+        block: { lead: expect.stringMatching(/^Inspect Button \d+ of \d+, $/), who: "Confirmar", own: true },
+      },
     ]);
   });
 

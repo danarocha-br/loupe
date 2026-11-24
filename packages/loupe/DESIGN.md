@@ -224,6 +224,12 @@ typography:
     fontSize: "11px"
     fontWeight: 400
     lineHeight: "16px"
+  count:
+    fontFamily: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
+    fontSize: "13px"
+    fontWeight: 600
+    lineHeight: "18px"
+    fontFeature: "\"tnum\""
   key:
     fontFamily: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, monospace"
     fontSize: "11px"
@@ -252,6 +258,7 @@ typography:
     fontWeight: 400
     lineHeight: "15px"
 rounded:
+  edge: "2px"
   swatch: "3px"
   page-tag: "4px"
   checkbox: "5px"
@@ -541,7 +548,7 @@ Where the Paper boards draw lighter, the code keeps the contrast:
 - **Option** (400, 12px/16px): option chips; the chip that shows now at 500.
 - **Label** (500, 11px/14px) and **Meta** (400, 11px/14px, tabular, faint): field labels, the "Inside" label, and the counts beside card titles. **Tag** (400, 11px/16px): a tag's words.
 - **Delta** (700, 9px/1, tabular): the number inside a delta. The 9px step is the delta's alone.
-- **Mono** (400, 12px) and **Mono Small** (400, 11px): call sites, change lines, the change list, values in Inspect only, a row's counts at a scope (`"outline" 1 · "ghost" 3`), never recased since they quote values. A component's count in the list is mono 600 13px.
+- **Mono** (400, 12px) and **Mono Small** (400, 11px): call sites, change lines, the change list, values in Inspect only, a row's counts at a scope (`"outline" 1 · "ghost" 3`), never recased since they quote values. A component's count in the list is **Count** (600, 13px/18px mono, tabular).
 - **Annotation** (400, 10px/14px, 0.04em, uppercase mono): the page after the wordmark ("/ Billing") and beside the component's name, and the "app" tag on a chip (500). The status chip, the held chip, the "picked" tag and a chip's count are 10px mono 500, not recased (**Chip**, 500 10px/14px). A reason tag is **Tag Mono** (400, 10px/16px, 0.02em). A key in running text is **Key** (500, 11px/14px mono). The Proposal's text in a refused copy is 10px/15px mono.
 
 ### Named Rules
@@ -588,7 +595,7 @@ Dark replaces each with a white ring and darker drops.
 
 ## Shapes
 
-Soft corners in steps: the sheet's left corners at 24px; cards, the header, the footer and the copy popover at 18px; start tiles, the status strip and the toast at 14px; wells, text fields, notices, call-site cards and the page map at 12px; the popover's fields at 10px; option chips and the page outline at 8px; a checkbox and a key at 5px; the size tag and the map's blocks at 4px. Every button, tag, status chip and tool is a full pill.
+Soft corners in steps: the sheet's left corners at 24px; cards, the header, the footer and the copy popover at 18px; start tiles, the status strip and the toast at 14px; wells, text fields, notices, call-site cards and the page map at 12px; the popover's fields at 10px; option chips and the page outline at 8px; a checkbox and a key at 5px; the size tag and the map's blocks at 4px; the 3px edge in its hue that marks an open row of "On this page" at 2px on its outer side. Every button, tag, status chip and tool is a full pill, and so are a row's usage bar and a call site's dots.
 
 Three shapes carry meaning and appear nowhere else:
 - **The delta**: a triangle, 22 × 20px, card-filled with a 1.25px lilac stroke and its number at the base. Dashed and empty, it is a State prop held on one Instance, which the Proposal shows as a state, not a numbered change. It stays in the panel and the Proposal; the page carries no numbers.
@@ -602,8 +609,8 @@ On the page, a solid outline is the one Instance in hand and a dashed coral one 
 The toolbar is built in four layers (ADR 0003). Each imports only from the layers before it:
 
 1. **Tokens.** `src/toolbar/tokens.ts`, one typed module: colour by role and theme, the page's marks, the map's hues, type, space, radius, shadow and motion. It is declared on the host as custom properties (`--ink`, `--space-sheet`, `--radius-chip`, `--font-option`, …). The tests read the module, and `design-md.test.ts` holds this file's front matter to it.
-2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel, Popover and its panel, Card and its head, Row and its line, name, value and action), plain props for a single control (Button, Toggle, Switch, Field) or mark (Tag, Dot, Delta, Kbd). So far: ChipGroup, Fold, Button, Toggle, Switch, Field and Popover, the marks Tag, Dot, Delta and Kbd, which UI SDK has no part for and need none, the Announcer, which has none under it either: UI SDK’s announcer writes into the host’s document (ADR 0008), the surfaces Card (`plain`, `list` and `divided`) and Row (`inset`, `ruled` and `pair`, with a 20px glyph column), which need none, and Icon, the Toolbar's icons, so that a pattern can draw them.
-3. **Patterns.** `src/toolbar/patterns/<pattern>/`, one folder each, as a primitive has: primitives composed, taking `panel-view` types. A pattern draws the data and the words `panelView()` decided (`InspectorWords` for the Inspector's) and builds none; it makes no write: its callbacks do, in the view. So far the Inspector's: Identity, ScopeSection and PropRow, and the Marks they share with the list (a change's delta, the status chip, a tag in panel-view's words, a name that breaks between its words). Still views, for later: On this page (SiteCard, the map, Held for review, Appears on interaction) and the chrome (the header, the footer, CopySplit, the toast, the pill).
+2. **Primitives.** `src/toolbar/ui/<primitive>/`, one folder each: the component, its `.css`, its tests and a `.md` of its states, ARIA and keys. A primitive knows no domain word (Instance, Override, Scope, Proposal). It is built on UI SDK (`@ui-sdk/react`, pinned) for keyboard, focus, selection and the ARIA that goes with them, behind Loupe's own interface: a parent with child parts for a group (ChipGroup and Chip, Fold and its trigger and panel, Popover and its panel, Card and its head, Row and its line, name, value and action), plain props for a single control (Button, Toggle, Switch, Field) or mark (Tag, Dot, Delta, Kbd). So far: ChipGroup, Fold, Button, Toggle, Switch, Field and Popover, the marks Tag, Dot, Delta and Kbd, which UI SDK has no part for and need none, the Announcer, which has none under it either: UI SDK’s announcer writes into the host’s document (ADR 0008), the surfaces Card (`plain`, `list` and `divided`) and Row (`inset`, `ruled`, `pair` and `item`, with a 20px glyph column), which need none, and Icon, the Toolbar's icons, so that a pattern can draw them.
+3. **Patterns.** `src/toolbar/patterns/<pattern>/`, one folder each, as a primitive has: primitives composed, taking `panel-view` types. A pattern draws the data and the words `panelView()` decided (`InspectorWords` for the Inspector's) and builds none; it makes no write: its callbacks do, in the view. So far the Inspector's (Identity, ScopeSection and PropRow, words in `InspectorWords`), the list's (StartCard, HeldForReview, OnThisPage, PageMap, GroupRow, SiteCard and AppearsOnInteraction, words in `ListWords`), and the Marks they share (a change's delta, the status chip, a tag in panel-view's words, a name that breaks between its words, a held record's values, a card head's count, a component's hue). The page map draws boxes the view measured: a pattern never reads the page. Still views, for later: the Inspector's leftovers (Inspect only, the legend), the notices, Feature flags, the change list, and the chrome (the header, the footer, CopySplit, the toast, the pill).
 4. **Views.** The panel, the list, the Inspector. They render only what `panelView()` decides, words included.
 
 **The import rule.**

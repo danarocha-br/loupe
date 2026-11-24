@@ -10,8 +10,11 @@ import type { Reads } from "./reads.js";
 import type { InstanceRow } from "../../runtime/debug.js";
 import type { CallSiteItem, ChangeItem, GroupItem, InstanceItem, ListBody, StateItem, Tag } from "./types.js";
 import { componentVerdict } from "./verdict.js";
+import { MAP_HUES } from "../tokens.js";
 import {
+  blockLead,
   heldValues,
+  inspectText,
   instanceLabel,
   listSummary,
   notMountedNote,
@@ -36,25 +39,29 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
   const most = Math.max(1, ...page.groups.map((group) => group.instances.length));
   // Most used first: the bars then read as a ranking; ties stay alphabetical.
   const ranked = [...page.groups].sort((a, b) => b.instances.length - a.instances.length);
-  const groups = ranked.map((group): GroupItem => {
+  const groups = ranked.map((group, index): GroupItem => {
     const verdict = componentVerdict(group, reads, page);
     const notes: GroupItem["notes"] = [];
     if (group.overrides > 0) notes.push({ kind: "overrides", text: overridesNote(group.overrides) });
     if (page.stale.has(group.component)) notes.push({ kind: "stale", text: TAGS.stale.text });
     if (group.held.length > 0) notes.push({ kind: "not-mounted", text: notMountedNote(group.held.length) });
     // Why it is inspect only is the eye's, in the row's tooltip (`statusTitle`): the line keeps what changed.
-    const mounted = group.instances.map((row): InstanceItem => {
+    const mounted = group.instances.map((row, nth): InstanceItem => {
       const tags: Tag[] = [];
       if (row.rendered === "server") tags.push(TAGS.server);
       if (instanceRecord(page.records, row.id)?.suspended) tags.push(TAGS.suspended);
+      const label = instanceLabel(row.id, row.hint);
+      const name = reads.name(row.id);
       return {
         id: row.id,
-        label: instanceLabel(row.id, row.hint),
-        name: reads.name(row.id),
+        label,
+        name,
         keys: marked.get(row.id) ?? [],
         mounted: true,
         tags,
         values: [],
+        // Loupe's words, then the Instance's own: what it shows on screen is the app's, in its language.
+        block: { lead: blockLead(group.component, nth + 1, group.instances.length), who: name ?? label, own: name !== null },
       };
     });
     const unmounted = group.held.map(
@@ -67,6 +74,7 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
         tags: [unmountedTag(entry.record.suspended !== null)],
         // A Suspended record's values are on the "Held for review" card above.
         values: entry.record.suspended ? [] : heldValues(entry.record.values, entry.lastSeen),
+        block: null,
       }),
     );
     return {
@@ -83,6 +91,8 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
       notes,
       outlineIds: group.instances.map((row) => row.id),
       instances: [...mounted, ...unmounted],
+      hue: index % MAP_HUES.length,
+      mapTitle: `${group.component} ${timesText(group.instances.length)}`,
     };
   });
   const notGenerated = page.groups.map((group) => group.component).filter((component) => page.notGenerated.has(component));
@@ -118,12 +128,18 @@ function callSites(rows: readonly InstanceRow[], reads: Reads, supported: boolea
   for (const row of rows) bySite.set(row.anchor, [...(bySite.get(row.anchor) ?? []), row]);
   return [...bySite].map(([anchor, siteRows]) => {
     const [first] = siteRows as [InstanceRow];
-    const instances = siteRows.map((row) => ({ id: row.id, label: reads.name(row.id) ?? instanceLabel(row.id, row.hint) }));
+    const instances = siteRows.map((row) => {
+      const label = reads.name(row.id) ?? instanceLabel(row.id, row.hint);
+      return { id: row.id, label, inspect: inspectText(label) };
+    });
+    const label = siteWhere(anchor, first.hint);
+    const names = siteNames(instances.map((instance) => instance.label));
     return {
       anchor,
-      label: siteWhere(anchor, first.hint),
-      names: siteNames(instances.map((instance) => instance.label)),
+      label,
+      names,
       ids: instances.map((instance) => instance.id),
+      inspect: inspectText(`${label}: ${names}`),
       instances,
       select: first.id,
       // An Instance on the server, or one with no Adapter, keeps the component's own word.

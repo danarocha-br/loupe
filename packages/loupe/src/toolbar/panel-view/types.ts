@@ -7,9 +7,10 @@ import type { OptionValue } from "../../meta/types.js";
 import type { LoupeDebug } from "../../runtime/debug.js";
 import type { NoteKind } from "../../runtime/inspect.js";
 import type { Scope, ScopeTarget } from "../../runtime/store.js";
+import type { SelectMode } from "../picker.js";
 
-// The runtime's scope words, as the panel's data speaks them: a pattern takes them from here.
-export type { Scope, ScopeTarget };
+// The runtime's scope words, and the select tools' modes, as the panel's data speaks them: a pattern takes them from here.
+export type { Scope, ScopeTarget, SelectMode };
 
 /** Components seen on a route so far, for "Appears on interaction". */
 export type SeenComponents = { readonly route: string; readonly components: ReadonlySet<string> };
@@ -118,6 +119,10 @@ export type GroupItem = {
   /** The mounted Instances, outlined while the row is hovered. */
   outlineIds: string[];
   instances: InstanceItem[];
+  /** Its hue, one of the map's, by its place in the list: the row's bar and dots, and its blocks on the map. */
+  hue: number;
+  /** Its blocks' tooltip on the page map: "Button ×7". */
+  mapTitle: string;
 };
 
 /** A call site of a component on the page: where it is written, and what its Instances show. */
@@ -128,8 +133,10 @@ export type CallSiteItem = {
   /** What its Instances show, the first two by name: "Ana Souza, Bruno Lima +2". */
   names: string;
   ids: string[];
-  /** Each Instance, a dot on the card: what its tooltip and its name for a screen reader say. */
-  instances: { id: string; label: string }[];
+  /** The card's name for a screen reader: "Inspect member-row-menu.tsx:37: Ana Souza, Bruno Lima +2". */
+  inspect: string;
+  /** Each Instance, a dot on the card: its tooltip, and its name for a screen reader ("Inspect Ana Souza"). */
+  instances: { id: string; label: string; inspect: string }[];
   /** The Instance its card selects: the first. */
   select: string;
   /** False when no Override can reach its Instances: drawn with the inspect-only eye. */
@@ -172,6 +179,11 @@ export type InstanceItem = {
   tags: Tag[];
   /** A held record's values, each beside its last-seen Current value. */
   values: string[];
+  /**
+   * Its block on the page map, named for a screen reader: Loupe's words ("Inspect Button 2 of 7, "),
+   * then `who`, what it shows on screen (`own`: the app's words) or its call site. Null while it isn't mounted.
+   */
+  block: { lead: string; who: string; own: boolean } | null;
 };
 
 /** "Not on the page now": the selected Instance has gone. */
@@ -229,6 +241,23 @@ export type InspectorBody = {
   /** "Overrides off" beside the Inspect only heading. */
   inspectOnlyMeta: string | null;
   injected: { summary: string; rows: { name: string; value: string }[] } | null;
+};
+
+/**
+ * The words the list's patterns draw whatever is on the page (DESIGN.md "Start", "On this
+ * page"): decided here, so a pattern builds none.
+ */
+export type ListWords = {
+  /** The guided start: its question, the line under it, and the name of its two tiles' group. */
+  start: { title: string; body: string; tools: string };
+  /** Each select tool: its name, what it does in a few words, and its tooltip. */
+  tools: Record<SelectMode, { label: string; hint: string; title: string }>;
+  /** "On this page": its title, its rows' list, and the page map's toolbar. */
+  onPage: { title: string; rows: string; map: string };
+  /** "Held for review": its title, and the button that drops a held record. */
+  held: { title: string; discard: string };
+  /** "Appears on interaction": its title, what it counts, and what each row says under its name. */
+  interaction: { title: string; meta: string; seen: string };
 };
 
 /** Select multiple on an Instance with no call site to group by: why, and the way to the page when that scope applies. */

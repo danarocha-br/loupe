@@ -1,0 +1,45 @@
+/*
+ * StartCard (ADR 0003): the guided start, written against `[data-start]` and its parts
+ * (`[data-start-tools]`, `[data-start-tool]`, `[data-tool-preview]`, `[data-preview-chip]`,
+ * `[data-preview-pointer]`, `[data-tool-name]`, `[data-tool-hint]`), with ChipGroup's
+ * `[data-checked]` for the mode and `[data-armed]` while a tool waits for a click. Values
+ * from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* A plain card, its text 16px from its top, its parts set apart by their own margins. */
+[data-card][data-start] { gap: 0; padding-top: var(--space-hero); }
+[data-start] h2 { font: var(--font-hero); letter-spacing: var(--tracking-hero); color: var(--ink); text-wrap: balance; }
+/* Focus lands on the heading when the list opens: no ring, but an outline forced colours draw. */
+[data-start] h2:focus { outline: 2px solid transparent; }
+[data-start] > p { margin-top: var(--space-sheet); font: var(--font-paragraph); color: var(--muted); }
+
+/* The two select tools as tiles, side by side, 8px apart, 14px under the line. */
+[data-start-tools] { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-inset); margin-top: var(--space-gutter); }
+[data-start-tool] {
+  display: flex; flex-direction: column; align-items: stretch; padding: var(--space-xs) var(--space-xs) var(--space-card);
+  border-radius: var(--radius-tile); background: var(--card); color: var(--ink); text-align: left;
+  box-shadow: var(--tile-shadow); transition: box-shadow var(--duration-hover) var(--ease-out);
+}
+@media (hover: hover) { [data-start-tool]:hover { box-shadow: var(--raised-shadow); } }
+/* The mode: a 1px `field-edge` ring. Armed: a 1.5px coral one, raised. */
+[data-start-tool][data-checked] { box-shadow: inset 0 0 0 1px var(--field-edge), var(--tile-shadow); }
+[data-start-tool][data-armed] { box-shadow: inset 0 0 0 1.5px var(--accent), var(--raised-shadow); }
+
+/* What the tool does, drawn small on a 56px sunk well: three controls and a pointer. */
+[data-tool-preview] {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: var(--space-card); height: 56px; overflow: hidden;
+  border-radius: var(--radius-field); background: var(--sunk);
+}
+[data-preview-chip] { position: relative; width: 28px; height: 16px; border-radius: var(--radius-checkbox); background: var(--card); box-shadow: 0 0 0 1px var(--divider), 0 1px 1px var(--hairline); }
+/* The one it selects ringed in coral, 3px off; the rest from its call site dashed. */
+[data-preview-chip="ringed"]::after, [data-preview-chip="dashed"]::after {
+  content: ""; position: absolute; inset: -3px; border: 1.5px solid var(--accent); border-radius: var(--radius-chip);
+}
+[data-preview-chip="dashed"]::after { border-style: dashed; }
+[data-preview-pointer] { position: absolute; left: calc(50% + 8px); top: 32px; width: 14px; height: 14px; }
+[data-preview-pointer] path { fill: var(--card); stroke: var(--primary); stroke-width: 2.5; stroke-linejoin: round; }
+
+/* Its name, 13px at 600, then a faint hint, 8px in from the tile's sides. */
+[data-tool-name] { margin: var(--space-row) var(--space-inset) 0; font: var(--font-body); font-weight: 600; }
+/* 11px on a 15px line, which no type step has. */
+[data-tool-hint] { margin: var(--space-hair) var(--space-inset) 0; font: var(--font-meta); line-height: 1.3636; color: var(--faint); }
