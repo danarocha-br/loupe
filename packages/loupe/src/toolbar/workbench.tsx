@@ -7,9 +7,12 @@
 // `<LoupeMount />` loads the Toolbar; a host never imports it.
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { InfoIcon, PROP_ICONS, ResetIcon } from "./icons.js";
 import { Surface, type Theme } from "./surface/index.js";
 import {
   Button,
+  Card,
+  CardHead,
   Chip,
   ChipGroup,
   Delta,
@@ -22,6 +25,11 @@ import {
   Kbd,
   Popover,
   PopoverPanel,
+  Row,
+  RowAction,
+  RowLine,
+  RowName,
+  RowValue,
   Switch,
   Tag,
   Toggle,
@@ -71,7 +79,7 @@ function ChipGroupStates() {
   const [chosen, setChosen] = useState<string>("—");
   return (
     <div className="wb-states">
-      <Row title="Chosen, arrows move, Space or Enter chooses">
+      <Frame title="Chosen, arrows move, Space or Enter chooses">
         <ChipGroup
           label="size"
           value={size}
@@ -89,8 +97,8 @@ function ChipGroupStates() {
         <p className="wb-note">
           Last chosen: {chosen}
         </p>
-      </Row>
-      <Row title="Marks: tag (app's value), dot (default), count">
+      </Frame>
+      <Frame title="Marks: tag (app's value), dot (default), count">
         <ChipGroup label="variant" value={variant} onChoose={setVariant}>
           {VARIANTS.map((value, index) => (
             <Chip
@@ -105,14 +113,14 @@ function ChipGroupStates() {
             </Chip>
           ))}
         </ChipGroup>
-      </Row>
-      <Row title="Nothing chosen until one is (the app decides)">
+      </Frame>
+      <Frame title="Nothing chosen until one is (the app decides)">
         <ChipGroup label="plan" value={flag} onChoose={setFlag}>
           <Chip value="free">Free</Chip>
           <Chip value="pro">Pro</Chip>
           <Chip value="team">Team</Chip>
         </ChipGroup>
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -133,18 +141,18 @@ function AnnouncerStates() {
   };
   return (
     <div className="wb-states">
-      <Row title="Polite waits for a pause; the same message twice is read twice">
+      <Frame title="Polite waits for a pause; the same message twice is read twice">
         <div className="wb-line">
           <Button onClick={() => say(COPIED)}>Announce a copy</Button>
           <Button onClick={() => say("Reset 2 Overrides")}>Announce a reset</Button>
         </div>
-      </Row>
-      <Row title="Assertive interrupts: a refusal to act on">
+      </Frame>
+      <Frame title="Assertive interrupts: a refusal to act on">
         <div className="wb-line">
           <Button onClick={() => say("Couldn’t reach the clipboard. Select the command and copy it.", "assertive")}>Announce a refusal</Button>
         </div>
         <p className="wb-note">Last said, {said}</p>
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -154,7 +162,7 @@ function FoldStates() {
   const [open, setOpen] = useState(false);
   return (
     <div className="wb-states">
-      <Row title="Closed: Enter or Space opens it, focus stays on the row">
+      <Frame title="Closed: Enter or Space opens it, focus stays on the row">
         <Fold>
           <FoldTrigger className="wb-fold-row">
             <span>Order details</span>
@@ -164,8 +172,8 @@ function FoldStates() {
             <p className="wb-fold-body">Still in the page while closed: find in page opens it.</p>
           </FoldPanel>
         </Fold>
-      </Row>
-      <Row title="Open at first, with a fold inside">
+      </Frame>
+      <Frame title="Open at first, with a fold inside">
         <Fold defaultOpen>
           <FoldTrigger className="wb-fold-row">
             <span>Inspect only · 3</span>
@@ -185,8 +193,8 @@ function FoldStates() {
             </div>
           </FoldPanel>
         </Fold>
-      </Row>
-      <Row title="Inline, the caller keeps the state">
+      </Frame>
+      <Frame title="Inline, the caller keeps the state">
         <Fold open={open} onOpenChange={setOpen}>
           <div className="wb-fold-line">
             <span>Reaches 4 of 4</span>
@@ -199,7 +207,7 @@ function FoldStates() {
             <p className="wb-fold-body">{open ? "Opened by the caller’s state." : ""}</p>
           </FoldPanel>
         </Fold>
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -219,7 +227,7 @@ function ButtonStates() {
   const [presses, setPresses] = useState(0);
   return (
     <div className="wb-states">
-      <Row title="Soft: small, medium, large; disabled">
+      <Frame title="Soft: small, medium, large; disabled">
         <div className="wb-line">
           <Button size="small" onClick={() => setPresses(presses + 1)}>
             Discard
@@ -236,8 +244,8 @@ function ButtonStates() {
         <p className="wb-note">
           Pressed {presses} times
         </p>
-      </Row>
-      <Row title="Primary, and icon only">
+      </Frame>
+      <Frame title="Primary, and icon only">
         <div className="wb-line">
           <Button look="primary">
             <Glyph />
@@ -254,8 +262,8 @@ function ButtonStates() {
             <span className="sr-only">Reset</span>
           </Button>
         </div>
-      </Row>
-      <Row title="Toggle: a tool, a soft pill, and one whose pressed shows elsewhere">
+      </Frame>
+      <Frame title="Toggle: a tool, a soft pill, and one whose pressed shows elsewhere">
         <div className="wb-line">
           <Toggle look="tool" iconOnly pressed={pressed} onPressedChange={setPressed} title="Hide marks">
             <Glyph />
@@ -273,7 +281,7 @@ function ButtonStates() {
         <p className="wb-note">
           Dark theme {dark ? "pressed" : "not pressed"}: the button draws no mark
         </p>
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -284,7 +292,7 @@ function SwitchStates() {
   const [modal, setModal] = useState(true);
   return (
     <div className="wb-states">
-      <Row title="Space or Enter turns it; the thumb slides with its corners">
+      <Frame title="Space or Enter turns it; the thumb slides with its corners">
         <label className="wb-switch-row">
           <span>open</span>
           <Switch label="open" checked={open} onCheckedChange={setOpen} />
@@ -297,7 +305,7 @@ function SwitchStates() {
           <span>disabled</span>
           <Switch label="disabled" checked={false} disabled onCheckedChange={() => {}} />
         </label>
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -311,10 +319,10 @@ function FieldStates() {
   const [text, setText] = useState("Save changes");
   return (
     <div className="wb-states">
-      <Row title="Filled: a label, an optional marker, a placeholder">
+      <Frame title="Filled: a label, an optional marker, a placeholder">
         <Field label="Designer" optional="optional" placeholder="Who is asking for this?" value={designer} onValueChange={setDesigner} />
-      </Row>
-      <Row title="Filled, with an error until it has text, and a hint">
+      </Frame>
+      <Frame title="Filled, with an error until it has text, and a hint">
         <Field
           label="Title"
           required
@@ -323,13 +331,13 @@ function FieldStates() {
           value={title}
           onValueChange={setTitle}
         />
-      </Row>
-      <Row title="Outline: a hidden label, grows with its text">
+      </Frame>
+      <Frame title="Outline: a hidden label, grows with its text">
         <Field label="children" labelHidden look="outline" multiline autoResize rows={1} value={text} onValueChange={setText} />
-      </Row>
-      <Row title="Well: read-only, fades out at its foot">
+      </Frame>
+      <Frame title="Well: read-only, fades out at its foot">
         <Field label="Long text" labelHidden look="well" multiline readOnly value={LONG_TEXT} />
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -350,7 +358,7 @@ function PopoverStates() {
   };
   return (
     <div className="wb-states">
-      <Row title="Escape or a press outside closes it; focus goes back to what opened it">
+      <Frame title="Escape or a press outside closes it; focus goes back to what opened it">
         <div ref={footer} className="wb-footer">
           <div ref={toggles} className="wb-line">
             <Button ref={center} aria-expanded={open && caret === "center"} aria-haspopup="dialog" onClick={() => toggle("center")}>
@@ -371,7 +379,7 @@ function PopoverStates() {
             </div>
           </PopoverPanel>
         </Popover>
-      </Row>
+      </Frame>
     </div>
   );
 }
@@ -380,7 +388,7 @@ function PopoverStates() {
 function MarkStates() {
   return (
     <div className="wb-states">
-      <Row title="Tag: plain, reason, picked, amber, ring, dashed, empty">
+      <Frame title="Tag: plain, reason, picked, amber, ring, dashed, empty">
         <div className="wb-line">
           <Tag>State prop</Tag>
           <Tag look="reason" title="The library sets this prop; the call site doesn’t pass it">set by the library</Tag>
@@ -390,8 +398,8 @@ function MarkStates() {
           <Tag look="dashed">Not visible now</Tag>
           <Tag look="empty">empty</Tag>
         </div>
-      </Row>
-      <Row title="Dot: hidden; the words beside it say what it marks">
+      </Frame>
+      <Frame title="Dot: hidden; the words beside it say what it marks">
         <div className="wb-line">
           <span className="wb-mark">
             <Dot tone="alert" /> Product layer missing
@@ -412,8 +420,8 @@ function MarkStates() {
             <Dot tone="ring" /> Held for review
           </span>
         </div>
-      </Row>
-      <Row title="Delta: numbered (an image named “Change n”), and empty and dashed (hidden)">
+      </Frame>
+      <Frame title="Delta: numbered (an image named “Change n”), and empty and dashed (hidden)">
         <div className="wb-line">
           <Delta n={1} label="Change 1" title="Change 1 in the Proposal" />
           <Delta n={2} label="Change 2" title="Change 2 in the Proposal" />
@@ -422,20 +430,129 @@ function MarkStates() {
             <Delta title="Held open: shown as a state" /> open <Tag>State prop</Tag>
           </span>
         </div>
-      </Row>
-      <Row title="Kbd: a key in running text">
+      </Frame>
+      <Frame title="Kbd: a key in running text">
         <p className="wb-status">
           Click an Instance on the page · <Kbd>Esc</Kbd> cancels
         </p>
         <p className="wb-status">
           A dialog on the page runs under the panel · hold <Kbd>Alt</Kbd> to see through
         </p>
-      </Row>
+      </Frame>
     </div>
   );
 }
 
-function Row({ title, children }: { title: string; children: ReactNode }) {
+/** Card's looks and Row's: the Inspector's divided card of glyph rows, a list card, a padded card of ruled rows. */
+function CardRowStates() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="wb-states">
+      <Frame title="Divided: parts on hairlines, inset rows on a 20px glyph column">
+        <Card look="divided">
+          <Row glyph={PROP_ICONS.size}>
+            <RowLine>
+              <Delta n={2} label="Change 2" />
+              <RowName code="size">Size</RowName>
+              <RowAction>
+                <Button size="small">
+                  <ResetIcon />
+                  Reset
+                </Button>
+              </RowAction>
+            </RowLine>
+            <ChipGroup label="Size" value="md" onChoose={() => {}}>
+              {SIZES.map((size) => (
+                <Chip key={size} value={size}>
+                  {size}
+                </Chip>
+              ))}
+            </ChipGroup>
+          </Row>
+          <Row glyph={PROP_ICONS.variant}>
+            <RowLine>
+              <RowName code="accessibilityLabelWhenCollapsed">A much longer label that wraps between its words</RowName>
+              <Tag look="reason">set by the library</Tag>
+              <RowValue>"ghost"</RowValue>
+            </RowLine>
+          </Row>
+          <Row glyph={PROP_ICONS.state}>
+            <RowLine>
+              <RowName>open</RowName>
+              <Tag>State prop</Tag>
+              <RowAction>
+                <Switch label="open" checked={open} onCheckedChange={setOpen} />
+              </RowAction>
+            </RowLine>
+          </Row>
+          <Row glyph={<InfoIcon />} role="note">
+            <div className="wb-note-text">
+              <h3>Rendered on the server</h3>
+              <p>Its props can't change here. A note is a Row, not a card on a card.</p>
+            </div>
+          </Row>
+          <div className="wb-pairs">
+            <Row look="pair">
+              <RowLine>
+                <RowName code="aria-label">aria-label</RowName>
+                <RowValue>"More actions"</RowValue>
+              </RowLine>
+            </Row>
+            <Row look="pair">
+              <RowLine>
+                <RowName>onSelect</RowName>
+                <RowValue>ƒ handleSelect</RowValue>
+              </RowLine>
+            </Row>
+          </div>
+        </Card>
+      </Frame>
+      <Frame title="List: rows run edge to edge, the head keeps 14px">
+        <Card look="list">
+          <CardHead>
+            <h3>Appears on interaction</h3>
+            <span className="wb-note">Not on screen yet</span>
+          </CardHead>
+          <ul className="wb-list">
+            <li>Dialog</li>
+            <li>Tooltip</li>
+          </ul>
+        </Card>
+      </Frame>
+      <Frame title="Plain, with ruled rows: a name in mono, a value, an action">
+        <Card>
+          <CardHead>
+            <h3>Feature flags</h3>
+            <span className="wb-note">2 declared · 1 previewing</span>
+          </CardHead>
+          <Row look="ruled">
+            <RowLine>
+              <Dot tone="lilac" small />
+              <RowName mono>showBetaFeature</RowName>
+              <RowAction>
+                <Button size="small">
+                  <ResetIcon />
+                  Clear
+                </Button>
+              </RowAction>
+            </RowLine>
+            <p className="wb-note">Previewing On</p>
+          </Row>
+          <ul className="wb-list">
+            <Row as="li" look="ruled">
+              <RowLine>
+                <span>Button, ButtonGroup, ButtonGroupSeparator</span>
+                <RowValue title="ui/button.tsx">ui/button.tsx</RowValue>
+              </RowLine>
+            </Row>
+          </ul>
+        </Card>
+      </Frame>
+    </div>
+  );
+}
+
+function Frame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="wb-row">
       <h3>{title}</h3>
@@ -446,15 +563,22 @@ function Row({ title, children }: { title: string; children: ReactNode }) {
 
 /** The frame's own layout: a card on the panel's ground, in the surface's tokens. */
 const FRAME_CSS = `
-.wb-card { padding: 14px; border-radius: var(--radius-card); background: var(--card); color: var(--ink); box-shadow: var(--shadow); font: var(--font-body); }
 .wb-states { display: flex; flex-direction: column; gap: 16px; }
 .wb-row { display: flex; flex-direction: column; gap: 8px; }
-.wb-row h3 { font: var(--font-label); color: var(--muted); }
+.wb-row > h3 { font: var(--font-label); color: var(--muted); }
+.wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
+.wb-list { list-style: none; margin: 0; padding: 0; }
+.wb-list > li:not([data-row]) { padding: var(--space-inset) var(--space-gutter); border-top: 1px solid var(--rule); }
+.wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
+.wb-note-text { display: flex; flex-direction: column; gap: var(--space-xs); }
+.wb-note-text p { font: var(--font-paragraph); color: var(--muted); }
 .wb-note { font: var(--font-meta); color: var(--faint); }
 .wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wb-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; font: var(--font-title); color: var(--ink); }
 .wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
-.wb-card > h2 { margin-bottom: 12px; font: var(--font-title); color: var(--ink); }
+.wb-card > h2 { font: var(--font-title); color: var(--ink); }
+.wb-bare { display: flex; flex-direction: column; gap: var(--space-row); padding: var(--space-card) var(--space-sheet); }
+.wb-bare > h2 { font: var(--font-title); color: var(--ink); }
 .wb-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; font: var(--font-title); color: var(--ink); }
 .wb-fold-row [data-fold-chevron] { color: var(--muted); }
 .wb-fold-small { justify-content: flex-start; gap: 6px; min-height: 28px; font: var(--font-control); color: var(--muted); }
@@ -481,38 +605,43 @@ function FrameView({ frame }: { frame: Frame }) {
       <Surface theme={frame.theme} textSize={frame.textSize} label={`${frame.name} frame`}>
         <style>{FRAME_CSS}</style>
         <div className="wb-ground">
-          <div className="wb-card">
+          <Card className="wb-card">
             <h2>ChipGroup</h2>
             <ChipGroupStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Button and Toggle</h2>
             <ButtonStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Switch</h2>
             <SwitchStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Fold</h2>
             <FoldStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Field</h2>
             <FieldStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Popover</h2>
             <PopoverStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Tag, Dot, Delta and Kbd</h2>
             <MarkStates />
-          </div>
-          <div className="wb-card">
+          </Card>
+          <Card className="wb-card">
             <h2>Announcer</h2>
             <AnnouncerStates />
-          </div>
+          </Card>
+          {/* On the ground, not in a frame's card: a card never sits on a card. */}
+          <section className="wb-bare">
+            <h2>Card and Row</h2>
+            <CardRowStates />
+          </section>
         </div>
       </Surface>
     </figure>

@@ -1,0 +1,53 @@
+/*
+ * Row (ADR 0003): a line inside a card, written against `[data-row]` (its look),
+ * `[data-glyphed]` and its parts, `[data-row-glyph]`, `[data-row-line]`, `[data-row-name]`,
+ * `[data-row-code]`, `[data-row-value]` and `[data-row-action]`. Values from the tokens. In
+ * the stylesheet's `primitives` layer.
+ *
+ * `--row-line` is the line's least height, and the glyph's: the glyph sits centred on the
+ * row's first line, whatever its name wraps to below it. `--row-gap` sets apart what is
+ * under the line.
+ */
+
+/* Inset: padded 14px, its glyph 15px under the hairline above it, as Paper draws it; what is under the line 13px apart. */
+[data-row] {
+  --row-line: 20px;
+  --row-gap: calc(var(--space-card) + var(--space-hairline));
+  position: relative; display: flex; flex-direction: column; gap: var(--row-gap);
+  padding: var(--space-gutter) var(--space-gutter) calc(var(--space-gutter) - var(--space-hairline));
+}
+
+/* The glyph column: 20px wide in every row, so the names after it line up on one edge, 42px in. */
+[data-row][data-glyphed] { display: grid; grid-template-columns: 20px minmax(0, 1fr); column-gap: var(--space-inset); row-gap: var(--row-gap); }
+[data-row][data-glyphed] > :not([data-row-glyph]) { grid-column: 2; }
+[data-row-glyph] { grid-row: 1; grid-column: 1; display: flex; align-items: center; justify-content: center; height: var(--row-line); color: var(--ink); }
+
+/*
+ * The line: name, what qualifies it, value and action, wrapping when they don't fit. The
+ * value grows into the free space from its own width (`auto`, not 0), so one that doesn't fit
+ * beside the name goes to a line of its own instead of breaking a letter per line.
+ */
+[data-row-line] { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-sheet); min-height: var(--row-line); flex-shrink: 0; }
+/* A delta before the name: its triangle overhangs, so the name keeps its place. */
+[data-row-line] [data-delta] { margin: -1px -2px -1px -3px; }
+[data-row-name] { flex: none; display: flex; align-items: baseline; gap: var(--space-sheet); max-width: 100%; font: var(--font-title); letter-spacing: var(--tracking-title); }
+[data-row-name][data-mono] { font: var(--font-mono); font-weight: 500; letter-spacing: 0; }
+[data-row-code] { font: var(--font-mono-small); letter-spacing: 0; color: var(--faint); }
+[data-row-value] { flex: 1 1 auto; min-width: 0; text-align: right; font: var(--font-mono-small); color: var(--muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+[data-row-action] { display: inline-flex; flex: none; align-items: center; gap: var(--space-inset); margin-left: auto; }
+
+/* A switch at the line's end is 22px: the line and the glyph take its height, and the name gives way rather than wrap under it. */
+[data-row]:has([data-row-line] [data-switch]) { --row-line: 22px; padding-bottom: var(--space-gutter); }
+[data-row-line]:has([data-switch]) { flex-wrap: nowrap; }
+[data-row-line]:has([data-switch]) > [data-row-name] { flex: 0 1 auto; min-width: 0; }
+
+/* Ruled: a hairline above, for a padded card whose padding sets its sides. */
+[data-row="ruled"], [data-row="pair"] { border-top: 1px solid var(--rule); }
+[data-row="ruled"] { --row-gap: var(--space-inset); padding: var(--space-inset) 0; }
+
+/* A pair: name and value in two mono columns, tight, the code name left to the tooltip. */
+[data-row="pair"] { --row-gap: var(--space-hair); padding: var(--space-sheet) 0; }
+[data-row="pair"] [data-row-line] { display: grid; grid-template-columns: minmax(96px, 38%) minmax(0, 1fr) auto; align-items: baseline; gap: var(--space-inset); min-height: 24px; }
+[data-row="pair"] [data-row-name] { min-width: 0; font: var(--font-mono); letter-spacing: 0; color: var(--muted); overflow-wrap: normal; }
+[data-row="pair"] [data-row-code] { display: none; }
+[data-row="pair"] [data-row-value] { text-align: left; font: var(--font-mono); color: var(--ink); }

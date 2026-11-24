@@ -293,10 +293,17 @@ describe("the Feature flags card", () => {
       { key: "showBetaFeature", value: true },
     ]);
 
-    act(() => (container.querySelector('[data-flag="plan"] .reset') as HTMLButtonElement).click());
+    // Clear goes with the preview: focus moves to the cleared flag's options, not another flag's.
+    const clear = within(container.querySelector('[data-flag="plan"]') as HTMLElement).getByRole("button", { name: "Clear" });
+    clear.focus();
+    act(() => clear.click());
     await idle();
     expect(await previewedFlags()).toEqual([{ key: "showBetaFeature", value: true }]);
     expect(container.querySelector('[data-flag="plan"]')?.textContent).toContain("App decides");
+    await until(() => {
+      if (!within(container).getByRole("radiogroup", { name: "plan" }).contains(document.activeElement)) throw new Error("focus not on plan");
+    });
+    expect(document.activeElement?.getAttribute("role")).toBe("radio");
 
     act(() => button("Clear flag previews").click());
     await idle();
@@ -324,9 +331,9 @@ describe("the Feature flags card", () => {
     pageLoad();
     act(() => root.render(<FlagsCard />));
     await idle();
-    expect(container.querySelector(".card.flags")?.textContent).toContain(
-      "A preview lasts 8 hours, in a cookie every app on localhost shares. Clear it before switching projects.",
-    );
+    expect(
+      within(container).getByText("A preview lasts 8 hours, in a cookie every app on localhost shares. Clear it before switching projects."),
+    ).toBeTruthy();
   });
 
   it("stays ready when a read fails during an export, since the page still has the preview (PER-226)", async () => {

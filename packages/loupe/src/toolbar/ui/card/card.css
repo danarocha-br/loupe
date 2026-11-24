@@ -1,0 +1,28 @@
+/*
+ * Card (ADR 0003): the sheet's surface, written against `[data-card]` (its look) and
+ * `[data-card-head]`. Values from the tokens. In the stylesheet's `primitives` layer.
+ */
+
+/*
+ * Every card: the card's white, 18px corners, the card's lift, and its text 14px from its
+ * left edge, 12px from its top and 14px from its foot. A 1px transparent outline inside its
+ * edge, invisible here, is drawn by forced colours, which drop the fill and the shadow, so
+ * the card keeps its edge. Its words are the body's, in ink, wherever it is drawn.
+ */
+[data-card] {
+  display: flex; flex-direction: column; gap: var(--space-row);
+  padding: var(--space-card) var(--space-gutter) var(--space-gutter);
+  border-radius: var(--radius-card); outline: 1px solid transparent; outline-offset: -1px;
+  background: var(--card); box-shadow: var(--shadow); color: var(--ink); font: var(--font-body);
+}
+
+/* Its title at the left, what counts it at the right, on one baseline. */
+[data-card-head] { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-card); }
+
+/* Rows run edge to edge: no side padding, so their hover and hairlines reach both edges; the head keeps the text's 14px. */
+[data-card="list"] { gap: var(--space-xs); padding: var(--space-card) 0 var(--space-sheet); overflow: hidden; }
+[data-card="list"] > [data-card-head] { padding: 0 var(--space-gutter) var(--space-xs); }
+
+/* Parts on hairlines: no padding, each part padding itself, and a 1px rule between them. */
+[data-card="divided"] { gap: 0; padding: 0; overflow: hidden; }
+[data-card="divided"] > * + * { border-top: 1px solid var(--rule); }

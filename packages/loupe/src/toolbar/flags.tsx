@@ -10,13 +10,16 @@ import { PREVIEW_HOURS } from "./flags-lifetime.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags, sameFlagValue } from "./flags-store.js";
 import { ClockIcon, ResetIcon } from "./icons.js";
 import { Command } from "./command.js";
-import { Button, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, useAnnounceChange } from "./ui/index.js";
+import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Row, RowAction, RowLine, RowName, useAnnounceChange } from "./ui/index.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [
   { value: false, label: "Off" },
   { value: true, label: "On" },
 ];
+
+/** A flag's options are one radio group, one Tab stop: the radio that holds it. */
+const TAB_STOP = '[role="radio"][tabindex="0"]';
 
 export function FlagsCard() {
   const current = useSyncExternalStore(onFlagsChange, flagsView);
@@ -46,12 +49,13 @@ export function FlagsCard() {
   const clearing = (from: HTMLElement, done: Promise<void>) => {
     const root = from.getRootNode() as Document | ShadowRoot;
     if (root.activeElement !== from) return;
-    const row = from.closest(".flag");
+    const row = from.closest("[data-flag]");
     void done.then(() => {
       if (from.isConnected && !(from as HTMLButtonElement).disabled) return;
+      // The cleared flag's options, at their tab stop (ChipGroup's roving one); else the card's first control.
       const next =
-        (row?.isConnected ? row.querySelector<HTMLElement>(".pills button") : null) ??
-        card.current?.querySelector<HTMLElement>(".pills button, button:not(:disabled)") ??
+        (row?.isConnected ? row.querySelector<HTMLElement>(TAB_STOP) : null) ??
+        card.current?.querySelector<HTMLElement>(`${TAB_STOP}, button:not(:disabled)`) ??
         null;
       next?.focus();
     });
@@ -64,11 +68,11 @@ export function FlagsCard() {
         ? "Unavailable"
         : null;
   return (
-    <div className="card flags" ref={card}>
-      <div className="head">
+    <Card className="flags" ref={card}>
+      <CardHead>
         <h3>Feature flags</h3>
         {meta && <span className="meta">{meta}</span>}
-      </div>
+      </CardHead>
       {current.status === "loading" && <div className="muted">Reading the app’s flags…</div>}
       {current.status === "unavailable" && (
         // One line until it's opened: the fix is an engineer's, and the list comes first.
@@ -137,7 +141,7 @@ export function FlagsCard() {
           </Button>
         </>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -164,17 +168,19 @@ function FlagRow({
   const checked = previewing ? options.findIndex((option) => sameFlagValue(option.value, value)) : -1;
   const shown = options[checked];
   return (
-    <div className={previewing ? "row flag overridden" : "row flag"} data-flag={definition.key}>
-      <div className="line">
+    <Row look="ruled" className={previewing ? "flag overridden" : "flag"} data-flag={definition.key}>
+      <RowLine>
         <Dot tone={previewing ? "lilac" : "hollow"} small />
-        <span className="name">{definition.key}</span>
+        <RowName mono>{definition.key}</RowName>
         {previewing && (
-          <Button size="small" className="reset" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>
-            <ResetIcon />
-            Clear
-          </Button>
+          <RowAction>
+            <Button size="small" disabled={busy} onClick={(event) => onClear(event.currentTarget)}>
+              <ResetIcon />
+              Clear
+            </Button>
+          </RowAction>
         )}
-      </div>
+      </RowLine>
       {definition.description && <div className="muted">{definition.description}</div>}
       {!definition.options && !undeclared && <div className="muted">No options declared: offered as on and off.</div>}
       <div className="foot">
@@ -200,6 +206,6 @@ function FlagRow({
           {previewing ? `Previewing ${shown?.label ?? formatCurrent(value)}` : "App decides"}
         </div>
       </div>
-    </div>
+    </Row>
   );
 }
