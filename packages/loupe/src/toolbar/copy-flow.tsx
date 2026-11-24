@@ -5,39 +5,17 @@
 // popover says why, holds the Proposal's text to copy by hand, and tries again. The
 // popover points at what opened it: the chevron, or the button a one-click copy came from.
 // It isn't modal: the page and the panel stay usable while it is open.
+//
+// What it draws is the Copy flow's patterns' (patterns/copy-flow/), in panel-view's words
+// (`COPY_WORDS`). This keeps the state machine: running a copy, which half opened the
+// popover and where focus goes back, the timers, the form's text and what is announced.
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
-import { AlertIcon, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, ResetIcon } from "./ui/icon/icon.js";
-import { Button, Field, focusField, Popover, PopoverPanel, useAnnounce } from "./ui/index.js";
-
-/** Every word the flow shows, beside the component that shows it. */
-export const COPY = {
-  idle: "Copy Proposal",
-  copied: "Copied",
-  failed: "Not copied",
-  mainTitle: "Copy the Proposal for your coding agent or an engineer",
-  detailsTitle: "Copy with a title and a designer",
-  details: "Copy with details",
-  title: "Title",
-  designer: "Designer",
-  optional: "optional",
-  designerHint: "Who is asking for this?",
-  copyWith: "Copy with these details",
-  notCopied: "Couldn’t copy automatically",
-  below: "Your Proposal is below.",
-  selectAll: "Select all",
-  retry: "Try again",
-  pasteIt: "Paste it into your coding agent",
-  proposal: "The Proposal",
-} as const;
-
-/** Under the title field when the details' copy is pressed with none. */
-export const TITLE_MISSING = "Give the Proposal a title: it heads the text your coding agent reads.";
-
-/** What a screen reader hears once a copy lands: the toast's words. */
-export const copiedText = (title: string) => `Copied “${title}”. ${COPY.pasteIt}.`;
+import { COPY_WORDS } from "./panel-view/index.js";
+import { CopySplit, CopyToast, DetailsForm, NotCopied } from "./patterns/index.js";
+import { focusField, Popover, PopoverPanel, useAnnounce } from "./ui/index.js";
 
 /** How long the button says Copied, and the toast stays. */
 const COPIED_MS = 2500;
@@ -47,13 +25,6 @@ type From = "copy" | "details";
 type Failure = { reason: string; text: string; from: From };
 /** The last copy that landed; `at` tells two copies of the same title apart, so each restarts the timers. */
 type Landed = { title: string; at: number };
-
-/** The split button's look and words in each state. */
-const STATES = {
-  idle: { icon: <CopyIcon size={16} />, text: COPY.idle },
-  copied: { icon: <CheckIcon size={16} />, text: COPY.copied },
-  failed: { icon: <AlertIcon />, text: COPY.failed },
-} as const;
 
 /** `disabled` while there is nothing to copy; `frame`, the footer the popovers stand over. */
 export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObject<HTMLElement | null> }) {
@@ -104,7 +75,7 @@ export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObj
         setCopied(landed);
         setToast(landed);
         // Once per copy, the same title twice included: the toast itself is for the eye.
-        announce(copiedText(title));
+        announce(COPY_WORDS.copiedText(title));
       },
       (error: unknown) => {
         running.current = false;
@@ -131,83 +102,60 @@ export function CopyFlow({ disabled, frame }: { disabled: boolean; frame: RefObj
   };
 
   const state = failure?.from === "copy" ? "failed" : copied !== null ? "copied" : "idle";
-  const look = STATES[state];
   const detailsOpen = details || failure?.from === "details";
   return (
     <>
-      <div ref={split} className="split" data-state={state} aria-busy={busy || undefined}>
-        <button
-          ref={main}
-          type="button"
-          className="split-main"
-          data-copy=""
-          disabled={disabled}
-          title={COPY.mainTitle}
-          onClick={() => run("copy", formDetails())}
-        >
-          {look.icon}
-          {look.text}
-        </button>
-        <span className="split-rule" aria-hidden="true" />
-        <button
-          ref={chevron}
-          type="button"
-          className="split-more"
-          data-copy-details=""
-          disabled={disabled}
-          aria-expanded={detailsOpen}
-          aria-haspopup="dialog"
-          title={COPY.detailsTitle}
-          onClick={() => {
-            if (!details && !failure) return setDetails(true);
-            close();
-            chevron.current?.focus();
-          }}
-        >
-          <ChevronUpIcon />
-          <span className="sr-only">{COPY.details}</span>
-        </button>
-      </div>
+      <CopySplit
+        ref={split}
+        mainRef={main}
+        chevronRef={chevron}
+        state={state}
+        busy={busy}
+        disabled={disabled}
+        expanded={detailsOpen}
+        words={COPY_WORDS}
+        onCopy={() => run("copy", formDetails())}
+        onDetails={() => {
+          if (!details && !failure) return setDetails(true);
+          close();
+          chevron.current?.focus();
+        }}
+      />
       {/* A press on the split is its own: the chevron toggles, the main half copies again. */}
       <Popover open={details} onOpenChange={(open) => !open && setDetails(false)} inside={split}>
-        <PopoverPanel label={COPY.details} anchor={frame} returnFocus={chevron} initialFocus={titleField} caret="end" className="copy-popover">
+        <PopoverPanel label={COPY_WORDS.details} anchor={frame} returnFocus={chevron} initialFocus={titleField} caret="end">
           <Details titleField={titleField} busy={busy} onCopy={(copyDetails) => run("details", copyDetails)} />
         </PopoverPanel>
       </Popover>
       <Popover open={failure !== null} onOpenChange={(open) => !open && setFailure(null)} inside={split}>
         <PopoverPanel
-          label={COPY.notCopied}
+          label={COPY_WORDS.notCopied}
           anchor={frame}
           returnFocus={halfFor(failedFrom)}
           initialFocus={retry}
           caret={failedFrom === "copy" ? "center" : "end"}
-          className="copy-popover"
         >
-          {failure && <NotCopied failure={failure} busy={busy} retry={retry} onRetry={() => run(failure.from, formDetails())} />}
+          {failure && (
+            <NotCopied
+              said={notCopiedText(failure)}
+              text={failure.text}
+              busy={busy}
+              words={COPY_WORDS}
+              retryRef={retry}
+              onRetry={() => run(failure.from, formDetails())}
+            />
+          )}
         </PopoverPanel>
       </Popover>
-      {toast !== null && failure === null && !details && (
-        <div className="copy-toast" aria-hidden="true">
-          <span className="badge">
-            <CheckIcon size={14} />
-          </span>
-          <span className="what">
-            <span className="line">
-              {/* `bdi`: the title is the app's words, whatever their direction. */}
-              {COPY.copied} “<bdi className="copied-title">{toast.title}</bdi>”
-            </span>
-            <span className="sub">{COPY.pasteIt}</span>
-          </span>
-        </div>
-      )}
+      {toast !== null && failure === null && !details && <CopyToast title={toast.title} words={COPY_WORDS} />}
     </>
   );
 }
 
 /** Why a copy was refused, as the popover says it: with "Your Proposal is below." when it holds the text. */
-const notCopiedText = (failure: Failure) => (failure.text === "" ? failure.reason : `${failure.reason} ${COPY.below}`);
+const notCopiedText = (failure: Failure) => COPY_WORDS.notCopiedText(failure.reason, failure.text !== "");
 
-/** The chevron's popover: a title, prefilled from the suggestion until edited, and an optional designer. */
+/** The chevron's popover's state: a title, prefilled from the suggestion until edited, and an optional designer. */
 function Details({ titleField, busy, onCopy }: { titleField: RefObject<HTMLInputElement | null>; busy: boolean; onCopy(details: CopyDetails): void }) {
   const announce = useAnnounce();
   const form = copyForm();
@@ -234,93 +182,35 @@ function Details({ titleField, busy, onCopy }: { titleField: RefObject<HTMLInput
     };
   }, []);
   return (
-    // The title's error is the form's own, in the page: the browser's bubble would sit outside Loupe.
-    <form
-      className="details"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
+    <DetailsForm
+      title={title}
+      designer={designer}
+      missing={missing}
+      busy={busy}
+      words={COPY_WORDS}
+      titleRef={titleField}
+      onTitle={(next) => {
+        setTitle(next);
+        if (next.trim() !== "") setMissing(false);
+        copyForm().title = next;
+      }}
+      onDesigner={(next) => {
+        setDesigner(next);
+        copyForm().designer = next;
+      }}
+      onSubmit={() => {
         if (title.trim() === "") {
           setMissing(true);
           // Focus moving to the field reads its error with it, once the error is there (the
           // effect above). Already there (Enter in the field), nothing moves, so the error
           // is said: once either way (field.md).
           const field = titleField.current;
-          if (field && (field.getRootNode() as ShadowRoot | Document).activeElement === field) announce(TITLE_MISSING, { politeness: "assertive" });
+          if (field && (field.getRootNode() as ShadowRoot | Document).activeElement === field) announce(COPY_WORDS.titleMissing, { politeness: "assertive" });
           else setTitleFocusRequests((asked) => asked + 1);
           return;
         }
         onCopy({ title, designer });
       }}
-    >
-      <Field
-        ref={titleField}
-        label={COPY.title}
-        name="title"
-        required
-        error={missing ? TITLE_MISSING : undefined}
-        value={title}
-        onValueChange={(next) => {
-          setTitle(next);
-          if (next.trim() !== "") setMissing(false);
-          copyForm().title = next;
-        }}
-      />
-      <Field
-        label={COPY.designer}
-        optional={COPY.optional}
-        name="designer"
-        placeholder={COPY.designerHint}
-        value={designer}
-        onValueChange={(next) => {
-          setDesigner(next);
-          copyForm().designer = next;
-        }}
-      />
-      <Button type="submit" look="primary" className="submit" aria-disabled={busy || undefined}>
-        <CopyIcon size={16} />
-        {COPY.copyWith}
-      </Button>
-    </form>
-  );
-}
-
-/** A refused copy: why, the Proposal's text to copy by hand when it was built, and another try. */
-function NotCopied({ failure, busy, retry, onRetry }: { failure: Failure; busy: boolean; retry: RefObject<HTMLButtonElement | null>; onRetry(): void }) {
-  const text = useRef<HTMLTextAreaElement>(null);
-  const hasText = failure.text !== "";
-  // Said by the announcer as the refusal lands (CopyFlow); here it is for the eye.
-  return (
-    <>
-      <div className="not-copied">
-        <span className="badge" aria-hidden="true">
-          <ExclaimIcon />
-        </span>
-        <div className="why">
-          <h3>{COPY.notCopied}</h3>
-          <p>{notCopiedText(failure)}</p>
-        </div>
-      </div>
-      {hasText && (
-        <Field ref={text} className="proposal-text" label={COPY.proposal} labelHidden look="well" multiline readOnly spellCheck={false} value={failure.text} />
-      )}
-      <div className={hasText ? "popover-actions" : "popover-actions alone"}>
-        {hasText && (
-          <Button
-            size="large"
-            onClick={() => {
-              text.current?.focus();
-              text.current?.select();
-            }}
-          >
-            {COPY.selectAll}
-          </Button>
-        )}
-        <Button ref={retry} look="primary" aria-disabled={busy || undefined} onClick={onRetry}>
-          <ResetIcon />
-          {COPY.retry}
-        </Button>
-      </div>
-    </>
+    />
   );
 }

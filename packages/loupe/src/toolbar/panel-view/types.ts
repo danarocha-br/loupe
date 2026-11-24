@@ -67,7 +67,14 @@ export type PanelView = {
   /** The plot key: per mounted Instance a numbered change reaches, its numbers. */
   marks: { id: string; keys: number[]; stamp: string }[];
   /** The report line names the page and counts its changes. */
-  header: { route: string; /** The page's name alone: "Home". */ page: string; report: string };
+  header: {
+    route: string;
+    /** The page's name alone: "Home". */
+    page: string;
+    report: string;
+    /** The page's tooltip after the wordmark: the report and the route, "Home · 2 changes · /". */
+    title: string;
+  };
   /**
    * The notices over the panel's content: the Product layer's (missing, another format, or
    * sources changed since `generate`), then "Overrides are off" while the React self-check fails.
@@ -75,19 +82,23 @@ export type PanelView = {
   notices: NoticeView[];
   /** What the notices say, for the panel's live regions: a missing or other-format layer is an alert, the rest a status. */
   announcements: { alert: string; status: string };
-  footer: {
-    countText: string;
+  footer: FooterView & {
     hasOverrides: boolean;
     /** Copy Proposal is on while there is a record. */
     copyEnabled: boolean;
-    /** Every record "Reset all" discards; empty while it is off. */
-    resetAll: ScopeTarget[];
-    /** The numbered changes: the big number, and its word, "change" or "changes". */
-    changes: { count: number; word: string };
-    /** The State props held open, which the Proposal shows as states: the chip's words, and each one for its tooltip. */
-    states: { chip: string | null; title: string };
   };
   body: ListBody | InspectorBody | GoneBody;
+};
+
+/** What the footer's card draws: the count, said once, its figure and word, the held chip, and what Reset all discards. */
+export type FooterView = {
+  countText: string;
+  /** The numbered changes: the big number, and its word, "change" or "changes". */
+  changes: { count: number; word: string };
+  /** The State props held open, which the Proposal shows as states: the chip's words, and each one for its tooltip. */
+  states: { chip: string | null; title: string };
+  /** Every record "Reset all" discards; empty while it is off. */
+  resetAll: ScopeTarget[];
 };
 
 export type ListBody = {
@@ -368,6 +379,76 @@ export type ListWords = {
   changes: { title: string; meta: string };
   /** A change's delta: "Change 1", and its tooltip, as the Inspector says it. */
   change: InspectorWords["change"];
+};
+
+/** A piece of the status strip under the header: its words, or a key drawn in `kbd`. */
+export type StripPart = string | { key: string };
+
+/**
+ * The words the header and its status strip draw (DESIGN.md "Select tools", "Hide marks"): decided here, so a
+ * pattern builds none. The select tools' own words are the list's (`ListWords.tools`).
+ */
+export type HeaderWords = {
+  /** Before the page's name, after the wordmark: "/ ". */
+  pageLead: string;
+  /** Each select tool: its name, and its tooltip, as the list's start names them. */
+  tools: ListWords["tools"];
+  /** The select tools' radio group. */
+  select: string;
+  /** Hide marks: its name, and its tooltip while the marks show and while they are hidden. */
+  marks: { label: string; hide: string; show: string };
+  /** The button that hides the panel: its name and tooltip. */
+  hide: { label: string; title: string };
+  /** The strip under the header: picking with each tool, an app's dialog under the panel, and the marks hidden. */
+  strip: { pick: Record<SelectMode, StripPart[]>; covered: StripPart[]; marksHidden: StripPart[] };
+};
+
+/** What the strip under the header answers to: the view's own state, which panel-view never reads. */
+export type StripState = { picking: boolean; mode: SelectMode; covered: boolean; marksHidden: boolean };
+
+/** The words the footer draws beside its count (DESIGN.md "Layout", "Undo"): decided here, so a pattern builds none. */
+export type FooterWords = {
+  resetAll: string;
+  /** The undo offer's button, after what a reset dropped. */
+  undo: string;
+  /** Light or dark: its name, and its tooltip in each theme. */
+  theme: { label: string; toLight: string; toDark: string };
+};
+
+/**
+ * Copy Proposal's words (DESIGN.md "Copy Proposal"): the split button's, the details' form,
+ * a refused copy's, and the toast's, and what the announcer says of them.
+ */
+export type CopyWords = {
+  /** The split button's main half in each state. */
+  idle: string;
+  copied: string;
+  failed: string;
+  mainTitle: string;
+  detailsTitle: string;
+  /** The chevron's name, and the details popover's. */
+  details: string;
+  title: string;
+  designer: string;
+  optional: string;
+  designerHint: string;
+  copyWith: string;
+  /** Under the title field when the details' copy is pressed with none. */
+  titleMissing: string;
+  /** A refused copy's popover: its name and heading. */
+  notCopied: string;
+  selectAll: string;
+  retry: string;
+  /** The Proposal's text in a refused copy, as its field is named. */
+  proposal: string;
+  /** Under the toast's line: what to do with the copy. */
+  pasteIt: string;
+  /** Around the copied title on the toast's line: `Copied “title”`. */
+  quote: { open: string; close: string };
+  /** What a screen reader hears once a copy lands: the toast's words. */
+  copiedText(title: string): string;
+  /** Why a copy was refused, as the popover says it: with "Your Proposal is below." when it holds the text. */
+  notCopiedText(reason: string, withText: boolean): string;
 };
 
 /** Select multiple on an Instance with no call site to group by: why, and the way to the page when that scope applies. */

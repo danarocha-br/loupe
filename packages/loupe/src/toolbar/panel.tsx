@@ -21,13 +21,14 @@ import { attempt, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Card, Chip, ChipGroup, Dot, Kbd, lookAttributes, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
+import { Button, Card, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
-import { ContrastIcon, CursorIcon, MarksHiddenIcon, MarksIcon, PanelIcon, ResetIcon, SelectManyIcon, Wordmark } from "./ui/icon/icon.js";
 import {
   COMMAND_WORDS,
+  FOOTER_WORDS,
   type GoneBody,
   type GroupItem,
+  HEADER_WORDS,
   type InspectorBody,
   INSPECTOR_WORDS,
   isSwitch,
@@ -35,6 +36,8 @@ import {
   LIST_WORDS,
   type PanelView,
   type PropItem,
+  stripParts,
+  stripText,
 } from "./panel-view/index.js";
 import { appLang } from "./app-lang.js";
 import {
@@ -49,8 +52,11 @@ import {
   NoGroup,
   Notice,
   OnThisPage,
+  PanelFooter,
+  PanelHeader,
   ScopeSection,
   StartCard,
+  StatusStrip,
 } from "./patterns/index.js";
 import { copyToClipboard } from "./clipboard.js";
 import { PageMapView } from "./page-map.js";
@@ -90,15 +96,6 @@ const PANEL_INSET = 8;
  */
 type Actions = Pick<PanelProps, "debug" | "onSelect" | "onScope" | "onHover">;
 
-/** The header's select tools are chips of a radio group drawn as Button's round tool. */
-const TOOL_LOOK = lookAttributes({ look: "tool", iconOnly: true });
-
-/** The header's two select tools: the scope each opens a selection at, and its icon. Their words are panel-view's. */
-const SELECT_TOOLS: { mode: SelectMode; scope: Scope; icon: ReactNode }[] = [
-  { mode: "one", scope: "instance", icon: <CursorIcon /> },
-  { mode: "many", scope: "group", icon: <SelectManyIcon /> },
-];
-
 export function Panel(props: PanelProps) {
   const { view, column } = props;
   const middle = useRef<HTMLDivElement>(null);
@@ -124,17 +121,9 @@ export function Panel(props: PanelProps) {
     if (middle.current) middle.current.scrollTop = 0;
     if (focusWasHere.current) heading.current?.focus();
   }, [opened, body.kind]);
-  // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer
-  // as they change. A key is a `{ key }` part.
-  const strip: StripPart[] | null = props.picking
-    ? [props.mode === "one" ? "Click an Instance on the page" : "Click an Instance: every one from its call site is selected", " · ", { key: "Esc" }, " cancels"]
-    : covered
-      ? ["A dialog on the page runs under the panel · hold ", { key: "Alt" }, " to see through"]
-      : props.marksHidden
-        ? ["Outlines are hidden on the page"]
-        : null;
-  useAnnounceChange(strip ? strip.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
-  const status = strip?.map((part, index) => (typeof part === "string" ? part : <Kbd key={index}>{part.key}</Kbd>));
+  // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer as they change.
+  const strip = stripParts({ picking: props.picking, mode: props.mode, covered, marksHidden: props.marksHidden });
+  useAnnounceChange(stripText(strip));
   return (
     <section
       className={`panel${column.docked ? "" : " overlay"}${peeking ? " peek" : ""}${props.closing ? " closing" : ""}`}
@@ -142,57 +131,18 @@ export function Panel(props: PanelProps) {
       inert={props.closing || undefined}
       style={{ width: column.width - PANEL_INSET * 2 }}
     >
-      <header className="header">
-        <div className="brand">
-          <Wordmark />
-          {/* The page, while nothing is selected: an Instance's identity names it beside the component instead. */}
-          {body.kind === "list" && (
-            <span className="report" title={`${view.header.report} · ${view.header.route}`}>
-              / {view.header.page}
-            </span>
-          )}
-        </div>
-        <div className="tools">
-          {/* The mode, as a radio group: armed is the page's state, said by the status strip below. */}
-          <ChipGroup look="bare" className="select-tools" label="Select" value={props.mode} onChoose={(mode) => props.onTool(mode as SelectMode)}>
-            {SELECT_TOOLS.map((tool) => (
-              <Chip
-                key={tool.mode}
-                value={tool.mode}
-                {...TOOL_LOOK}
-                className="tool"
-                data-scope={tool.scope}
-                data-armed={props.picking && props.mode === tool.mode ? "" : undefined}
-                title={LIST_WORDS.tools[tool.mode].title}
-              >
-                {tool.icon}
-                <span className="sr-only">{LIST_WORDS.tools[tool.mode].label}</span>
-              </Chip>
-            ))}
-          </ChipGroup>
-          <span className="divider" aria-hidden="true" />
-          <Toggle
-            look="tool"
-            iconOnly
-            data-marks=""
-            pressed={props.marksHidden}
-            onPressedChange={() => props.onMarks()}
-            title={
-              props.marksHidden
-                ? "Show marks: outline the selection on the page again"
-                : "Hide marks: take Loupe’s outlines off the page, to judge the change as it will ship. The selection stays."
-            }
-          >
-            {props.marksHidden ? <MarksHiddenIcon /> : <MarksIcon />}
-            <span className="sr-only">Hide marks</span>
-          </Toggle>
-          <Button look="tool" iconOnly onClick={props.onHide} title="Hide the panel">
-            <PanelIcon />
-            <span className="sr-only">Hide panel</span>
-          </Button>
-        </div>
-      </header>
-      <div className="status-region">{status && <div className="status-line">{status}</div>}</div>
+      <PanelHeader
+        // The page, while nothing is selected: an Instance's identity names it beside the component instead.
+        page={body.kind === "list" ? { name: view.header.page, title: view.header.title } : null}
+        mode={props.mode}
+        armed={props.picking}
+        marksHidden={props.marksHidden}
+        words={HEADER_WORDS}
+        onTool={props.onTool}
+        onMarks={props.onMarks}
+        onHide={props.onHide}
+      />
+      <StatusStrip parts={strip} />
       <div className="middle" ref={middle}>
         {body.kind === "list" ? (
           <ComponentList {...props} body={body} notices={notices} heading={heading} />
@@ -308,9 +258,6 @@ function focusHeading(from: HTMLElement) {
   const root = from.getRootNode();
   if (root instanceof ShadowRoot) root.querySelector<HTMLElement>("h2")?.focus();
 }
-
-/** A piece of the status strip: its words, or a key drawn in `kbd`. */
-type StripPart = string | { key: string };
 
 /**
  * How long after an undo offer is made the count's next change still counts as the
@@ -530,74 +477,28 @@ function Footer({
   // Copy Proposal's popovers stand over the whole footer.
   const frame = useRef<HTMLElement>(null);
   return (
-    <footer ref={frame} className="footer">
-      <div className="tally">
-        <span className="count">
-          <span className="sr-only">{footer.countText}</span>
-          <span className="n" aria-hidden="true">
-            {footer.changes.count}
-          </span>
-          <span className="word" aria-hidden="true">
-            {footer.changes.word}
-          </span>
-          {footer.states.chip && (
-            <span className="held-chip" aria-hidden="true" title={footer.states.title}>
-              <Dot tone="amber" small />
-              {footer.states.chip}
-            </span>
-          )}
-        </span>
-        <Button
-          className="reset-all"
-          ref={resetAllButton}
-          disabled={footer.resetAll.length === 0}
-          onClick={() => {
-            // Kept so the footer can put them back: Reset all asks nothing, so it is undoable.
-            const saved = debug.records();
-            const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
-            for (const target of footer.resetAll) debug.discard(target);
-            focusUndo.current = true;
-            offerUndo(resetText(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
-          }}
-        >
-          <ResetIcon />
-          Reset all
-        </Button>
-        <span className="undo">
-          {offer && (
-            <>
-              <span className="what">{offer.text}</span>
-              <button
-                type="button"
-                className="link"
-                ref={undoButton}
-                onClick={() => {
-                  focusResetAll.current = true;
-                  takeUndo();
-                }}
-              >
-                Undo
-              </button>
-            </>
-          )}
-        </span>
-      </div>
-      <div className="act">
-        {/* Pressed in dark, unmarked: the whole panel says it. */}
-        <Toggle
-          size="large"
-          iconOnly
-          marksPressed={false}
-          className="theme"
-          pressed={theme === "dark"}
-          onPressedChange={() => onTheme()}
-          title={theme === "dark" ? "Switch to light" : "Switch to dark"}
-        >
-          <ContrastIcon />
-          <span className="sr-only">Dark theme</span>
-        </Toggle>
-        <CopyFlow disabled={!footer.copyEnabled} frame={frame} />
-      </div>
-    </footer>
+    <PanelFooter
+      ref={frame}
+      footer={footer}
+      words={FOOTER_WORDS}
+      undo={offer?.text ?? null}
+      theme={theme}
+      resetAllRef={resetAllButton}
+      undoRef={undoButton}
+      onResetAll={() => {
+        // Kept so the footer can put them back: Reset all asks nothing, so it is undoable.
+        const saved = debug.records();
+        const count = saved.reduce((sum, record) => sum + Object.keys(record.values).length, 0);
+        for (const target of footer.resetAll) debug.discard(target);
+        focusUndo.current = true;
+        offerUndo(resetText(count), () => attempt(() => debug.restore(saved)), recordsKey(debug));
+      }}
+      onUndo={() => {
+        focusResetAll.current = true;
+        takeUndo();
+      }}
+      onTheme={onTheme}
+      copy={<CopyFlow disabled={!footer.copyEnabled} frame={frame} />}
+    />
   );
 }

@@ -10,10 +10,14 @@
 /* What says more about a flag or the card, muted at 400 wherever it stands. */
 [data-flags-muted] { color: var(--muted); font-weight: 400; }
 
-/* A flag's options share its width, on one line; what shows now at the right, level with their foot. */
-[data-flag] [data-chip-group] { flex-wrap: nowrap; }
-[data-flag] [data-chip] { flex: 1; }
-[data-flag-foot] { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
+/* A flag's options share its width, on one line; what shows now at the right, level with their foot.
+   A chip never narrows past its longest word, so a label breaks only between words ("Of f" did):
+   on a crowded row, what shows now drops under the options, and options that still don't fit wrap
+   onto rows of their own, each row shared out. A word wider than the row still breaks, in its chip. */
+[data-flag-foot] { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
+[data-flag] [data-chip-group] { flex: 1 1 auto; flex-wrap: wrap; }
+[data-flag] [data-chip] { flex: 1 1 0; min-width: auto; max-width: 100%; }
+[data-flag] [data-chip] [data-part="label"] { overflow-wrap: break-word; }
 [data-flag-state] { margin-left: auto; padding-bottom: var(--space-sheet); font: var(--font-meta); color: var(--muted); white-space: nowrap; }
 [data-flag][data-previewing] [data-flag-state] { color: var(--ink); }
 

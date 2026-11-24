@@ -1,0 +1,43 @@
+/*
+ * PanelFooter (ADR 0003): written against `[data-footer]` and its parts
+ * (`[data-footer-tally]`, `[data-footer-count]` with `[data-footer-figure]`,
+ * `[data-footer-word]` and `[data-footer-held]`, `[data-footer-reset]`, `[data-footer-undo]`
+ * with `[data-footer-undo-what]` and `[data-footer-undo-button]`, `[data-footer-act]`,
+ * `[data-footer-theme]`). Reset all is Button's soft look, the theme Toggle's large one.
+ * Values from the tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* The footer card: 6px in from the sheet's sides and foot, its tally 10px over its actions. */
+[data-footer] {
+  position: relative; flex: none; display: flex; flex-direction: column; gap: var(--space-row);
+  margin: 0 var(--space-sheet) var(--space-sheet); padding: var(--space-gutter);
+  border-radius: var(--radius-card); background: var(--card); box-shadow: var(--shadow);
+}
+
+/* The tally: the count at the left, Reset all at the right; the undo offer wraps to a line of its own. */
+[data-footer-tally] { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sheet) var(--space-inset); min-height: 24px; }
+[data-footer-count] { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: var(--space-sheet); }
+[data-footer-figure] { font: var(--font-figure); letter-spacing: var(--tracking-figure); color: var(--ink); font-variant-numeric: tabular-nums; }
+/* Body at 500. */
+[data-footer-word] { font: var(--font-body); font-weight: 500; color: var(--muted); white-space: nowrap; }
+[data-footer-held] {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; margin-left: var(--space-xs); padding: 0 var(--space-inset) 0 7px;
+  border-radius: var(--radius-pill); background: var(--warn-bg); color: var(--warn-fg); font: var(--font-chip); white-space: nowrap;
+}
+[data-footer-reset] { height: 24px; padding: 0 var(--space-inset) 0 var(--space-sheet); gap: 5px; color: var(--muted); }
+
+/* What a reset dropped, cut short at the line's end, then its Undo: Control at 600, underlined. */
+[data-footer-undo] { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: var(--space-inset); font: var(--font-caption); color: var(--muted); }
+/* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
+[data-footer-undo]:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+[data-footer-undo-what] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-footer-undo-button] { min-height: 24px; font: var(--font-control); font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+/* The actions: light or dark, ringed, then Copy Proposal across the rest. */
+[data-footer-act] { display: flex; align-items: center; gap: var(--space-inset); }
+[data-footer-theme] { color: var(--primary); box-shadow: inset 0 0 0 1px var(--hairline); }
+
+/* Forced colours drop the shadow that edges the card: it keeps a border they draw. */
+@media (forced-colors: active) {
+  [data-footer] { border: 1px solid transparent; }
+}

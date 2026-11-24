@@ -1,0 +1,78 @@
+/*
+ * Copy Proposal's parts (ADR 0003): written against `[data-copy-split]` and its
+ * `[data-state]` (`idle`, `copied`, `failed`), with `[data-copy]`, `[data-copy-rule]` and
+ * `[data-copy-details]`; the details' `[data-copy-form]` and `[data-copy-submit]`; a refused
+ * copy's `[data-not-copied]` (`[data-not-copied-badge]`, `[data-not-copied-why]`) and
+ * `[data-copy-actions]` (`[data-alone]`); and `[data-copy-toast]` with `[data-toast-badge]`,
+ * `[data-toast-what]`, `[data-toast-line]`, `[data-toast-title]` and `[data-toast-sub]`. The
+ * popovers are Popover's (ui/popover/), their fields Field's (ui/field/). Values from the
+ * tokens. In the stylesheet's `patterns` layer.
+ */
+
+/* The split button: a 40px ink pill, its main half copying, a rule, then the chevron in a wash. */
+[data-copy-split] {
+  flex: 1; min-width: 0; display: flex; align-items: center; height: 40px; overflow: hidden;
+  border-radius: var(--radius-pill); background: var(--primary); color: var(--on-primary); box-shadow: var(--primary-shadow);
+  transition: background-color var(--duration-fold) var(--ease-out), color var(--duration-fold) var(--ease-out);
+}
+[data-copy-split] button { height: 40px; color: inherit; }
+[data-copy-split] [data-copy] { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-inset); font: var(--font-action); white-space: nowrap; }
+[data-copy-rule] { flex: none; width: 1px; height: 20px; background: var(--on-primary-rule); }
+[data-copy-split] [data-copy-details] { flex: none; display: grid; place-items: center; width: 41px; background: var(--on-primary-wash); }
+/* Hover belongs to the ink button: the green and amber states are read, not pressed again. */
+@media (hover: hover) {
+  [data-copy-split][data-state="idle"] [data-copy]:not(:disabled):hover { background: var(--on-primary-wash); }
+  [data-copy-split][data-state="idle"] [data-copy-details]:not(:disabled):hover { background: var(--on-primary-rule); }
+}
+/* Off, the split fades as one: its halves keep their own opacity. */
+[data-copy-split]:has(button:disabled) { opacity: 0.45; }
+[data-copy-split] button:disabled { opacity: 1; }
+[data-copy-split] button:focus-visible { outline-offset: -3px; border-radius: var(--radius-pill); }
+[data-copy-split][data-state="copied"] { background: var(--copied-bg); color: var(--copied-fg); box-shadow: inset 0 0 0 1px var(--copied-edge); }
+[data-copy-split][data-state="copied"] [data-copy-rule] { background: var(--copied-rule); }
+[data-copy-split][data-state="copied"] [data-copy-details] { background: none; }
+[data-copy-split][data-state="failed"] { background: var(--warn-bg); color: var(--warn-fg); box-shadow: inset 0 0 0 1px var(--warn-edge); }
+[data-copy-split][data-state="failed"] [data-copy-rule] { background: var(--warn-rule); }
+[data-copy-split][data-state="failed"] [data-copy-details] { background: var(--warn-wash); }
+
+/* The details: a title, a designer and the copy, 12px apart, the copy as wide as the fields. */
+[data-copy-form] { display: flex; flex-direction: column; gap: var(--space-card); }
+[data-copy-submit] { width: 100%; }
+
+/* A refused copy: an amber badge level with its heading, why under it, then the text 15px down. */
+[data-not-copied] { display: flex; gap: var(--space-row); }
+[data-not-copied-badge] {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--radius-pill); background: var(--warn-bg); color: var(--warn-fg);
+}
+/* Body at 600, untracked. */
+[data-not-copied-why] h3 { padding-top: 1px; font: var(--font-body); font-weight: 600; letter-spacing: 0; color: var(--warn-fg); }
+[data-not-copied-why] p { margin-top: var(--space-hair); font: var(--font-caption); color: var(--warn-muted); }
+[data-not-copied] + [data-field] { margin-top: 15px; }
+/* Select all at 112px beside Try again; alone, Try again across. */
+[data-copy-actions] { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: var(--space-inset); margin-top: var(--space-gutter); }
+[data-copy-actions][data-alone] { grid-template-columns: minmax(0, 1fr); }
+
+/* The toast: a dark well 10px over the footer, rising into place. */
+[data-copy-toast] {
+  position: absolute; left: var(--space-inset); right: var(--space-inset); bottom: calc(100% + var(--space-row)); z-index: 1;
+  display: flex; align-items: flex-start; gap: var(--space-row); min-height: 50px; padding: var(--space-inset) var(--space-card) 9px;
+  border-radius: var(--radius-status); background: var(--toast); color: var(--on-toast); box-shadow: inset 0 0 0 1px var(--toast-edge), var(--toast-shadow);
+  animation: loupe-toast-in var(--duration-toast) var(--ease-out);
+}
+[data-toast-badge] {
+  flex: none; margin-top: 5px; display: grid; place-items: center; width: 24px; height: 24px;
+  border-radius: var(--radius-pill); background: var(--copied-badge); color: var(--on-toast);
+}
+[data-toast-what] { min-width: 0; display: flex; flex-direction: column; gap: var(--space-hair); }
+/* Control at 600; the title cut short before its closing quote. */
+[data-toast-line] { display: flex; min-width: 0; font: var(--font-control); font-weight: 600; white-space: nowrap; }
+[data-toast-title] { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Tag's 11px on a 15px line. */
+[data-toast-sub] { font: var(--font-tag); line-height: 1.3636; color: var(--toast-muted); }
+@keyframes loupe-toast-in { from { opacity: 0; transform: translateY(4px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-copy-toast] { animation: none; }
+  [data-copy-split] { transition: none; }
+}

@@ -273,13 +273,13 @@ describe("the Toolbar", () => {
 
     // It asked nothing, so the footer offers to put them back, and says what it dropped: the
     // offer, made with the count's change, is the one said.
-    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 2 OverridesUndo");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Reset 2 OverridesUndo");
     expect(await saidTimes("Reset 2 Overrides"), JSON.stringify(heard)).toBe(1);
     expect(heard.polite).not.toContain("0 changes");
     await clickInPanel(panelButton("Undo"));
     expect(loupe.records().map((record) => record.values)).toEqual(before.map((record) => record.values));
     expect(panelText()).toContain("2 changes");
-    expect(shadow().querySelector(".undo")?.textContent).toBe("");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("");
     // The count says what Undo put back.
     expect(await saidTimes("2 changes")).toBe(1);
   });
@@ -434,10 +434,10 @@ describe("controls at This instance", () => {
     expect(panelButton("Reset this Instance")).toBeUndefined();
 
     // It asked nothing, so the footer offers to put both back (review 2026-11-20).
-    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 2 OverridesUndo");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Reset 2 OverridesUndo");
     await clickInPanel(panelButton("Undo"));
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca", variant: "default" });
-    expect(shadow().querySelector(".undo")?.textContent).toBe("");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("");
   });
 
   it("keeps the undo offer until the Overrides change some other way", async () => {
@@ -445,14 +445,14 @@ describe("controls at This instance", () => {
     await select(BIA);
     await clickInPanel(pill("variant", '"default"'));
     await clickInPanel(panelButton("Reset all"));
-    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 1 OverrideUndo");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Reset 1 OverrideUndo");
     // Redraws that change no Override leave it (it has no timer either: undo.test.ts).
     await settle();
-    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 1 OverrideUndo");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Reset 1 OverrideUndo");
     // A new change ends it: putting the old records back would undo this one too.
     await type(textField(), "Bianca");
     await settle();
-    expect(shadow().querySelector(".undo")?.textContent).toBe("");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("");
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca" });
   });
 
@@ -548,7 +548,7 @@ describe("group and page scopes", () => {
     expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "instance", id: ANA }]);
     expect(variants()).toEqual(["ghost", "ghost", "ghost", "ghost"]);
     expect(loupe.props(ANA).overrides).toEqual({ variant: "ghost" });
-    expect(shadow().querySelector(".undo")?.textContent).toBe("Reset 1 OverrideUndo");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Reset 1 OverrideUndo");
   });
 
   it("selects the Instances a narrower scope keeps, from the row's note", async () => {
@@ -715,7 +715,7 @@ describe("leaving a selection, and hiding the marks", () => {
   };
   const hideMarks = () => shadow().querySelector<HTMLButtonElement>("button[data-marks]") as HTMLButtonElement;
   const changeOutlines = () => shadow().querySelectorAll(".mark").length;
-  const status = () => shadow().querySelector(".status-line")?.textContent ?? "";
+  const status = () => shadow().querySelector("[data-strip]")?.textContent ?? "";
 
   it("goes back to the list on Esc, and the app still gets the key", async () => {
     await mount();
@@ -754,10 +754,10 @@ describe("leaving a selection, and hiding the marks", () => {
     // Copy Proposal's popover closes on its own Esc, wherever its focus is.
     await clickInPanel(pill("variant", '"default"'));
     await clickInPanel(shadow().querySelector("[data-copy-details]") as HTMLButtonElement);
-    const copyButton = [...shadow().querySelectorAll<HTMLButtonElement>(".copy-popover button")].at(-1) as HTMLButtonElement;
+    const copyButton = [...shadow().querySelectorAll<HTMLButtonElement>("[data-popover] button")].at(-1) as HTMLButtonElement;
     act(() => copyButton.focus());
     await keyEscape(copyButton);
-    expect(shadow().querySelector(".copy-popover")).toBeNull();
+    expect(shadow().querySelector("[data-popover]")).toBeNull();
     expect(selectedId()).toBe(ANA);
 
     await escape();
@@ -1006,7 +1006,7 @@ describe("held for review", () => {
     expect(screen().queryByRole("heading", { level: 3, name: "Held for review" })).toBeNull();
 
     // Discard asks nothing either: the footer offers the held record back, still held.
-    expect(shadow().querySelector(".undo")?.textContent).toBe("Discarded 1 held OverrideUndo");
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Discarded 1 held OverrideUndo");
     await clickInPanel(panelButton("Undo"));
     expect(loupe.records().map(({ target, values, suspended }) => ({ target, values, suspended: suspended !== null }))).toEqual(
       held.map(({ target, values }) => ({ target, values, suspended: true })),
@@ -1116,7 +1116,7 @@ describe("keyboard focus (review 2026-11-20)", () => {
     expect(within(shadow() as unknown as HTMLElement).getAllByRole("status")).toHaveLength(1);
     expect(within(shadow() as unknown as HTMLElement).getAllByRole("alert")).toHaveLength(1);
     await clickInPanel(selectTool("Select one"));
-    const strip = shadow().querySelector(".status-line")?.textContent ?? "";
+    const strip = shadow().querySelector("[data-strip]")?.textContent ?? "";
     expect(strip).toBe("Click an Instance on the page · Esc cancels");
     expect(await saidTimes(strip)).toBe(1);
 

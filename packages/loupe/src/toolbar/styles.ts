@@ -5,6 +5,8 @@
 // rows, each option a chip, what shows now in salmon; Select multiple's scope says
 // how far it reaches. Changes keep their numbered delta; on the page, red outlines
 // mark the selection and, for a moment, what a change reached.
+// The header, the footer and Copy Proposal are patterns now (patterns/header/, footer/,
+// copy-flow/); what is left here is the sheet itself, the pill and the page's marks.
 // It lives in the Toolbar's shadow root, so the app's CSS
 // can't reach it and none of it reaches the app. Every colour is a token on the host,
 // generated from tokens.ts, light by default and dark under `data-loupe-theme="dark"`, set from the OS
@@ -24,7 +26,7 @@ export const THEME_KEY = "loupe:theme";
 /** On the host for the one frame a theme switch lands in: every transition is off. */
 export const SWITCHING_ATTRIBUTE = "data-loupe-switching";
 
-const { sans: SANS, mono: MONO } = FONT;
+const { sans: SANS } = FONT;
 
 /** On the host once the text-size unit is registered (index.tsx): sizes then follow the reader's default. */
 export const SCALE_ATTRIBUTE = "data-loupe-scale";
@@ -66,10 +68,6 @@ export const CSS = `
 .panel { overflow-wrap: break-word; text-wrap: pretty; }
 .label { font: 500 ${size(11)}/1.2727 ${SANS}; color: var(--muted); }
 
-/* Controls: Button and Toggle (ui/button/, ui/toggle/). A view that sets a button's background restates its hover:
-   the views' rules come after the primitives' layer, so a background here would win over the layer's hover. */
-.link { font: 600 ${size(12)}/1.3333 ${SANS}; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; min-height: 24px; }
-
 /* The panel: a sheet in the column the page makes room for (dock.ts), white cards on it */
 .panel {
   position: fixed; top: 8px; right: 0; bottom: 8px; z-index: 2147483647; width: 344px;
@@ -89,17 +87,6 @@ export const CSS = `
 .panel.overlay { box-shadow: 0 0 0 1px var(--edge), var(--overlay-shadow); }
 /* Alt held: see through to what runs under the column, such as an app's own dialog. */
 .panel.peek { opacity: 0.08; pointer-events: none; }
-.header { flex: none; position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 40px; margin: 4px 6px 0; padding: 0 8px 0 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
-.header .brand { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink); }
-.wordmark { display: block; flex: none; }
-.report { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 ${size(10)}/1.4 ${MONO}; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); font-variant-numeric: tabular-nums; }
-.header .report { padding-top: 4px; }
-.tools { flex: none; display: flex; align-items: center; gap: 2px; }
-.select-tools { display: flex; gap: 2px; padding: 2px; border-radius: var(--radius-pill); background: var(--tools-wash); }
-.select-tools .tool[data-checked], .select-tools .tool[data-armed] { background: var(--card); color: var(--primary); box-shadow: var(--raised-shadow); }
-.tools .divider { flex: none; width: 1px; height: 16px; margin: 0 2px 0 11px; border-radius: 1px; background: var(--divider); }
-.status-region { flex: none; }
-.status-line { flex: none; margin: 6px 6px 0; padding: 8px 14px; border-radius: 14px; background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); font-size: ${size(12)}; line-height: 1.4167; }
 .middle {
   flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 6px; padding: 6px;
   scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent;
@@ -107,55 +94,6 @@ export const CSS = `
 /* Cards keep their height and the middle scrolls: a card that clips its overflow would otherwise shrink to nothing. */
 .middle > * { flex: none; }
 
-/* The footer: the count and Reset all, then light or dark and Copy Proposal */
-.footer { position: relative; flex: none; display: flex; flex-direction: column; gap: 10px; margin: 0 6px 6px; padding: 14px; border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
-.footer .tally { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; min-height: 24px; }
-.footer .count { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; }
-.footer .count .n { font: 600 ${size(20)}/1.2 ${SANS}; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.footer .count .word { font: 500 ${size(13)}/1.3846 ${SANS}; color: var(--muted); white-space: nowrap; }
-.footer .held-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; margin-left: 4px; padding: 0 8px 0 7px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); font: 500 ${size(10)}/1.4 ${MONO}; white-space: nowrap; }
-.footer .reset-all { height: 24px; padding: 0 8px 0 6px; gap: 5px; color: var(--muted); }
-.footer .act { display: flex; align-items: center; gap: 8px; }
-/* Copy Proposal (Copy flow v2 · A): a split button, its main half copying in one click, its chevron opening the details */
-.split { flex: 1; min-width: 0; display: flex; align-items: center; height: 40px; overflow: hidden; border-radius: 999px; background: var(--primary); color: var(--on-primary); box-shadow: var(--primary-shadow); transition: background-color 160ms ease-out, color 160ms ease-out; }
-.split button { height: 40px; color: inherit; }
-.split-main { flex: 1; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font: 600 ${size(13)}/1.3077 ${SANS}; white-space: nowrap; }
-.split-rule { flex: none; width: 1px; height: 20px; background: var(--on-primary-rule); }
-.split-more { flex: none; display: grid; place-items: center; width: 41px; background: var(--on-primary-wash); }
-/* Hover belongs to the ink button: the green and amber states are read, not pressed again. */
-@media (hover: hover) { .split[data-state="idle"] .split-main:not(:disabled):hover { background: var(--on-primary-wash); } .split[data-state="idle"] .split-more:not(:disabled):hover { background: var(--on-primary-rule); } }
-.split:has(button:disabled) { opacity: 0.45; }
-.split button:disabled { opacity: 1; }
-.split button:focus-visible { outline-offset: -3px; border-radius: 999px; }
-.split[data-state="copied"] { background: var(--copied-bg); color: var(--copied-fg); box-shadow: inset 0 0 0 1px var(--copied-edge); }
-.split[data-state="copied"] .split-rule { background: var(--copied-rule); }
-.split[data-state="copied"] .split-more { background: none; }
-.split[data-state="failed"] { background: var(--warn-bg); color: var(--warn-fg); box-shadow: inset 0 0 0 1px var(--warn-edge); }
-.split[data-state="failed"] .split-rule { background: var(--warn-rule); }
-.split[data-state="failed"] .split-more { background: var(--warn-wash); }
-/* Copy Proposal's popovers (ui/popover): what each holds. Its fields are Field's (ui/field). */
-.copy-popover .details { display: flex; flex-direction: column; gap: var(--space-card); }
-.copy-popover .submit { width: 100%; }
-.not-copied { display: flex; gap: var(--space-row); }
-.not-copied .badge { flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--radius-pill); background: var(--warn-bg); color: var(--warn-fg); }
-.not-copied h3 { padding-top: 1px; font: 600 ${size(13)}/1.3846 ${SANS}; letter-spacing: 0; color: var(--warn-fg); }
-.not-copied p { margin-top: 2px; font: var(--font-caption); color: var(--warn-muted); }
-.proposal-text { margin-top: 15px; }
-.popover-actions { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: var(--space-inset); margin-top: var(--space-gutter); }
-.popover-actions.alone { grid-template-columns: minmax(0, 1fr); }
-.copy-toast { position: absolute; left: 8px; right: 8px; bottom: calc(100% + 10px); z-index: 1; display: flex; align-items: flex-start; gap: 10px; min-height: 50px; padding: 8px 12px 9px; border-radius: 14px; background: var(--toast); color: var(--on-toast); box-shadow: inset 0 0 0 1px var(--toast-edge), var(--toast-shadow); animation: loupe-toast-in 180ms ease-out; }
-.copy-toast .badge { flex: none; margin-top: 5px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 12px; background: var(--copied-badge); color: var(--on-toast); }
-.copy-toast .what { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.copy-toast .line { display: flex; min-width: 0; font: 600 ${size(12)}/1.3333 ${SANS}; white-space: nowrap; }
-.copy-toast .copied-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.copy-toast .sub { font: 400 ${size(11)}/1.3636 ${SANS}; color: var(--toast-muted); }
-@keyframes loupe-toast-in { from { opacity: 0; transform: translateY(4px); } }
-@media (prefers-reduced-motion: reduce) { .copy-toast { animation: none; } .split { transition: none; } }
-.footer .theme { color: var(--primary); box-shadow: inset 0 0 0 1px var(--hairline); }
-.footer .undo { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: ${size(12)}; line-height: 1.4167; color: var(--muted); }
-/* Empty, it stays a live region, out of the layout but not out of the accessibility tree. */
-.footer .undo:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.footer .undo .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Collapsed (launcher.tsx): a flat dark pill with the L, free, or docked a few px off a side. Its body
    is drawn in .goo, where it runs together with the window's edge while it glues, and lets go once parked. */
 .launcher {
@@ -220,7 +158,7 @@ export const CSS = `
 
 /* Forced colours (Windows High Contrast) drop backgrounds and box-shadows: draw edges and states in system colours. */
 @media (forced-colors: active) {
-  .panel, .footer, .header { border: 1px solid transparent; }
+  .panel { border: 1px solid transparent; }
   .launcher { forced-color-adjust: none; color: ButtonFace; filter: none; }
   .launcher .goo rect { fill: ButtonText; }
   .launcher:focus-visible { outline-color: Highlight; }
