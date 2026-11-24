@@ -82,19 +82,23 @@ export type PanelView = {
   notices: NoticeView[];
   /** What the notices say, for the panel's live regions: a missing or other-format layer is an alert, the rest a status. */
   announcements: { alert: string; status: string };
-  footer: {
-    countText: string;
+  footer: FooterView & {
     hasOverrides: boolean;
     /** Copy Proposal is on while there is a record. */
     copyEnabled: boolean;
-    /** Every record "Reset all" discards; empty while it is off. */
-    resetAll: ScopeTarget[];
-    /** The numbered changes: the big number, and its word, "change" or "changes". */
-    changes: { count: number; word: string };
-    /** The State props held open, which the Proposal shows as states: the chip's words, and each one for its tooltip. */
-    states: { chip: string | null; title: string };
   };
   body: ListBody | InspectorBody | GoneBody;
+};
+
+/** What the footer's card draws: the count, said once, its figure and word, the held chip, and what Reset all discards. */
+export type FooterView = {
+  countText: string;
+  /** The numbered changes: the big number, and its word, "change" or "changes". */
+  changes: { count: number; word: string };
+  /** The State props held open, which the Proposal shows as states: the chip's words, and each one for its tooltip. */
+  states: { chip: string | null; title: string };
+  /** Every record "Reset all" discards; empty while it is off. */
+  resetAll: ScopeTarget[];
 };
 
 export type ListBody = {
@@ -398,6 +402,9 @@ export type HeaderWords = {
   /** The strip under the header: picking with each tool, an app's dialog under the panel, and the marks hidden. */
   strip: { pick: Record<SelectMode, StripPart[]>; covered: StripPart[]; marksHidden: StripPart[] };
 };
+
+/** What the strip under the header answers to: the view's own state, which panel-view never reads. */
+export type StripState = { picking: boolean; mode: SelectMode; covered: boolean; marksHidden: boolean };
 
 /** The words the footer draws beside its count (DESIGN.md "Layout", "Undo"): decided here, so a pattern builds none. */
 export type FooterWords = {

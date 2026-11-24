@@ -1,7 +1,7 @@
-// PanelHeader and StatusStrip (ADR 0003, DESIGN.md "Select tools", "Hide marks"): the panel's pinned header
-// card, the wordmark and the page at its left, the tools at its right (the select tools as
-// one radio group, Hide marks, Hide), and the strip under it that says what the page is
-// doing: picking, a dialog of the app's under the panel, the marks hidden.
+// PanelHeader and StatusStrip (ADR 0003, DESIGN.md "Select tools", "Hide marks"): the
+// panel's pinned header card, the wordmark and the page at its left, the tools at its right
+// (the select tools as one radio group, Hide marks, Hide), and the strip under it that says
+// what the page is doing: picking, a dialog of the app's under the panel, the marks hidden.
 //
 // Both draw panel-view's words (`HeaderWords`) and build none. They write nothing: a tool,
 // Hide marks and Hide call back, and the view picks, hides and says the strip as it
@@ -105,6 +105,3 @@ export function StatusStrip({ parts }: StatusStripProps) {
     </div>
   );
 }
-
-/** What the strip says as one line, its keys by name: for the announcer, which says it as it changes. */
-export const stripText = (parts: readonly StripPart[] | null) => (parts ? parts.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");

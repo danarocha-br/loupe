@@ -8,7 +8,7 @@
 // timers that turn the button back and take the toast away, the form's text), places the
 // popovers and hands focus back, and says each copy and refusal. See copy-flow.md.
 
-import { type Ref, type RefObject, useRef } from "react";
+import { type Ref, useRef } from "react";
 import type { CopyWords } from "../../panel-view/index.js";
 import { AlertIcon, Button, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, Field, ResetIcon } from "../../ui/index.js";
 
@@ -111,7 +111,7 @@ export type NotCopiedProps = {
   busy: boolean;
   words: CopyWords;
   /** Try again, which takes focus as the popover opens. */
-  retryRef?: RefObject<HTMLButtonElement | null>;
+  retryRef?: Ref<HTMLButtonElement>;
   onRetry(): void;
 };
 

@@ -36,7 +36,8 @@ import {
   LIST_WORDS,
   type PanelView,
   type PropItem,
-  type StripPart,
+  stripParts,
+  stripText,
 } from "./panel-view/index.js";
 import { appLang } from "./app-lang.js";
 import {
@@ -56,7 +57,6 @@ import {
   ScopeSection,
   StartCard,
   StatusStrip,
-  stripText,
 } from "./patterns/index.js";
 import { copyToClipboard } from "./clipboard.js";
 import { PageMapView } from "./page-map.js";
@@ -122,13 +122,7 @@ export function Panel(props: PanelProps) {
     if (focusWasHere.current) heading.current?.focus();
   }, [opened, body.kind]);
   // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer as they change.
-  const strip: readonly StripPart[] | null = props.picking
-    ? HEADER_WORDS.strip.pick[props.mode]
-    : covered
-      ? HEADER_WORDS.strip.covered
-      : props.marksHidden
-        ? HEADER_WORDS.strip.marksHidden
-        : null;
+  const strip = stripParts({ picking: props.picking, mode: props.mode, covered, marksHidden: props.marksHidden });
   useAnnounceChange(stripText(strip));
   return (
     <section

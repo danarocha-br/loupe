@@ -9,7 +9,7 @@ import { HEADER_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { HEADER_PAGE } from "../samples.js";
-import { PanelHeader, type PanelHeaderProps, StatusStrip, stripText } from "./header.js";
+import { PanelHeader, type PanelHeaderProps, StatusStrip } from "./header.js";
 import CSS from "./header.css?inline";
 
 afterEach(cleanup);
@@ -93,11 +93,6 @@ describe("StatusStrip", () => {
     screen.rerender(<StatusStrip parts={null} />);
     expect(screen.shadow.querySelector("[data-strip-region]")).not.toBeNull();
     expect(screen.shadow.querySelector("[data-strip]")).toBeNull();
-  });
-
-  it("reads as one line for the announcer, each key by name", () => {
-    expect(stripText(HEADER_WORDS.strip.covered)).toBe("A dialog on the page runs under the panel · hold Alt to see through");
-    expect(stripText(null)).toBe("");
   });
 });
 

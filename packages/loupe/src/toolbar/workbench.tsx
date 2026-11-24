@@ -8,7 +8,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
-import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode } from "./panel-view/index.js";
+import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, LIST_WORDS, type SelectMode, stripParts } from "./panel-view/index.js";
 import {
   AppearsOnInteraction,
   ChangeList,
@@ -856,7 +856,7 @@ function ChromePatternStates() {
       onDetails={() => setLast("details")}
     />
   );
-  const strip = armed ? HEADER_WORDS.strip.pick[mode] : marksHidden ? HEADER_WORDS.strip.marksHidden : null;
+  const strip = stripParts({ picking: armed, mode, covered: false, marksHidden });
   return (
     <div className="wb-states">
       <Frame title="PanelHeader and StatusStrip: pick a tool, press it again to arm it, hide the marks">

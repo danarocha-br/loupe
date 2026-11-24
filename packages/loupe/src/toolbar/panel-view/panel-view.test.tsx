@@ -14,7 +14,19 @@ import { disableOverrides } from "../../runtime/registry.js";
 import { resetLoupe } from "../../runtime/slot.js";
 import type { Scope } from "../../runtime/store.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, GROUP, MENU, members, Page, site } from "../members.fixture.js";
-import { type GoneBody, type InspectorBody, isolate, type ListBody, panelView, type PanelView, type PropItem, type SeenComponents } from "./index.js";
+import {
+  COPY_WORDS,
+  type GoneBody,
+  type InspectorBody,
+  isolate,
+  type ListBody,
+  panelView,
+  type PanelView,
+  type PropItem,
+  type SeenComponents,
+  stripParts,
+  stripText,
+} from "./index.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -802,5 +814,25 @@ describe("the plot key and on-screen names (critique 2026-11-19)", () => {
       loupe.set(row("caio"), "variant", "ghost");
     });
     expect(listOf(view()).changes.map(({ n }) => n)).toEqual([2, 4]);
+  });
+});
+
+describe("the chrome's words", () => {
+  const still = { picking: false, mode: "one" as const, covered: false, marksHidden: false };
+
+  it("says on the strip what the page is doing: picking first, then a dialog under the panel, then the marks hidden", () => {
+    expect(stripParts(still)).toBeNull();
+    expect(stripText(stripParts({ ...still, marksHidden: true }))).toBe("Outlines are hidden on the page");
+    expect(stripText(stripParts({ ...still, marksHidden: true, covered: true }))).toBe("A dialog on the page runs under the panel · hold Alt to see through");
+    expect(stripText(stripParts({ ...still, covered: true, picking: true, mode: "many" }))).toBe(
+      "Click an Instance: every one from its call site is selected · Esc cancels",
+    );
+    expect(stripText(null)).toBe("");
+  });
+
+  it("says a copy as the toast shows it, and a refusal with the text below only when there is text", () => {
+    expect(COPY_WORDS.copiedText("Outline the menu")).toBe("Copied “Outline the menu”. Paste it into your coding agent.");
+    expect(COPY_WORDS.notCopiedText("Document is not focused.", true)).toBe("Document is not focused. Your Proposal is below.");
+    expect(COPY_WORDS.notCopiedText("The clipboard needs localhost or HTTPS.", false)).toBe("The clipboard needs localhost or HTTPS.");
   });
 });

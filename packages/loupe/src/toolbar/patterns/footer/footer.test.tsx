@@ -26,7 +26,8 @@ describe("PanelFooter", () => {
   it("says the count once, whole, and draws its figure, word and held chip for the eye", () => {
     const { screen } = draw();
     expect(screen.getByRole("contentinfo")).toBeTruthy();
-    expect(screen.getByText(FOOTER.countText).className).toBe("sr-only");
+    // Read by assistive technology, unlike everything else in the count.
+    expect(screen.getByText(FOOTER.countText).closest("[aria-hidden]")).toBeNull();
     const figure = screen.getByText("2");
     expect(figure.getAttribute("aria-hidden")).toBe("true");
     expect(screen.getByText("changes").getAttribute("aria-hidden")).toBe("true");

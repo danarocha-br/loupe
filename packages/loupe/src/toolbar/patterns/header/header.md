@@ -13,7 +13,7 @@ The panel's pinned header card (DESIGN.md "Layout", "Select tools" and "Hide mar
   onMarks={onMarks}
   onHide={onHide}
 />
-<StatusStrip parts={picking ? HEADER_WORDS.strip.pick[mode] : null} />
+<StatusStrip parts={stripParts({ picking, mode, covered, marksHidden })} />
 ```
 
 ## Interface
@@ -25,7 +25,7 @@ The panel's pinned header card (DESIGN.md "Layout", "Select tools" and "Hide mar
   - `words`: panel-view's `HeaderWords`: the page's lead, each tool's name and tooltip (the list's `ListWords.tools`), the group's name, Hide marks' and Hide's.
   - `onTool(mode)`, `onMarks()`, `onHide()`: the view picks, hides the marks and hides the panel.
 - `StatusStrip`: `parts`, panel-view's `StripPart[]` (words, or `{ key }` drawn in `kbd`), or null.
-- `stripText(parts)`: the strip as one line, each key by name, for the announcer.
+- panel-view decides the strip (`stripParts`) and the line the announcer says (`stripText`).
 
 ## States
 
@@ -47,8 +47,8 @@ Under forced colours the card keeps a transparent border, which they draw.
 - A `header` element: in the panel's `section` it heads that section, and only on its own (as the tests draw it) is it the `banner` landmark. The wordmark is an image named "Loupe"; every icon beside it is hidden.
 - The select tools are one `radiogroup` named "Select": arrows move between the tools, Space or Enter picks one (ChipGroup). Each tool's name is hidden text, its tooltip says what it does. Armed is the page's state, said by the strip.
 - Hide marks is a toggle button (`aria-pressed`); Hide is a button.
-- The strip carries no role: the view says it through the announcer as it changes (`stripText`). Its region stays while it is empty, so the line comes and goes inside it.
+- The strip carries no role: the view says it through the announcer as it changes, as panel-view's `stripText` puts it. Its region stays while it is empty, so the line comes and goes inside it.
 
 ## Tests
 
-`header.test.tsx`: the wordmark and the page with its tooltip, no page while an Instance is selected, the radio group and a pick, armed, Hide marks' pressed state and tooltips, Hide, the strip with its key and empty, `stripText`, and axe.
+`header.test.tsx`: the wordmark and the page with its tooltip, no page while an Instance is selected, the radio group and a pick, armed, Hide marks' pressed state and tooltips, Hide, the strip with its key and empty, and axe.

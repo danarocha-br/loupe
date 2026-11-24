@@ -1,8 +1,9 @@
 // Sample panel-view data for the patterns: what `panelView()` would hand them for a
 // MemberRowMenu Button on /billing, at This instance and at its call site, and for the
-// list of /billing with nothing selected, and for the panel's chrome around them. The patterns' tests draw it, and so does the
-// fixture's `/workbench` page, beside the words (panel-view's `INSPECTOR_WORDS` and
-// `LIST_WORDS`, which the caller passes). Data only: no words a pattern would draw by
+// list of /billing with nothing selected, and for the panel's chrome around them. The
+// patterns' tests draw it, and so does the fixture's `/workbench` page, beside the words
+// (panel-view's `INSPECTOR_WORDS`, `LIST_WORDS`, `HEADER_WORDS`, `FOOTER_WORDS` and
+// `COPY_WORDS`, which the caller passes). Data only: no words a pattern would draw by
 // itself, and nothing that writes.
 
 import type {
@@ -16,8 +17,8 @@ import type {
   ListBody,
   MembersView,
   NoGroupView,
+  FooterView,
   NoticeView,
-  PanelView,
   PropItem,
   StatusTag,
   Tag,
@@ -592,7 +593,7 @@ export const FLAGS_OFF: FlagsCardView = {
 export const HEADER_PAGE = { name: "Billing", title: "Billing · 2 changes · 1 state shown · /org/acme/settings/billing" } as const;
 
 /** The footer with two numbered changes and a State prop held open: Reset all reaches both records. */
-export const FOOTER: Pick<PanelView["footer"], "countText" | "changes" | "states" | "resetAll"> = {
+export const FOOTER: FooterView = {
   countText: "2 changes · 1 state shown",
   changes: { count: 2, word: "changes" },
   states: { chip: "1 held", title: "open held at true · Actions for Ana Souza" },
@@ -603,7 +604,7 @@ export const FOOTER: Pick<PanelView["footer"], "countText" | "changes" | "states
 };
 
 /** The footer with nothing changed: Reset all off, nothing to copy. */
-export const FOOTER_EMPTY: Pick<PanelView["footer"], "countText" | "changes" | "states" | "resetAll"> = {
+export const FOOTER_EMPTY: FooterView = {
   countText: "0 changes",
   changes: { count: 0, word: "changes" },
   states: { chip: null, title: "" },

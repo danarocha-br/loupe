@@ -24,7 +24,7 @@ export {
 export { FlagRow, type FlagRowProps, FlagsCard, type FlagsCardProps } from "./flags-card/flags-card.js";
 export { PanelFooter, type PanelFooterProps } from "./footer/footer.js";
 export { GroupRow, type GroupRowProps } from "./group-row/group-row.js";
-export { PanelHeader, type PanelHeaderProps, StatusStrip, type StatusStripProps, stripText } from "./header/header.js";
+export { PanelHeader, type PanelHeaderProps, StatusStrip, type StatusStripProps } from "./header/header.js";
 export { HeldForReview, type HeldForReviewProps } from "./held-for-review/held-for-review.js";
 export { Identity, type IdentityProps } from "./identity/identity.js";
 export { InspectOnly, type InspectOnlyProps } from "./inspect-only/inspect-only.js";

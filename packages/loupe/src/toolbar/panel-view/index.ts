@@ -15,7 +15,20 @@ import { changesWord, footerCount, headerView, heldChip } from "./words.js";
 export type * from "./types.js";
 export { flagsCard } from "./flags.js";
 export { isSwitch } from "./inspector.js";
-export { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, isolate, LIST_WORDS, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
+export {
+  COMMAND_WORDS,
+  COPY_WORDS,
+  FOOTER_WORDS,
+  HEADER_WORDS,
+  INSPECTOR_WORDS,
+  isolate,
+  LIST_WORDS,
+  sourceText,
+  stripParts,
+  stripText,
+  TEXT,
+  THIS_INSTANCE,
+} from "./words.js";
 
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides

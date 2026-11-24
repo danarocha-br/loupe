@@ -8,7 +8,7 @@ import type { NoteKind } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
-import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, Tag, ValueText } from "./types.js";
+import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, StripPart, StripState, Tag, ValueText } from "./types.js";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";
@@ -189,6 +189,16 @@ export const HEADER_WORDS: HeaderWords = {
   },
 };
 
+/** What the strip says, first of: picking with a tool, a dialog of the app's under the panel, the marks hidden. Null for nothing. */
+export function stripParts({ picking, mode, covered, marksHidden }: StripState): readonly StripPart[] | null {
+  if (picking) return HEADER_WORDS.strip.pick[mode];
+  if (covered) return HEADER_WORDS.strip.covered;
+  return marksHidden ? HEADER_WORDS.strip.marksHidden : null;
+}
+
+/** What the strip says as one line, each key by name: for the announcer, which says it as it changes. */
+export const stripText = (parts: readonly StripPart[] | null) => (parts ? parts.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
+
 /** The footer's words beside its count (types.ts `FooterWords`). */
 export const FOOTER_WORDS: FooterWords = {
   resetAll: "Reset all",
@@ -196,10 +206,14 @@ export const FOOTER_WORDS: FooterWords = {
   theme: { label: "Dark theme", toLight: "Switch to light", toDark: "Switch to dark" },
 };
 
+const COPIED = "Copied";
+const PASTE_IT = "Paste it into your coding agent";
+const QUOTE = { open: " “", close: "”" };
+
 /** Copy Proposal's words (types.ts `CopyWords`). */
 export const COPY_WORDS: CopyWords = {
   idle: "Copy Proposal",
-  copied: "Copied",
+  copied: COPIED,
   failed: "Not copied",
   mainTitle: "Copy the Proposal for your coding agent or an engineer",
   detailsTitle: "Copy with a title and a designer",
@@ -214,9 +228,10 @@ export const COPY_WORDS: CopyWords = {
   selectAll: "Select all",
   retry: "Try again",
   proposal: "The Proposal",
-  pasteIt: "Paste it into your coding agent",
-  quote: { open: " “", close: "”" },
-  copiedText: (title) => `Copied “${title}”. Paste it into your coding agent.`,
+  pasteIt: PASTE_IT,
+  quote: QUOTE,
+  // The toast's line and the line under it, as one sentence each.
+  copiedText: (title) => `${COPIED}${QUOTE.open}${title}${QUOTE.close}. ${PASTE_IT}.`,
   notCopiedText: (reason, withText) => (withText ? `${reason} Your Proposal is below.` : reason),
 };
 

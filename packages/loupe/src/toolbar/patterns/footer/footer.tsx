@@ -8,12 +8,12 @@
 // Copy Proposal is the view's, drawn from the Copy flow's patterns. See footer.md.
 
 import type { ReactNode, Ref } from "react";
-import type { FooterWords, PanelView } from "../../panel-view/index.js";
+import type { FooterView, FooterWords } from "../../panel-view/index.js";
 import { Button, ContrastIcon, Dot, ResetIcon, Toggle } from "../../ui/index.js";
 
 export type PanelFooterProps = {
   /** panel-view's footer: the count and its words, the held chip, and what Reset all discards. */
-  footer: Pick<PanelView["footer"], "countText" | "changes" | "states" | "resetAll">;
+  footer: FooterView;
   words: FooterWords;
   /** What the last reset dropped, said beside its Undo; null while there is no offer. */
   undo: string | null;

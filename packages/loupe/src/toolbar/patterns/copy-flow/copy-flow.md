@@ -11,7 +11,7 @@ The parts draw and call back. The view (`copy-flow.tsx`) keeps the state machine
     <DetailsForm title={title} designer={designer} missing={missing} busy={busy} words={COPY_WORDS} titleRef={titleField} onTitle={…} onDesigner={…} onSubmit={…} />
   </PopoverPanel>
 </Popover>
-<NotCopied said={COPY_WORDS.notCopiedText(reason, text !== "")} text={text} busy={busy} words={COPY_WORDS} retryRef={retry} onRetry={retry} />
+<NotCopied said={COPY_WORDS.notCopiedText(reason, text !== "")} text={text} busy={busy} words={COPY_WORDS} retryRef={retry} onRetry={tryAgain} />
 {toast && <CopyToast title={toast.title} words={COPY_WORDS} />}
 ```
 
