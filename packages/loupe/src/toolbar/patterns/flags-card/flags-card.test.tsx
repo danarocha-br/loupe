@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { COMMAND_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { FLAGS, FLAGS_OFF } from "../samples.js";
+import { FLAGS, FLAGS_CROWDED, FLAGS_OFF } from "../samples.js";
 import { FlagsCard } from "./flags-card.js";
 import CSS from "./flags-card.css?inline";
 
@@ -80,6 +80,13 @@ describe("FlagsCard", () => {
     expect(empty.getByText("The app declares no flags.")).toBeTruthy();
   });
 
+  it("draws a crowded flag's options as one radio group, what shows now with them", () => {
+    const { screen } = draw(FLAGS_CROWDED);
+    expect(screen.getAllByRole("radio").map((radio) => radio.textContent)).toEqual(["North America", "Europe", "Asia Pacific", "Latin America"]);
+    expect(screen.getByRole("radio", { name: "Asia Pacific" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("Previewing Asia Pacific")).toBeTruthy();
+  });
+
   it("has no axe violations, ready and off", async () => {
     const { screen } = draw();
     expect(await axeViolations(screen.host)).toEqual([]);
@@ -94,17 +101,23 @@ describe("FlagsCard's CSS", () => {
     expectPatternCss(CSS);
   });
 
-  // jsdom lays nothing out, so the rule is read: a group sized to its content let each chip
-  // (flex: 1, from nothing) squeeze to its narrowest, breaking "Off" into "Of f".
-  it("grows a flag's chip group into the row, so its chips share the width and keep their words whole", () => {
+  // jsdom lays nothing out, so the rules are read. A group sized to its content let each chip
+  // (flex: 1, from nothing) squeeze to its narrowest, breaking "Off" into "Of f"; on a crowded
+  // row, the state beside the options squeezed them the same way ("Nort h Am eri ca").
+  it("keeps each option's words whole: chips share the row but never narrow past a word, and a crowded row wraps", () => {
     const style = document.createElement("style");
     style.textContent = CSS;
     document.head.append(style);
     const rules = [...(style.sheet?.cssRules ?? [])].filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule);
     const declared = (selector: string, property: string) => rules.find((rule) => rule.selectorText === selector)?.style.getPropertyValue(property);
     style.remove();
-    expect(declared("[data-flag] [data-chip-group]", "flex")).toBe("1");
-    expect(declared("[data-flag] [data-chip-group]", "min-width")).toBe("0");
-    expect(declared("[data-flag] [data-chip]", "flex")).toBe("1");
+    expect(declared("[data-flag-foot]", "flex-wrap")).toBe("wrap");
+    expect(declared("[data-flag] [data-chip-group]", "flex")).toBe("1 1 auto");
+    expect(declared("[data-flag] [data-chip-group]", "flex-wrap")).toBe("wrap");
+    expect(declared("[data-flag] [data-chip]", "flex")).toBe("1 1 0");
+    // The primitive lets a chip narrow to nothing (min-width: 0) and break anywhere: a flag's chip doesn't.
+    expect(declared("[data-flag] [data-chip]", "min-width")).toBe("auto");
+    expect(declared("[data-flag] [data-chip]", "max-width")).toBe("100%");
+    expect(declared('[data-flag] [data-chip] [data-part="label"]', "overflow-wrap")).toBe("break-word");
   });
 });

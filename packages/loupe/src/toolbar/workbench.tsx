@@ -42,6 +42,7 @@ import {
   CHANGES,
   COPIED_TITLE,
   FLAGS,
+  FLAGS_CROWDED,
   FLAGS_OFF,
   FOOTER,
   FOOTER_EMPTY,
@@ -813,6 +814,17 @@ function NoticePatternStates() {
       <Frame title="FlagsCard: one previewed, a write refused">
         <FlagsCard
           flags={FLAGS}
+          busy={false}
+          onPreview={(key, value) => setLast(`preview ${key} ${JSON.stringify(value)}`)}
+          onClear={(key) => setLast(`clear ${key}`)}
+          onClearAll={() => setLast("clear all")}
+          words={COMMAND_WORDS}
+          onCopy={onCopy}
+        />
+      </Frame>
+      <Frame title="FlagsCard: a crowded flag, what shows now under its options, words whole">
+        <FlagsCard
+          flags={FLAGS_CROWDED}
           busy={false}
           onPreview={(key, value) => setLast(`preview ${key} ${JSON.stringify(value)}`)}
           onClear={(key) => setLast(`clear ${key}`)}

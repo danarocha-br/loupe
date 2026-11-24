@@ -569,6 +569,30 @@ export const FLAGS: FlagsCardView = {
   clearAll: { label: "Clear flag previews", enabled: true },
 };
 
+/** One flag with more, and longer, options than fit beside what shows now: the state drops under them. */
+export const FLAGS_CROWDED: FlagsCardView = {
+  ...FLAGS,
+  meta: "1 declared · 1 previewing",
+  rows: [
+    {
+      key: "region",
+      previewing: true,
+      description: "Where the workspace's data lives.",
+      note: null,
+      options: [
+        { label: "North America", value: "na" },
+        { label: "Europe", value: "eu" },
+        { label: "Asia Pacific", value: "apac" },
+        { label: "Latin America", value: "latam" },
+      ],
+      checked: 2,
+      state: "Previewing Asia Pacific",
+      clear: "Clear",
+    },
+  ],
+  error: null,
+};
+
 /** Previews off: FLAGS_SECRET isn't set, and the fix goes in .env.local. */
 export const FLAGS_OFF: FlagsCardView = {
   title: "Feature flags",
