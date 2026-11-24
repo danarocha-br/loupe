@@ -18,7 +18,7 @@ The records Suspended for review (DESIGN.md "On this page", PER-95): a call site
 | Attribute | Draws |
 | --- | --- |
 | `data-held-for-review` | A `list` Card. |
-| `data-held-title` | The hollow ring (Dot `ring`) before the title, 8px apart. |
+| Marks' `DotTitle` | The hollow ring (Dot `ring`) before the title, 8px apart. |
 | `data-held-item` | A Row `item` (ui/row/): the hairline and the 14px inset are the Row's; this card pads it 10px above and below and sets its parts 6px apart. |
 | `data-held-target` | What it names in 12px mono on a 16px line, and Discard at the right. |
 | `data-held-why` | Why it is held, 12px muted (`--font-caption`). |

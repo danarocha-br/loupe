@@ -22,13 +22,16 @@ The top of the Inspector card, which says what is selected (DESIGN.md "Identity"
 
 ## Interface
 
+- `identity`: panel-view's `IdentityView`, the Inspector's or "Not on the page now"'s:
+  - `component` (null when the headline is the component), `page`, `status` (a verdict or a plain status), `keys`;
+  - `name`, `nameTitle`, and `ownName`, true when the name is the app's own words;
+  - `where`: `{ file, line }`, after a file icon, the line set apart; or one line of words. `whereTitle`, `id` (null once gone);
+  - `note` (once gone), `tags`, `chips`, `held` (what a gone Instance still holds), `notGenerated` (`{ tag, command }`);
+  - `crumbs`, nearest first.
 - `words`: `back` (Back's hidden label and tooltip), `inside`, `run` and `fromRootToReadProps`, `change(n)` for its deltas.
-- `onBack()`. `component` (null when the headline is the component), `page`, `status` (a verdict or a plain status), `keys`.
-- `name`, `nameTitle`, `nameLang` (the app's language, for a name the app wrote), `heading` (its ref, for the view that moves focus to it).
-- `where`: `{ file, line }`, after a file icon, the line set apart; or one line of words. `whereTitle`, `id`.
-- `note` (once gone), `tags`, `chips`, `held` (what a gone Instance still holds), `notGenerated` (`{ tag, command }`).
-- `actions`: the view's buttons (Hold open, Reset this Instance), set on a line 10px under the rest. `children`: the view's, after the actions.
-- `crumbs` (nearest first) and `onCrumb(id)`.
+- `onBack()`, and `onCrumb(id)` for an Instance in Inside.
+- `nameLang`: the app's language, given to the headline only when `ownName`. `heading`: its ref, for the view that moves focus to it.
+- `actions`: the view's buttons (Hold open, Reset this Instance), set on a line 10px under the rest. `children`: the view's, after the actions (NoGroup).
 
 ## States and ARIA
 

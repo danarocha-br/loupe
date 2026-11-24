@@ -15,54 +15,43 @@
 // `panelView()`, and each button makes the `__loupe` call its data names.
 
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
-import type { LayerStatus } from "../layer-status.js";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { Scope, ScopeTarget } from "../runtime/store.js";
 import { attempt, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Card, CardHead, Chip, ChipGroup, Dot, Fold, FoldChevron, FoldPanel, FoldTrigger, Kbd, lookAttributes, Row, RowLine, RowName, RowValue, Tag, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
+import { Button, Card, Chip, ChipGroup, Dot, Kbd, lookAttributes, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
 import { plural } from "./format.js";
+import { ContrastIcon, CursorIcon, MarksHiddenIcon, MarksIcon, PanelIcon, ResetIcon, SelectManyIcon, Wordmark } from "./ui/icon/icon.js";
 import {
-  ContrastIcon,
-  CursorIcon,
-  InfoIcon,
-  MarksHiddenIcon,
-  MarksIcon,
-  PanelIcon,
-  PROP_ICONS,
-  ResetIcon,
-  SelectManyIcon,
-  Wordmark,
-} from "./ui/icon/icon.js";
-import { layerAnnouncement, LayerNotices, NotGeneratedNotice } from "./notices.js";
-import {
+  COMMAND_WORDS,
   type GoneBody,
   type GroupItem,
   type InspectorBody,
+  INSPECTOR_WORDS,
   type ListBody,
+  LIST_WORDS,
   type PanelView,
   type PropItem,
-  type NoGroupView,
-  INSPECTOR_WORDS,
-  inspectOnlyTitle,
-  LEGEND,
-  LIST_WORDS,
-  TEXT,
 } from "./panel-view/index.js";
 import { appLang } from "./app-lang.js";
 import {
   AppearsOnInteraction,
-  ChangeKey,
+  ChangeList,
   GroupRow,
   HeldForReview,
   Identity,
+  InspectOnly,
+  InstanceNote,
+  Legend,
+  NoGroup,
+  Notice,
   OnThisPage,
-  ScopeMoveButton,
   ScopeSection,
   StartCard,
 } from "./patterns/index.js";
+import { copyToClipboard } from "./clipboard.js";
 import { PageMapView } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
 import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndoOffer } from "./undo.js";
@@ -70,8 +59,6 @@ import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndo
 type PanelProps = {
   debug: LoupeDebug;
   view: PanelView;
-  /** For the Product layer's notices, which decide their own words. */
-  layer: LayerStatus | null;
   column: Column;
   /** The select tool: one Instance, or every one from its call site. */
   mode: SelectMode;
@@ -117,16 +104,10 @@ export function Panel(props: PanelProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const peeking = usePeek();
   const covered = useCoveredDialog(column);
-  const notices = (
-    <>
-      <LayerNotices status={props.layer} />
-      {view.banner && <OverridesOff banner={view.banner} />}
-    </>
-  );
+  const notices = view.notices.map((notice) => <Notice key={notice.kind} notice={notice} words={COMMAND_WORDS} onCopy={copyToClipboard} />);
   // The notices' cards come and go with the view; what they say is announced from here.
-  const layerSaid = layerAnnouncement(props.layer);
-  useAnnounceChange(layerSaid.alert, { politeness: "assertive" });
-  useAnnounceChange([layerSaid.status, view.banner ? `${view.banner.title}. ${view.banner.body}` : ""].filter(Boolean).join(" "));
+  useAnnounceChange(view.said.alert, { politeness: "assertive" });
+  useAnnounceChange(view.said.status);
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
   // Read while rendering, before React swaps the view: once the row that had focus is
@@ -262,21 +243,6 @@ function useCoveredDialog(column: Column): boolean {
   });
 }
 
-/** The React self-check failed (PER-184: said here once, not again on the Instance). */
-function OverridesOff({ banner }: { banner: NonNullable<PanelView["banner"]> }) {
-  return (
-    <Card className="notice-card banner">
-      <CardHead>
-        <div className="title">
-          <Dot tone="alert" />
-          {banner.title}
-        </div>
-      </CardHead>
-      <p className="body">{banner.body}</p>
-    </Card>
-  );
-}
-
 type Heading = { heading: RefObject<HTMLHeadingElement | null> };
 
 function ComponentList({
@@ -300,34 +266,8 @@ function ComponentList({
     <>
       <StartCard words={LIST_WORDS} mode={mode} armed={picking} onTool={onTool} headingRef={heading} />
       {notices}
-      {body.notGenerated && <NotGeneratedNotice names={body.notGenerated.names} command={body.notGenerated.command} />}
-      {body.changes.length > 0 && (
-        <Card look="list">
-          <CardHead>
-            <h3>Changes</h3>
-            <span className="meta">numbered as in the Proposal</span>
-          </CardHead>
-          <ol className="keylist" aria-label="Changes">
-            {body.changes.map((change) => (
-              <li key={change.n}>
-                <button
-                  type="button"
-                  disabled={change.select === null}
-                  onClick={() => change.select !== null && onSelect(change.select)}
-                  onMouseOver={() => onHover(change.reached)}
-                  onMouseLeave={() => onHover([])}
-                  onFocus={() => onHover(change.reached)}
-                  onBlur={() => onHover([])}
-                >
-                  <ChangeKey n={change.n} words={INSPECTOR_WORDS} />
-                  <span className="what">{change.detail}</span>
-                  <span className="where">{change.where}</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
+      {body.notGenerated && <Notice notice={body.notGenerated} words={COMMAND_WORDS} onCopy={copyToClipboard} />}
+      <ChangeList changes={body.changes} words={LIST_WORDS} onSelect={(id) => onSelect(id)} onHover={onHover} />
       <HeldForReview
         items={body.suspended}
         meta={body.suspendedMeta}
@@ -444,18 +384,10 @@ function Gone({ debug, onSelect, body, notices, heading }: Actions & Heading & {
     <>
       <Card look="divided">
         <Identity
+          identity={body.identity}
           words={INSPECTOR_WORDS}
           onBack={() => onSelect(null)}
-          component={null}
-          status={body.component ? { text: TEXT.notOnPage } : null}
-          name={body.component ?? TEXT.notOnPage}
-          nameTitle={body.id}
           heading={heading}
-          where={body.where}
-          whereTitle={body.id}
-          note={TEXT.showsWhenMounted}
-          tags={body.held ? [body.held.tag] : []}
-          held={body.held?.values}
           actions={body.canReset ? <ResetInstance debug={debug} id={body.id} enabled /> : undefined}
         />
       </Card>
@@ -487,12 +419,9 @@ function Inspector({
   // State props first: a menu's `open` is the switch a designer reaches for.
   const switches = body.editable.filter(isSwitch).sort((a, b) => Number(b.state) - Number(a.state));
   const cards = body.editable.filter((item) => !isSwitch(item));
-  const named = body.name !== null;
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
-  // The exceptions: a server or stale tag, and the scopes acting on it, unless the scope's own section already names its scope.
-  const chips = body.members ? [] : body.chips;
   // The marks' legend: a row of its own under the options, when any of them marks a default.
   const legend = cards.some((item) => item.control?.kind === "options" && item.control.options.some((option) => option.isDefault));
   const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={onSelect} onHover={onHover} />;
@@ -502,22 +431,11 @@ function Inspector({
       {notices}
       <Card look="divided">
         <Identity
+          identity={body.identity}
           words={INSPECTOR_WORDS}
           onBack={() => onSelect(null)}
-          component={named ? body.component : null}
-          page={view.header.page}
-          status={body.verdict.status}
-          keys={body.keys}
-          name={body.name ?? body.component}
-          nameTitle={body.name ?? body.component}
-          nameLang={body.name ? appLang() : undefined}
+          nameLang={appLang()}
           heading={heading}
-          where={body.source}
-          whereTitle={body.source.title}
-          id={body.id}
-          tags={body.tags}
-          chips={chips}
-          notGenerated={body.coverage.notGenerated}
           actions={
             holdButton || resetInstance ? (
               <>
@@ -541,19 +459,20 @@ function Inspector({
               </>
             ) : undefined
           }
-          crumbs={body.crumbs}
           onCrumb={(id) => onSelect(id)}
         >
-          {mode === "many" && body.editing?.noGroup && view.scope === "instance" && <NoGroup noGroup={body.editing.noGroup} onScope={onScope} heading={heading} />}
+          {mode === "many" && body.editing?.noGroup && view.scope === "instance" && (
+            <NoGroup
+              noGroup={body.editing.noGroup}
+              // Widened, this goes, and the page scope has no call site to narrow back to: focus goes to the heading.
+              onScope={(scope) => {
+                onScope(scope);
+                heading.current?.focus();
+              }}
+            />
+          )}
         </Identity>
-        {body.note && (
-          <Row glyph={<InfoIcon />} role="note" className="note">
-            <div className="text">
-              <h3>{body.note.title}</h3>
-              <p className="body">{body.note.body}</p>
-            </div>
-          </Row>
-        )}
+        {body.note && <InstanceNote note={body.note} />}
         {body.members && (
           <ScopeSection
             members={body.members}
@@ -573,115 +492,11 @@ function Inspector({
           />
         )}
         {cards.map(propRow)}
-        {legend && <Legend app={cards.some((card) => card.change !== null && card.counts === null)} />}
+        {legend && <Legend words={INSPECTOR_WORDS} app={cards.some((card) => card.change !== null && card.counts === null)} />}
         {switches.map(propRow)}
-        <InspectOnly key={body.id} body={body} row={row} />
+        <InspectOnly key={body.id} inspect={body.inspect} row={row} />
       </Card>
     </>
-  );
-}
-
-/** What a chip's marks mean, once, on a row of its own under the options. */
-function Legend({ app }: { app: boolean }) {
-  return (
-    <div className="legend" aria-hidden="true">
-      <span>
-        <i className="shown" />
-        {LEGEND.shown}
-      </span>
-      {app && (
-        <span>
-          <i className="app" />
-          {LEGEND.app}
-        </span>
-      )}
-      <span>
-        <i className="is-default" />
-        {LEGEND.default}
-      </span>
-    </div>
-  );
-}
-
-/**
- * The props it shows but can't change here, folded to one row (open when nothing
- * else can change). Closed, the row names them; one cause for them all is said
- * once, under the row, instead of a tag on every row.
- */
-function InspectOnly({ body, row }: { body: InspectorBody; row(item: PropItem): ReactNode }) {
-  const [open, setOpen] = useState(body.editable.length === 0);
-  const items = body.inspectOnly;
-  const reasons = new Set(items.map((item) => item.reason));
-  const [only] = reasons.size === 1 ? [...reasons] : [];
-  const shared = only ? items.find((item) => item.reason === only) : undefined;
-  const rows = shared ? items.map((item) => ({ ...item, reason: null })) : items;
-  return (
-    <div className="inspect">
-      <Fold open={open} onOpenChange={setOpen}>
-        <FoldTrigger>
-          <span className="glyph" aria-hidden="true">
-            {PROP_ICONS.inspect}
-          </span>
-          <span className="summary-text" data-testid="inspect-only">
-            {inspectOnlyTitle(items.length)}
-            {!open && items.length > 0 && <span className="muted"> · {items.map((item) => item.name).join(", ")}</span>}
-          </span>
-          {body.inspectOnlyMeta ? <span className="meta">{body.inspectOnlyMeta}</span> : <span />}
-          <FoldChevron />
-        </FoldTrigger>
-        <FoldPanel>
-        {shared?.reason && (
-          <p className="why">
-            <Tag look="reason" title={shared.reasonTitle ?? undefined}>
-              {shared.reason}
-            </Tag>{" "}
-            {shared.reasonTitle}
-          </p>
-        )}
-        <div className="inspect-rows">{rows.length === 0 ? <div className="muted">{TEXT.none}</div> : rows.map(row)}</div>
-        {body.injected && (
-          <Fold className="injected">
-            <FoldTrigger>
-              <FoldChevron />
-              {body.injected.summary}
-            </FoldTrigger>
-            <FoldPanel>
-            {body.injected.rows.map((injected) => (
-              <Row look="pair" key={injected.name}>
-                <RowLine>
-                  <RowName>{injected.name}</RowName>
-                  <RowValue>{injected.value}</RowValue>
-                </RowLine>
-              </Row>
-            ))}
-            </FoldPanel>
-          </Fold>
-        )}
-        </FoldPanel>
-      </Fold>
-    </div>
-  );
-}
-
-/**
- * Select multiple, on an Instance with no call site to group by: it is selected alone,
- * and the page is still one click away when that scope applies. Widened, this goes, and
- * the page scope has no call site to narrow back to: focus goes to the heading.
- */
-function NoGroup({ noGroup, onScope, heading }: Heading & { noGroup: NoGroupView; onScope(scope: Scope): void }) {
-  return (
-    <div className="selection">
-      <span className="muted">{noGroup.text}</span>
-      {noGroup.widen && (
-        <ScopeMoveButton
-          move={noGroup.widen}
-          onScope={(scope) => {
-            onScope(scope);
-            heading.current?.focus();
-          }}
-        />
-      )}
-    </div>
   );
 }
 

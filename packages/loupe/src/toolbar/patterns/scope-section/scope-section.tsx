@@ -9,7 +9,7 @@
 
 import type { InspectorWords, MemberItem, MembersView, Scope, ScopeMove } from "../../panel-view/index.js";
 import { Button, Fold, FoldChevron, FoldPanel, FoldTrigger, LayersIcon, ResetIcon, Tag, WidenIcon } from "../../ui/index.js";
-import { Breakable, TagChip } from "../marks/marks.js";
+import { Breakable, hovering, TagChip } from "../marks/marks.js";
 
 /** As many dots as the meter can show: past this, the words alone say how far it reaches. */
 export const METER_MAX = 12;
@@ -30,16 +30,6 @@ export type ScopeSectionProps = {
   /** Outline these Instances on the page while the pointer or focus is on what names them; none clears. */
   onHover(ids: string[]): void;
 };
-
-/** Pointing at or focusing something outlines `ids` on the page, and leaving it clears them. */
-function hovering(onHover: ScopeSectionProps["onHover"], ids: string[]) {
-  return {
-    onMouseOver: () => onHover(ids),
-    onMouseLeave: () => onHover([]),
-    onFocus: () => onHover(ids),
-    onBlur: () => onHover([]),
-  };
-}
 
 /** Moves the selection to another scope: "Widen to All on page · 7", a soft navy pill. */
 export function ScopeMoveButton({ move, onScope }: { move: ScopeMove; onScope(scope: Scope): void }) {

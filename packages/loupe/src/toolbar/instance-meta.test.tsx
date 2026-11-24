@@ -135,7 +135,7 @@ describe("loading meta/ for an Instance with no Adapter", () => {
     await click(instance(CARD));
     await settle();
     // Every row shares the reason, so the fold says it once rather than on each row.
-    expect(shadow().querySelector(".inspect .why")?.textContent).toContain("UNVERIFIED");
+    expect(shadow().querySelector("[data-inspect-fold-why]")?.textContent).toContain("UNVERIFIED");
     expect(shadow().querySelector("[data-prop=children]")?.textContent).not.toContain("UNVERIFIED");
     expect(warn.mock.calls).toEqual([["[loupe] Couldn't read meta/ for Card: Error: restarting"]]);
     warn.mockRestore();

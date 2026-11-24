@@ -26,9 +26,6 @@ vi.mock("./notices.js", () => ({
   useLayerStatus: () => null,
   staleComponents: () => new Set(),
   notGeneratedComponents: () => [],
-  LayerNotices: () => null,
-  NotGeneratedNotice: () => null,
-  layerAnnouncement: () => ({ alert: "", status: "" }),
 }));
 
 const { default: Toolbar } = await import("./index.js");

@@ -1,0 +1,37 @@
+/*
+ * FlagsCard and FlagRow (ADR 0003): written against `[data-flags]` and its parts
+ * (`[data-flags-muted]`, `[data-flags-off]`, `[data-flags-why]`, `[data-flags-reason]`,
+ * `[data-flags-error]`, `[data-flags-lasts]`, `[data-flags-clear]`), and `[data-flag]`
+ * (`[data-previewing]`) with `[data-flag-foot]` and `[data-flag-state]`. Each flag is a Row
+ * `ruled` (ui/row/), its options a ChipGroup. Values from the tokens. In the stylesheet's
+ * `patterns` layer.
+ */
+
+/* What says more about a flag or the card, muted at 400 wherever it stands. */
+[data-flags-muted] { color: var(--muted); font-weight: 400; }
+
+/* A flag's options share its width, on one line; what shows now at the right, level with their foot. */
+[data-flag] [data-chip-group] { flex-wrap: nowrap; }
+[data-flag] [data-chip] { flex: 1; }
+[data-flag-foot] { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-inset); }
+[data-flag-state] { margin-left: auto; padding-bottom: var(--space-sheet); font: var(--font-meta); color: var(--muted); white-space: nowrap; }
+[data-flag][data-previewing] [data-flag-state] { color: var(--ink); }
+
+/* Previews off: one line in a well, the chevron at its right; opened, why and the fix, 8px apart. */
+[data-flags-off] { padding: var(--space-inset) var(--space-card); border-radius: var(--radius-well); background: var(--well); }
+[data-flags-off] > [data-fold-trigger] { display: flex; align-items: center; gap: var(--space-inset); min-height: 24px; font-weight: 500; }
+[data-flags-off] [data-fold-chevron] { margin-left: auto; color: var(--muted); }
+[data-flags-why] { display: flex; flex-direction: column; gap: var(--space-inset); padding-top: var(--space-inset); }
+[data-flags-reason] { font: var(--font-paragraph); color: var(--muted); }
+
+/* A write the dev server refused: an amber well, its dot level with the first line. */
+[data-flags-error] {
+  display: flex; gap: var(--space-row); padding: var(--space-row) var(--space-card); border-radius: var(--radius-well);
+  background: var(--warn-bg); color: var(--warn-fg); font: var(--font-caption);
+}
+[data-flags-error] [data-dot] { margin-top: 5px; }
+
+/* How long a preview lasts: on a hairline, 10px under the flags, the clock level with the first line. */
+[data-flags-lasts] { display: flex; gap: var(--space-inset); padding-top: var(--space-row); border-top: 1px solid var(--rule); font: var(--font-caption); color: var(--muted); }
+[data-flags-lasts] [data-icon] { margin-top: 1px; }
+[data-flags-clear] { align-self: flex-start; }

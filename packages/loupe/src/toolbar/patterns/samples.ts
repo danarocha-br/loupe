@@ -5,8 +5,23 @@
 // `LIST_WORDS`, which the caller passes). Data only: no words a pattern would draw by
 // itself, and nothing that writes.
 
-import type { CallSiteItem, GroupItem, InstanceItem, ListBody, MembersView, PropItem, StatusTag, Tag, Write } from "../panel-view/index.js";
-import type { IdentityProps } from "./identity/identity.js";
+import type {
+  CallSiteItem,
+  ChangeItem,
+  FlagsCardView,
+  GroupItem,
+  IdentityView,
+  InspectOnlyView,
+  InstanceItem,
+  ListBody,
+  MembersView,
+  NoGroupView,
+  NoticeView,
+  PropItem,
+  StatusTag,
+  Tag,
+  Write,
+} from "../panel-view/index.js";
 import type { MapBox } from "./page-map/page-map.js";
 
 const ID = "app/billing/member-row-menu.tsx › MemberRowMenu › Button[1]#caio";
@@ -147,18 +162,23 @@ export const PROP_ITEMS: readonly PropItem[] = [VARIANT, SIZE, CHILDREN, DISABLE
 const SUPPORTED: StatusTag = { kind: "supported", text: "Supported" };
 const NOT_VISIBLE: Tag = { kind: "not-visible", text: "Not visible now" };
 
-/** The Inspector's identity for that Button: everything but the words and the callbacks. */
-export const IDENTITY: Omit<IdentityProps, "words" | "onBack"> = {
+/** The Inspector's identity for that Button: everything panel-view decides for the block. */
+export const IDENTITY: IdentityView = {
   component: "Button",
   page: "Billing",
   status: SUPPORTED,
   keys: [1, 2, 3],
   name: "Remove Caio from the workspace",
+  nameTitle: "Remove Caio from the workspace",
+  ownName: true,
   where: { file: "member-row-menu.tsx", line: ":37 · use 2 of 3" },
   whereTitle: `app/billing/member-row-menu.tsx:37\n${ID}`,
   id: ID,
+  note: null,
   tags: [NOT_VISIBLE],
   chips: ["Also in All on page"],
+  held: null,
+  notGenerated: null,
   crumbs: [
     { id: "menu", label: "MemberRowMenu" },
     { id: "row", label: "MemberRow" },
@@ -166,16 +186,24 @@ export const IDENTITY: Omit<IdentityProps, "words" | "onBack"> = {
   ],
 };
 
-/** The same Button once it is gone: its call site, what it still holds, and the view's Reset this Instance. */
-export const GONE: Omit<IdentityProps, "words" | "onBack" | "actions"> = {
+/** The same Button once it is gone: its call site, and what it still holds. The view adds Reset this Instance. */
+export const GONE: IdentityView = {
   component: null,
+  page: null,
   status: { text: "Not on the page now" },
+  keys: [],
   name: "Button",
+  nameTitle: ID,
+  ownName: false,
   where: "member-row-menu.tsx:37",
   whereTitle: ID,
+  id: null,
   note: "It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open.",
   tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
+  chips: [],
   held: ['variant "outline"', 'children ""'],
+  notGenerated: null,
+  crumbs: [],
 };
 
 /** The same Button, never generated: the warning says what to run. */
@@ -393,3 +421,160 @@ export const HELD_META = "2 · apply to nothing";
 
 /** Components seen on /billing with nothing mounted now: a dialog's parts. */
 export const INTERACTION: readonly string[] = ["AlertDialogAction", "AlertDialogCancel", "AlertDialogTitle"];
+
+// ── Notices, the Inspector's leftovers, the change list and the flags (wave 3) ──
+
+/** Two of the design system's sources changed since `generate` read them. */
+export const STALE_NOTICE: NoticeView = {
+  kind: "stale",
+  tone: "amber",
+  title: "Source changed",
+  meta: "3 components",
+  body: "3 components changed since the last generate. Their props here may be out of date. Run the command below from the repo root.",
+  rows: [
+    { text: "Button, ButtonGroup", value: "ui/button.tsx", valueTitle: "ds/components/ui/button.tsx" },
+    { text: "Badge", value: "ui/badge.tsx", valueTitle: "ds/components/ui/badge.tsx" },
+  ],
+  command: "pnpm -C apps/app exec loupe generate",
+};
+
+/** A component on the page `generate` has never read. */
+export const NOT_GENERATED_NOTICE: NoticeView = {
+  kind: "not-generated",
+  tone: "amber",
+  title: "Not generated yet",
+  meta: "1 component",
+  body: "1 component on this page is not generated yet, so it has no prop metadata and no Adapter. Run the command below from the repo root.",
+  rows: [{ text: "MemberNote", value: null, valueTitle: null }],
+  command: "pnpm -C apps/app exec loupe generate",
+};
+
+/** adapt-list.json went missing, as after a branch switch. */
+export const MISSING_NOTICE: NoticeView = {
+  kind: "missing",
+  tone: "alert",
+  title: "Product layer missing",
+  meta: null,
+  body: "adapt-list.json is gone, so files that reload lose their Adapters and their Instances drop out of this panel. A branch switch can remove it. Restore it with git, or write it again with the command below.",
+  rows: [],
+  command: "pnpm -C apps/app exec loupe generate --design-system <dir> --app <dir>",
+};
+
+/** The React self-check failed: no row, no command. */
+export const OVERRIDES_OFF_NOTICE: NoticeView = {
+  kind: "overrides-off",
+  tone: "alert",
+  title: "Overrides are off",
+  meta: null,
+  body: "Everything is inspect-only: this React build isn’t supported (React reported no fiber while an Adapter rendered.).",
+  rows: [],
+  command: null,
+};
+
+/** An Instance no Adapter renders: why nothing on it can change. */
+export const NOTE = {
+  title: "Inspect only · No Adapter",
+  body: "No Adapter renders this Instance, so it is inspect-only: `loupe generate` writes Adapters only for components with a prop that can be Editable.",
+};
+
+/** The Button's Inspect only, folded: its props named after the title, and the library's two. */
+export const INSPECT_ONLY: InspectOnlyView = {
+  title: "Inspect only · 2",
+  names: "type, onClick",
+  meta: null,
+  open: false,
+  shared: null,
+  rows: [TYPE_INSPECT_ONLY, { ...TYPE_INSPECT_ONLY, name: "onClick", label: "onClick", reason: "FUNCTION", reasonTitle: "A function, such as an event handler: there is no value to try." }],
+  empty: "None",
+  injected: {
+    summary: "2 set by the library",
+    rows: [
+      { name: "aria-expanded", value: "false" },
+      { name: "data-slot", value: '"button"' },
+    ],
+  },
+};
+
+/** Nothing on it can change, every prop for one reason: open, the reason said once, Overrides off at the right. */
+export const INSPECT_ONLY_SHARED: InspectOnlyView = {
+  ...INSPECT_ONLY,
+  meta: "Overrides off",
+  open: true,
+  shared: { reason: "OPEN TEXT", title: "Any text fits here, so there is no set of options to choose from." },
+  rows: INSPECT_ONLY.rows.map((row) => ({ ...row, reason: null })),
+  injected: null,
+};
+
+/** Select multiple on an Instance with no call site: alone, and the page one press away. */
+export const NO_GROUP: NoGroupView = {
+  text: "No call site was anchored here, so it has no group.",
+  widen: { scope: "page", text: "Widen to All on page · 11", title: "All on page · 11" },
+};
+
+/** The page's numbered changes: an Instance's, a call site's, and one whose Instance isn't mounted. */
+export const CHANGES: readonly ChangeItem[] = [
+  { n: 1, props: "variant, size", detail: 'variant "ghost" → "outline", size "icon" → "sm"', where: "Actions for Ana Souza", select: "ana", reached: ["ana"] },
+  { n: 2, props: "variant", detail: 'variant "ghost" → "secondary"', where: "⁨Actions for eva@example.com⁩ and 1 more", select: "eva", reached: ["eva", "fabio"] },
+  { n: 3, props: "variant", detail: 'variant "default" → "destructive"', where: "Change role", select: null, reached: [] },
+];
+
+const FLAG_LASTS = "A preview lasts 8 hours, in a cookie every app on localhost shares. Clear it before switching projects.";
+
+/** Three flags, one previewed, and a write the dev server refused. */
+export const FLAGS: FlagsCardView = {
+  title: "Feature flags",
+  meta: "3 declared · 1 previewing",
+  loading: null,
+  off: null,
+  empty: null,
+  rows: [
+    {
+      key: "beta-banner",
+      previewing: false,
+      description: null,
+      note: "No options declared: offered as on and off.",
+      options: [
+        { label: "Off", value: false },
+        { label: "On", value: true },
+      ],
+      checked: -1,
+      state: "App decides",
+      clear: null,
+    },
+    {
+      key: "plan-tier",
+      previewing: true,
+      description: "Which plan the workspace is on.",
+      note: null,
+      options: [
+        { label: "Free", value: "free" },
+        { label: "Pro", value: "pro" },
+        { label: "Team", value: "team" },
+      ],
+      checked: 1,
+      state: "Previewing Pro",
+      clear: "Clear",
+    },
+  ],
+  error: "Failed to fetch",
+  lasts: FLAG_LASTS,
+  clearAll: { label: "Clear flag previews", enabled: true },
+};
+
+/** Previews off: FLAGS_SECRET isn't set, and the fix goes in .env.local. */
+export const FLAGS_OFF: FlagsCardView = {
+  title: "Feature flags",
+  meta: "Unavailable",
+  loading: null,
+  off: {
+    title: "Flag previews are off",
+    why: " · why",
+    reason: "FLAGS_SECRET isn't set on the dev server. The Flags SDK encrypts flag overrides with it, so previews need it.",
+    fix: { text: "FLAGS_SECRET=… in .env.local", copy: "FLAGS_SECRET=" },
+  },
+  empty: null,
+  rows: [],
+  error: null,
+  lasts: null,
+  clearAll: null,
+};

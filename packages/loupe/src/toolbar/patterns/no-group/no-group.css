@@ -1,0 +1,9 @@
+/*
+ * NoGroup (ADR 0003): written against `[data-no-group]` and `[data-no-group-why]`. The move
+ * is ScopeSection's (`ScopeMoveButton`). Values from the tokens. In the stylesheet's
+ * `patterns` layer.
+ */
+
+/* Under the identity's actions, 10px down: why it is alone, in 12px muted, and the move 6px under it. */
+[data-no-group] { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sheet); padding-top: var(--space-row); font: var(--font-caption); }
+[data-no-group-why] { color: var(--muted); }

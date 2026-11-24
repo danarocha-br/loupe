@@ -310,10 +310,24 @@ describe("the Inspector", () => {
     expect(prop(body, "render").reason).toBe("STRUCTURAL");
     // Injected by "the library": one collapsed line, not a row.
     expect(prop(body, "aria-expanded")).toBeUndefined();
-    expect(body.injected).toEqual({ summary: "1 set by the library", rows: [{ name: "aria-expanded", value: "false" }] });
+    expect(body.inspect.injected).toEqual({ summary: "1 set by the library", rows: [{ name: "aria-expanded", value: "false" }] });
     expect(prop(body, "children")).toMatchObject({ label: "Text", codeName: "children", control: { kind: "text", value: "bia" } });
     expect(prop(body, "variant").codeName).toBeNull();
     expect(body.note).toBeNull();
+    // The identity block: its component, the page, the verdict, its visible name as the app's own words, and where it is written.
+    expect(body.identity).toMatchObject({
+      component: body.name === null ? null : "Button",
+      page: "Home",
+      status: { kind: "supported", text: "Supported" },
+      ownName: body.name !== null,
+      where: { file: "members.tsx", line: ":11 · use 1 of 2" },
+      id: BIA,
+      note: null,
+      held: null,
+    });
+    // Inspect only, folded: two props, for two reasons, so each row keeps its own.
+    expect(body.inspect).toMatchObject({ title: "Inspect only · 2", names: "render, onClick", meta: null, open: false, shared: null });
+    expect(body.inspect.rows.map((row) => row.reason)).toEqual(["STRUCTURAL", "FUNCTION"]);
   });
 
   it("goes inspect-only as a whole while the React self-check fails, and says so once, in the banner", () => {
@@ -323,9 +337,20 @@ describe("the Inspector", () => {
     });
     act(() => disableOverrides("React reported no fiber while an Adapter rendered."));
     const shown = view(BIA);
-    expect(shown.banner).toEqual({
-      title: "Overrides are off",
-      body: "Everything is inspect-only: this React build isn’t supported (React reported no fiber while an Adapter rendered.).",
+    expect(shown.notices).toEqual([
+      {
+        kind: "overrides-off",
+        tone: "alert",
+        title: "Overrides are off",
+        meta: null,
+        body: "Everything is inspect-only: this React build isn’t supported (React reported no fiber while an Adapter rendered.).",
+        rows: [],
+        command: null,
+      },
+    ]);
+    expect(shown.said).toEqual({
+      alert: "",
+      status: "Overrides are off. Everything is inspect-only: this React build isn’t supported (React reported no fiber while an Adapter rendered.).",
     });
     expect(shown.footer.resetAll).toEqual([]);
     const body = inspector(shown);
@@ -334,7 +359,7 @@ describe("the Inspector", () => {
     // The banner says it (PER-184).
     expect(body.note).toBeNull();
     expect(body.editing).toBeNull();
-    expect(body.inspectOnlyMeta).toBe("Overrides off");
+    expect(body.inspect.meta).toBe("Overrides off");
     // Each row draws the eye, and says why in its tooltip.
     expect(listOf(view()).groups.map((candidate) => [candidate.inspectOnly, candidate.statusTitle])).toEqual([
       [true, "Overrides are off"],
@@ -361,7 +386,19 @@ describe("the Inspector", () => {
     expect(view(item).body.kind).toBe("inspector");
     click("Menu");
     // What it was stays: the component its id names, though Loupe never kept how it rendered.
-    expect(gone(view(item))).toEqual({ kind: "gone", id: item, component: "MenuItem", where: null, held: null, canReset: false });
+    expect(gone(view(item))).toMatchObject({ kind: "gone", id: item, component: "MenuItem", where: null, held: null, canReset: false });
+    // The identity block says so, in words, and names it by its component: Loupe's word, not the app's.
+    expect(gone(view(item)).identity).toMatchObject({
+      component: null,
+      page: null,
+      status: { text: "Not on the page now" },
+      name: "MenuItem",
+      ownName: false,
+      where: null,
+      id: null,
+      tags: [],
+      held: null,
+    });
 
     click("Abrir");
     act(() => {
@@ -374,6 +411,10 @@ describe("the Inspector", () => {
       component: "Button",
       held: { tag: { kind: "not-mounted", text: "No Instance mounted" }, values: ['variant "default" · Current "ghost" (last seen)'] },
       canReset: true,
+    });
+    expect(gone(view(CONFIRM)).identity).toMatchObject({
+      tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
+      held: ['variant "default" · Current "ghost" (last seen)'],
     });
     act(() => {
       loupe.discard({ scope: "instance", id: CONFIRM });

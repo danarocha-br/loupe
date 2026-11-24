@@ -9,12 +9,13 @@ import type { LayerStatus } from "../layer-status.js";
 import { devMount } from "../mount.js";
 import { createAdapter } from "../runtime/adapter.js";
 import { resetLoupe } from "../runtime/slot.js";
-import { COPY_REFUSED } from "./command.js";
 import Toolbar from "./index.js";
 import { OPEN_KEY } from "./launcher-place.js";
+import { COMMAND_WORDS } from "./panel-view/index.js";
+import COMMAND_CSS from "./patterns/command/command.css?inline";
 import IDENTITY_CSS from "./patterns/identity/identity.css?inline";
 import { loadPanel } from "./start.js";
-import { CSS, HOST_ATTRIBUTE } from "./styles.js";
+import { HOST_ATTRIBUTE } from "./styles.js";
 import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -152,12 +153,13 @@ describe("the Product layer's notices", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
     expect(copy.textContent).toBe("Copy failed");
-    expect(notice.querySelector(".command-refused")?.textContent).toBe(COPY_REFUSED);
+    const refused = () => within(notice).queryByText(COMMAND_WORDS.refused);
+    expect(refused()).not.toBeNull();
     // Shown under the command, and said once by the announcer.
-    expect(await said("assertive")).toEqual([COPY_REFUSED]);
+    expect(await said("assertive")).toEqual([COMMAND_WORDS.refused]);
     // It stays: it says what to do instead, so it doesn't time out like "Copied".
     await act(async () => await new Promise((resolve) => setTimeout(resolve, 2100)));
-    expect(notice.querySelector(".command-refused")?.textContent).toBe(COPY_REFUSED);
+    expect(refused()).not.toBeNull();
   });
 
   it("shows another formatVersion and logs the command once", async () => {
@@ -309,8 +311,8 @@ describe("components that are new since the last generate", () => {
     // The element whose own text is the command, its run of spaces kept as written.
     const shown = (where: string) =>
       within(shadow().querySelector(`[data-testid=${where}]`) as HTMLElement).queryByText(command, { normalizer: (text) => text })?.textContent;
-    // jsdom applies no shadow-root stylesheet, so this reads the rules apart: the card's, and Identity's (patterns/identity/).
-    expect(CSS).toContain(".verbatim { white-space: pre-wrap; }");
+    // jsdom applies no shadow-root stylesheet, so this reads the rules apart: the command's (patterns/command/), and Identity's (patterns/identity/).
+    expect(COMMAND_CSS).toMatch(/\[data-command-text\] \{[^}]*white-space: pre-wrap/);
     expect(IDENTITY_CSS).toMatch(/\[data-identity-command\] \{[^}]*white-space: pre-wrap/);
     server.status = { ...FRESH, command, notGenerated: ["NewCard"] };
     await mountWithNew();

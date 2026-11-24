@@ -9,10 +9,12 @@ import { changeItems, listBody, stateItems } from "./list.js";
 import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
 import type { PanelInput, PanelView } from "./types.js";
-import { changesWord, footerCount, headerReport, heldChip, OVERRIDES_OFF_TITLE, overridesOffBanner, pageName } from "./words.js";
+import { layerNotice, noticesSaid, overridesOffNotice } from "./notices.js";
+import { changesWord, footerCount, headerReport, heldChip, pageName } from "./words.js";
 
 export type * from "./types.js";
-export { INSPECTOR_WORDS, inspectOnlyTitle, isolate, LEGEND, LIST_WORDS, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
+export { flagsCard } from "./flags.js";
+export { COMMAND_WORDS, INSPECTOR_WORDS, isolate, LIST_WORDS, sourceText, TEXT, THIS_INSTANCE } from "./words.js";
 
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides
@@ -36,6 +38,8 @@ export function panelView(input: PanelInput): PanelView {
   const changes = changeItems(keys, page, reads);
   // State props an Instance Override holds: Overrides, but shown as states, not numbered changes.
   const states = stateItems(page, reads);
+  const layer = layerNotice(input.layer);
+  const overridesOff = page.status.overrides ? null : overridesOffNotice(page.status.reason);
   return {
     scope,
     seen: page.seen,
@@ -48,7 +52,8 @@ export function panelView(input: PanelInput): PanelView {
     instanceCount: page.instanceCount,
     marks: keys.marks,
     header: { route: page.route, page: pageName(page.route), report: headerReport(page.route, changes.length, states.length) },
-    banner: page.status.overrides ? null : { title: OVERRIDES_OFF_TITLE, body: overridesOffBanner(page.status.reason) },
+    notices: [layer, overridesOff].filter((notice) => notice !== null),
+    said: noticesSaid(input.layer, overridesOff),
     footer: {
       countText: footerCount(changes.length, states.length),
       hasOverrides: page.overrideCount > 0,

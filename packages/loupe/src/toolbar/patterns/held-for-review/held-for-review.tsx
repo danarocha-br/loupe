@@ -8,8 +8,8 @@
 // through `onDiscard`, which makes the write in the view. See held-for-review.md.
 
 import type { ListBody, ListWords, ScopeTarget } from "../../panel-view/index.js";
-import { Button, Card, CardHead, Dot, Row } from "../../ui/index.js";
-import { HeldValues, Meta } from "../marks/marks.js";
+import { Button, Card, CardHead, Row } from "../../ui/index.js";
+import { DotTitle, HeldValues, Meta } from "../marks/marks.js";
 
 export type HeldForReviewProps = {
   items: ListBody["suspended"];
@@ -25,10 +25,9 @@ export function HeldForReview({ items, meta, words, onDiscard }: HeldForReviewPr
   return (
     <Card look="list" data-held-for-review="">
       <CardHead>
-        <div data-held-title="">
-          <Dot tone="ring" />
+        <DotTitle tone="ring">
           <h3>{words.held.title}</h3>
-        </div>
+        </DotTitle>
         <Meta>{meta}</Meta>
       </CardHead>
       <ul data-held-list="">

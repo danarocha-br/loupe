@@ -5,6 +5,7 @@
 import type { ScopeTarget } from "../../runtime/store.js";
 import { formatCurrent } from "../format.js";
 import type { Keys } from "./keys.js";
+import { notGeneratedNotice } from "./notices.js";
 import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
 import type { InstanceRow } from "../../runtime/debug.js";
@@ -112,7 +113,7 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
   return {
     kind: "list",
     page: { name: pageName(page.route), route: page.route },
-    notGenerated: notGenerated.length > 0 ? { names: notGenerated, command: page.command } : null,
+    notGenerated: notGeneratedNotice(notGenerated, page.command),
     suspended,
     suspendedMeta: suspendedMeta(suspended.length),
     summary: listSummary(page.groups.length, page.instanceCount),
