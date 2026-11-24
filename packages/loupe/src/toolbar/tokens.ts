@@ -198,8 +198,11 @@ export const PAGE = {
   band: "#1B2220",
   /** Not applied: a left-out or hovered Instance's grey dashes. */
   hover: "#6F7472",
-  /** Text on `ink` (the size tag) and on `band` (the pick tag), and the pick tag's detail. */
-  onInk: "#FFFFFF",
+  /**
+   * Text on `ink` (the size tag), and on `band` (the pick tag), and the pick tag's detail. The size
+   * tag's figures are the band's near-black, 4.7:1 on `ink`: white was 3.4:1 (PER-245).
+   */
+  onInk: "#1B2220",
   onBand: "#F0F0F0",
   onBandMuted: "rgba(240, 240, 240, 0.62)",
   /** The white keyline that lifts the selection's outline off any page. */

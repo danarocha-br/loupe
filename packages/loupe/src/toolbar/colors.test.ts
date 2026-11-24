@@ -38,6 +38,13 @@ describe("the toolbar's colours (colour review 2026-11-20)", () => {
     expect(contrast(theme["switch-on"], theme.card)).toBeGreaterThanOrEqual(3);
   });
 
+  it("keeps the page's tags' text at 4.5:1 on their fill, whatever the app's page is (PER-245)", () => {
+    // The size tag: its figures on the selection's coral.
+    expect(contrast(PAGE.onInk, PAGE.ink)).toBeGreaterThanOrEqual(4.5);
+    // The pick tag: its name on the band.
+    expect(contrast(PAGE.onBand, PAGE.band)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("names its tokens by role, never by hue, and gives every one a dark value", () => {
     for (const name of [...Object.keys(LIGHT), ...Object.keys(SHADOW.light)]) {
       expect(name).not.toMatch(/lilac|amber|pencil|violet|purple|teal|green|orange/);

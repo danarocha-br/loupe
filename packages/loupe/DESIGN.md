@@ -120,7 +120,7 @@ colors:
   page-fill: "rgba(254, 68, 55, 0.12)"
   page-band: "#1B2220"
   page-hover: "#6F7472"
-  page-on-ink: "#FFFFFF"
+  page-on-ink: "#1B2220"
   page-on-band: "#F0F0F0"
   page-on-band-muted: "rgba(240, 240, 240, 0.62)"
   page-halo: "rgba(255, 255, 255, 0.85)"
@@ -514,7 +514,7 @@ A grey ground, white cards, near-black ink; salmon for what shows now, coral for
 - **Notice Amber** (`warn-fg`, `warn-bg`, `warn-dot`, `warn-muted`, `warn-edge`, `warn-rule`, `warn-wash`): out of date and warnings (stale tags, the warn strip, "Not generated yet"), the footer's "held" chip for State props held open, and a copy that didn't land: the "Not copied" button and its popover.
 
 ### On the page
-- **Page Ink** (`page-ink`), **Page Line** (`page-line`) and **Page Fill** (`page-fill`): the outlines over the host product, fixed values in both panel themes because they sit on the app, not on the panel. The selected Instance's outline is solid `page-ink`, haloed in `page-halo`, and its size tag is `page-ink` with white figures; the other Instances a selection or a change reaches are dashed `page-line`; left-out and hovered Instances are dashed **Page Hover** (`page-hover`) grey. White on `page-ink` is 3.4:1.
+- **Page Ink** (`page-ink`), **Page Line** (`page-line`) and **Page Fill** (`page-fill`): the outlines over the host product, fixed values in both panel themes because they sit on the app, not on the panel. The selected Instance's outline is solid `page-ink`, haloed in `page-halo`, and its size tag is `page-ink` with **Page On Ink** (`page-on-ink`) figures, the band's near-black; the other Instances a selection or a change reaches are dashed `page-line`; left-out and hovered Instances are dashed **Page Hover** (`page-hover`) grey. `page-on-ink` on `page-ink` is 4.7:1, past AA for the tag's 11px text; the white it replaced was 3.4:1 (PER-245, 2026-11-24).
 - **Picking** (a select tool armed), after the browser's element picker: what a click would select gets a solid `page-ink` outline washed with `page-fill`. Select one outlines the Instance under the pointer; Select multiple outlines every Instance from its call site, a left-out one dashed grey. A **Page Band** (`page-band`) pill names the component on the hovered Instance's top-left ("Button"), with a detail in `page-on-band-muted`: "4 from this call site" in Select multiple, "Inspect only" when no Override can reach it. It goes below the outline when there is no room above, and slides sideways to stay clear of the page's edge and the panel's column.
 - **Map hues** (`map-hue-0` … `map-hue-6`): seven named values, one per component in the order "On this page" lists them, repeating after seven. Categories, not roles, so they are the same in either theme.
 
