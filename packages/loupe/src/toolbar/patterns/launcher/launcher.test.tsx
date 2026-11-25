@@ -6,20 +6,19 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LAUNCHER_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { atRest, expectPatternCss, forcedColorRules, selectorsOf, styleRules } from "../css.fixture.js";
-import { PILL_DOCKED, PILL_HELD, PILL_IN_STAGE } from "../samples.js";
+import { PILL_DOCKED, PILL_HELD, PILL_IN_STAGE, WORDS } from "../samples.js";
 import { LauncherPill, type LauncherPillProps, PILL, PILL_SIDES } from "./launcher.js";
 import CSS from "./launcher.css?inline";
 
 afterEach(cleanup);
 
-const WORDS = { label: LAUNCHER_WORDS.label, title: LAUNCHER_WORDS.title("⌘.") };
+const PILL_WORDS = { label: WORDS.launcher.label, title: WORDS.launcher.title("⌘.") };
 
 function draw(props: Partial<LauncherPillProps> = {}) {
   const onClick = vi.fn();
-  const screen = renderInSurface(<LauncherPill {...PILL_DOCKED} words={WORDS} onClick={onClick} {...props} />);
+  const screen = renderInSurface(<LauncherPill {...PILL_DOCKED} words={PILL_WORDS} onClick={onClick} {...props} />);
   const pill = screen.getByRole("button", { name: "Show Loupe" });
   return { screen, pill, onClick };
 }
@@ -44,7 +43,7 @@ describe("LauncherPill", () => {
     const { pill, screen } = draw();
     expect(pill.dataset.edge).toBe("right");
     for (const state of ["dragging", "settling", "leaving"]) expect(pill.hasAttribute(`data-${state}`), state).toBe(false);
-    screen.rerender(<LauncherPill {...PILL_HELD} words={WORDS} settling leaving />);
+    screen.rerender(<LauncherPill {...PILL_HELD} words={PILL_WORDS} settling leaving />);
     expect(pill.dataset.edge).toBe("free");
     for (const state of ["dragging", "settling", "leaving"]) expect(pill.hasAttribute(`data-${state}`), state).toBe(true);
   });
@@ -72,7 +71,7 @@ describe("LauncherPill", () => {
     const screen = renderInSurface(
       <>
         {Object.values(PILL_IN_STAGE).map((sample) => (
-          <LauncherPill key={sample.at.x} {...sample} words={WORDS} />
+          <LauncherPill key={sample.at.x} {...sample} words={PILL_WORDS} />
         ))}
       </>,
     );
@@ -102,7 +101,7 @@ describe("LauncherPill", () => {
     const { screen } = draw();
     expect(await axeViolations(screen.host)).toEqual([]);
     cleanup();
-    const held = renderInSurface(<LauncherPill {...PILL_HELD} words={WORDS} />);
+    const held = renderInSurface(<LauncherPill {...PILL_HELD} words={PILL_WORDS} />);
     expect(await axeViolations(held.host)).toEqual([]);
   });
 });

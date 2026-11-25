@@ -4,10 +4,9 @@
 // (over the page, peeking, closing) as attributes; and inert while it closes.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { SHEET_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { atRest, expectPatternCss, forcedColorRules } from "../css.fixture.js";
-import { SHEET_WIDTH } from "../samples.js";
+import { SHEET_WIDTH, WORDS } from "../samples.js";
 import { Sheet, type SheetProps } from "./sheet.js";
 import CSS from "./sheet.css?inline";
 
@@ -20,7 +19,7 @@ function sheet(props: Partial<SheetProps> = {}) {
       peeking={false}
       closing={false}
       width={SHEET_WIDTH}
-      words={SHEET_WORDS}
+      words={WORDS.sheet}
       header={<header>The header</header>}
       footer={<footer>The footer</footer>}
       {...props}

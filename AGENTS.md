@@ -13,7 +13,7 @@ Read `packages/loupe/DESIGN.md` first, its **Layers** section above all. It sets
 - the import rule between them:
   - `@loupe/ui` imports nothing from Loupe (`packages/ui/src/boundary.test.ts`);
   - nothing in `packages/loupe` imports UI SDK, or reaches into `packages/ui` but through `@loupe/ui`'s entries;
-  - a pattern (`src/toolbar/patterns/`) imports only `@loupe/ui` (the primitives and the tokens), other patterns and `panel-view`'s types;
+  - a pattern (`src/toolbar/patterns/`) imports only `@loupe/ui` (the primitives and the tokens), other patterns, `patterns/tokens.ts` and the patterns' contract, `patterns/view.ts`; nothing from `panel-view`, not even a type (ADR 0012);
   - `packages/loupe/src/toolbar/layers.test.ts` enforces Loupe's side;
 - the layered stylesheet and the surface every primitive draws in.
 
@@ -24,7 +24,7 @@ When you add or change a primitive:
 - Delete a view's test only once the primitive's own test covers the same behaviour.
 - Look at it on the package's own workbench (`pnpm --filter @loupe/ui dev`, port 3200), which draws each primitive in its states, light and dark, with its `.md` beside it. Give a new primitive its states in `packages/ui/workbench/states/` and an entry in `workbench/primitives.ts`: a test fails until it has one.
 
-A pattern works the same way, in `src/toolbar/patterns/<pattern>/`: its `.css` in the `patterns` layer, against its own part attributes; a role-based test with axe in the surface; a `.md`; and sample panel-view data in `patterns/samples.ts` for its test and the fixture's `/workbench` page. A value only the Toolbar draws from (a page mark's colour, a map hue) is a token in `src/toolbar/patterns/tokens.ts`, not in `@loupe/ui/tokens` (ADR 0011). It draws the words `panelView()` decided and builds none, and its callbacks make the writes, in the view.
+A pattern works the same way, in `src/toolbar/patterns/<pattern>/`: its `.css` in the `patterns` layer, against its own part attributes; a role-based test with axe in the surface; a `.md`; and sample data in `patterns/samples.ts` for its test and the fixture's `/workbench` page. The types it draws are the contract's, in `patterns/view.ts`: a new one goes there (or in the pattern's own folder, if that pattern alone uses it), and `panelView()` returns it. Its words come from `samples.ts`'s `WORDS`, spelled out, never a `*_WORDS` constant; `panel-view/samples.test.ts` holds them equal to panel-view's. A value only the Toolbar draws from (a page mark's colour, a map hue) is a token in `src/toolbar/patterns/tokens.ts`, not in `@loupe/ui/tokens` (ADR 0011). It draws the words `panelView()` decided and builds none, and its callbacks make the writes, in the view.
 
 Primitives are built on UI SDK (`@ui-sdk/react`, `@ui-sdk/core`, pinned to one exact version in `packages/ui/package.json`). `packages/loupe/package.json` repeats the pin, because `dist/ui` imports UI SDK; a test fails when the two differ. Its `ui-sdk` skill is installed at `.claude/skills/ui-sdk/`, copied from `packages/ui/node_modules/@ui-sdk/core/skills/ui-sdk/`. Refresh that copy when the pin moves. The installed docs are in `packages/ui/node_modules/@ui-sdk/react/docs/`; start at `llms.txt`.
 
@@ -57,4 +57,4 @@ For each, every element in a Loupe shadow root: its box (to 0.05px), 85 computed
 
 ## Decisions
 
-The architecture decision records live in `docs/adr/` and the plans in `plans/`, in the maintainer's checkout only. They are local and never go to GitHub: never `git add` them. ADR 0003 decides the primitives on UI SDK, ADR 0004 the Vite build of the browser side, ADR 0010 the primitives' package, `@loupe/ui`, and ADR 0011 its own workbench and the Toolbar's tokens kept out of it.
+The architecture decision records live in `docs/adr/` and the plans in `plans/`, in the maintainer's checkout only. They are local and never go to GitHub: never `git add` them. ADR 0003 decides the primitives on UI SDK, ADR 0004 the Vite build of the browser side, ADR 0010 the primitives' package, `@loupe/ui`, and ADR 0011 its own workbench and the Toolbar's tokens kept out of it. ADR 0012 gives the patterns their own view contract, `patterns/view.ts`, with `panelView()` as the adapter, and plans their move into a private `@loupe/patterns`.

@@ -8,7 +8,7 @@ The panel's pinned header card (DESIGN.md "Layout", "Select tools" and "Hide mar
   mode={mode}
   armed={picking}
   marksHidden={marksHidden}
-  words={HEADER_WORDS}
+  words={headerWords}
   onTool={onTool}
   onMarks={onMarks}
   onHide={onHide}
@@ -19,13 +19,13 @@ The panel's pinned header card (DESIGN.md "Layout", "Select tools" and "Hide mar
 ## Interface
 
 - `PanelHeader`:
-  - `page`: the page's name and its tooltip (panel-view's `header.page` and `header.title`), or null while an Instance's identity names it.
+  - `page`: the page's name and its tooltip (`panelView()`'s `header.page` and `header.title`), or null while an Instance's identity names it.
   - `mode`: the select tool checked; `armed`: picking on the page with it.
   - `marksHidden`: Hide marks pressed.
-  - `words`: panel-view's `HeaderWords`: the page's lead, each tool's name and tooltip (the list's `ListWords.tools`), the group's name, Hide marks' and Hide's.
+  - `words`: `panelView()`'s `HeaderWords`: the page's lead, each tool's name and tooltip (the list's `ListWords.tools`), the group's name, Hide marks' and Hide's.
   - `onTool(mode)`, `onMarks()`, `onHide()`: the view picks, hides the marks and hides the panel.
-- `StatusStrip`: `parts`, panel-view's `StripPart[]` (words, or `{ key }` drawn in `kbd`), or null.
-- panel-view decides the strip (`stripParts`) and the line the announcer says (`stripText`).
+- `StatusStrip`: `parts`, `panelView()`'s `StripPart[]` (words, or `{ key }` drawn in `kbd`), or null.
+- The view decides the strip and the line the announcer says, from what `panelView()` decides.
 
 ## States
 
@@ -47,7 +47,7 @@ Under forced colours the card keeps a transparent border, which they draw.
 - A `header` element: in the panel's `section` it heads that section, and only on its own (as the tests draw it) is it the `banner` landmark. The wordmark is an image named "Loupe"; every icon beside it is hidden.
 - The select tools are one `radiogroup` named "Select": arrows move between the tools, Space or Enter picks one (ChipGroup). Each tool's name is hidden text, its tooltip says what it does. Armed is the page's state, said by the strip.
 - Hide marks is a toggle button (`aria-pressed`); Hide is a button.
-- The strip carries no role: the view says it through the announcer as it changes, as panel-view's `stripText` puts it. Its region stays while it is empty, so the line comes and goes inside it.
+- The strip carries no role: the view says it through the announcer as it changes, as `panelView()`'s `stripText` puts it. Its region stays while it is empty, so the line comes and goes inside it.
 
 ## Tests
 

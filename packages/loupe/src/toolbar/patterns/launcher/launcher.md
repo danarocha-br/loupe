@@ -10,7 +10,7 @@ The collapsed Toolbar (DESIGN.md "Collapsed"): a flat dark pill with Loupe's L, 
   leaving={leaving}
   at={{ x: centre.x - PILL.width / 2, y: centre.y - PILL.height / 2 }}
   gaps={gaps}
-  words={{ label: LAUNCHER_WORDS.label, title: LAUNCHER_WORDS.title(shortcutLabel()) }}
+  words={{ label: launcherWords.label, title: launcherWords.title(shortcutLabel()) }}
   aria-keyshortcuts={SHORTCUT_ARIA}
   onPointerDown={down}
   onPointerMove={move}
@@ -28,7 +28,7 @@ The view (`launcher.tsx`) owns everything that moves it: the pointer and its cap
 - `dragging`, `settling`, `leaving`: held; travelling to its place after a drop, a dock or a key; tucking into its side as the panel opens.
 - `at`: its body's top left in the window, in px, set as `translate`, so its travel stays off layout.
 - `gaps`: how far each side's body stands off the window's edge: the pill's real gap to that side while it glues, 24px more once parked, past where they can join.
-- `words`: panel-view's `LauncherWords`, with the shortcut filled into the tooltip.
+- `words`: `panelView()`'s `LauncherWords`, with the shortcut filled into the tooltip.
 - Any other button attribute or handler (`aria-keyshortcuts`, `tabIndex`, the pointer and key handlers, `onClick`) goes to the button.
 - `PILL` is the body's size (44 × 32), which the place maths lays out; `PILL_SIDES` the sides in the Goo's order.
 

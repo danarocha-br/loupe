@@ -2,17 +2,17 @@
 // how many changes the Proposal will list, the State props it shows held, Reset all, and
 // the undo offer after a reset. Under it, light or dark, and Copy Proposal in its slot.
 //
-// It draws panel-view's footer and words (`FooterWords`) and builds none. It writes
+// It draws `panelView()`'s footer and words (`FooterWords`) and builds none. It writes
 // nothing: Reset all, Undo and the theme call back, and the view keeps the offer, moves
 // focus between Reset all and Undo through the refs, and says the count as it changes.
 // Copy Proposal is the view's, drawn from the Copy flow's patterns. See footer.md.
 
 import type { ReactNode, Ref } from "react";
-import type { FooterView, FooterWords } from "../../panel-view/index.js";
+import type { FooterView, FooterWords } from "../view.js";
 import { Button, ContrastIcon, Dot, ResetIcon, Toggle } from "@loupe/ui";
 
 export type PanelFooterProps = {
-  /** panel-view's footer: the count and its words, the held chip, and what Reset all discards. */
+  /** `panelView()`'s footer: the count and its words, the held chip, and what Reset all discards. */
   footer: FooterView;
   words: FooterWords;
   /** What the last reset dropped, said beside its Undo; null while there is no offer. */

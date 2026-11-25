@@ -6,7 +6,7 @@ The panel's pinned footer card (DESIGN.md "Layout" and "Undo"). Its tally: how m
 <PanelFooter
   ref={frame}
   footer={view.footer}
-  words={FOOTER_WORDS}
+  words={footerWords}
   undo={offer?.text ?? null}
   theme={theme}
   resetAllRef={resetAll}
@@ -20,8 +20,8 @@ The panel's pinned footer card (DESIGN.md "Layout" and "Undo"). Its tally: how m
 
 ## Interface
 
-- `footer`: panel-view's footer: `countText` (said once), `changes` (`count` and its `word`), `states` (the held chip's words and its tooltip), `resetAll` (Reset all is off while it is empty).
-- `words`: panel-view's `FooterWords`: Reset all, Undo, and the theme's name and tooltips.
+- `footer`: `panelView()`'s footer: `countText` (said once), `changes` (`count` and its `word`), `states` (the held chip's words and its tooltip), `resetAll` (Reset all is off while it is empty).
+- `words`: `panelView()`'s `FooterWords`: Reset all, Undo, and the theme's name and tooltips.
 - `undo`: what the last reset dropped, beside its Undo; null while there is no offer.
 - `theme`: `light` or `dark`; the theme toggle is pressed in dark.
 - `ref`: the footer card, which Copy Proposal's popovers stand over. `resetAllRef` and `undoRef`: the view moves focus between them as an offer comes and goes.

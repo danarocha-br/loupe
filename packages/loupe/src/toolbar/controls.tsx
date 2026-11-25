@@ -6,7 +6,8 @@
 
 import type { LoupeDebug } from "../runtime/debug.js";
 import { singleLine } from "../runtime/label-text.js";
-import { INSPECTOR_WORDS, type PropItem } from "./panel-view/index.js";
+import { INSPECTOR_WORDS } from "./panel-view/index.js";
+import type { PropItem } from "./patterns/view.js";
 import { PropRow } from "./patterns/index.js";
 import type { SelectMode } from "./picker.js";
 import type { RowLook } from "@loupe/ui";

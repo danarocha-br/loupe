@@ -3,12 +3,12 @@
 The page's numbered changes as the Proposal will list them, on the list with nothing selected (DESIGN.md "Revision marks"). A row each: its delta, what it changes from and to, and what it reaches. A row selects what it changed and outlines on the page every Instance it reaches; one whose Instances aren't mounted is off.
 
 ```tsx
-<ChangeList changes={body.changes} words={LIST_WORDS} onSelect={select} onHover={outline} />
+<ChangeList changes={body.changes} words={listWords} onSelect={select} onHover={outline} />
 ```
 
 ## Interface
 
-- `changes`: panel-view's `ChangeItem`s: `n`, `detail` ('variant "ghost" → "outline"'), `where`, `select` (null while nothing it reaches is mounted), `reached`.
+- `changes`: `panelView()`'s `ChangeItem`s: `n`, `detail` ('variant "ghost" → "outline"'), `where`, `select` (null while nothing it reaches is mounted), `reached`.
 - `words`: `ListWords.changes` (the card's title and what it says of its numbers) and `ListWords.change(n)`, each delta's name.
 - `onSelect(id)`, `onHover(ids)` (none clears).
 

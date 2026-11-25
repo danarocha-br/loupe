@@ -5,6 +5,8 @@
 // the system's (`stylesheet(PATTERNS_CSS, PATTERN_PROPERTIES)`, surface/). Loupe's DESIGN.md
 // front matter names them too, and design-md.test.ts holds it to this module.
 
+import { font, TYPE, type TypeStyle } from "@loupe/ui/tokens";
+
 /** The page's marks don't follow the panel's theme: they sit on the app, in its light. */
 export const PAGE = {
   /** The Instances a selection reaches besides the one picked: dashed. */
@@ -33,6 +35,16 @@ export const PAGE_SHADOW = {
 } as const;
 
 /**
+ * The page's own type, fixed like its colours. The pick tag is Label on a 17px line, so its
+ * band pill, padded 2px, stands 21px high: no step of the system's scale sets 11px on 17px,
+ * and only the page's tag needs it. In px, like the system's steps, and written by its `font()`.
+ */
+export const PAGE_TYPE = {
+  /** The pick tag's name and detail. */
+  pick: { ...TYPE.label, lineHeight: 17 },
+} as const satisfies Record<string, TypeStyle>;
+
+/**
  * The page map's hues, one per component in the list's order (page-map.tsx): categories,
  * not roles, so they are named values like the page's marks, the same in either theme.
  */
@@ -43,10 +55,12 @@ const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.to
 
 /**
  * The custom properties these declare on the host, by name without the `--`, in the order the
- * stylesheet writes them: `--map-hue-0` … `--map-hue-6`, `--page-*`, then `--page-*-shadow`.
+ * stylesheet writes them: `--map-hue-0` … `--map-hue-6`, `--page-*`, `--page-*-shadow`, then
+ * `--page-*-font`, a type step as a `font` shorthand.
  */
 export const PATTERN_PROPERTIES: Readonly<Record<string, string>> = {
   ...Object.fromEntries(MAP_HUES.map((hue, index) => [`map-hue-${index}`, hue])),
   ...Object.fromEntries(Object.entries(PAGE).map(([name, value]) => [`page-${kebab(name)}`, value])),
   ...Object.fromEntries(Object.entries(PAGE_SHADOW).map(([name, value]) => [`page-${name}-shadow`, value])),
+  ...Object.fromEntries(Object.entries(PAGE_TYPE).map(([name, style]) => [`page-${name}-font`, font(style)])),
 };

@@ -3,10 +3,10 @@
 // count, and under the name only what is exceptional. Opened, its call sites as cards
 // (SiteCard), then the Instances that hold an Override but aren't mounted now.
 //
-// It draws panel-view's `GroupItem` and builds no words: pointing, picking and opening an
+// It draws `panelView()`'s `GroupItem` and builds no words: pointing, picking and opening an
 // unmounted Instance go out through its callbacks. See group-row.md.
 
-import type { CallSiteItem, GroupItem, InspectorWords } from "../../panel-view/index.js";
+import type { CallSiteItem, GroupItem, InspectorWords } from "../view.js";
 import { Dot, EyeIcon, Fold, FoldChevron, FoldPanel, FoldTrigger } from "@loupe/ui";
 import { Breakable, HeldValues, Keys, StatusChip, TagChip } from "../marks/marks.js";
 import { SiteCard } from "../site-card/site-card.js";

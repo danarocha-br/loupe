@@ -3,12 +3,12 @@
 The records Suspended for review (DESIGN.md "On this page", PER-95): a call site's total changed, or an id names more than one Instance. They apply to nothing until discarded, which the hollow ring by the title says. Nothing here opens a menu or a dialog to reach one.
 
 ```tsx
-<HeldForReview items={body.suspended} meta={body.suspendedMeta} words={LIST_WORDS} onDiscard={(target) => dropUndoably(debug, target, …)} />
+<HeldForReview items={body.suspended} meta={body.suspendedMeta} words={listWords} onDiscard={(target) => dropUndoably(debug, target, …)} />
 ```
 
 ## Interface
 
-- `items`: panel-view's held records, each `{ target, label, why, values }`. Nothing is drawn while there are none.
+- `items`: `panelView()`'s held records, each `{ target, label, why, values }`. Nothing is drawn while there are none.
 - `meta`: "2 · apply to nothing".
 - `words`: `held` (`title`, "Held for review"; `discard`, "Discard").
 - `onDiscard(target)`: Discard pressed. The view drops the record, offers it back, and moves focus to its heading, since the card may go with its last record.

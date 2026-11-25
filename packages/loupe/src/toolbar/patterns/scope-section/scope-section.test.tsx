@@ -6,10 +6,10 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INSPECTOR_WORDS, type MembersView } from "../../panel-view/index.js";
+import type { MembersView } from "../view.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { MEMBERS, PAGE_MEMBERS } from "../samples.js";
+import { MEMBERS, PAGE_MEMBERS, WORDS } from "../samples.js";
 import { METER_MAX, ScopeSection } from "./scope-section.js";
 import CSS from "./scope-section.css?inline";
 
@@ -19,7 +19,7 @@ const SELECTED = MEMBERS.members[2]?.id as string;
 
 function draw(members: MembersView) {
   const calls = { onScope: vi.fn(), onReset: vi.fn(), onToggle: vi.fn(), onHover: vi.fn() };
-  const screen = renderInSurface(<ScopeSection members={members} selected={SELECTED} words={INSPECTOR_WORDS} {...calls} />);
+  const screen = renderInSurface(<ScopeSection members={members} selected={SELECTED} words={WORDS.inspector} {...calls} />);
   return { screen, ...calls };
 }
 
@@ -54,7 +54,7 @@ describe("ScopeSection", () => {
     const { screen, onToggle, onHover } = draw(MEMBERS);
     const count = screen.getByRole("button", { name: "4 Instances" });
     expect(count.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText(INSPECTOR_WORDS.untick)).toBeTruthy();
+    expect(screen.getByText(WORDS.inspector.untick)).toBeTruthy();
     const boxes = screen.getAllByRole("checkbox");
     expect(boxes.map((box) => (box as HTMLInputElement).checked)).toEqual([true, true, true, false]);
     expect(screen.getByRole("checkbox", { name: "Remove Caio picked" })).toBeTruthy();
@@ -93,8 +93,8 @@ describe("ScopeSection", () => {
     const calls = { onScope: () => {}, onReset: () => {}, onToggle: () => {}, onHover: () => {} };
     const screen = renderInSurface(
       <>
-        <ScopeSection members={MEMBERS} selected={SELECTED} words={INSPECTOR_WORDS} {...calls} />
-        <ScopeSection members={PAGE_MEMBERS} selected={SELECTED} words={INSPECTOR_WORDS} {...calls} />
+        <ScopeSection members={MEMBERS} selected={SELECTED} words={WORDS.inspector} {...calls} />
+        <ScopeSection members={PAGE_MEMBERS} selected={SELECTED} words={WORDS.inspector} {...calls} />
       </>,
     );
     expect(await axeViolations(screen.host)).toEqual([]);

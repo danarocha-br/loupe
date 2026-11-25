@@ -1,13 +1,13 @@
 // Marks (ADR 0003, DESIGN.md "Layers"): the small marks the Inspector's patterns and the
 // list share. A change's delta and an Instance's row of them, a held State prop's empty
-// delta, a verdict's status chip, a tag in panel-view's words, a name that breaks only
+// delta, a verdict's status chip, a tag in `panelView()`'s words, a name that breaks only
 // between its words, a held record's values, a card title that leads with a dot, and the
 // count beside a card's title. Primitives composed: Delta, Dot, Tag and the check icon. A
 // component's hue is CSS alone (`[data-hue]`). And `hovering()`, the handlers that outline
 // what a row names on the page while it is pointed at or focused. See marks.md.
 
 import { Fragment, type ReactNode } from "react";
-import type { InspectorWords, StatusText, Tag as TagText } from "../../panel-view/index.js";
+import type { InspectorWords, StatusText, Tag as TagText } from "../view.js";
 import { CheckIcon, Delta, Dot, type DotTone, Tag, type TagLook } from "@loupe/ui";
 
 /**
@@ -51,7 +51,7 @@ export function Keys({ keys, words }: { keys: readonly number[]; words: Pick<Ins
   );
 }
 
-/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. panel-view's `StatusText`. */
+/** A status in words: a verdict, or a plain one ("Not on the page now") when it has no kind. `panelView()`'s `StatusText`. */
 export type Status = StatusText;
 
 /** A verdict in words. Supported is the rule, so the list says only the exceptions; `check` leads Supported with a tick. */
@@ -74,7 +74,7 @@ const TAG_LOOK: Record<TagText["kind"], TagLook> = {
   "not-visible": "dashed",
 };
 
-/** One of panel-view's tags, in the look its kind takes: dashed for what isn't there now, amber for out of date. */
+/** One of `panelView()`'s tags, in the look its kind takes: dashed for what isn't there now, amber for out of date. */
 export function TagChip({ tag }: { tag: TagText }) {
   return <Tag look={TAG_LOOK[tag.kind]}>{tag.text}</Tag>;
 }

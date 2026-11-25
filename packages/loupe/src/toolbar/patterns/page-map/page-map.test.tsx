@@ -7,10 +7,10 @@
 import { userEvent } from "@testing-library/user-event";
 import { act, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type GroupItem, LIST_WORDS } from "../../panel-view/index.js";
+import type { GroupItem } from "../view.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { MAP_BOXES, MAP_GROUPS } from "../samples.js";
+import { MAP_BOXES, MAP_GROUPS, WORDS } from "../samples.js";
 import { type MapBox, PageMap, stepFrom } from "./page-map.js";
 import CSS from "./page-map.css?inline";
 
@@ -34,7 +34,7 @@ function Sheet({
       groups={MAP_GROUPS}
       boxes={boxes}
       lit={lit}
-      words={LIST_WORDS}
+      words={WORDS.list}
       nameLang={nameLang}
       onPoint={(group) => {
         setLit(group?.component ?? null);

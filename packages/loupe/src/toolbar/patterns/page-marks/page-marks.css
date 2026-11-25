@@ -2,8 +2,8 @@
  * The page's marks (ADR 0003): written against `[data-ring]` (its kind as its value) with
  * `[data-quiet]` and its `[data-ring-label]` (`[data-below]`, `[data-at-start]`), `[data-mark]`,
  * and `[data-pick-tag]` with `[data-pick-detail]`. They sit on the app, not on the panel: their
- * colours are the page's fixed tokens (`--page-*`), the same in either panel theme. In the
- * stylesheet's `patterns` layer.
+ * colours and the pick tag's type are the page's fixed tokens (`--page-*`), the same in either
+ * panel theme. In the stylesheet's `patterns` layer.
  */
 
 /* On the page: the selected Instance solid and tagged with its size, the others it reaches
@@ -26,7 +26,7 @@
 [data-ring="pick"] { border: 1.5px solid var(--page-ink); background: var(--page-fill); }
 [data-pick-tag] {
   position: fixed; pointer-events: none; z-index: 2147483646; padding: 2px 9px; border-radius: var(--radius-pill);
-  background: var(--page-band); color: var(--page-on-band); font: var(--font-label); line-height: 1.5455; white-space: nowrap; box-shadow: var(--page-pick-shadow);
+  background: var(--page-band); color: var(--page-on-band); font: var(--page-pick-font); white-space: nowrap; box-shadow: var(--page-pick-shadow);
 }
 [data-pick-detail] { color: var(--page-on-band-muted); font-weight: 400; }
 /* Forced colours draw every outline in CanvasText and drop the shadows and the tags' fills:

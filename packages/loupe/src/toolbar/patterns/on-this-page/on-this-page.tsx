@@ -6,7 +6,7 @@
 // See on-this-page.md.
 
 import type { ReactNode } from "react";
-import type { ListWords } from "../../panel-view/index.js";
+import type { ListWords } from "../view.js";
 import { Card, CardHead } from "@loupe/ui";
 import { Meta } from "../marks/marks.js";
 

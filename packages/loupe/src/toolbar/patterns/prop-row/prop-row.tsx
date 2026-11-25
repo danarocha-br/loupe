@@ -1,4 +1,4 @@
-// PropRow (ADR 0003, DESIGN.md "Property rows"): one prop of the Inspector, as panel-view
+// PropRow (ADR 0003, DESIGN.md "Property rows"): one prop of the Inspector, as `panelView()`
 // decided it. A Row with the prop's glyph (or, under Inspect only, a `pair`), its delta,
 // name, tags, value and Reset on the line; the change line under it; then its control:
 // chips for a closed set, a switch for true/false, a one-line field for label text, or
@@ -8,7 +8,7 @@
 // through its callbacks, which the view turns into the runtime's calls. See prop-row.md.
 
 import { useState } from "react";
-import type { Control, InspectorWords, PropItem, ValueText, Write } from "../../panel-view/index.js";
+import type { Control, InspectorWords, PropItem, ValueText, Write } from "../view.js";
 import {
   Button,
   Chip,

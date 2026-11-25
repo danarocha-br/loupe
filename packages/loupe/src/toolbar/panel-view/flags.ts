@@ -7,7 +7,7 @@ import { PREVIEW_HOURS } from "../flags-lifetime.js";
 import type { FlagsView } from "../flags-store.js";
 import { sameFlagValue } from "../flags-value.js";
 import { formatCurrent } from "../format.js";
-import type { FlagRowView, FlagsCardView } from "./types.js";
+import type { FlagRowView, FlagsCardView } from "../patterns/view.js";
 
 /** A flag with no declared options is offered as on and off. */
 const ON_OFF: FlagOption[] = [

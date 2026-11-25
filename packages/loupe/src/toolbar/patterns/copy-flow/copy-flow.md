@@ -5,19 +5,19 @@ Copy Proposal's drawn parts (ADR 0002; Paper's "Copy flow v2 · A"; DESIGN.md "C
 The parts draw and call back. The view (`copy-flow.tsx`) keeps the state machine: it runs the copy, decides which state the button shows, which half opened the popover and where focus goes back, the timers that turn the button back and take the toast away, the form's text, and what the announcer says. It places the popovers (ui/popover/) over the footer.
 
 ```tsx
-<CopySplit ref={split} mainRef={main} chevronRef={chevron} state={state} busy={busy} disabled={disabled} expanded={detailsOpen} words={COPY_WORDS} onCopy={copyNow} onDetails={toggleDetails} />
+<CopySplit ref={split} mainRef={main} chevronRef={chevron} state={state} busy={busy} disabled={disabled} expanded={detailsOpen} words={copyWords} onCopy={copyNow} onDetails={toggleDetails} />
 <Popover open={details} …>
-  <PopoverPanel label={COPY_WORDS.details} anchor={frame} returnFocus={chevron} initialFocus={titleField} caret="end">
-    <DetailsForm title={title} designer={designer} missing={missing} busy={busy} words={COPY_WORDS} titleRef={titleField} onTitle={…} onDesigner={…} onSubmit={…} />
+  <PopoverPanel label={copyWords.details} anchor={frame} returnFocus={chevron} initialFocus={titleField} caret="end">
+    <DetailsForm title={title} designer={designer} missing={missing} busy={busy} words={copyWords} titleRef={titleField} onTitle={…} onDesigner={…} onSubmit={…} />
   </PopoverPanel>
 </Popover>
-<NotCopied said={COPY_WORDS.notCopiedText(reason, text !== "")} text={text} busy={busy} words={COPY_WORDS} retryRef={retry} onRetry={tryAgain} />
-{toast && <CopyToast title={toast.title} words={COPY_WORDS} />}
+<NotCopied said={copyWords.notCopiedText(reason, text !== "")} text={text} busy={busy} words={copyWords} retryRef={retry} onRetry={tryAgain} />
+{toast && <CopyToast title={toast.title} words={copyWords} />}
 ```
 
 ## Interface
 
-- Every part takes `words`, panel-view's `CopyWords`.
+- Every part takes `words`, `panelView()`'s `CopyWords`.
 - `CopySplit`: `state` (`idle`, `copied` or `failed`), `busy`, `disabled`, `expanded` (the details, or a refusal from the chevron, stand open), `ref` (the split, which a press on stays the popover's own), `mainRef` and `chevronRef` (for focus to go back to), `onCopy()`, `onDetails()`.
 - `DetailsForm`: `title`, `designer`, `missing` (copied with no title), `busy`, `titleRef`, `onTitle(title)`, `onDesigner(designer)`, `onSubmit()` (the view checks the title).
 - `NotCopied`: `said` (why, `CopyWords.notCopiedText`), `text` (the Proposal's, empty when it wasn't built), `busy`, `retryRef`, `onRetry()`.

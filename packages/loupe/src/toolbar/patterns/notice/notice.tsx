@@ -5,10 +5,10 @@
 // fixes it, for the reader to run. An Instance's note is a row of the Inspector's card, not
 // a card (One Card Deep): why nothing on it can change, said once.
 //
-// Both draw panel-view's words and build none; the copy is the view's (`onCopy`). The
+// Both draw `panelView()`'s words and build none; the copy is the view's (`onCopy`). The
 // panel says each notice through its live regions, so the card carries no role. See notice.md.
 
-import type { CommandWords, InspectorBody, NoticeView } from "../../panel-view/index.js";
+import type { CommandWords, InstanceNoteView, NoticeView } from "../view.js";
 import { Card, CardHead, InfoIcon, Row, RowLine, RowValue } from "@loupe/ui";
 import { CommandLine } from "../command/command.js";
 import { DotTitle, Meta } from "../marks/marks.js";
@@ -53,7 +53,7 @@ export function Notice({ notice, words, onCopy }: NoticeProps) {
 
 export type InstanceNoteProps = {
   /** Why nothing on the Instance can change: its kind's title, and the sentence. */
-  note: Pick<NonNullable<InspectorBody["note"]>, "title" | "body">;
+  note: InstanceNoteView;
 };
 
 /** An Instance's note: a row with the info glyph, its title over its paragraph, read as a note. */

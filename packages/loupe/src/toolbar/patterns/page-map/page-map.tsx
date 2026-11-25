@@ -3,12 +3,12 @@
 // rows are its legend. Point to find, click to inspect. Nothing is drawn while nothing has
 // a box (an Instance that isn't mounted, or a page with no layout).
 //
-// It draws the boxes the view measured on the page (`boxes`) and the words panel-view
+// It draws the boxes the view measured on the page (`boxes`) and the words `panelView()`
 // decided, and reads neither the page nor the runtime: pointing and choosing go out
 // through its callbacks. See page-map.md.
 
 import { type CSSProperties, useRef, useState } from "react";
-import type { GroupItem, ListWords } from "../../panel-view/index.js";
+import type { GroupItem, ListWords } from "../view.js";
 
 /** An Instance's box on the page, in the window's pixels. */
 export type MapBox = { left: number; top: number; width: number; height: number };

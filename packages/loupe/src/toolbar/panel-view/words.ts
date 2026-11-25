@@ -8,7 +8,8 @@ import type { NoteKind } from "../../runtime/inspect.js";
 import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
-import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, StripPart, StripState, Tag, ValueText } from "./types.js";
+import type { StripState } from "./types.js";
+import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, StripPart, Tag, ValueText } from "../patterns/view.js";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";
@@ -114,7 +115,7 @@ export const TEXT = {
   fromRootToReadProps: "from the repo root to read its props.",
 } as const;
 
-/** The Inspector's patterns' words (types.ts `InspectorWords`). */
+/** The Inspector's patterns' words (patterns/view.ts `InspectorWords`). */
 export const INSPECTOR_WORDS: InspectorWords = {
   change: (n) => ({ label: `Change ${n}`, title: `Change ${n} in the Proposal` }),
   heldTitle: "Held by your Override: shown as a state in the Proposal",
@@ -139,7 +140,7 @@ export const INSPECTOR_WORDS: InspectorWords = {
   resetInstance: "Reset this Instance",
 };
 
-/** The list's patterns' words (types.ts `ListWords`). */
+/** The list's patterns' words (patterns/view.ts `ListWords`). */
 export const LIST_WORDS: ListWords = {
   start: { title: TEXT.startTitle, body: TEXT.startBody, tools: "Start selecting" },
   tools: {
@@ -161,7 +162,7 @@ export const LIST_WORDS: ListWords = {
   change: INSPECTOR_WORDS.change,
 };
 
-/** A command's Copy button (types.ts `CommandWords`). */
+/** A command's Copy button (patterns/view.ts `CommandWords`). */
 export const COMMAND_WORDS: CommandWords = {
   prompt: "$ ",
   copy: "Copy",
@@ -170,7 +171,7 @@ export const COMMAND_WORDS: CommandWords = {
   refused: "Couldn’t reach the clipboard. Select the command and copy it.",
 };
 
-/** The header's words and its status strip's (types.ts `HeaderWords`). */
+/** The header's words and its status strip's (patterns/view.ts `HeaderWords`). */
 export const HEADER_WORDS: HeaderWords = {
   pageLead: "/ ",
   tools: LIST_WORDS.tools,
@@ -201,7 +202,7 @@ export function stripParts({ picking, mode, covered, marksHidden }: StripState):
 /** What the strip says as one line, each key by name: for the announcer, which says it as it changes. */
 export const stripText = (parts: readonly StripPart[] | null) => (parts ? parts.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
 
-/** The footer's words beside its count (types.ts `FooterWords`). */
+/** The footer's words beside its count (patterns/view.ts `FooterWords`). */
 export const FOOTER_WORDS: FooterWords = {
   resetAll: "Reset all",
   undo: "Undo",
@@ -213,7 +214,7 @@ const COPIED = "Copied";
 const PASTE_IT = "Paste it into your coding agent";
 const QUOTE = { open: " “", close: "”" };
 
-/** Copy Proposal's words (types.ts `CopyWords`). */
+/** Copy Proposal's words (patterns/view.ts `CopyWords`). */
 export const COPY_WORDS: CopyWords = {
   idle: "Copy Proposal",
   copied: COPIED,

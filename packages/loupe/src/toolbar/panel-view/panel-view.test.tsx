@@ -22,11 +22,11 @@ import {
   type ListBody,
   panelView,
   type PanelView,
-  type PropItem,
   type SeenComponents,
   stripParts,
   stripText,
 } from "./index.js";
+import type { PropItem } from "../patterns/view.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

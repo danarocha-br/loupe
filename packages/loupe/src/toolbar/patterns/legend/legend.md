@@ -3,7 +3,7 @@
 What a chip's marks mean, said once, on a row of its own under the Inspector's option rows (DESIGN.md "Property rows"): the salmon swatch of what shows now, the ring of the app's value once an Override replaces it, and the dot of the design system's default.
 
 ```tsx
-{legend && <Legend words={INSPECTOR_WORDS} app={someChipRingsTheAppsValue} />}
+{legend && <Legend words={inspectorWords} app={someChipRingsTheAppsValue} />}
 ```
 
 ## Interface

@@ -26,7 +26,6 @@ import {
   COMMAND_WORDS,
   FOOTER_WORDS,
   type GoneBody,
-  type GroupItem,
   HEADER_WORDS,
   type InspectorBody,
   INSPECTOR_WORDS,
@@ -34,11 +33,11 @@ import {
   type ListBody,
   LIST_WORDS,
   type PanelView,
-  type PropItem,
   SHEET_WORDS,
   stripParts,
   stripText,
 } from "./panel-view/index.js";
+import type { GroupItem, PropItem } from "./patterns/view.js";
 import { appLang } from "./app-lang.js";
 import {
   AppearsOnInteraction,
