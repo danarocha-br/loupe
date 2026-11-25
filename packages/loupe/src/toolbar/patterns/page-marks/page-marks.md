@@ -31,6 +31,8 @@ The view (`highlight.tsx`) reads the page and measures each box, again whenever 
 
 Reduced motion takes the fades away: marks come and go at once.
 
+Forced colours draw every outline in CanvasText and drop the shadows and the tags' fills. The size tag and the pick tag keep a 1px border they draw, the left-out and hovered dashes turn GrayText so they stay apart from the members', and the pick's wash goes, since forced to Canvas it would hide the page under it.
+
 ## ARIA and keys
 
 - Every mark is `aria-hidden`: they are for the eye. The panel says what is selected, what a scope reaches and what a change reached, and the status strip says what picking does.

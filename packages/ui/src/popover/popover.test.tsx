@@ -4,7 +4,7 @@
 // the toggle, and that hands focus back to what opened it.
 
 import { userEvent } from "@testing-library/user-event";
-import { act, useRef, useState } from "react";
+import { act, useLayoutEffect, useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SYSTEM_STYLESHEET as STYLESHEET } from "../surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../surface/render.fixture.js";
@@ -184,6 +184,65 @@ describe("Popover", () => {
     expect(dialog.querySelector("[data-popover-caret]")?.getAttribute("aria-hidden")).toBe("true");
     screen.rerender(<Harness caret="end" />);
     expect(screen.getByRole("dialog").getAttribute("data-caret")).toBe("end");
+  });
+
+  it("has its anchor and its width when UI SDK first measures it, as it opens", async () => {
+    // UI SDK places the box as it mounts, and again only on its next frame, which a
+    // throttled tab may not run for a second. It measures the box first and only then
+    // writes `--anchor-width`: a box sized by that stood 41px off-centre until that frame,
+    // and Copy Proposal's details landed at x = 694 or x = 735 from run to run. A box
+    // mounted before its anchor was known stood at the viewport's corner. So UI SDK
+    // measures it as the open's click lands, and whatever its width reads, a token
+    // aside, is the anchor's width by then.
+    const declarations = /\[data-popover\]\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? "";
+    const width = /(?:^|[\s;])width:\s*([^;]+);/.exec(declarations)?.[1] ?? "";
+    const variables = [...width.matchAll(/var\((--[\w-]+)\)/g)].map(([, name]) => name!).filter((name) => !STYLESHEET.includes(`${name}:`));
+    expect(variables.length, width).toBeGreaterThan(0);
+    let measured: Record<string, string> | undefined;
+    const offsetWidth = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+      if (!measured && this.hasAttribute("data-popover")) {
+        measured = Object.fromEntries(variables.map((name) => [name, this.style.getPropertyValue(name)]));
+      }
+      return 0;
+    });
+    function Footer() {
+      const [open, setOpen] = useState(false);
+      const footer = useRef<HTMLDivElement>(null);
+      const toggle = useRef<HTMLButtonElement>(null);
+      // jsdom lays nothing out: the footer Copy Proposal stands over, 332px wide.
+      useLayoutEffect(() => {
+        footer.current!.getBoundingClientRect = () => ({ x: 942, y: 684, left: 942, top: 684, right: 1274, bottom: 786, width: 332, height: 102, toJSON: () => ({}) });
+      }, []);
+      return (
+        <div ref={footer}>
+          <button ref={toggle} type="button" onClick={() => setOpen(!open)}>
+            Details
+          </button>
+          <Popover open={open} onOpenChange={setOpen} inside={toggle}>
+            <PopoverPanel label="Copy with details" anchor={footer} returnFocus={toggle} caret="end">
+              <button type="button">First</button>
+            </PopoverPanel>
+          </Popover>
+        </div>
+      );
+    }
+    try {
+      const user = setup();
+      const screen = renderInSurface(<Footer />);
+      const toggle = screen.getByRole("button", { name: "Details" });
+      // Twice: the first open reads the anchor as it opens; the next keeps what it read.
+      // No waiting: measured on UI SDK's next frame would be too late.
+      for (const _ of [1, 2]) {
+        measured = undefined;
+        await user.click(toggle);
+        screen.getByRole("dialog", { name: "Copy with details" });
+        expect(measured).toEqual(Object.fromEntries(variables.map((name) => [name, "332px"])));
+        await user.click(toggle);
+        expect(screen.queryByRole("dialog")).toBeNull();
+      }
+    } finally {
+      offsetWidth.mockRestore();
+    }
   });
 
   it("passes axe, open", async () => {

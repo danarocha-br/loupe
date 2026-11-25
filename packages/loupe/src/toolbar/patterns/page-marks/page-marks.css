@@ -29,5 +29,13 @@
   background: var(--page-band); color: var(--page-on-band); font: var(--font-label); line-height: 1.5455; white-space: nowrap; box-shadow: var(--page-pick-shadow);
 }
 [data-pick-detail] { color: var(--page-on-band-muted); font-weight: 400; }
+/* Forced colours draw every outline in CanvasText and drop the shadows and the tags' fills:
+   the tags keep a border they draw, the left-out and hovered dashes stay apart from the
+   members' in GrayText, and a pick's wash, forced to Canvas, would hide the page under it. */
+@media (forced-colors: active) {
+  [data-ring-label], [data-pick-tag] { border: 1px solid transparent; }
+  [data-ring="out"], [data-ring="hover"] { border-color: GrayText; }
+  [data-ring="pick"] { background: none; }
+}
 @keyframes loupe-mark-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { [data-ring], [data-mark], [data-ring][data-quiet], [data-mark][data-quiet] { animation: none; transition: none; } }

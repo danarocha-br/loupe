@@ -3,13 +3,15 @@
  * and `[data-popover-caret]`, and UI SDK's `[data-side]`. Values from the tokens. In the
  * stylesheet's `primitives` layer.
  *
- * UI SDK places it (`position: fixed`, `left`, `top`) in the top layer and gives it its
- * anchor's size as `--anchor-width`. The browser's own `[popover]` rules would scroll,
- * frame and fill it: each is undone here.
+ * UI SDK places it (`position: fixed`, `left`, `top`) in the top layer. Its width is its
+ * anchor's, which the panel writes as `--popover-anchor-width` before UI SDK first measures
+ * it: UI SDK's own `--anchor-width` comes after that measurement, and would place it at its
+ * auto width. The browser's own `[popover]` rules would scroll, frame and fill it: each is
+ * undone here.
  */
 
 [data-popover] {
-  box-sizing: border-box; width: calc(var(--anchor-width) - 2 * var(--space-inset)); max-width: none;
+  box-sizing: border-box; width: calc(var(--popover-anchor-width) - 2 * var(--space-inset)); max-width: none;
   overflow: visible; padding: var(--space-gutter); border: 0;
   border-radius: var(--radius-card); background: var(--card); color: inherit; box-shadow: var(--popover-shadow);
 }
