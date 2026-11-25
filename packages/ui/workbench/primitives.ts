@@ -2,7 +2,6 @@
 // ARIA and keys) and its states. `primitives.test.tsx` fails when a folder with a `.md` has
 // no entry here, so a new primitive comes with its workbench page.
 
-import type { ComponentType } from "react";
 import ANNOUNCER_MD from "../src/announcer/announcer.md?raw";
 import BUTTON_MD from "../src/button/button.md?raw";
 import CARD_MD from "../src/card/card.md?raw";
@@ -33,17 +32,10 @@ import { RowStates } from "./states/row.js";
 import { SwitchStates } from "./states/switch.js";
 import { TagStates } from "./states/tag.js";
 import { ToggleStates } from "./states/toggle.js";
+import type { Page } from "./shell/index.js";
 
-export type Primitive = {
-  /** Its folder in `src/`, and its address on the page: `#chip-group`. */
-  id: string;
-  name: string;
-  /** Its `.md`, as written. */
-  doc: string;
-  States: ComponentType;
-  /** Drawn on the ground rather than in a card: a card never sits on a card. */
-  bare?: boolean;
-};
+/** A primitive's page: its folder in `src/` (`#chip-group`), its name, its `.md` and its states. */
+export type Primitive = Page;
 
 /** In the order DESIGN.md's Layers lists them: the controls, the marks, the surfaces, the icons, the announcer. */
 export const PRIMITIVES: Primitive[] = [

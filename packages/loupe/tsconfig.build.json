@@ -14,8 +14,7 @@
       "@loupe/patterns": ["../patterns/dist/index.d.ts"],
       "@loupe/patterns/launcher": ["../patterns/dist/launcher/launcher.d.ts"],
       "@loupe/patterns/stylesheet": ["../patterns/dist/stylesheet.d.ts"],
-      "@loupe/patterns/tokens": ["../patterns/dist/tokens.d.ts"],
-      "@loupe/patterns/samples": ["../patterns/dist/samples.d.ts"]
+      "@loupe/patterns/tokens": ["../patterns/dist/tokens.d.ts"]
     }
   },
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.fixture.ts", "src/**/*.fixture.tsx"]

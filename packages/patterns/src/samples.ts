@@ -2,8 +2,8 @@
 // would hand them for a MemberRowMenu Button on /billing, at This instance and at its call
 // site, and for the list of /billing with nothing selected, and for the panel's chrome
 // around them; and the words it decides, spelled out (`WORDS`). The patterns' tests draw
-// it, and so do Loupe's tests (through `@loupe/patterns/testing`) and the fixture's `/workbench`
-// page (`@loupe/patterns/samples`). Data only: nothing that writes.
+// it, and so do Loupe's tests (through `@loupe/patterns/testing`) and the package's workbench
+// (`workbench/`). Data only: nothing that writes, and never shipped: `dist` leaves it out.
 
 import type {
   CallSiteItem,

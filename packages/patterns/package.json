@@ -10,7 +10,6 @@
     "./launcher": "./src/launcher/launcher.tsx",
     "./stylesheet": "./src/stylesheet.ts",
     "./tokens": "./src/tokens.ts",
-    "./samples": "./src/samples.ts",
     "./testing": "./src/testing.fixture.tsx",
     "./package.json": "./package.json"
   },

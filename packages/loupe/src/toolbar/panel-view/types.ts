@@ -1,6 +1,6 @@
 // What `panelView()` takes, and the parts of what it returns that no pattern draws
-// (PER-214). Everything a pattern draws is the patterns' contract, `patterns/view.ts`
-// (ADR 0012): `panelView()` is the adapter that fits Loupe's runtime to it. Nothing here
+// (PER-214). Everything a pattern draws is the patterns' contract, `@loupe/patterns`'
+// `view.ts` (ADR 0012): `panelView()` is the adapter that fits Loupe's runtime to it. Nothing here
 // writes; each action comes with what it needs, and the views make the `__loupe` call.
 
 import type { LayerStatus } from "../../layer-status.js";

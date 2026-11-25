@@ -1,6 +1,6 @@
-/* The page around the surfaces: the nav, the frames' captions and each primitive's `.md`.
-   Plain CSS, outside every shadow root, so none of it reaches a primitive: what draws inside
-   a frame is the system's stylesheet and frame.css alone. */
+/* The page around the surfaces: the nav, the frames' captions and each page's `.md`. Plain CSS,
+   outside every shadow root, so none of it reaches a primitive or a pattern: what draws inside
+   a frame is the package's stylesheet alone, its frame.css in the top layer. */
 :root {
   --page: #f4f4f2;
   --panel: #ffffff;

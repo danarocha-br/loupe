@@ -485,6 +485,8 @@ the Toolbar's visual design, which will change how the panel looks.
 | Path | What it is |
 | -- | -- |
 | `packages/loupe` | Runtime, dev loader and the `loupe` CLI. Published to npm as `@danarocha/loupe`. Its [README](packages/loupe/README.md) is the CLI reference. |
+| `packages/ui` | `@loupe/ui`, the Toolbar's design system: tokens, primitives and the surface they draw in. Private: `@danarocha/loupe` ships it in `dist/ui`. Its workbench: `pnpm --filter @loupe/ui dev`. |
+| `packages/patterns` | `@loupe/patterns`, the Toolbar's patterns on `@loupe/ui`. Private: `@danarocha/loupe` ships it in `dist/patterns`. Its workbench: `pnpm --filter @loupe/patterns dev`. |
 | `plugins/loupe` | The Installer: a thin Claude Code plugin (skills `install`, `upgrade`, `remove`, `doctor` and a guard hook) that runs the CLI. See its [README](plugins/loupe/README.md). |
 | `fixture/app` | A Next 16.3 app that CI runs every check against. |
 | `fixture/design-system` | The fixture's tiny design system: shadcn-style components on Base UI and cva. It has no `components.json`, which is why the check grades it untested. |

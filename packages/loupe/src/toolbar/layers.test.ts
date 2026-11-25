@@ -158,7 +158,7 @@ describe("the layers' import rule", () => {
     expect(manifest).not.toContain("@loupe/patterns");
     const entries = workspaceEntries();
     expect(Object.keys(uiEntries())).toContain("@loupe/ui/surface");
-    expect(Object.keys(patternsEntries())).toEqual(["@loupe/patterns", "@loupe/patterns/launcher", "@loupe/patterns/stylesheet", "@loupe/patterns/tokens", "@loupe/patterns/samples", "@loupe/patterns/testing"]);
+    expect(Object.keys(patternsEntries())).toEqual(["@loupe/patterns", "@loupe/patterns/launcher", "@loupe/patterns/stylesheet", "@loupe/patterns/tokens", "@loupe/patterns/testing"]);
     const source = tsconfigPaths("tsconfig.json");
     expect(Object.keys(source).sort()).toEqual(Object.keys(entries).sort());
     for (const [specifier, target] of Object.entries(entries)) expect(source[specifier], specifier).toEqual([posix(path.relative(pkg, target))]);
@@ -236,7 +236,7 @@ describe("the layers' import rule", () => {
   });
 
   it("keeps the Server Actions out of panel-view: the flags store and its actions for types only", () => {
-    // panel-view is what the workbench draws its samples with; it must not pull a request in.
+    // panel-view is the adapter the views draw through; it must not pull a request in.
     const actions = ["flags-store", "flags-server"].flatMap((name) => [path.join(toolbar, `${name}.ts`), path.join(toolbar, `${name}.js`)]);
     const offenders = sources(panelView)
       .filter((file) => !isTest(file))

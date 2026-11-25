@@ -7,8 +7,8 @@
 // the pill is doing (`data-edge`, `data-dragging`, `data-settling`, `data-leaving`), which
 // its CSS times. Its words are `panelView()`'s (`LauncherWords`). See launcher.md.
 //
-// Imported by its own path, never through `patterns/index.js`: the collapsed pill loads no
-// other pattern.
+// An entry of its own, `@loupe/patterns/launcher`, never reached through the package's main
+// entry: the collapsed pill loads no other pattern.
 
 import { type ComponentPropsWithoutRef, type Ref, useId } from "react";
 

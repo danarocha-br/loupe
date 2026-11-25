@@ -1,5 +1,6 @@
-// What every primitive's states share: a frame of one state, titled with what to try, and
-// a glyph for the icon-only buttons, which the Toolbar's tools draw their own icons for.
+// What every page's states share, a primitive's or a pattern's: a frame of one state, titled
+// with what to try, and a glyph for the icon-only buttons, which the Toolbar's tools draw
+// their own icons for.
 
 import type { ReactNode } from "react";
 

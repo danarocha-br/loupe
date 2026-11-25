@@ -1,0 +1,25 @@
+/* The workbench's own layout inside a surface: the stylesheet's top layer, after the patterns'
+   CSS (`stylesheet(PATTERNS_CSS + FRAME_CSS, PATTERN_PROPERTIES)`), so it stands on the ground,
+   the primitives and the patterns as a view does. Values from the tokens. The fixture's
+   `/workbench` drew the patterns in frames like these until ADR 0012 moved them here. */
+.wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
+.wb-card { gap: 16px; }
+.wb-bare { display: flex; flex-direction: column; gap: var(--space-row); padding: var(--space-card) var(--space-sheet); }
+.wb-states { display: flex; flex-direction: column; gap: 16px; }
+.wb-row { display: flex; flex-direction: column; gap: 8px; }
+.wb-row > h3 { font: var(--font-label); color: var(--muted); }
+.wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
+.wb-list { list-style: none; margin: 0; padding: 0; }
+.wb-note { font: var(--font-meta); color: var(--faint); }
+.wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wb-site { display: flex; flex-direction: column; gap: var(--space-sheet); padding: var(--space-row) var(--space-gutter) var(--space-card); border-radius: var(--radius-card); background: var(--hover); }
+.wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
+.wb-popover { padding: var(--space-gutter); border-radius: var(--radius-card); background: var(--card); box-shadow: var(--popover-shadow); }
+.wb-toast-room { padding-top: 64px; }
+.wb-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font: var(--font-control); color: var(--ink); }
+.wb-name { max-width: 96px; font: var(--font-title); color: var(--ink); }
+.wb-titles { display: flex; flex-direction: column; gap: 8px; font: var(--font-title); color: var(--ink); }
+/* A stage stands in for the window: `contain` makes it the box a fixed pill, sheet or outline is placed in. */
+.wb-stage { position: relative; height: 88px; overflow: hidden; contain: layout paint; border-radius: var(--radius-well); background: var(--well); box-shadow: inset 0 0 0 1px var(--hairline); }
+.wb-stage-sheet { height: 360px; }
+.wb-stage-page { height: 248px; background: var(--card); }

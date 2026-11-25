@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "../../src/index.js";
-import { Frame, Glyph, States } from "./frame.js";
+import { Frame, Glyph, States } from "../shell/frame.js";
 
 /** Button's looks and sizes: soft in three sizes and disabled, primary, and icon only. */
 export function ButtonStates() {

@@ -12,8 +12,8 @@
 // difference is the code's. Nothing is committed: a baseline made on one OS would fail on
 // another, since the tokens draw in the system's sans.
 //
-// Options: `--base <ref>`, `--only <scene prefix>` (`ui/`, `ui/chip-group`, `toolbar/dark`,
-// `overlay/`, `patterns`), `--update` to record the base again (`pnpm visual:update`).
+// Options: `--base <ref>`, `--only <scene prefix>` (`ui/`, `ui/chip-group`, `patterns/`,
+// `patterns/sheet`, `toolbar/dark`, `overlay/`), `--update` to record the base again (`pnpm visual:update`).
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";

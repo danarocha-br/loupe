@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Button, Field, Popover, PopoverPanel } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Popover's states: over a footer, its caret at its end or under its middle. */
 export function PopoverStates() {

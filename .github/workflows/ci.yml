@@ -10,8 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # A pull request draws as its base on main does: every @loupe/ui workbench page and the
-  # Toolbar's states, recorded on both on this runner and diffed (`pnpm visual`, AGENTS.md).
+  # A pull request draws as its base on main does: every page of the @loupe/ui and
+  # @loupe/patterns workbenches and the Toolbar's states, recorded on both on this runner and
+  # diffed (`pnpm visual`, AGENTS.md).
   # A change that is meant fails here until the PR carries the `visual-change` label (then
   # re-run the job): the label waives a measured difference, never a check that couldn't run.
   visual:

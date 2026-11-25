@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Card, CardHead, Chip, ChipGroup, Delta, Dot, InfoIcon, PROP_ICONS, ResetIcon, Row, RowAction, RowLine, RowName, RowValue, Switch, Tag } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 const SIZES = ["sm", "md", "lg"];
 

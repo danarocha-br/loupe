@@ -19,8 +19,11 @@ const root = dirname(fileURLToPath(import.meta.url));
 const src = join(root, "src");
 
 const SOURCE = /\.tsx?$/;
-/** What `dist` leaves out: the tests, the fixtures (the test host among them) and the type declarations. */
-const NOT_SHIPPED = /\.(test|fixture)\.tsx?$|\.d\.ts$/;
+/**
+ * What `dist` leaves out: the tests, the fixtures (the test host among them), the type
+ * declarations, and the sample data, which the tests and the workbench draw and nothing shipped imports.
+ */
+const NOT_SHIPPED = /\.(test|fixture)\.tsx?$|\.d\.ts$|^samples\.ts$/;
 
 /** Every shipped module, keyed by its path in `dist` without `.js`. */
 export function entries(): Record<string, string> {

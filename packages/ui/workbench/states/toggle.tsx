@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Toggle } from "../../src/index.js";
-import { Frame, Glyph, States } from "./frame.js";
+import { Frame, Glyph, States } from "../shell/frame.js";
 
 /** Toggle pressed, unpressed and unmarked: a tool, a soft pill, and one whose pressed shows elsewhere. */
 export function ToggleStates() {

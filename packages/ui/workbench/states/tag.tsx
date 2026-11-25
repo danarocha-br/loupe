@@ -1,5 +1,5 @@
 import { Tag } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Tag in each look. */
 export function TagStates() {

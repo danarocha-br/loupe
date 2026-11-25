@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Fold, FoldChevron, FoldPanel, FoldTrigger } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Fold's states: closed, open, kept by the caller at its own width, and one inside another. */
 export function FoldStates() {

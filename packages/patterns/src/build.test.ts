@@ -40,8 +40,8 @@ describe("dist", () => {
     const expected = [...modules.map((name) => `${name}.js`), ...modules.map((name) => `${name}.d.ts`), ...stylesheets];
     expect(files().sort()).toEqual(expected.sort());
     for (const entry of ["index", "launcher/launcher", "stylesheet", "tokens", "view"]) expect(modules).toContain(entry);
-    // Neither the tests nor their host.
-    expect(modules.some((name) => /\.(test|fixture)$/.test(name))).toBe(false);
+    // Neither the tests nor their host, nor the sample data they and the workbench draw.
+    expect(modules.some((name) => /\.(test|fixture)$/.test(name) || name === "samples")).toBe(false);
   });
 
   it("imports only React and @loupe/ui's shipped entries, and names no Loupe package", () => {

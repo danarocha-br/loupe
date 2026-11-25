@@ -109,7 +109,6 @@ describe("dist", () => {
   it.each([
     ["mount.js", "use client"],
     ["toolbar/index.js", "use client"],
-    ["toolbar/workbench.js", "use client"],
     ["toolbar/flags-server.js", "use server"],
     ["toolbar/layer-server.js", "use server"],
     ["toolbar/meta-server.js", "use server"],
@@ -182,8 +181,6 @@ describe("dist", () => {
       "./mount": { types: "./dist/mount.d.ts", default: "./dist/mount.js" },
       "./next": { types: "./dist/next.d.cts", default: "./dist/next.cjs" },
       "./runtime": { types: "./dist/runtime/index.d.ts", default: "./dist/runtime/index.js" },
-      // The fixture's workbench page (ADR 0003), loaded in development only; not for hosts.
-      "./workbench": { types: "./dist/toolbar/workbench.d.ts", default: "./dist/toolbar/workbench.js" },
       "./proposal.schema.json": "./proposal.schema.json",
       "./package.json": "./package.json",
     });

@@ -22,7 +22,6 @@
       "@loupe/patterns/launcher": ["../patterns/src/launcher/launcher.tsx"],
       "@loupe/patterns/stylesheet": ["../patterns/src/stylesheet.ts"],
       "@loupe/patterns/tokens": ["../patterns/src/tokens.ts"],
-      "@loupe/patterns/samples": ["../patterns/src/samples.ts"],
       "@loupe/patterns/testing": ["../patterns/src/testing.fixture.tsx"]
     }
   },

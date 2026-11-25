@@ -1,5 +1,5 @@
 import { Delta, Tag } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Delta numbered, and empty. */
 export function DeltaStates() {
