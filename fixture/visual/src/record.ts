@@ -1,6 +1,5 @@
 // Records one tree: starts its servers, drives every scene in headless Chromium and writes,
-// per scene, the structural snapshot (`<scene>.json`) and a screenshot of each Loupe root
-// (`<scene>~<root>.png`) into `out`.
+// per scene, the structural snapshot and a screenshot of each Loupe root (`files.ts`).
 //
 // Deterministic by construction rather than by waiting:
 // - a fixed viewport, device scale 1, locale, time zone and a fake clock at a fixed date;
@@ -11,9 +10,9 @@
 // - the mouse rests in a corner of the page unless the scene is a hover.
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { type Browser, type BrowserContext, type BrowserContextOptions, chromium, type ElementHandle, type Locator, type Page } from "playwright";
-import { hasUiWorkbench, PORTS, type Server, startFixture, startUi } from "./servers.ts";
+import { manifestFile, sceneFile, shotFile } from "./files.ts";
+import { hasUiWorkbench, type Server, startFixture, startUi } from "./servers.ts";
 import { freeze, type Snapshot, snapshot } from "./snapshot.ts";
 
 export type Recording = Snapshot & { aria: Record<string, string> };
@@ -31,8 +30,6 @@ const CLOCK_TIME = new Date("2026-01-15T12:00:00Z");
 
 /** The pages whose clock has stopped: from their first capture on. */
 const paused = new WeakSet<Page>();
-
-export const slug =(name: string) => name.replace(/[^\w@.-]+/g, "-").replace(/^-|-$/g, "");
 
 /**
  * Stops the page's clock, if it still runs, and moves it 3s on, firing every timer due by
@@ -73,7 +70,12 @@ class Recorder {
     this.only = only;
   }
 
-  /** Whether any scene under `prefix` is wanted: `only` is a prefix of scene names. */
+  /** Whether the scene is wanted: `only` is a prefix of scene names. */
+  wanted(scene: string): boolean {
+    return !this.only || scene.startsWith(this.only);
+  }
+
+  /** Whether any scene under `prefix` may be wanted. */
   wants(prefix: string): boolean {
     return !this.only || prefix.startsWith(this.only) || this.only.startsWith(prefix);
   }
@@ -91,18 +93,30 @@ class Recorder {
 
   /** Settles the page, then writes its snapshot, its ARIA tree and a screenshot of each root. */
   async capture(page: Page, scene: string): Promise<void> {
-    if (this.only && !scene.startsWith(this.only)) return;
+    if (!this.wanted(scene)) return;
     const shot = await settle(page);
     for (const [name, root] of Object.entries(shot.roots)) {
       const locator: Locator = root.index === undefined ? page.locator("[data-loupe-toolbar]") : page.locator("[data-loupe-surface]").nth(root.index);
       shot.aria[name] = await locator.ariaSnapshot().catch((error: Error) => `(no ARIA snapshot: ${error.message.split("\n")[0]})`);
-      const png = join(this.out, `${slug(scene)}~${slug(name)}.png`);
-      if (root.index === undefined) await page.screenshot({ path: png, animations: "disabled", caret: "hide" });
-      else await locator.screenshot({ path: png, animations: "disabled", caret: "hide" });
+      const path = shotFile(this.out, scene, name);
+      if (root.index === undefined) await page.screenshot({ path, animations: "disabled", caret: "hide" });
+      else await locator.screenshot({ path, animations: "disabled", caret: "hide" });
     }
-    writeFileSync(join(this.out, `${slug(scene)}.json`), JSON.stringify(shot));
+    writeFileSync(sceneFile(this.out, scene), JSON.stringify(shot));
     this.scenes.push(scene);
     process.stdout.write(`  ${scene}: ${Object.values(shot.roots).reduce((n, r) => n + Object.keys(r.entries).length, 0)} elements\n`);
+  }
+
+  /**
+   * Drives a flow: each step's action, then its capture. It stops after the last wanted
+   * scene, so a focused run (`--only toolbar/light/01-pill`) never fails on a later control.
+   */
+  async flow(page: Page, prefix: string, steps: [string, () => Promise<unknown>][]): Promise<void> {
+    const last = steps.findLastIndex(([name]) => this.wanted(`${prefix}/${name}`));
+    for (const [name, act] of steps.slice(0, last + 1)) {
+      await act();
+      await this.capture(page, `${prefix}/${name}`);
+    }
   }
 }
 
@@ -135,9 +149,7 @@ const click = async (target: ElementHandle<Element> | Locator): Promise<void> =>
   await handle.evaluate((el) => (el as HTMLElement).click());
 };
 
-async function press(page: Page, label: string): Promise<void> {
-  await click(await button(page, label));
-}
+const press = async (page: Page, label: string) => click(await button(page, label));
 
 const inToolbar = (page: Page, selector: string) => page.locator(`[data-loupe-toolbar] ${selector}`).first();
 
@@ -147,45 +159,78 @@ async function toolbarStates(r: Recorder, url: string, theme: "light" | "dark"):
   if (!r.wants(prefix)) return;
   const context = await r.context({ colorScheme: theme });
   const page = await context.newPage();
-  await page.goto(url);
-  await inToolbar(page, "[data-launcher]").waitFor();
-  await rest(page);
-  await r.capture(page, `${prefix}/01-pill`);
-  await inToolbar(page, "[data-launcher]").hover();
-  await r.capture(page, `${prefix}/01-pill-hover`);
-  await rest(page);
-  await click(inToolbar(page, "[data-launcher]"));
-  await inToolbar(page, "[data-sheet]").waitFor();
-  await r.capture(page, `${prefix}/02-list`);
-  const group = await button(page, "Button ×7");
-  await group.hover();
-  await r.capture(page, `${prefix}/03-row-hover`);
-  await rest(page);
-  await click(group);
-  await r.capture(page, `${prefix}/04-row-open`);
-  await click(group);
-  await press(page, "Select one");
-  await r.capture(page, `${prefix}/05-armed`);
-  await press(page, "Select one");
-  await press(page, "Inspect Button 1 of 7");
-  await page.waitForFunction(() => {
-    const root = document.querySelector("[data-loupe-toolbar]")?.shadowRoot;
-    return ![...(root?.querySelectorAll("button") ?? [])].some((b) => (b.getAttribute("aria-label") ?? "").startsWith("Inspect Button 2 of 7"));
-  });
-  await r.capture(page, `${prefix}/06-inspector`);
-  await press(page, "Select multiple");
-  await r.capture(page, `${prefix}/07-inspector-multiple`);
-  await press(page, "Select one");
-  // A change: the first unchecked chip of a prop row, then Copy Proposal's details popover.
-  await click(page.locator('[data-loupe-toolbar] [data-prop] [role="radio"][aria-checked="false"]').first());
-  await r.capture(page, `${prefix}/08-changed`);
-  await press(page, "Copy with details");
-  await inToolbar(page, '[role="dialog"]').waitFor();
-  await r.capture(page, `${prefix}/09-details`);
-  await page.keyboard.press("Escape");
-  await page.clock.runFor(1000);
-  await press(page, "Hide marks");
-  await r.capture(page, `${prefix}/10-marks-hidden`);
+  const launcher = inToolbar(page, "[data-launcher]");
+  const group = () => button(page, "Button ×7");
+  await r.flow(page, prefix, [
+    [
+      "01-pill",
+      async () => {
+        await page.goto(url);
+        await launcher.waitFor();
+        await rest(page);
+      },
+    ],
+    ["01-pill-hover", () => launcher.hover()],
+    [
+      "02-list",
+      async () => {
+        await rest(page);
+        await click(launcher);
+        await inToolbar(page, "[data-sheet]").waitFor();
+      },
+    ],
+    ["03-row-hover", async () => (await group()).hover()],
+    [
+      "04-row-open",
+      async () => {
+        await rest(page);
+        await click(await group());
+      },
+    ],
+    [
+      "05-armed",
+      async () => {
+        await click(await group());
+        await press(page, "Select one");
+      },
+    ],
+    [
+      "06-inspector",
+      async () => {
+        await press(page, "Select one");
+        await press(page, "Inspect Button 1 of 7");
+        await page.waitForFunction(() => {
+          const root = document.querySelector("[data-loupe-toolbar]")?.shadowRoot;
+          return ![...(root?.querySelectorAll("button") ?? [])].some((b) => (b.getAttribute("aria-label") ?? "").startsWith("Inspect Button 2 of 7"));
+        });
+      },
+    ],
+    ["07-inspector-multiple", () => press(page, "Select multiple")],
+    [
+      // A change: the first unchecked chip of a prop row.
+      "08-changed",
+      async () => {
+        await press(page, "Select one");
+        await click(page.locator('[data-loupe-toolbar] [data-prop] [role="radio"][aria-checked="false"]').first());
+      },
+    ],
+    [
+      // Copy Proposal's details popover.
+      "09-details",
+      async () => {
+        await press(page, "Copy with details");
+        await inToolbar(page, '[role="dialog"]').waitFor();
+      },
+    ],
+    [
+      "10-marks-hidden",
+      async () => {
+        await page.keyboard.press("Escape");
+        await page.clock.runFor(1000);
+        await press(page, "Hide marks");
+      },
+    ],
+  ]);
   await context.close();
 }
 
@@ -195,21 +240,30 @@ async function overlay(r: Recorder, url: string, theme: "light" | "dark"): Promi
   if (!r.wants(prefix)) return;
   const context = await r.context({ colorScheme: theme, viewport: { width: 700, height: 860 } });
   const page = await context.newPage();
-  await page.goto(url);
-  await rest(page);
-  await click(inToolbar(page, "[data-launcher]"));
-  await inToolbar(page, "[data-sheet]").waitFor();
-  await r.capture(page, `${prefix}/list`);
-  await press(page, "Inspect Button 1 of 7");
-  await r.capture(page, `${prefix}/inspector`);
+  await r.flow(page, prefix, [
+    [
+      "list",
+      async () => {
+        await page.goto(url);
+        await rest(page);
+        await click(inToolbar(page, "[data-launcher]"));
+        await inToolbar(page, "[data-sheet]").waitFor();
+      },
+    ],
+    ["inspector", () => press(page, "Inspect Button 1 of 7")],
+  ]);
   await context.close();
 }
 
+const PATTERN_VARIANTS = [
+  ["patterns", {}],
+  ["patterns@forced", { forcedColors: "active" }],
+] as const;
+
 /** The fixture's `/workbench`: every pattern with sample data, in each of its frames. */
 async function patterns(r: Recorder, url: string): Promise<void> {
-  for (const [variant, options] of [["", {}], ["@forced", { forcedColors: "active" }]] as const) {
-    const scene = `patterns${variant}`;
-    if (!r.wants(scene)) continue;
+  for (const [scene, options] of PATTERN_VARIANTS) {
+    if (!r.wanted(scene)) continue;
     const context = await r.context(options);
     const page = await context.newPage();
     await page.goto(`${url}workbench`);
@@ -232,13 +286,15 @@ async function primitives(r: Recorder, url: string): Promise<void> {
     const context = await r.context(options, { "loupe-ui-workbench:doc": "false", "loupe-ui-workbench:text-size": size });
     const index = await context.newPage();
     await index.goto(url);
-    const ids = await index.locator('nav[aria-label="Primitives"] a').evaluateAll((links) =>
-      links.map((a) => (a.getAttribute("href") ?? "").slice(1)).filter((id) => id && id !== "all"),
-    );
+    // The nav is drawn by React after the page loads: wait for it, or no page would be found.
+    const links = index.locator('nav[aria-label="Primitives"] a');
+    await links.first().waitFor();
+    const ids = await links.evaluateAll((all) => all.map((a) => (a.getAttribute("href") ?? "").slice(1)).filter((id) => id && id !== "all"));
+    if (ids.length === 0) throw new Error(`the ui workbench at ${url} lists no primitive`);
     await index.close();
     for (const id of ids) {
       const scene = `ui/${id}${variant}`;
-      if (!r.wants(scene)) continue;
+      if (!r.wanted(scene)) continue;
       const page = await context.newPage();
       await page.goto(`${url}#${id}`);
       await page.locator("[data-loupe-surface]").first().waitFor();
@@ -251,19 +307,19 @@ async function primitives(r: Recorder, url: string): Promise<void> {
 }
 
 /** Records the tree at `root` into `out`; `only` keeps the scenes whose name starts with it. */
-export async function record(root: string, out: string, only?: string): Promise<string[]> {
+export async function record(root: string, out: string, only?: string): Promise<void> {
   mkdirSync(out, { recursive: true });
   const servers: Server[] = [];
   const browser = await chromium.launch();
   try {
     const recorder = new Recorder(browser, out, only);
     if (hasUiWorkbench(root) && recorder.wants("ui/")) {
-      const ui = await startUi(root, PORTS.ui);
+      const ui = await startUi(root);
       servers.push(ui);
       await primitives(recorder, ui.url);
     }
     if (["toolbar/", "overlay/", "patterns"].some((prefix) => recorder.wants(prefix))) {
-      const fixture = await startFixture(root, PORTS.fixture);
+      const fixture = await startFixture(root, PATTERN_VARIANTS.some(([scene]) => recorder.wanted(scene)));
       servers.push(fixture);
       await toolbarStates(recorder, fixture.url, "light");
       await toolbarStates(recorder, fixture.url, "dark");
@@ -271,8 +327,7 @@ export async function record(root: string, out: string, only?: string): Promise<
       await overlay(recorder, fixture.url, "dark");
       await patterns(recorder, fixture.url);
     }
-    writeFileSync(join(out, "scenes.json"), JSON.stringify(recorder.scenes, null, 2));
-    return recorder.scenes;
+    writeFileSync(manifestFile(out), JSON.stringify(recorder.scenes, null, 2));
   } finally {
     await browser.close();
     for (const server of servers) await server.stop();

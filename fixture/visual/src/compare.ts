@@ -5,9 +5,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
-import { type Entry, type Root } from "./snapshot.ts";
+import { manifestFile, sceneFile, shotFile, shotName } from "./files.ts";
 import type { Recording } from "./record.ts";
-import { slug } from "./record.ts";
+import type { Entry, Root } from "./snapshot.ts";
 
 /** Subpixel layout lands a box 0.01–0.02px off when its origin moves by a fraction; 1px is far above this. */
 export const BOX_TOLERANCE = 0.05;
@@ -20,10 +20,14 @@ export const BOX_TOLERANCE = 0.05;
 export const CHANNEL_TOLERANCE = 3;
 
 export type SceneReport = { scene: string; differences: string[]; pixels: string[] };
-export type Report = { scenes: SceneReport[]; added: string[]; removed: string[]; elements: number; images: number };
+/** `compared` is how many scenes both sides have; `scenes` lists those that differ. */
+export type Report = { compared: number; scenes: SceneReport[]; added: string[]; removed: string[]; elements: number; images: number };
 
-const readScenes = (dir: string): string[] => (existsSync(join(dir, "scenes.json")) ? JSON.parse(readFileSync(join(dir, "scenes.json"), "utf8")) : []);
-const readScene = (dir: string, scene: string): Recording => JSON.parse(readFileSync(join(dir, `${slug(scene)}.json`), "utf8"));
+/** The verdict: the scenes that differ, and those the head no longer has. */
+export const failures = (report: Report) => report.scenes.length + report.removed.length;
+
+const readScenes = (dir: string): string[] => (existsSync(manifestFile(dir)) ? JSON.parse(readFileSync(manifestFile(dir), "utf8")) : []);
+const readScene = (dir: string, scene: string): Recording => JSON.parse(readFileSync(sceneFile(dir, scene), "utf8"));
 
 function diffValues(label: string, names: string[], a: string[] | undefined, b: string[] | undefined, out: string[]): void {
   if (!a && !b) return;
@@ -121,7 +125,9 @@ export async function compare(baseDir: string, headDir: string, diffDir: string,
   const wanted = (scene: string) => !only || scene.startsWith(only);
   const baseScenes = readScenes(baseDir).filter(wanted);
   const headScenes = readScenes(headDir).filter(wanted);
+  const both = baseScenes.filter((s) => headScenes.includes(s));
   const report: Report = {
+    compared: both.length,
     scenes: [],
     added: headScenes.filter((s) => !baseScenes.includes(s)),
     removed: baseScenes.filter((s) => !headScenes.includes(s)),
@@ -131,7 +137,7 @@ export async function compare(baseDir: string, headDir: string, diffDir: string,
   const browser = await chromium.launch();
   const page = await browser.newPage();
   try {
-    for (const scene of baseScenes.filter((s) => headScenes.includes(s))) {
+    for (const scene of both) {
       const base = readScene(baseDir, scene);
       const head = readScene(headDir, scene);
       const differences: string[] = [];
@@ -144,15 +150,14 @@ export async function compare(baseDir: string, headDir: string, diffDir: string,
           continue;
         }
         report.elements += diffRoot(name, a, b, base, head, differences);
-        const file = `${slug(scene)}~${slug(name)}.png`;
-        const pa = readFileSync(join(baseDir, file));
-        const pb = readFileSync(join(headDir, file));
+        const pa = readFileSync(shotFile(baseDir, scene, name));
+        const pb = readFileSync(shotFile(headDir, scene, name));
         report.images++;
         if (pa.equals(pb)) continue;
         const result = await pixels(page, pa, pb);
         if (result.differing === -1) shots.push(`${name}: the screenshot's size changed, ${result.size}`);
         else if (result.differing > 0) {
-          const out = join(diffDir, file);
+          const out = join(diffDir, shotName(scene, name));
           writeFileSync(out, Buffer.from(result.diff!, "base64"));
           shots.push(`${name}: ${result.differing} of ${result.total} pixels differ (${out})`);
         }
@@ -168,9 +173,9 @@ export async function compare(baseDir: string, headDir: string, diffDir: string,
 /** The report as Markdown: every difference, scene by scene. */
 export function markdown(report: Report, title: string): string {
   const lines = [`# ${title}`, ""];
-  const failed = report.scenes.length + report.removed.length;
+  const failed = failures(report);
   lines.push(failed ? `**${failed} scene(s) differ.**` : "**No difference.**", "");
-  lines.push(`Compared ${report.elements} elements and ${report.images} screenshots.`, "");
+  lines.push(`Compared ${report.compared} scenes: ${report.elements} elements and ${report.images} screenshots.`, "");
   if (report.removed.length) lines.push("## Scenes only in the base", "", ...report.removed.map((s) => `- ${s}`), "");
   if (report.added.length) lines.push("## Scenes only in the head (new, not compared)", "", ...report.added.map((s) => `- ${s}`), "");
   for (const s of report.scenes) {

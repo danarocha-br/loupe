@@ -9,7 +9,7 @@
     "build": "pnpm -r --filter '!@loupe/ui' build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "visual": "node fixture/visual/src/cli.ts",
-    "visual:update": "node fixture/visual/src/cli.ts --update"
+    "visual": "node --experimental-strip-types --disable-warning=ExperimentalWarning fixture/visual/src/cli.ts",
+    "visual:update": "pnpm visual --update"
   }
 }

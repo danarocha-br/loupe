@@ -64,7 +64,8 @@ export function snapshot(): Snapshot {
     "fill", "stroke", "stroke-width", "list-style-type", "forced-color-adjust",
   ];
   const PSEUDO = ["content", "display", "position", "top", "left", "width", "height", "color", "background-color", "border-top-width", "border-top-color", "border-top-left-radius", "box-shadow", "transform", "opacity"];
-  // References to ids: generated ids are not layout, and a counter shifts them for no reason.
+  // References to ids. A generated id shifts with a counter for no reason, so each is recorded
+  // as the snapshot key of the element it names (or `missing`, or `outside:<tag>`).
   const ID_REFS = new Set(["aria-labelledby", "aria-describedby", "aria-controls", "aria-owns", "aria-activedescendant", "aria-details", "aria-errormessage", "aria-flowto"]);
   const READER = ["tabindex", "disabled", "hidden", "inert", "title", "alt", "placeholder", "type", "lang", "dir"];
   const SECTIONS = new Set(["SECTION", "ARTICLE", "FIGURE", "FIELDSET"]);
@@ -95,11 +96,20 @@ export function snapshot(): Snapshot {
     for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE) text += node.textContent;
     return text.trim();
   };
+  /** Each element's key, for the id references, which are resolved once every root is walked. */
+  const keys = new Map<Element, string>();
   const aria = (el: Element) => {
     const out: string[] = [];
     for (const attr of [...el.attributes].sort((a, b) => a.name.localeCompare(b.name))) {
       const name = attr.name;
-      if (name === "role" || (name.startsWith("aria-") && !ID_REFS.has(name)) || READER.includes(name)) out.push(`${name}=${attr.value}`);
+      if (ID_REFS.has(name)) {
+        const scope = el.getRootNode() as Document | ShadowRoot;
+        const targets = attr.value.trim().split(/\s+/).filter(Boolean).map((id) => {
+          const target = scope.getElementById(id) ?? document.getElementById(id);
+          return target ? (keys.get(target) ?? `outside:${target.tagName.toLowerCase()}`) : "missing";
+        });
+        out.push(`${name}=${targets.join(",")}`);
+      } else if (name === "role" || name.startsWith("aria-") || READER.includes(name)) out.push(`${name}=${attr.value}`);
     }
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) out.push(`value=${el.value}`);
     if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) out.push(`checked=${el.checked}`);
@@ -107,6 +117,7 @@ export function snapshot(): Snapshot {
   };
 
   const result: Snapshot = { props: PROPS, pseudo: PSEUDO, roots: {} };
+  const pending: [Entry, Element][] = [];
   for (const [name, root, host, index] of roots) {
     const hostRect = host?.getBoundingClientRect();
     const entries: Record<string, Entry> = {};
@@ -129,14 +140,18 @@ export function snapshot(): Snapshot {
         }
         const text = ownText(el);
         if (text) entry.text = text.slice(0, 120);
-        const a = aria(el);
-        if (a) entry.aria = a;
+        keys.set(el, key);
+        pending.push([entry, el]);
         entries[key] = entry;
         walk(el, key, section ? [rect.x, rect.y] : origin);
       }
     };
     walk(root, name, hostRect ? [hostRect.x, hostRect.y] : [0, 0]);
     result.roots[name] = { host: hostRect ? [round(hostRect.width), round(hostRect.height)] : [innerWidth, innerHeight], index, entries };
+  }
+  for (const [entry, el] of pending) {
+    const a = aria(el);
+    if (a) entry.aria = a;
   }
   return result;
 }

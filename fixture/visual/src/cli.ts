@@ -21,8 +21,9 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { compare, markdown } from "./compare.ts";
+import { compare, failures, markdown } from "./compare.ts";
 import { record } from "./record.ts";
+import { assertFixtureFree, stopAll } from "./servers.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "../../..");
@@ -31,7 +32,7 @@ const BASE_TREE = join(WORK, "base");
 
 const { values } = parseArgs({
   options: {
-    base: { type: "string", default: "main" },
+    base: { type: "string" },
     only: { type: "string" },
     update: { type: "boolean", default: false },
   },
@@ -51,15 +52,25 @@ const step = (text: string) => process.stdout.write(`\n▸ ${text}\n`);
 /** What makes a recording: the recorder's source and Playwright's version. A change to either records the base again; the diff and this file don't. */
 function recorderHash(): string {
   const hash = createHash("sha256");
-  for (const file of ["record.ts", "servers.ts", "snapshot.ts"]) hash.update(file).update(readFileSync(join(HERE, file)));
+  for (const file of ["files.ts", "record.ts", "servers.ts", "snapshot.ts"]) hash.update(file).update(readFileSync(join(HERE, file)));
   hash.update(readFileSync(join(HERE, "../package.json")));
   return hash.digest("hex").slice(0, 8);
+}
+
+/** `main`, or `origin/main` in a checkout that has no local `main`; a `--base` is taken as given. */
+function baseRef(): string {
+  if (values.base) return values.base;
+  const has = (ref: string) => spawnSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { cwd: REPO }).status === 0;
+  if (has("main")) return "main";
+  if (has("origin/main")) return "origin/main";
+  throw new Error("no main or origin/main to compare against: pass --base <ref>");
 }
 
 /** `.visual/base` at `sha`, installed and with Loupe built. */
 function prepareBase(sha: string): void {
   const registered = git(["worktree", "list", "--porcelain"]).split("\n").some((line) => line === `worktree ${BASE_TREE}`);
-  if (!registered) {
+  // A `.visual` deleted by hand leaves git's registration of the worktree behind: prune it and start again.
+  if (!registered || !existsSync(join(BASE_TREE, ".git"))) {
     git(["worktree", "prune"]);
     rmSync(BASE_TREE, { recursive: true, force: true });
     mkdirSync(WORK, { recursive: true });
@@ -76,7 +87,10 @@ function prepareBase(sha: string): void {
 
 async function main(): Promise<number> {
   const only = values.only;
-  const ref = values.base!;
+  const ref = baseRef();
+  // Before anything is built: a build of Loupe under a running `next dev` breaks it.
+  assertFixtureFree(REPO);
+  if (existsSync(BASE_TREE)) assertFixtureFree(BASE_TREE);
   const sha = git(["merge-base", "HEAD", ref]);
   const short = sha.slice(0, 12);
   const key = `${short}-${recorderHash()}`;
@@ -94,7 +108,7 @@ async function main(): Promise<number> {
     step(`Recording the base into ${baseDir.slice(REPO.length + 1)}`);
     rmSync(baseDir, { recursive: true, force: true });
     await record(BASE_TREE, baseDir, only);
-    if (!only) writeFileSync(join(baseDir, "complete"), new Date().toISOString());
+    if (!only) writeFileSync(join(baseDir, "complete"), "");
   }
 
   step("Head: building Loupe from the working tree");
@@ -114,9 +128,12 @@ async function main(): Promise<number> {
   const text = markdown(report, title);
   writeFileSync(join(WORK, "report.md"), text);
 
-  const failed = report.scenes.length + report.removed.length;
+  if (report.compared === 0 && report.removed.length === 0) {
+    throw new Error(only ? `--only ${only} selects no scene that both sides have: nothing was compared` : "nothing was compared: neither side recorded a scene");
+  }
+  const failed = failures(report);
   if (!failed) {
-    process.stdout.write(`\n✓ No difference: ${report.elements} elements and ${report.images} screenshots, identical to ${short}.\n`);
+    process.stdout.write(`\n✓ No difference: ${report.compared} scenes, ${report.elements} elements and ${report.images} screenshots, identical to ${short}.\n`);
     if (report.added.length) process.stdout.write(`  New scenes, not compared: ${report.added.join(", ")}\n`);
     return 0;
   }
@@ -131,6 +148,15 @@ async function main(): Promise<number> {
   return 1;
 }
 
+// The servers run in process groups of their own, so Ctrl+C reaches only this process: stop them on the way out.
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    process.stderr.write(`\n✗ ${signal}: stopping the servers\n`);
+    void stopAll().finally(() => process.exit(2));
+  });
+}
+
+// 0: no difference. 1: a difference, the report says which. 2: the check couldn't run.
 main().then(
   (code) => process.exit(code),
   (error: unknown) => {

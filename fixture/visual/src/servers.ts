@@ -1,107 +1,146 @@
-// The two servers a tree is recorded from: `@loupe/ui`'s workbench (Vite) and the fixture
-// (`next dev`, the only phase the Toolbar runs in). Each run starts its own, on its own
-// ports, and stops them, so the check never measures a server some other checkout started.
+// The two servers a tree is recorded from: `@loupe/ui`'s workbench (its own `dev` script)
+// and the fixture (`next dev`, the only phase the Toolbar runs in). Each run starts its own,
+// on ports it first checks are free, and stops them, so the check never measures a server
+// some other checkout started.
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 
-export const PORTS = { ui: 3300, fixture: 3310 };
+const UI_PORT = 3300;
+const FIXTURE_PORT = 3310;
+const HOST = "127.0.0.1";
 
 export type Server = { url: string; stop: () => Promise<void> };
+
+/** Every server still running, so an interrupted run (Ctrl+C) can stop them: see `stopAll`. */
+const running = new Set<Server>();
+
+export async function stopAll(): Promise<void> {
+  await Promise.all([...running].map((server) => server.stop()));
+}
+
+const exited = (child: ChildProcess) => child.exitCode !== null || child.signalCode !== null;
 
 /** Stops a server and everything it forked: it is started in a process group of its own. */
 function stopper(child: ChildProcess): () => Promise<void> {
   return () =>
     new Promise((resolve) => {
-      if (child.exitCode !== null || child.pid === undefined) return resolve();
-      child.once("exit", () => resolve());
-      try {
-        process.kill(-child.pid, "SIGTERM");
-      } catch {
-        child.kill("SIGTERM");
-      }
-      setTimeout(() => {
+      if (exited(child) || child.pid === undefined) return resolve();
+      const pid = child.pid;
+      const kill = (signal: NodeJS.Signals) => {
         try {
-          process.kill(-child.pid!, "SIGKILL");
+          process.kill(-pid, signal);
         } catch {
-          // Gone already.
+          // Gone already, or no group: the child alone.
+          try {
+            child.kill(signal);
+          } catch {
+            // Gone.
+          }
         }
-      }, 5000).unref();
+      };
+      const force = setTimeout(() => kill("SIGKILL"), 5000);
+      child.once("exit", () => {
+        clearTimeout(force);
+        resolve();
+      });
+      kill("SIGTERM");
     });
 }
 
+/** Whether nothing listens on the port yet: a server already there would answer for ours. */
+function free(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = createServer();
+    probe.once("error", () => resolve(false));
+    probe.once("listening", () => probe.close(() => resolve(true)));
+    probe.listen(port, HOST);
+  });
+}
+
+/** Waits for a 2xx from `url`, each request bounded by what is left of the deadline. */
 async function waitFor(url: string, child: ChildProcess, log: () => string, timeoutMs: number): Promise<void> {
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
-    if (child.exitCode !== null) throw new Error(`the server for ${url} exited (${child.exitCode}):\n${log()}`);
+    if (exited(child)) throw new Error(`the server for ${url} exited (${child.exitCode ?? child.signalCode}):\n${log()}`);
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(Math.max(1000, end - Date.now())) });
       if (response.ok) return;
     } catch {
-      // Not listening yet.
+      // Not listening yet, or not answering in time.
     }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`no answer from ${url} in ${timeoutMs / 1000}s:\n${log()}`);
 }
 
-function start(command: string, args: string[], cwd: string, url: string, timeoutMs: number, env: NodeJS.ProcessEnv = {}): Promise<Server> {
-  const child = spawn(command, args, { cwd, detached: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...env } });
+async function start(command: string, args: string[], cwd: string, port: number, paths: string[], timeoutMs: number): Promise<Server> {
+  if (!(await free(port))) throw new Error(`port ${port} is taken. The visual check serves each tree on ${UI_PORT} and ${FIXTURE_PORT}: stop whatever listens there (another run of the check?).`);
+  const child = spawn(command, args, { cwd, detached: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" } });
   let output = "";
   const keep = (chunk: Buffer) => {
     output = (output + chunk.toString()).slice(-8000);
   };
   child.stdout?.on("data", keep);
   child.stderr?.on("data", keep);
-  const stop = stopper(child);
-  return waitFor(url, child, () => output, timeoutMs).then(
-    () => ({ url, stop }),
-    async (error: unknown) => {
-      await stop();
-      throw error;
-    },
-  );
+  const url = `http://${HOST}:${port}/`;
+  const server: Server = { url, stop: stopper(child) };
+  running.add(server);
+  const stop = server.stop;
+  server.stop = async () => {
+    running.delete(server);
+    await stop();
+  };
+  try {
+    // The first path is the server's root; the others are compiled before a browser waits on them.
+    for (const path of paths) await waitFor(`${url}${path}`, child, () => output, timeoutMs);
+  } catch (error) {
+    await server.stop();
+    throw error;
+  }
+  return server;
 }
 
-/** The ui workbench of `root`, or null where the tree has none yet (before ADR 0011). */
+/** Whether `root` has a ui workbench to serve: its `dev` script (ADR 0011, #88). */
 export function hasUiWorkbench(root: string): boolean {
-  return existsSync(join(root, "packages/ui/workbench/vite.config.ts"));
+  const manifest = join(root, "packages/ui/package.json");
+  return existsSync(manifest) && Boolean(JSON.parse(readFileSync(manifest, "utf8")).scripts?.dev);
 }
 
-export function startUi(root: string, port = PORTS.ui): Promise<Server> {
-  const cwd = join(root, "packages/ui");
-  return start(join(cwd, "node_modules/.bin/vite"), ["--config", "workbench/vite.config.ts", "--port", String(port), "--strictPort", "--host", "127.0.0.1"], cwd, `http://127.0.0.1:${port}/`, 60_000);
+/** `@loupe/ui`'s workbench, through the package's own `dev` script, on the check's port. */
+export function startUi(root: string): Promise<Server> {
+  return start("pnpm", ["run", "dev", "--port", String(UI_PORT), "--strictPort", "--host", HOST], join(root, "packages/ui"), UI_PORT, [""], 60_000);
 }
 
 /**
- * `next dev` on the fixture. Next 16 locks a project's dev server (`.next/dev/lock`), and a
- * build of Loupe under a running one breaks it, so a server already running there is an
- * error to stop, not one to share.
+ * Throws when a `next dev` holds the fixture of `root`. Next 16 locks a project's dev server
+ * (`.next/dev/lock`), and a build of Loupe under a running one breaks it, so the check asks
+ * for it to be stopped before it builds anything.
  */
-export async function startFixture(root: string, port = PORTS.fixture): Promise<Server> {
-  const cwd = join(root, "fixture/app");
-  const lock = join(cwd, ".next/dev/lock");
-  if (existsSync(lock)) {
-    let info: { pid?: number; appUrl?: string } = {};
-    try {
-      info = JSON.parse(readFileSync(lock, "utf8"));
-    } catch {
-      // An empty or old lock: Next takes it over if nothing holds it.
-    }
-    let alive = false;
-    if (info.pid) {
-      try {
-        process.kill(info.pid, 0);
-        alive = true;
-      } catch {
-        // Not running: a stale lock.
-      }
-    }
-    if (alive) throw new Error(`a next dev server is running on the fixture in ${root} (pid ${info.pid}, ${info.appUrl ?? "port unknown"}). Stop it first: the check builds Loupe and starts its own.`);
+export function assertFixtureFree(root: string): void {
+  const lock = join(root, "fixture/app/.next/dev/lock");
+  if (!existsSync(lock)) return;
+  let info: { pid?: number; appUrl?: string } = {};
+  try {
+    info = JSON.parse(readFileSync(lock, "utf8"));
+  } catch {
+    // An empty or old lock: Next takes it over if nothing holds it.
   }
-  const server = await start(join(cwd, "node_modules/.bin/next"), ["dev", "--port", String(port), "--hostname", "127.0.0.1"], cwd, `http://127.0.0.1:${port}/`, 180_000, { NEXT_TELEMETRY_DISABLED: "1" });
-  // The first request compiled `/`; compile `/workbench` too before a browser waits on it.
-  await waitFor(`${server.url}workbench`, { exitCode: null } as ChildProcess, () => "", 180_000);
-  return server;
+  if (!info.pid) return;
+  try {
+    process.kill(info.pid, 0);
+  } catch {
+    return; // Not running: a stale lock.
+  }
+  throw new Error(`a next dev server is running on the fixture in ${root} (pid ${info.pid}, ${info.appUrl ?? "port unknown"}). Stop it first: the check builds Loupe and starts its own.`);
+}
+
+/** `next dev` on the fixture; `/workbench` is compiled up front only when its scenes are wanted. */
+export function startFixture(root: string, workbench: boolean): Promise<Server> {
+  assertFixtureFree(root);
+  const cwd = join(root, "fixture/app");
+  const args = ["dev", "--port", String(FIXTURE_PORT), "--hostname", HOST];
+  return start(join(cwd, "node_modules/.bin/next"), args, cwd, FIXTURE_PORT, workbench ? ["", "workbench"] : [""], 180_000);
 }
