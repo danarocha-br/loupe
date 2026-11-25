@@ -8,6 +8,8 @@
   "scripts": {
     "build": "pnpm -r --filter '!@loupe/ui' build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "visual": "node fixture/visual/src/cli.ts",
+    "visual:update": "node fixture/visual/src/cli.ts --update"
   }
 }

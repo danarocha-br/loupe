@@ -10,6 +10,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A pull request draws as its base on main does: every @loupe/ui workbench page and the
+  # Toolbar's states, recorded on both on this runner and diffed (`pnpm visual`, AGENTS.md).
+  # A change that is meant fails here until the PR carries the `visual-change` label.
+  visual:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The base is `git merge-base HEAD origin/main`.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @fixture/visual exec playwright install --with-deps --only-shell chromium
+      - name: Visual check
+        id: visual
+        run: pnpm visual --base origin/main
+        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'visual-change') }}
+      - name: Report
+        if: always()
+        # A job summary holds 1MiB; the artifact has the whole report.
+        run: test -f .visual/report.md && head -c 900000 .visual/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: visual-report
+          path: |
+            .visual/report.md
+            .visual/diff/
+          if-no-files-found: ignore
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
