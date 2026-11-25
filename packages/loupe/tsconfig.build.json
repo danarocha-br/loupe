@@ -4,12 +4,18 @@
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
-    // @loupe/ui's own build has written these; Vite copies them into dist/ui (ADR 0010).
+    // @loupe/ui's and @loupe/patterns' own builds have written these; Vite copies them into
+    // dist/ui and dist/patterns (ADR 0010, 0012).
     "paths": {
       "@loupe/ui": ["../ui/dist/index.d.ts"],
       "@loupe/ui/announcer": ["../ui/dist/announcer/announcer.d.ts"],
       "@loupe/ui/surface": ["../ui/dist/surface/index.d.ts"],
-      "@loupe/ui/tokens": ["../ui/dist/tokens.d.ts"]
+      "@loupe/ui/tokens": ["../ui/dist/tokens.d.ts"],
+      "@loupe/patterns": ["../patterns/dist/index.d.ts"],
+      "@loupe/patterns/launcher": ["../patterns/dist/launcher/launcher.d.ts"],
+      "@loupe/patterns/stylesheet": ["../patterns/dist/stylesheet.d.ts"],
+      "@loupe/patterns/tokens": ["../patterns/dist/tokens.d.ts"],
+      "@loupe/patterns/samples": ["../patterns/dist/samples.d.ts"]
     }
   },
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.fixture.ts", "src/**/*.fixture.tsx"]

@@ -10,9 +10,9 @@ import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
 import type { InstanceRow } from "../../runtime/debug.js";
 import type { ListBody, StateItem } from "./types.js";
-import type { CallSiteItem, ChangeItem, GroupItem, InstanceItem, Tag } from "../patterns/view.js";
+import type { CallSiteItem, ChangeItem, GroupItem, InstanceItem, Tag } from "@loupe/patterns";
 import { componentVerdict } from "./verdict.js";
-import { MAP_HUES } from "../patterns/tokens.js";
+import { MAP_HUES } from "@loupe/patterns/tokens";
 import {
   blockLead,
   heldValues,

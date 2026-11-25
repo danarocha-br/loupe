@@ -14,7 +14,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import { useEscape } from "./escape.js";
 import { type CopyDetails, CopyFailed, copyForm, copyProposal, formDetails, suggestTitle } from "./copy.js";
 import { COPY_WORDS } from "./panel-view/index.js";
-import { CopySplit, CopyToast, DetailsForm, NotCopied } from "./patterns/index.js";
+import { CopySplit, CopyToast, DetailsForm, NotCopied } from "@loupe/patterns";
 import { focusField, Popover, PopoverPanel, useAnnounce } from "@loupe/ui";
 
 /** How long the button says Copied, and the toast stays. */

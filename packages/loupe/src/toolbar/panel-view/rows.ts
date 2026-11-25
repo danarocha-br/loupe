@@ -10,7 +10,7 @@ import type { Scope, Source } from "../../runtime/store.js";
 import { appValue, formatCurrent } from "../format.js";
 import type { Reads } from "./reads.js";
 import { type Counted, isSuspended, keepingOwn, type ScopeLabels, type ScopeView, valueCounts } from "./scopes.js";
-import type { Control, PropGlyph, PropItem, Write } from "../patterns/view.js";
+import type { Control, PropGlyph, PropItem, Write } from "@loupe/patterns";
 import { countsText, EXPLAIN, heldNotice, keepingText, NOT_SET, REASON_TITLES, RESET, RESET_TO, sameOnAll, sourceText, THE_APP, THIS_CALL_SITE, valueText } from "./words.js";
 
 /** A mounted, browser-rendered, adapted Instance while Overrides are on: what its rows can edit. */

@@ -1,0 +1,47 @@
+{
+  "name": "@loupe/patterns",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Loupe's patterns: the Toolbar's product layer, primitives of @loupe/ui composed and drawn from their own view contract. Bundled into @danarocha/loupe's dist, never published (ADR 0012).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./launcher": "./src/launcher/launcher.tsx",
+    "./stylesheet": "./src/stylesheet.ts",
+    "./tokens": "./src/tokens.ts",
+    "./samples": "./src/samples.ts",
+    "./testing": "./src/testing.fixture.tsx",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "dev": "vite --config workbench/vite.config.ts",
+    "build": "pnpm --dir ../ui build && rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
+    "test": "vitest run --exclude src/build.test.ts",
+    "typecheck": "tsc6 --noEmit"
+  },
+  "dependencies": {
+    "@loupe/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.13",
+    "@rolldown/plugin-babel": "0.3.1",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "^22.19.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "axe-core": "4.14.1",
+    "babel-plugin-react-compiler": "1.0.0",
+    "jsdom": "26.1.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vite": "8.3.8",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  }
+}

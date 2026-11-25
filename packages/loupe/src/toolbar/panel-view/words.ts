@@ -9,7 +9,7 @@ import type { LastSeen } from "../../runtime/registry.js";
 import type { Props, Scope, ScopeTarget, Status, Suspension } from "../../runtime/store.js";
 import { formatCurrent, formatDefault, plural } from "../format.js";
 import type { StripState } from "./types.js";
-import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, StripPart, Tag, ValueText } from "../patterns/view.js";
+import type { CommandWords, CopyWords, FooterWords, HeaderWords, InspectOnlyReason, InspectorWords, ListWords, StatusTag, StripPart, Tag, ValueText } from "@loupe/patterns";
 
 export const NOT_SET = "not set";
 export const THIS_INSTANCE = "This instance";

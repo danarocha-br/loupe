@@ -7,7 +7,7 @@
 // Pure geometry, so it can be tested without a layout: a place is kept in fractions
 // of the viewport, so it holds across a resize, and laid out in px for the viewport there is.
 
-import { PILL, PILL_SIDES, type PillSide } from "./patterns/launcher/launcher.js";
+import { PILL, PILL_SIDES, type PillSide } from "@loupe/patterns/launcher";
 
 export type Edge = PillSide;
 

@@ -6,9 +6,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "jsx": "react-jsx",
-    // @loupe/ui is private and bundled into dist/ui, so package.json never names it (ADR 0010):
-    // its entries are reached by path. Its source here; its built .d.ts in tsconfig.build.json.
-    // `src/toolbar/layers.test.ts` holds both lists to its package.json's exports.
+    // @loupe/ui and @loupe/patterns are private and bundled into dist/ui and dist/patterns, so
+    // package.json never names them (ADR 0010, 0012): their entries are reached by path. Their
+    // source here; their built .d.ts in tsconfig.build.json. `src/toolbar/layers.test.ts` holds
+    // these lists to each package.json's exports.
     "paths": {
       "@loupe/ui": ["../ui/src/index.ts"],
       "@loupe/ui/announcer": ["../ui/src/announcer/announcer.tsx"],
@@ -16,7 +17,13 @@
       "@loupe/ui/tokens": ["../ui/src/tokens.ts"],
       "@loupe/ui/testing": ["../ui/src/surface/render.fixture.tsx"],
       "@loupe/ui/listen": ["../ui/src/announcer/announcer.fixture.ts"],
-      "@loupe/ui/jsdom-gaps": ["../ui/src/surface/jsdom-gaps.fixture.ts"]
+      "@loupe/ui/jsdom-gaps": ["../ui/src/surface/jsdom-gaps.fixture.ts"],
+      "@loupe/patterns": ["../patterns/src/index.ts"],
+      "@loupe/patterns/launcher": ["../patterns/src/launcher/launcher.tsx"],
+      "@loupe/patterns/stylesheet": ["../patterns/src/stylesheet.ts"],
+      "@loupe/patterns/tokens": ["../patterns/src/tokens.ts"],
+      "@loupe/patterns/samples": ["../patterns/src/samples.ts"],
+      "@loupe/patterns/testing": ["../patterns/src/testing.fixture.tsx"]
     }
   },
   "include": ["src"]

@@ -25,7 +25,7 @@ import type {
   Tag,
   Verdict,
   Write,
-} from "../patterns/view.js";
+} from "@loupe/patterns";
 
 /** Components seen on a route so far, for "Appears on interaction". */
 export type SeenComponents = { readonly route: string; readonly components: ReadonlySet<string> };

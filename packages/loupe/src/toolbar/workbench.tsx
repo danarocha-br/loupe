@@ -8,7 +8,7 @@
 // `<LoupeMount />` loads the Toolbar; a host never imports it.
 
 import { type ReactNode, useEffect, useState } from "react";
-import type { SelectMode } from "./patterns/view.js";
+import type { SelectMode } from "@loupe/patterns";
 import {
   AppearsOnInteraction,
   ChangeList,
@@ -40,7 +40,7 @@ import {
   SiteCard,
   StartCard,
   StatusStrip,
-} from "./patterns/index.js";
+} from "@loupe/patterns";
 import {
   BUTTON_GROUP,
   CHANGE_OUTLINE,
@@ -84,8 +84,8 @@ import {
   TYPE_INSPECT_ONLY,
   UNDO_OFFER,
   WORDS,
-} from "./patterns/samples.js";
-import { LauncherPill } from "./patterns/launcher/launcher.js";
+} from "@loupe/patterns/samples";
+import { LauncherPill } from "@loupe/patterns/launcher";
 import { Surface, type Theme } from "./surface/index.js";
 import { Button, Card, CardHead } from "@loupe/ui";
 

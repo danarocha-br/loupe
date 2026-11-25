@@ -4,7 +4,7 @@
 // views pass, value for value, and each of its functions says the same for the same input.
 
 import { describe, expect, it } from "vitest";
-import { WORDS } from "../patterns/samples.js";
+import { WORDS } from "@loupe/patterns/testing";
 import { LAUNCHER_WORDS, OUTLINE_WORDS, SHEET_WORDS } from "./chrome.js";
 import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, LIST_WORDS } from "./words.js";
 
