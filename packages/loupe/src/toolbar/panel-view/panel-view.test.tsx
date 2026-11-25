@@ -840,7 +840,22 @@ describe("the chrome's words", () => {
 describe("structural sharing across calls", () => {
   /** A call given the last view, as the Toolbar makes it (`open.tsx`). */
   const after = (previous: PanelView, selected: string | null = null, scope: Scope = "instance") =>
-    panelView({ debug: loupe, layer: null, selected, scope, seen: previous.seen, previous });
+    panelView({ debug: loupe, layer: null, selected, scope, previous });
+
+  it("starts from nothing seen with no last view, then takes its memory from the last view alone", () => {
+    render();
+    const first = panelView({ debug: loupe, layer: null, selected: null, scope: "instance", previous: null });
+    expect(listOf(first).interaction).toEqual([]);
+    click("Menu");
+    const open = after(first);
+    click("Menu");
+    // Seen while the menu was open, carried over by `previous`: Appears on interaction.
+    const closed = after(open);
+    expect(listOf(closed).interaction).toEqual(["MenuItem"]);
+    // Another route starts its memory afresh.
+    history.replaceState(null, "", "/other");
+    expect(listOf(after(closed)).interaction).toEqual([]);
+  });
 
   it("hands back the last view itself when nothing it shows changed", () => {
     render();

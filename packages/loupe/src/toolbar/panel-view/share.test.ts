@@ -2,7 +2,7 @@
 // view's same part replaced by the last view's object.
 
 import { describe, expect, it } from "vitest";
-import { share } from "./share.js";
+import { sameMembers, share } from "./share.js";
 
 describe("share", () => {
   it("hands back the previous value when the two are deeply equal", () => {
@@ -59,9 +59,29 @@ describe("share", () => {
     expect(next.rows[0]?.v).toBe(2);
   });
 
+  it("keeps the sign of a zero inside an object or an array, and an unchanged NaN's container", () => {
+    const option = { value: 0, label: "0" };
+    const signed = share({ options: [option] }, { options: [{ value: -0, label: "0" }] });
+    expect(Object.is(signed.options[0]?.value, -0)).toBe(true);
+    expect(signed.options[0]).not.toBe(option);
+    expect(Object.is(share([0], [-0])[0], -0)).toBe(true);
+    const nan = { value: Number.NaN };
+    expect(share({ row: nan }, { row: { value: Number.NaN } }).row).toBe(nan);
+  });
+
   it("returns the next value as it is when there is no previous one", () => {
     const next = { a: [1] };
     expect(share(null, next)).toBe(next);
     expect(share(undefined, next)).toBe(next);
+  });
+});
+
+describe("sameMembers", () => {
+  it("is true for the same members in any order, and false for another member or another size", () => {
+    expect(sameMembers(new Set(["a", "b"]), new Set(["b", "a"]))).toBe(true);
+    expect(sameMembers(new Set(), new Set())).toBe(true);
+    expect(sameMembers(new Set(["a", "b"]), new Set(["a", "c"]))).toBe(false);
+    expect(sameMembers(new Set(["a"]), new Set(["a", "b"]))).toBe(false);
+    expect(sameMembers(new Set(["a", "b"]), new Set(["a"]))).toBe(false);
   });
 });

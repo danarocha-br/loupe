@@ -24,7 +24,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { pageWidth } from "./dock.js";
-import { type Member, OUTLINE_WORDS } from "./panel-view/index.js";
+import { type Member, OUTLINE_WORDS, sameMembers } from "./panel-view/index.js";
 import { inView, type PageSignal } from "./page-signal.js";
 import { type Hovered, NOT_PICKING, type PickPreview, pickPreview, type SelectMode, useHovered } from "./picker.js";
 import { ChangeOutline, type OutlineKind, PageOutline, PickTag } from "./patterns/index.js";
@@ -125,7 +125,7 @@ function useLanded(marks: readonly { id: string; stamp: string }[], selection: r
         next.add(id);
         soonest = Math.min(soonest, end);
       }
-      setLanded((previous) => (previous.size === next.size && [...next].every((id) => previous.has(id)) ? previous : next));
+      setLanded((previous) => (sameMembers(previous, next) ? previous : next));
       if (soonest !== Number.POSITIVE_INFINITY) timer = setTimeout(update, soonest - at);
     };
     update();

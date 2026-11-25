@@ -9,7 +9,7 @@ import { changeItems, listBody, stateItems } from "./list.js";
 import { readPage } from "./page.js";
 import { present, scopeView } from "./scopes.js";
 import { share } from "./share.js";
-import type { PanelInput, PanelView } from "./types.js";
+import type { PanelInput, PanelView, SeenComponents } from "./types.js";
 import { layerNotice, noticesSaid, overridesOffNotice } from "./notices.js";
 import { changesWord, footerCount, headerView, heldChip } from "./words.js";
 
@@ -17,6 +17,7 @@ export type * from "./types.js";
 export { LAUNCHER_WORDS, OUTLINE_WORDS, SHEET_WORDS } from "./chrome.js";
 export { flagsCard } from "./flags.js";
 export { isSwitch } from "./inspector.js";
+export { sameMembers } from "./share.js";
 export {
   COMMAND_WORDS,
   COPY_WORDS,
@@ -32,6 +33,9 @@ export {
   THIS_INSTANCE,
 } from "./words.js";
 
+/** Nothing seen yet: a first call with neither a last view nor a memory. */
+const NONE_SEEN: SeenComponents = { route: "", components: new Set() };
+
 /**
  * Reads the page through `input.debug`, each Instance at most once, and decides
  * what the panel shows. It writes nothing, and never throws because an Instance
@@ -46,7 +50,7 @@ export function panelView(input: PanelInput): PanelView {
 function decide(input: PanelInput): PanelView {
   const { selected } = input;
   const reads = createReads(input.debug);
-  const page = readPage(input.debug, input.seen, input.layer);
+  const page = readPage(input.debug, input.previous?.seen ?? input.seen ?? NONE_SEEN, input.layer);
   const row = selected === null ? null : (page.rows.find((candidate) => candidate.id === selected) ?? null);
   // The picked scope applies while the Instance has it: mounted, adapted, with a call
   // site for a group, and Overrides on. Otherwise This instance does.

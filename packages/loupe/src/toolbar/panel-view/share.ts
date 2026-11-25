@@ -17,8 +17,8 @@ const isPlain = (value: unknown): value is Record<string, unknown> => {
   return proto === Object.prototype || proto === null;
 };
 
-/** Two sets of the same primitives: the memory of the components seen, say. */
-function sameSet(a: ReadonlySet<unknown>, b: ReadonlySet<unknown>): boolean {
+/** Two sets with the same members, compared without making an array: the components seen, the outlines landed. */
+export function sameMembers(a: ReadonlySet<unknown>, b: ReadonlySet<unknown>): boolean {
   if (a.size !== b.size) return false;
   for (const member of b) if (!a.has(member)) return false;
   return true;
@@ -39,8 +39,8 @@ export function share<T>(previous: unknown, next: T): T {
     let reused = false;
     const out = next.map((item, index) => {
       const kept = index < previous.length ? share(previous[index], item) : item;
-      if (kept !== previous[index]) same = false;
-      if (kept !== item) reused = true;
+      if (!Object.is(kept, previous[index])) same = false;
+      if (!Object.is(kept, item)) reused = true;
       return kept;
     });
     return (same ? previous : reused ? out : next) as T;
@@ -54,13 +54,13 @@ export function share<T>(previous: unknown, next: T): T {
     for (const key of keys) {
       const had = Object.hasOwn(previous, key);
       const kept = had ? share(previous[key], next[key]) : next[key];
-      if (!had || kept !== previous[key]) same = false;
-      if (kept !== next[key]) reused = true;
+      if (!had || !Object.is(kept, previous[key])) same = false;
+      if (!Object.is(kept, next[key])) reused = true;
       out[key] = kept;
     }
     // Nothing of the last one kept inside it: `next` as it is.
     return (same ? previous : reused ? out : next) as T;
   }
-  if (next instanceof Set && previous instanceof Set && sameSet(previous, next)) return previous as T;
+  if (next instanceof Set && previous instanceof Set && sameMembers(previous, next)) return previous as T;
   return next;
 }

@@ -21,7 +21,7 @@ import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
 import { createPageSignal, PageSignalContext, usePageVersion } from "./page-signal.js";
 import { Panel } from "./panel.js";
-import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
+import { type PanelView, panelView } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startTrackers } from "./start.js";
 import { scopeOf, useToolbar, useToolbarStore } from "./toolbar-store.js";
@@ -39,8 +39,6 @@ export type ToolbarOpenProps = {
   onShown(): void;
 };
 
-const NONE_SEEN: SeenComponents = { route: "", components: new Set() };
-
 /**
  * What the panel shows, from `panelView()`. It takes what it returned last time and
  * returns the next: "Appears on interaction" remembers components across page versions,
@@ -55,8 +53,7 @@ function usePanelView(debug: LoupeDebug, layer: LayerStatus | null, selected: st
   const last = useRef<PanelView | null>(null);
   // `version` is the trigger: it moves whenever the registry or the page changes.
   const view = useMemo(() => {
-    const previous = last.current;
-    return panelView({ debug, layer, selected, scope, seen: previous?.seen ?? NONE_SEEN, previous });
+    return panelView({ debug, layer, selected, scope, previous: last.current });
   }, [debug, layer, selected, scope, version]);
   last.current = view;
   return view;
@@ -122,6 +119,7 @@ export function ToolbarOpen({ host, column, onHide, closing, theme, onTheme, onS
       <Panel
         debug={debug}
         view={view}
+        version={version}
         column={column}
         picking={picker.picking}
         onTool={tool}
