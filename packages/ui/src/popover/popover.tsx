@@ -68,9 +68,23 @@ export function Popover({ open, onOpenChange, inside, children }: PopoverProps) 
 /** What the box stands over, and that element's width, which the box takes less its insets. */
 type Over = { element: HTMLElement; width: number };
 
+/**
+ * The anchor's border-box width in its own CSS pixels, which is what the box's CSS width
+ * means. Its client rect is drawn at whatever zoom or transform is around it, and the box,
+ * inside the same, would be scaled twice. Fractional where the computed width is the laid-out
+ * one; `offsetWidth` where it isn't (`auto` on an inline element), as UI SDK checks its own.
+ */
+function layoutWidth(element: HTMLElement): number {
+  const style = getComputedStyle(element);
+  const px = (name: string) => parseFloat(style.getPropertyValue(name)) || 0;
+  const edges = style.boxSizing === "border-box" ? 0 : px("padding-left") + px("padding-right") + px("border-left-width") + px("border-right-width");
+  const width = parseFloat(style.width) + edges;
+  return Math.abs(width - element.offsetWidth) < 1 ? width : element.offsetWidth;
+}
+
 /** `element` as it measures now: `last` itself while that hasn't changed, so React skips the render. */
 function measure(last: Over | null, element: HTMLElement): Over {
-  const width = element.getBoundingClientRect().width;
+  const width = layoutWidth(element);
   return last?.element === element && last.width === width ? last : { element, width };
 }
 
@@ -81,21 +95,23 @@ export function PopoverPanel({ label, anchor, returnFocus, initialFocus, caret =
   // places it as it mounts, and again only on its next frame, which a throttled tab may not
   // run for a second. Mounted sooner, the box stood at the viewport's corner until then; sized
   // by UI SDK's `--anchor-width`, which comes after that first measure, it stood off-centre.
+  // Each open measures afresh: what was read last time is cleared as it closes, since the
+  // anchor may have changed width since then with nothing yet observed.
   const open = useContext(Open);
   const [over, setOver] = useState<Over | null>(null);
   useLayoutEffect(() => {
     const element = open ? anchor.current : null;
-    if (element) setOver((last) => measure(last, element));
-  }, [open, anchor]);
-  // The width follows the anchor from then on, closed or open, so the next open is placed at once too.
-  const element = over?.element;
-  useLayoutEffect(() => {
-    if (!element || typeof ResizeObserver === "undefined") return;
-    // Only the element it was set up for: an anchor the next open swapped in has its own.
+    if (!element) {
+      setOver(null);
+      return;
+    }
+    setOver((last) => measure(last, element));
+    // While it is open, the width follows the anchor.
+    if (typeof ResizeObserver === "undefined") return;
     const resize = new ResizeObserver(() => setOver((last) => (last?.element === element ? measure(last, element) : last)));
     resize.observe(element);
     return () => resize.disconnect();
-  }, [element]);
+  }, [open, anchor]);
   const box = useRef<HTMLDivElement>(null);
   if (!over) return null;
   return (

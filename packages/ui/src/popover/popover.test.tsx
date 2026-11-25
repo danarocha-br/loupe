@@ -193,13 +193,19 @@ describe("Popover", () => {
     // and Copy Proposal's details landed at x = 694 or x = 735 from run to run. A box
     // mounted before its anchor was known stood at the viewport's corner. So UI SDK
     // measures it as the open's click lands, and whatever its width reads, a token
-    // aside, is the anchor's width by then.
+    // aside, is the anchor's width by then: its layout width, which a zoom around them
+    // both would scale again, on every open, however it has changed since the last.
     const declarations = /\[data-popover\]\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? "";
     const width = /(?:^|[\s;])width:\s*([^;]+);/.exec(declarations)?.[1] ?? "";
     const variables = [...width.matchAll(/var\((--[\w-]+)\)/g)].map(([, name]) => name!).filter((name) => !STYLESHEET.includes(`${name}:`));
     expect(variables.length, width).toBeGreaterThan(0);
+    // jsdom lays nothing out: the footer Copy Proposal stands over, drawn at a zoom of 1.5.
+    let footerWidth = 332;
+    const ZOOM = 1.5;
+    let footer: HTMLElement | null = null;
     let measured: Record<string, string> | undefined;
     const offsetWidth = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockImplementation(function (this: HTMLElement) {
+      if (this === footer) return footerWidth;
       if (!measured && this.hasAttribute("data-popover")) {
         measured = Object.fromEntries(variables.map((name) => [name, this.style.getPropertyValue(name)]));
       }
@@ -207,19 +213,22 @@ describe("Popover", () => {
     });
     function Footer() {
       const [open, setOpen] = useState(false);
-      const footer = useRef<HTMLDivElement>(null);
+      const anchor = useRef<HTMLDivElement>(null);
       const toggle = useRef<HTMLButtonElement>(null);
-      // jsdom lays nothing out: the footer Copy Proposal stands over, 332px wide.
       useLayoutEffect(() => {
-        footer.current!.getBoundingClientRect = () => ({ x: 942, y: 684, left: 942, top: 684, right: 1274, bottom: 786, width: 332, height: 102, toJSON: () => ({}) });
+        footer = anchor.current!;
+        footer.getBoundingClientRect = () => {
+          const drawn = footerWidth * ZOOM;
+          return { x: 942, y: 684, left: 942, top: 684, right: 942 + drawn, bottom: 786, width: drawn, height: 102, toJSON: () => ({}) };
+        };
       }, []);
       return (
-        <div ref={footer}>
+        <div ref={anchor}>
           <button ref={toggle} type="button" onClick={() => setOpen(!open)}>
             Details
           </button>
           <Popover open={open} onOpenChange={setOpen} inside={toggle}>
-            <PopoverPanel label="Copy with details" anchor={footer} returnFocus={toggle} caret="end">
+            <PopoverPanel label="Copy with details" anchor={anchor} returnFocus={toggle} caret="end">
               <button type="button">First</button>
             </PopoverPanel>
           </Popover>
@@ -230,13 +239,15 @@ describe("Popover", () => {
       const user = setup();
       const screen = renderInSurface(<Footer />);
       const toggle = screen.getByRole("button", { name: "Details" });
-      // Twice: the first open reads the anchor as it opens; the next keeps what it read.
+      // Opened, then opened again after the footer widened while it was closed, with no
+      // ResizeObserver to say so (jsdom has none; a browser's may not have reported yet).
       // No waiting: measured on UI SDK's next frame would be too late.
-      for (const _ of [1, 2]) {
+      for (const next of [332, 372]) {
+        footerWidth = next;
         measured = undefined;
         await user.click(toggle);
         screen.getByRole("dialog", { name: "Copy with details" });
-        expect(measured).toEqual(Object.fromEntries(variables.map((name) => [name, "332px"])));
+        expect(measured).toEqual(Object.fromEntries(variables.map((name) => [name, `${next}px`])));
         await user.click(toggle);
         expect(screen.queryByRole("dialog")).toBeNull();
       }
