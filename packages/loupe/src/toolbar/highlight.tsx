@@ -27,7 +27,7 @@ import { pageWidth } from "./dock.js";
 import { type Member, OUTLINE_WORDS, sameMembers } from "./panel-view/index.js";
 import { inView, type PageSignal } from "./page-signal.js";
 import { type Hovered, NOT_PICKING, type PickPreview, pickPreview, type SelectMode, useHovered } from "./picker.js";
-import { ChangeOutline, type OutlineKind, PageOutline, PickTag } from "./patterns/index.js";
+import { ChangeOutline, type OutlineKind, PageOutline, PickTag } from "@loupe/patterns";
 import { HOST_ATTRIBUTE } from "./styles.js";
 import { useToolbar } from "./toolbar-store.js";
 

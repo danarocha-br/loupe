@@ -9,7 +9,7 @@ import { inScope, PRECEDENCE, reachOf, recordsFor, type Scope, type ScopeTarget,
 import { formatCurrent } from "../format.js";
 import type { AppValue, Reads } from "./reads.js";
 import type { Member, ScopeOption } from "./types.js";
-import type { MemberItem, MembersView, SiteItem } from "../patterns/view.js";
+import type { MemberItem, MembersView, SiteItem } from "@loupe/patterns";
 import {
   groupName,
   instancesText,

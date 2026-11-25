@@ -31,8 +31,8 @@ vi.mock("./panel.js", async (importOriginal) => {
   };
 });
 
-vi.mock("./patterns/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./patterns/index.js")>();
+vi.mock("@loupe/patterns", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@loupe/patterns")>();
   return {
     ...actual,
     GroupRow(props: Parameters<typeof actual.GroupRow>[0]) {

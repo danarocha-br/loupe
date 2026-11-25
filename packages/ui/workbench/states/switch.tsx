@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Switch } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Switch's states: off, on, and disabled. */
 export function SwitchStates() {

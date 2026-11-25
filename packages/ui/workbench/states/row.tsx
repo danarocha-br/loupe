@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Card, CardHead, PROP_ICONS, ResetIcon, Row, RowAction, RowLine, RowName, RowValue, Switch, Tag } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Row's four looks, each in the card it is made for, and its parts: a glyph, a code name, a mono name, a value, an action. */
 export function RowStates() {

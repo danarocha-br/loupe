@@ -7,7 +7,7 @@
 import { formatNotice, missingLayerAdvice } from "../../format-notice.js";
 import type { LayerStatus } from "../../layer-status.js";
 import { plural } from "../format.js";
-import type { NoticeView } from "../patterns/view.js";
+import type { NoticeView } from "@loupe/patterns";
 import { OVERRIDES_OFF_TITLE, overridesOffBanner } from "./words.js";
 
 const RUN_BELOW = "Run the command below from the repo root.";

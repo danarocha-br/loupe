@@ -3,7 +3,7 @@
 // the collapsed pill (index.tsx, launcher.tsx) takes its words without loading the rest
 // of panel-view or anything it reads.
 
-import type { LauncherWords, OutlineWords, SheetWords } from "../patterns/view.js";
+import type { LauncherWords, OutlineWords, SheetWords } from "@loupe/patterns";
 
 /** The collapsed pill's words (patterns/view.ts `LauncherWords`). */
 export const LAUNCHER_WORDS: LauncherWords = {

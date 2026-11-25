@@ -29,7 +29,7 @@ import {
   type Viewport,
 } from "./launcher-place.js";
 import { LAUNCHER_WORDS } from "./panel-view/chrome.js";
-import { LauncherPill } from "./patterns/launcher/launcher.js";
+import { LauncherPill } from "@loupe/patterns/launcher";
 import { SHORTCUT_ARIA, shortcutLabel } from "./shortcut.js";
 import { DURATION } from "@loupe/ui/tokens";
 

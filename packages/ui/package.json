@@ -13,6 +13,7 @@
     "./testing": "./src/surface/render.fixture.tsx",
     "./listen": "./src/announcer/announcer.fixture.ts",
     "./jsdom-gaps": "./src/surface/jsdom-gaps.fixture.ts",
+    "./workbench": "./workbench/shell/index.tsx",
     "./package.json": "./package.json"
   },
   "scripts": {

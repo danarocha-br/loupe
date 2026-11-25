@@ -12,11 +12,10 @@ import { resetLoupe } from "../runtime/slot.js";
 import Toolbar from "./index.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import { COMMAND_WORDS } from "./panel-view/index.js";
-import COMMAND_CSS from "./patterns/command/command.css?inline";
-import IDENTITY_CSS from "./patterns/identity/identity.css?inline";
 import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 import { type Heard, listen } from "@loupe/ui/listen";
+import { PATTERNS_CSS } from "@loupe/patterns";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -311,9 +310,9 @@ describe("components that are new since the last generate", () => {
     // The element whose own text is the command, its run of spaces kept as written.
     const shown = (where: string) =>
       within(shadow().querySelector(`[data-testid=${where}]`) as HTMLElement).queryByText(command, { normalizer: (text) => text })?.textContent;
-    // jsdom applies no shadow-root stylesheet, so this reads the rules apart: the command's (patterns/command/), and Identity's (patterns/identity/).
-    expect(COMMAND_CSS).toMatch(/\[data-command-text\] \{[^}]*white-space: pre-wrap/);
-    expect(IDENTITY_CSS).toMatch(/\[data-identity-command\] \{[^}]*white-space: pre-wrap/);
+    // jsdom applies no shadow-root stylesheet, so this reads the rules apart, in the patterns' CSS: the command's (command/), and Identity's (identity/).
+    expect(PATTERNS_CSS).toMatch(/\[data-command-text\] \{[^}]*white-space: pre-wrap/);
+    expect(PATTERNS_CSS).toMatch(/\[data-identity-command\] \{[^}]*white-space: pre-wrap/);
     server.status = { ...FRESH, command, notGenerated: ["NewCard"] };
     await mountWithNew();
     expect(shown("not-generated-notice")).toBe(command);

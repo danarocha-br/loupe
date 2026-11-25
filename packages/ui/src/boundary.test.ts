@@ -112,11 +112,15 @@ describe("the package boundary", () => {
     expect(offending).toEqual([]);
   });
 
-  it("is private, and its entries are files in src", () => {
+  it("is private, and its entries are files in src, but the workbench's shell, which nothing builds", () => {
     expect(manifest.private).toBe(true);
     for (const [entry, target] of Object.entries(manifest.exports as Record<string, string>)) {
       expect(existsSync(path.join(pkg, target)), entry).toBe(true);
-      if (entry !== "./package.json") expect(target, entry).toMatch(/^\.\/src\//);
+      if (entry === "./package.json") continue;
+      // `@loupe/ui/workbench` (ADR 0012): for the packages' workbenches alone. Outside `src`, so
+      // `entries()` never builds it and `dist` never holds it; Loupe's tsconfigs never map it.
+      if (entry === "./workbench") expect(target).toBe("./workbench/shell/index.tsx");
+      else expect(target, entry).toMatch(/^\.\/src\//);
     }
   });
 

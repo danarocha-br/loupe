@@ -4,9 +4,9 @@
 // views pass, value for value, and each of its functions says the same for the same input.
 
 import { describe, expect, it } from "vitest";
-import { WORDS } from "../patterns/samples.js";
+import { STATUSES, TAGS, WORDS } from "@loupe/patterns/testing";
 import { LAUNCHER_WORDS, OUTLINE_WORDS, SHEET_WORDS } from "./chrome.js";
-import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, LIST_WORDS } from "./words.js";
+import { COMMAND_WORDS, COPY_WORDS, FOOTER_WORDS, HEADER_WORDS, INSPECTOR_WORDS, inspectOnlyTag, LIST_WORDS, NOT_GENERATED, TAGS as PANEL_TAGS, SUPPORTED } from "./words.js";
 
 const REAL: Record<keyof typeof WORDS, unknown> = {
   inspector: INSPECTOR_WORDS,
@@ -69,6 +69,11 @@ describe("the patterns' sample words", () => {
     expect(() => said(words, "probe", {})).toThrow("no probe for probe.title");
     expect(() => said(words, "probe", { "probe.title": [] })).toThrow("no probe for probe.title");
     expect(said(words, "probe", { "probe.title": [["Loupe"]] })).toEqual({ title: ["Show Loupe"] });
+  });
+
+  it("spell out every tag panel-view writes, and each status verdict, as the Marks page draws them", () => {
+    expect(TAGS).toEqual(Object.values(PANEL_TAGS));
+    expect(STATUSES.slice(0, 3)).toEqual([SUPPORTED, inspectOnlyTag("no-adapter"), NOT_GENERATED]);
   });
 
   it("would catch a word that drifted", () => {

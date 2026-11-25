@@ -19,8 +19,8 @@ import { HOST_ATTRIBUTE } from "./styles.js";
 
 const renders = vi.hoisted(() => new Map<string, number>());
 
-vi.mock("./patterns/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./patterns/index.js")>();
+vi.mock("@loupe/patterns", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@loupe/patterns")>();
   return {
     ...actual,
     PropRow(props: Parameters<typeof actual.PropRow>[0]) {

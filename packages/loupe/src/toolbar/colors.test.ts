@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STYLESHEET } from "./surface/index.js";
 import { COLOR, SHADOW } from "@loupe/ui/tokens";
-import { PAGE } from "./patterns/tokens.js";
+import { PAGE } from "@loupe/patterns/tokens";
 
 const LIGHT = COLOR.light;
 const DARK = COLOR.dark;

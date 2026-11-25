@@ -9,7 +9,7 @@ import { copyToClipboard } from "./clipboard.js";
 import type { FlagOverrides } from "./flags-preview.js";
 import { flagsView, loadFlags, onFlagsChange, previewFlags } from "./flags-store.js";
 import { COMMAND_WORDS, flagsCard } from "./panel-view/index.js";
-import { FlagsCard as FlagsCardPattern } from "./patterns/index.js";
+import { FlagsCard as FlagsCardPattern } from "@loupe/patterns";
 import { useAnnounceChange } from "@loupe/ui";
 
 /** A flag's options are one radio group, one Tab stop: the radio that holds it. */

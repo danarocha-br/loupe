@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    // @loupe/ui's own build has written these (`build` runs it first): the .d.ts this package
+    // emits name `@loupe/ui` as written, and @danarocha/loupe's build points them into dist/ui.
+    // `src/boundary.test.ts` holds this list to @loupe/ui's shipped entries.
+    "paths": {
+      "@loupe/ui": ["../ui/dist/index.d.ts"],
+      "@loupe/ui/announcer": ["../ui/dist/announcer/announcer.d.ts"],
+      "@loupe/ui/surface": ["../ui/dist/surface/index.d.ts"],
+      "@loupe/ui/tokens": ["../ui/dist/tokens.d.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.fixture.ts", "src/**/*.fixture.tsx", "src/samples.ts"]
+}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, type Politeness, useAnnounce } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 // The notes under a control are for the eye: the control says its own state (checked,
 // pressed), and nothing in a frame is a live region of its own. What a screen reader is

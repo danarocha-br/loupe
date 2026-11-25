@@ -12,7 +12,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { type Browser, type BrowserContext, type BrowserContextOptions, chromium, type ElementHandle, type Locator, type Page } from "playwright";
 import { manifestFile, sceneFile, shotFile } from "./files.ts";
-import { hasUiWorkbench, type Server, startFixture, startUi } from "./servers.ts";
+import { hasWorkbench, type Server, startFixture, startWorkbench, type Workbench } from "./servers.ts";
 import { freeze, type Snapshot, snapshot } from "./snapshot.ts";
 
 export type Recording = Snapshot & { aria: Record<string, string> };
@@ -255,27 +255,19 @@ async function overlay(r: Recorder, url: string, theme: "light" | "dark"): Promi
   await context.close();
 }
 
-const PATTERN_VARIANTS = [
-  ["patterns", {}],
-  ["patterns@forced", { forcedColors: "active" }],
-] as const;
+/** What tells one package's workbench from another's: its nav's name, and the key the page keeps the reader's settings under. */
+const WORKBENCHES: Record<Workbench, { nav: string; storage: string; what: string }> = {
+  ui: { nav: "Primitives", storage: "loupe-ui-workbench", what: "primitive" },
+  patterns: { nav: "Patterns", storage: "loupe-patterns-workbench", what: "pattern" },
+};
 
-/** The fixture's `/workbench`: every pattern with sample data, in each of its frames. */
-async function patterns(r: Recorder, url: string): Promise<void> {
-  for (const [scene, options] of PATTERN_VARIANTS) {
-    if (!r.wanted(scene)) continue;
-    const context = await r.context(options);
-    const page = await context.newPage();
-    await page.goto(`${url}workbench`);
-    await page.locator("[data-loupe-surface]").first().waitFor();
-    await rest(page);
-    await r.capture(page, scene);
-    await context.close();
-  }
-}
-
-/** Each `@loupe/ui` primitive's page, `#<folder>`: at 16px, at 20px and under forced colours. */
-async function primitives(r: Recorder, url: string): Promise<void> {
+/**
+ * Each page of a package's workbench (`ui/<primitive>`, `patterns/<pattern>`), by its folder
+ * (`#<folder>`): at 16px, at 20px and under forced colours. Both are drawn by `@loupe/ui`'s
+ * workbench shell, so one recorder reads either.
+ */
+async function workbench(r: Recorder, url: string, name: Workbench): Promise<void> {
+  const { nav, storage, what } = WORKBENCHES[name];
   const variants = [
     ["", {}, "16"],
     ["@20px", {}, "20"],
@@ -283,17 +275,17 @@ async function primitives(r: Recorder, url: string): Promise<void> {
   ] as const;
   for (const [variant, options, size] of variants) {
     // The .md is off: the check is about the surfaces, and the page's layout then doesn't hang on the docs.
-    const context = await r.context(options, { "loupe-ui-workbench:doc": "false", "loupe-ui-workbench:text-size": size });
+    const context = await r.context(options, { [`${storage}:doc`]: "false", [`${storage}:text-size`]: size });
     const index = await context.newPage();
     await index.goto(url);
     // The nav is drawn by React after the page loads: wait for it, or no page would be found.
-    const links = index.locator('nav[aria-label="Primitives"] a');
+    const links = index.locator(`nav[aria-label="${nav}"] a`);
     await links.first().waitFor();
     const ids = await links.evaluateAll((all) => all.map((a) => (a.getAttribute("href") ?? "").slice(1)).filter((id) => id && id !== "all"));
-    if (ids.length === 0) throw new Error(`the ui workbench at ${url} lists no primitive`);
+    if (ids.length === 0) throw new Error(`the ${name} workbench at ${url} lists no ${what}`);
     await index.close();
     for (const id of ids) {
-      const scene = `ui/${id}${variant}`;
+      const scene = `${name}/${id}${variant}`;
       if (!r.wanted(scene)) continue;
       const page = await context.newPage();
       await page.goto(`${url}#${id}`);
@@ -313,19 +305,19 @@ export async function record(root: string, out: string, only?: string): Promise<
   const browser = await chromium.launch();
   try {
     const recorder = new Recorder(browser, out, only);
-    if (hasUiWorkbench(root) && recorder.wants("ui/")) {
-      const ui = await startUi(root);
-      servers.push(ui);
-      await primitives(recorder, ui.url);
+    for (const name of ["ui", "patterns"] as const) {
+      if (!hasWorkbench(root, name) || !recorder.wants(`${name}/`)) continue;
+      const server = await startWorkbench(root, name);
+      servers.push(server);
+      await workbench(recorder, server.url, name);
     }
-    if (["toolbar/", "overlay/", "patterns"].some((prefix) => recorder.wants(prefix))) {
-      const fixture = await startFixture(root, PATTERN_VARIANTS.some(([scene]) => recorder.wanted(scene)));
+    if (["toolbar/", "overlay/"].some((prefix) => recorder.wants(prefix))) {
+      const fixture = await startFixture(root);
       servers.push(fixture);
       await toolbarStates(recorder, fixture.url, "light");
       await toolbarStates(recorder, fixture.url, "dark");
       await overlay(recorder, fixture.url, "light");
       await overlay(recorder, fixture.url, "dark");
-      await patterns(recorder, fixture.url);
     }
     writeFileSync(manifestFile(out), JSON.stringify(recorder.scenes, null, 2));
   } finally {

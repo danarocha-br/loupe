@@ -1,18 +1,18 @@
 // The Toolbar's surface: Loupe's adapters over the design system's (`@loupe/ui/surface`,
-// ADR 0003, 0010). The shadow root, the layered stylesheet, the reader's text size, the
-// language and the boundary are the package's; what is the Toolbar's is here:
-// - `STYLESHEET`, the system's with the patterns' layer on top, and the Toolbar's own
-//   tokens (patterns/tokens.ts) on the host;
+// ADR 0003, 0010, 0012). The shadow root, the layered stylesheet, the reader's text size, the
+// language and the boundary are the package's; the stylesheet the Toolbar adopts is
+// `@loupe/patterns`'; what is the Toolbar's is here:
+// - `STYLESHEET`, `@loupe/patterns/stylesheet`'s: the system's with the patterns' layer on
+//   top, and the Toolbar's own tokens (`@loupe/patterns/tokens`) on the host;
 // - `useToolbarSurface()`, the Toolbar's: a host on the body, so the app's CSS can't reach it;
-// - `<Surface>`, a host in place under `STYLESHEET`, for a test or the workbench page to draw
-//   any primitive or pattern inside a real shadow root;
+// - `<Surface>`, a host in place under `STYLESHEET`, to draw any primitive or pattern inside a
+//   real shadow root as the Toolbar does (the packages' workbenches draw in `@loupe/ui`'s own);
 // - `useTheme()`, light or dark as the reader last chose it.
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { attachSurface, Surface as SystemSurface, type SurfaceProps, stylesheet, SWITCHING_ATTRIBUTE, type Theme, THEME_ATTRIBUTE } from "@loupe/ui/surface";
+import { attachSurface, Surface as SystemSurface, type SurfaceProps, SWITCHING_ATTRIBUTE, type Theme, THEME_ATTRIBUTE } from "@loupe/ui/surface";
+import { STYLESHEET } from "@loupe/patterns/stylesheet";
 import { HOST_ATTRIBUTE, THEME_KEY } from "../styles.js";
-import { PATTERNS_CSS } from "../patterns/styles.js";
-import { PATTERN_PROPERTIES } from "../patterns/tokens.js";
 
 export { SurfaceBoundary, type Theme } from "@loupe/ui/surface";
 
@@ -21,7 +21,7 @@ export { SurfaceBoundary, type Theme } from "@loupe/ui/surface";
  * ground, with the Toolbar's own tokens on the host after the system's, then the
  * primitives, then the patterns. No view writes a rule of its own.
  */
-export const STYLESHEET: string = stylesheet(PATTERNS_CSS, PATTERN_PROPERTIES);
+export { STYLESHEET };
 
 /** The Toolbar's adapter: a host element on the body with an open shadow root. */
 export function useToolbarSurface(): ShadowRoot | null {
@@ -39,7 +39,7 @@ export function useToolbarSurface(): ShadowRoot | null {
 
 /**
  * The in-place adapter: draws `children` inside a real shadow root, under `STYLESHEET`,
- * at a theme and, for the workbench, a text size of the reader's choosing.
+ * at a theme and a text size of the reader's choosing.
  */
 export function Surface(props: Omit<SurfaceProps, "stylesheet">) {
   return <SystemSurface {...props} stylesheet={STYLESHEET} />;

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 // The Toolbar's surface (surface/): the design system's stylesheet with the patterns' layer
-// on top (ADR 0010), the one every surface of the Toolbar adopts.
+// on top (ADR 0010), `@loupe/patterns/stylesheet`'s (ADR 0012), the one every surface of the Toolbar adopts.
 
 import { PRIMITIVES_CSS } from "@loupe/ui";
 import { ground, stylesheet } from "@loupe/ui/surface";
 import { afterEach, describe, expect, it } from "vitest";
-import { PATTERNS_CSS } from "../patterns/styles.js";
-import { PATTERN_PROPERTIES } from "../patterns/tokens.js";
+import { PATTERNS_CSS } from "@loupe/patterns";
+import { PATTERN_PROPERTIES } from "@loupe/patterns/tokens";
 import { STYLESHEET } from "./index.js";
 import { cleanup, renderInSurface } from "./render.fixture.js";
 

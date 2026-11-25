@@ -17,10 +17,6 @@
       "types": "./dist/runtime/index.d.ts",
       "default": "./dist/runtime/index.js"
     },
-    "./workbench": {
-      "types": "./dist/toolbar/workbench.d.ts",
-      "default": "./dist/toolbar/workbench.js"
-    },
     "./proposal.schema.json": "./proposal.schema.json",
     "./package.json": "./package.json"
   },
@@ -44,7 +40,7 @@
     "directory": "packages/loupe"
   },
   "scripts": {
-    "build": "pnpm --dir ../ui build && rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
+    "build": "pnpm --dir ../patterns build && rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
     "prepack": "pnpm run build",
     "test": "vitest run",
     "typecheck": "tsc6 --noEmit"

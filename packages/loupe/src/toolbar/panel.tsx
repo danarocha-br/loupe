@@ -37,7 +37,7 @@ import {
   stripParts,
   stripText,
 } from "./panel-view/index.js";
-import type { GroupItem, PropItem } from "./patterns/view.js";
+import type { GroupItem, PropItem } from "@loupe/patterns";
 import { appLang } from "./app-lang.js";
 import {
   AppearsOnInteraction,
@@ -57,7 +57,7 @@ import {
   Sheet,
   StartCard,
   StatusStrip,
-} from "./patterns/index.js";
+} from "@loupe/patterns";
 import { copyToClipboard } from "./clipboard.js";
 import { PageMapView } from "./page-map.js";
 import type { SelectMode } from "./picker.js";

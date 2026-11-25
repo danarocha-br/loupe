@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Field } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 const LONG_TEXT = Array.from({ length: 14 }, (_, line) => `${line + 1}. A line of a long read-only text, to select and copy by hand.`).join("\n");
 

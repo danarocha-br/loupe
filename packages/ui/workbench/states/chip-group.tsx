@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Chip, ChipGroup } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 const SIZES = ["sm", "md", "lg"];
 const VARIANTS = ["solid", "ghost", "link", "a much longer value that wraps inside its chip"];

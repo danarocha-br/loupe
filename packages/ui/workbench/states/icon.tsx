@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import * as system from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Every icon the package exports, by its name: `ResetIcon`, `Wordmark`. */
 const ICONS: [string, ComponentType][] = Object.entries(system)

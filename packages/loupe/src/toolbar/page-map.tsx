@@ -7,8 +7,8 @@ import type { LoupeDebug } from "../runtime/debug.js";
 import { appLang } from "./app-lang.js";
 import { boxesOf, PageSignalContext, type PageSignal } from "./page-signal.js";
 import { LIST_WORDS } from "./panel-view/index.js";
-import type { GroupItem } from "./patterns/view.js";
-import { type MapBox, PageMap } from "./patterns/index.js";
+import type { GroupItem } from "@loupe/patterns";
+import { type MapBox, PageMap } from "@loupe/patterns";
 
 /** How long the page has to stay still before the map reads its boxes again. */
 const SETTLE_MS = 120;

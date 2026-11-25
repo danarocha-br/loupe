@@ -1,5 +1,5 @@
 import { Dot } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Dot in each tone, large and small. */
 export function DotStates() {

@@ -8,7 +8,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { PageMapView } from "./page-map.js";
-import { MAP_GROUPS } from "./patterns/samples.js";
+import { MAP_GROUPS } from "@loupe/patterns/testing";
 import { cleanup, renderInSurface } from "./surface/render.fixture.js";
 
 afterEach(cleanup);

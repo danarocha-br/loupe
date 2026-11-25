@@ -1,5 +1,5 @@
 import { Kbd } from "../../src/index.js";
-import { Frame, States } from "./frame.js";
+import { Frame, States } from "../shell/frame.js";
 
 /** Kbd in running text. */
 export function KbdStates() {
