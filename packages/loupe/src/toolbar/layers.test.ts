@@ -12,7 +12,8 @@
 //   nothing from `panel-view/`, not even a type (ADR 0012: `panelView()` is the adapter, and
 //   depends on the contract, never the other way), never `runtime/`, a view, or UI SDK. Its
 //   tests may also draw in the surface; they spell out their words (`patterns/samples.ts`)
-//   and name no `*_WORDS` constant, nor does a pattern's `.md`.
+//   and name no `*_WORDS` constant, nor does a pattern's `.md`. Their workbench
+//   (`workbench.tsx`) draws the same samples, and imports nothing from `panel-view/` either.
 // - panel-view takes from the patterns only their tokens and their contract, never a pattern.
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -260,6 +261,17 @@ describe("the layers' import rule", () => {
     expect(constants).toHaveLength(9);
     expect(files.length).toBeGreaterThan(0);
     expect(offenders).toEqual([]);
+  });
+
+  it("draws the patterns' workbench from their samples alone: nothing from panel-view, words included", () => {
+    // `workbench.tsx` is the patterns' page (the fixture's `/workbench`): it draws what their
+    // tests draw, `samples.ts` and its `WORDS`, so neither can drift from the other (review of #91).
+    const file = path.join(toolbar, "workbench.tsx");
+    const offenders = specifiers(file)
+      .filter((specifier) => specifier.startsWith(".") && inside(panelView, resolved(file, specifier)))
+      .map((specifier) => `${path.relative(src, file)} → ${specifier}`);
+    expect(offenders).toEqual([]);
+    expect(readFileSync(file, "utf8")).toContain("WORDS.");
   });
 
   it("lets panel-view take from the patterns only their tokens and their contract, never a pattern", () => {

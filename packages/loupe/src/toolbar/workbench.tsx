@@ -8,18 +8,6 @@
 // `<LoupeMount />` loads the Toolbar; a host never imports it.
 
 import { type ReactNode, useEffect, useState } from "react";
-import {
-  COMMAND_WORDS,
-  COPY_WORDS,
-  FOOTER_WORDS,
-  HEADER_WORDS,
-  INSPECTOR_WORDS,
-  LAUNCHER_WORDS,
-  LIST_WORDS,
-  OUTLINE_WORDS,
-  SHEET_WORDS,
-  stripParts,
-} from "./panel-view/index.js";
 import type { SelectMode } from "./patterns/view.js";
 import {
   AppearsOnInteraction,
@@ -57,6 +45,7 @@ import {
   BUTTON_GROUP,
   CHANGE_OUTLINE,
   CHANGES,
+  COMMAND,
   COPIED_TITLE,
   FLAGS,
   FLAGS_CROWDED,
@@ -79,7 +68,6 @@ import {
   NO_GROUP,
   NOT_GENERATED,
   NOT_GENERATED_NOTICE,
-  COMMAND,
   NOTE,
   OUTLINES,
   OVERRIDES_OFF_NOTICE,
@@ -95,6 +83,7 @@ import {
   TONE_AT_SCOPE,
   TYPE_INSPECT_ONLY,
   UNDO_OFFER,
+  WORDS,
 } from "./patterns/samples.js";
 import { LauncherPill } from "./patterns/launcher/launcher.js";
 import { Surface, type Theme } from "./surface/index.js";
@@ -132,7 +121,7 @@ const FRAMES: Frame[] = [
 ];
 
 /**
- * The Inspector's patterns with sample panel-view data: Identity, ScopeSection and
+ * The Inspector's patterns with sample data: Identity, ScopeSection and
  * PropRow in one divided card, as the Inspector draws them; a gone Instance's identity;
  * the page's scope; and a scope's row beside Inspect only's pairs. Each write is said
  * under the cards rather than made.
@@ -154,30 +143,30 @@ function PatternStates() {
     onHover: () => {},
   };
   const selected = MEMBERS.members[2]?.id ?? "";
-  const pairRow = (item: (typeof INSPECT_ONLY.rows)[number]) => <PropRow key={item.name} item={item} look="pair" words={INSPECTOR_WORDS} {...rowCalls} />;
+  const pairRow = (item: (typeof INSPECT_ONLY.rows)[number]) => <PropRow key={item.name} item={item} look="pair" words={WORDS.inspector} {...rowCalls} />;
   return (
     <div className="wb-states">
       <Frame title="The Inspector: Identity, ScopeSection, then a PropRow per prop">
         <Card look="divided">
-          <Identity identity={IDENTITY} words={INSPECTOR_WORDS} onBack={said("back")} onCrumb={(id) => setLast(`select ${id}`)} />
-          <ScopeSection members={MEMBERS} selected={selected} words={INSPECTOR_WORDS} {...scopeCalls} />
+          <Identity identity={IDENTITY} words={WORDS.inspector} onBack={said("back")} onCrumb={(id) => setLast(`select ${id}`)} />
+          <ScopeSection members={MEMBERS} selected={selected} words={WORDS.inspector} {...scopeCalls} />
           {PROP_ITEMS.map((item) => (
-            <PropRow key={item.name} item={item} words={INSPECTOR_WORDS} {...rowCalls} />
+            <PropRow key={item.name} item={item} words={WORDS.inspector} {...rowCalls} />
           ))}
-          <Legend words={INSPECTOR_WORDS} app />
+          <Legend words={WORDS.inspector} app />
           <InspectOnly inspect={INSPECT_ONLY} row={pairRow} />
         </Card>
       </Frame>
       <Frame title="An Instance nothing can change: its note, and Inspect only open with the one reason">
         <Card look="divided">
-          <Identity identity={{ ...IDENTITY, keys: [], tags: [], chips: [], crumbs: [] }} words={INSPECTOR_WORDS} onBack={said("back")} />
+          <Identity identity={{ ...IDENTITY, keys: [], tags: [], chips: [], crumbs: [] }} words={WORDS.inspector} onBack={said("back")} />
           <InstanceNote note={NOTE} />
           <InspectOnly inspect={INSPECT_ONLY_SHARED} row={pairRow} />
         </Card>
       </Frame>
       <Frame title="NoGroup: Select multiple on an Instance with no call site">
         <Card look="divided">
-          <Identity identity={{ ...IDENTITY, keys: [], tags: [], chips: [], crumbs: [] }} words={INSPECTOR_WORDS} onBack={said("back")}>
+          <Identity identity={{ ...IDENTITY, keys: [], tags: [], chips: [], crumbs: [] }} words={WORDS.inspector} onBack={said("back")}>
             <NoGroup noGroup={NO_GROUP} onScope={(scope) => setLast(`scope ${scope}`)} />
           </Identity>
         </Card>
@@ -194,14 +183,14 @@ function PatternStates() {
               crumbs: [],
               notGenerated: { tag: NOT_GENERATED, command: "npx loupe generate" },
             }}
-            words={INSPECTOR_WORDS}
+            words={WORDS.inspector}
             onBack={said("back")}
           />
         </Card>
         <Card look="divided">
           <Identity
             identity={GONE}
-            words={INSPECTOR_WORDS}
+            words={WORDS.inspector}
             onBack={said("back")}
             actions={
               <Button size="small" onClick={said("reset this Instance")}>
@@ -213,10 +202,10 @@ function PatternStates() {
       </Frame>
       <Frame title="ScopeSection at All on page, by call site">
         <Card look="divided">
-          <ScopeSection members={PAGE_MEMBERS} selected={selected} words={INSPECTOR_WORDS} {...scopeCalls} />
-          <PropRow item={TONE_AT_SCOPE} words={INSPECTOR_WORDS} {...rowCalls} />
+          <ScopeSection members={PAGE_MEMBERS} selected={selected} words={WORDS.inspector} {...scopeCalls} />
+          <PropRow item={TONE_AT_SCOPE} words={WORDS.inspector} {...rowCalls} />
           <div className="wb-pairs">
-            <PropRow item={TYPE_INSPECT_ONLY} look="pair" words={INSPECTOR_WORDS} {...rowCalls} />
+            <PropRow item={TYPE_INSPECT_ONLY} look="pair" words={WORDS.inspector} {...rowCalls} />
           </div>
         </Card>
       </Frame>
@@ -226,7 +215,7 @@ function PatternStates() {
 }
 
 /**
- * The list's patterns with sample panel-view data, as the list draws them with nothing
+ * The list's patterns with sample data, as the list draws them with nothing
  * selected: the guided start, Held for review, On this page (the map over its rows, one
  * opened to its call sites) and Appears on interaction. A choice or a write is said under
  * the cards rather than made.
@@ -241,7 +230,7 @@ function ListPatternStates() {
     <div className="wb-states">
       <Frame title="StartCard: the mode checked; pressed again, armed">
         <StartCard
-          words={LIST_WORDS}
+          words={WORDS.list}
           mode={mode}
           armed={armed}
           onTool={(next) => {
@@ -252,20 +241,20 @@ function ListPatternStates() {
         />
       </Frame>
       <Frame title="HeldForReview">
-        <HeldForReview items={HELD} meta={HELD_META} words={LIST_WORDS} onDiscard={(target) => setLast(`discard ${JSON.stringify(target)}`)} />
+        <HeldForReview items={HELD} meta={HELD_META} words={WORDS.list} onDiscard={(target) => setLast(`discard ${JSON.stringify(target)}`)} />
       </Frame>
       <Frame title="OnThisPage: PageMap over a GroupRow per component">
         <OnThisPage
-          words={LIST_WORDS}
+          words={WORDS.list}
           summary={LIST_SUMMARY}
-          map={<PageMap groups={LIST_GROUPS} boxes={LIST_BOXES} lit={lit} words={LIST_WORDS} onPoint={point} onSelect={(id) => setLast(`select ${id}`)} />}
+          map={<PageMap groups={LIST_GROUPS} boxes={LIST_BOXES} lit={lit} words={WORDS.list} onPoint={point} onSelect={(id) => setLast(`select ${id}`)} />}
         >
           {LIST_GROUPS.map((group) => (
             <GroupRow
               key={group.component}
               group={group}
               lit={lit === group.component}
-              words={INSPECTOR_WORDS}
+              words={WORDS.inspector}
               onPoint={point}
               onSite={(site) => setLast(`select ${site.label}`)}
               onInstance={(id) => setLast(`select ${id}`)}
@@ -282,7 +271,7 @@ function ListPatternStates() {
         </div>
       </Frame>
       <Frame title="AppearsOnInteraction">
-        <AppearsOnInteraction components={INTERACTION} words={LIST_WORDS} />
+        <AppearsOnInteraction components={INTERACTION} words={WORDS.list} />
       </Frame>
       <p className="wb-note">Last: {last}</p>
     </div>
@@ -290,7 +279,7 @@ function ListPatternStates() {
 }
 
 /**
- * The notices, the change list and the Feature flags card with sample panel-view data, as
+ * The notices, the change list and the Feature flags card with sample data, as
  * the list draws them. Copy and every write are said under the cards rather than made; a
  * copy refused here is a copy that rejects.
  */
@@ -303,20 +292,20 @@ function NoticePatternStates() {
   return (
     <div className="wb-states">
       <Frame title="Notice: amber, with rows and the command">
-        <Notice notice={STALE_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
-        <Notice notice={NOT_GENERATED_NOTICE} words={COMMAND_WORDS} onCopy={() => Promise.reject(new Error("refused"))} />
+        <Notice notice={STALE_NOTICE} words={WORDS.command} onCopy={onCopy} />
+        <Notice notice={NOT_GENERATED_NOTICE} words={WORDS.command} onCopy={() => Promise.reject(new Error("refused"))} />
       </Frame>
       <Frame title="Notice: red, with a command and without">
-        <Notice notice={MISSING_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
-        <Notice notice={OVERRIDES_OFF_NOTICE} words={COMMAND_WORDS} onCopy={onCopy} />
+        <Notice notice={MISSING_NOTICE} words={WORDS.command} onCopy={onCopy} />
+        <Notice notice={OVERRIDES_OFF_NOTICE} words={WORDS.command} onCopy={onCopy} />
       </Frame>
       <Frame title="CommandLine: a command with its prompt, a line without, and a copy the clipboard refuses">
-        <CommandLine text={COMMAND} words={COMMAND_WORDS} onCopy={onCopy} />
-        <CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={COMMAND_WORDS} onCopy={onCopy} />
-        <CommandLine text={COMMAND} words={COMMAND_WORDS} onCopy={() => Promise.reject(new Error("refused"))} />
+        <CommandLine text={COMMAND} words={WORDS.command} onCopy={onCopy} />
+        <CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={WORDS.command} onCopy={onCopy} />
+        <CommandLine text={COMMAND} words={WORDS.command} onCopy={() => Promise.reject(new Error("refused"))} />
       </Frame>
       <Frame title="ChangeList: the last change's Instance isn't mounted">
-        <ChangeList changes={CHANGES} words={LIST_WORDS} onSelect={(id) => setLast(`select ${id}`)} onHover={() => {}} />
+        <ChangeList changes={CHANGES} words={WORDS.list} onSelect={(id) => setLast(`select ${id}`)} onHover={() => {}} />
       </Frame>
       <Frame title="FlagsCard: one previewed, a write refused">
         <FlagsCard
@@ -325,7 +314,7 @@ function NoticePatternStates() {
           onPreview={(key, value) => setLast(`preview ${key} ${JSON.stringify(value)}`)}
           onClear={(key) => setLast(`clear ${key}`)}
           onClearAll={() => setLast("clear all")}
-          words={COMMAND_WORDS}
+          words={WORDS.command}
           onCopy={onCopy}
         />
       </Frame>
@@ -336,12 +325,12 @@ function NoticePatternStates() {
           onPreview={(key, value) => setLast(`preview ${key} ${JSON.stringify(value)}`)}
           onClear={(key) => setLast(`clear ${key}`)}
           onClearAll={() => setLast("clear all")}
-          words={COMMAND_WORDS}
+          words={WORDS.command}
           onCopy={onCopy}
         />
       </Frame>
       <Frame title="FlagsCard: previews off, folded to one line (open it for why)">
-        <FlagsCard flags={FLAGS_OFF} busy={false} onPreview={() => {}} onClear={() => {}} onClearAll={() => {}} words={COMMAND_WORDS} onCopy={onCopy} />
+        <FlagsCard flags={FLAGS_OFF} busy={false} onPreview={() => {}} onClear={() => {}} onClearAll={() => {}} words={WORDS.command} onCopy={onCopy} />
       </Frame>
       <p className="wb-note">Last: {last}</p>
     </div>
@@ -349,7 +338,7 @@ function NoticePatternStates() {
 }
 
 /**
- * The panel's chrome with sample panel-view data: the header and its strip, the footer,
+ * The panel's chrome with sample data: the header and its strip, the footer,
  * and Copy Proposal's parts. The tools, the theme and the halves work; what they would do
  * is said under the cards rather than done. The popovers' bodies stand in a card as the
  * popover draws them, without the popover.
@@ -370,12 +359,13 @@ function ChromePatternStates() {
       busy={false}
       disabled={disabled}
       expanded={false}
-      words={COPY_WORDS}
+      words={WORDS.copy}
       onCopy={() => setLast(`copy (${state})`)}
       onDetails={() => setLast("details")}
     />
   );
-  const strip = stripParts({ picking: armed, mode, covered: false, marksHidden });
+  // What the strip says, as panel-view's `stripParts` picks it: picking first, then the marks hidden.
+  const strip = armed ? WORDS.header.strip.pick[mode] : marksHidden ? WORDS.header.strip.marksHidden : null;
   return (
     <div className="wb-states">
       <Frame title="PanelHeader and StatusStrip: pick a tool, press it again to arm it, hide the marks">
@@ -384,7 +374,7 @@ function ChromePatternStates() {
           mode={mode}
           armed={armed}
           marksHidden={marksHidden}
-          words={HEADER_WORDS}
+          words={WORDS.header}
           onTool={(next) => {
             setArmed(next === mode ? !armed : true);
             setMode(next);
@@ -395,13 +385,13 @@ function ChromePatternStates() {
         <StatusStrip parts={strip} />
       </Frame>
       <Frame title="PanelHeader: an Instance selected (no page), the strip with a key">
-        <PanelHeader page={null} mode="many" armed marksHidden={false} words={HEADER_WORDS} onTool={() => {}} onMarks={() => {}} onHide={() => {}} />
-        <StatusStrip parts={HEADER_WORDS.strip.covered} />
+        <PanelHeader page={null} mode="many" armed marksHidden={false} words={WORDS.header} onTool={() => {}} onMarks={() => {}} onHide={() => {}} />
+        <StatusStrip parts={WORDS.header.strip.covered} />
       </Frame>
       <Frame title="PanelFooter: two changes, a held state, the undo offer after Reset all">
         <PanelFooter
           footer={FOOTER}
-          words={FOOTER_WORDS}
+          words={WORDS.footer}
           undo={undo}
           theme={dark ? "dark" : "light"}
           onResetAll={() => setUndo(UNDO_OFFER)}
@@ -411,7 +401,7 @@ function ChromePatternStates() {
         />
       </Frame>
       <Frame title="PanelFooter: nothing changed, nothing to copy">
-        <PanelFooter footer={FOOTER_EMPTY} words={FOOTER_WORDS} undo={null} theme="light" onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} copy={split("idle", true)} />
+        <PanelFooter footer={FOOTER_EMPTY} words={WORDS.footer} undo={null} theme="light" onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} copy={split("idle", true)} />
       </Frame>
       <Frame title="CopySplit: copied and refused">
         <div className="wb-line">{split("copied")}</div>
@@ -421,7 +411,7 @@ function ChromePatternStates() {
         <div className="wb-toast-room">
           <PanelFooter
             footer={FOOTER}
-            words={FOOTER_WORDS}
+            words={WORDS.footer}
             undo={null}
             theme="light"
             onResetAll={() => {}}
@@ -430,7 +420,7 @@ function ChromePatternStates() {
             copy={
               <>
                 {split("copied")}
-                <CopyToast title={COPIED_TITLE} words={COPY_WORDS} />
+                <CopyToast title={COPIED_TITLE} words={WORDS.copy} />
               </>
             }
           />
@@ -443,7 +433,7 @@ function ChromePatternStates() {
             designer={designer}
             missing={missing}
             busy={false}
-            words={COPY_WORDS}
+            words={WORDS.copy}
             onTitle={(next) => {
               setTitle(next);
               if (next.trim() !== "") setMissing(false);
@@ -455,10 +445,10 @@ function ChromePatternStates() {
       </Frame>
       <Frame title="NotCopied: with the Proposal's text, and without">
         <div className="wb-popover">
-          <NotCopied said={COPY_WORDS.notCopiedText(REFUSED.reason, true)} text={REFUSED.text} busy={false} words={COPY_WORDS} onRetry={() => setLast("try again")} />
+          <NotCopied said={WORDS.copy.notCopiedText(REFUSED.reason, true)} text={REFUSED.text} busy={false} words={WORDS.copy} onRetry={() => setLast("try again")} />
         </div>
         <div className="wb-popover">
-          <NotCopied said={REFUSED.reason} text="" busy={false} words={COPY_WORDS} onRetry={() => setLast("try again")} />
+          <NotCopied said={REFUSED.reason} text="" busy={false} words={WORDS.copy} onRetry={() => setLast("try again")} />
         </div>
       </Frame>
       <p className="wb-note">Last: {last}</p>
@@ -469,7 +459,7 @@ function ChromePatternStates() {
 function ShellPatternStates() {
   const [last, setLast] = useState("—");
   const [peeking, setPeeking] = useState(false);
-  const words = { label: LAUNCHER_WORDS.label, title: LAUNCHER_WORDS.title("⌘.") };
+  const words = { label: WORDS.launcher.label, title: WORDS.launcher.title("⌘.") };
   const open = () => setLast("open");
   return (
     <div className="wb-states">
@@ -500,14 +490,14 @@ function ShellPatternStates() {
             peeking={peeking}
             closing={false}
             width={SHEET_WIDTH - 40}
-            words={SHEET_WORDS}
+            words={WORDS.sheet}
             header={
               <>
-                <PanelHeader page={HEADER_PAGE} mode="one" armed={false} marksHidden={false} words={HEADER_WORDS} onTool={() => {}} onMarks={() => {}} onHide={() => setLast("hide")} />
-                <StatusStrip parts={HEADER_WORDS.strip.marksHidden} />
+                <PanelHeader page={HEADER_PAGE} mode="one" armed={false} marksHidden={false} words={WORDS.header} onTool={() => {}} onMarks={() => {}} onHide={() => setLast("hide")} />
+                <StatusStrip parts={WORDS.header.strip.marksHidden} />
               </>
             }
-            footer={<PanelFooter footer={FOOTER_EMPTY} words={FOOTER_WORDS} undo={null} theme="light" onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} copy={null} />}
+            footer={<PanelFooter footer={FOOTER_EMPTY} words={WORDS.footer} undo={null} theme="light" onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} copy={null} />}
           >
             <Card>
               <CardHead>
@@ -519,7 +509,7 @@ function ShellPatternStates() {
       </Frame>
       <Frame title="Sheet: over the page, where the window is too narrow for a column">
         <div className="wb-stage wb-stage-sheet">
-          <Sheet docked={false} peeking={false} closing={false} width={SHEET_WIDTH - 40} words={SHEET_WORDS} header={<StatusStrip parts={HEADER_WORDS.strip.covered} />} footer={null}>
+          <Sheet docked={false} peeking={false} closing={false} width={SHEET_WIDTH - 40} words={WORDS.sheet} header={<StatusStrip parts={WORDS.header.strip.covered} />} footer={null}>
             <Card>
               <CardHead>
                 <h3>A card</h3>
@@ -538,7 +528,7 @@ function ShellPatternStates() {
       <Frame title="The page's marks: picking, with its tag; a change's outline; the size tag below and from the start">
         <div className="wb-stage wb-stage-page">
           <PageOutline {...PICK_OUTLINE} box={{ ...PICK_OUTLINE.box, top: 44 }} />
-          <PickTag {...PICK_TAG} place={{ top: 18, left: 24 }} words={OUTLINE_WORDS} />
+          <PickTag {...PICK_TAG} place={{ top: 18, left: 24 }} words={WORDS.outline} />
           <ChangeOutline {...CHANGE_OUTLINE} box={{ ...CHANGE_OUTLINE.box, top: 120 }} quiet={false} />
           <PageOutline kind="ring" box={{ top: 6, left: 210, width: 38, height: 38 }} quiet={false} tag={{ text: "Button · 32 × 32", below: true, start: false }} />
           <PageOutline kind="ring" box={{ top: 150, left: 6, width: 38, height: 38 }} quiet={false} tag={{ text: "Button · 32 × 32", below: false, start: true }} />

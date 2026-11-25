@@ -52,6 +52,11 @@ const TOOLS: ListWords["tools"] = {
   },
 };
 
+/** The copy toast's line and the line under it, said once for both the toast and the announcer. */
+const COPIED = "Copied";
+const PASTE_IT = "Paste it into your coding agent";
+const QUOTE = { open: " “", close: "”" };
+
 /**
  * The words `panelView()` decides whatever is on the page, spelled out (ADR 0012): what a
  * view passes each pattern as `words`. A loupe test (`panel-view/samples.test.ts`) holds
@@ -134,7 +139,7 @@ export const WORDS: {
   },
   copy: {
     idle: "Copy Proposal",
-    copied: "Copied",
+    copied: COPIED,
     failed: "Not copied",
     mainTitle: "Copy the Proposal for your coding agent or an engineer",
     detailsTitle: "Copy with a title and a designer",
@@ -149,9 +154,9 @@ export const WORDS: {
     selectAll: "Select all",
     retry: "Try again",
     proposal: "The Proposal",
-    pasteIt: "Paste it into your coding agent",
-    quote: { open: " “", close: "”" },
-    copiedText: (title) => `Copied “${title}”. Paste it into your coding agent.`,
+    pasteIt: PASTE_IT,
+    quote: QUOTE,
+    copiedText: (title) => `${COPIED}${QUOTE.open}${title}${QUOTE.close}. ${PASTE_IT}.`,
     notCopiedText: (reason, withText) => (withText ? `${reason} Your Proposal is below.` : reason),
   },
   command: {

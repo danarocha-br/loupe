@@ -39,17 +39,18 @@ const PROBES: Record<string, unknown[][]> = {
 
 /**
  * The words as plain data: each function replaced by what it returns for its probes, so two
- * bundles compare by what they say. A function with no probe is named, to fail the test.
+ * bundles compare by what they say. A function with no probe throws: both sides would
+ * otherwise read the same and pass, whatever the functions said (review of #91).
  */
-function said(value: unknown, at: string): unknown {
+function said(value: unknown, at: string, probes: Record<string, unknown[][]> = PROBES): unknown {
   if (typeof value === "function") {
-    const probes = PROBES[at];
-    if (!probes) return `no probe for ${at}`;
-    return probes.map((args) => (value as (...args: unknown[]) => unknown)(...args));
+    const calls = probes[at];
+    if (!calls?.length) throw new Error(`no probe for ${at}`);
+    return calls.map((args) => (value as (...args: unknown[]) => unknown)(...args));
   }
-  if (Array.isArray(value)) return value.map((item, index) => said(item, `${at}.${index}`));
+  if (Array.isArray(value)) return value.map((item, index) => said(item, `${at}.${index}`, probes));
   if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, said(item, `${at}.${key}`)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, said(item, `${at}.${key}`, probes)]));
   }
   return value;
 }
@@ -61,6 +62,13 @@ describe("the patterns' sample words", () => {
 
   it.each(Object.keys(REAL) as (keyof typeof WORDS)[])("say what panel-view's %s words say", (name) => {
     expect(said(WORDS[name], name)).toEqual(said(REAL[name], name));
+  });
+
+  it("refuses a function it has no probe for, rather than passing it unread", () => {
+    const words = { title: (name: string) => `Show ${name}` };
+    expect(() => said(words, "probe", {})).toThrow("no probe for probe.title");
+    expect(() => said(words, "probe", { "probe.title": [] })).toThrow("no probe for probe.title");
+    expect(said(words, "probe", { "probe.title": [["Loupe"]] })).toEqual({ title: ["Show Loupe"] });
   });
 
   it("would catch a word that drifted", () => {
