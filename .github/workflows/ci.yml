@@ -10,6 +10,62 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A pull request draws as its base on main does: every @loupe/ui workbench page and the
+  # Toolbar's states, recorded on both on this runner and diffed (`pnpm visual`, AGENTS.md).
+  # A change that is meant fails here until the PR carries the `visual-change` label (then
+  # re-run the job): the label waives a measured difference, never a check that couldn't run.
+  visual:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # The PR's labels, read through the issues API.
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The base is `git merge-base HEAD origin/main`.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @fixture/visual exec playwright install --with-deps --only-shell chromium
+      - name: Visual check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          status=0
+          pnpm visual --base origin/main || status=$?
+          # Exit 1 is a measured difference, 2 a check that couldn't run (`fixture/visual/src/cli.ts`).
+          [ "$status" -eq 1 ] || exit "$status"
+          # The PR's labels now, not the event's: a re-run after labelling sees the label.
+          if gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name' | grep -qx visual-change; then
+            echo "::notice::The layout differs from main, and the PR is labelled visual-change: the report lists what changed."
+            exit 0
+          fi
+          echo "::error::The layout differs from main. If the change is meant, label the PR visual-change and re-run this job."
+          exit 1
+      - name: Report
+        if: always()
+        # A job summary holds 1MiB; the artifact has the whole report.
+        run: test -f .visual/report.md && head -c 900000 .visual/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: visual-report
+          # A re-run of the job uploads it again, into the same workflow run.
+          overwrite: true
+          path: |
+            .visual/report.md
+            .visual/diff/
+          if-no-files-found: ignore
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15

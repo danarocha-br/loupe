@@ -1,0 +1,18 @@
+{
+  "name": "@fixture/visual",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The visual check: records every @loupe/ui workbench page and the Toolbar's states on the fixture, on a base commit and on the working tree, and diffs the two. Run it from the root: `pnpm visual`.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "playwright": "1.65.0",
+    "typescript": "^5.9.3"
+  }
+}
