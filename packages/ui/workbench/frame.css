@@ -1,0 +1,31 @@
+/* The workbench's own layout inside a surface: the stylesheet's top layer, where a consumer's
+   patterns would go (`stylesheet(FRAME_CSS)`), so it stands on the ground and the primitives
+   as a pattern does. Values from the tokens. */
+.wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
+.wb-card { gap: 16px; }
+.wb-bare { display: flex; flex-direction: column; gap: var(--space-row); padding: var(--space-card) var(--space-sheet); }
+.wb-states { display: flex; flex-direction: column; gap: 16px; }
+.wb-row { display: flex; flex-direction: column; gap: 8px; }
+.wb-row > h3 { font: var(--font-label); color: var(--muted); }
+.wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
+.wb-list { list-style: none; margin: 0; padding: 0; }
+.wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
+.wb-note-text { display: flex; flex-direction: column; gap: var(--space-xs); }
+.wb-note-text p { font: var(--font-paragraph); color: var(--muted); }
+.wb-note { font: var(--font-meta); color: var(--faint); }
+.wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wb-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; font: var(--font-title); color: var(--ink); }
+.wb-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; font: var(--font-title); color: var(--ink); }
+.wb-fold-row [data-fold-chevron] { color: var(--muted); }
+.wb-fold-small { justify-content: flex-start; gap: 6px; min-height: 28px; font: var(--font-control); color: var(--muted); }
+.wb-fold-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font: var(--font-label); color: var(--faint); }
+.wb-fold-line .wb-fold-row { font: var(--font-control); }
+.wb-fold-body { padding: 4px 0 4px 12px; font: var(--font-paragraph); color: var(--muted); }
+.wb-footer { padding: 14px; border-radius: var(--radius-card); background: var(--card); box-shadow: var(--shadow); }
+.wb-mark { display: inline-flex; align-items: center; gap: 6px; font: var(--font-control); color: var(--ink); }
+.wb-status { padding: 8px 14px; border-radius: var(--radius-status); background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); font: var(--font-caption); }
+.wb-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; color: var(--ink); }
+.wb-muted { color: var(--muted); }
+.wb-icon { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0; padding: 10px 4px 8px; border-radius: var(--radius-well); background: var(--well); }
+.wb-icon-glyph { display: flex; align-items: center; justify-content: center; height: 24px; }
+.wb-icon figcaption { font: var(--font-mono-small); color: var(--faint); text-align: center; overflow-wrap: anywhere; }

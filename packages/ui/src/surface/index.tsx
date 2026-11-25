@@ -2,7 +2,8 @@
 // layered stylesheet, the reader's text size and the language (ADR 0003, 0010). The
 // primitives' CSS applies only inside one. A consumer brings the stylesheet's top layer
 // (Loupe's patterns) and its own host; this module is the rest:
-// - `stylesheet()` assembles `@layer tokens, primitives, patterns`;
+// - `stylesheet()` assembles `@layer tokens, primitives, patterns`, with the consumer's own
+//   tokens on the host if it has any;
 // - `attachSurface()` gives a host a shadow root under it;
 // - `<Surface>` draws anything in place inside one, for a test or a workbench.
 // Whatever renders in a `<Surface>` does so inside `SurfaceBoundary`: a throw takes the
@@ -15,10 +16,10 @@ import { createPortal } from "react-dom";
 import { Announcer } from "../announcer/announcer.js";
 import { PRIMITIVES_CSS } from "../styles.js";
 import type { Theme } from "../tokens.js";
-import { GROUND_CSS, SCALE_ATTRIBUTE, THEME_ATTRIBUTE } from "./ground.js";
+import { ground, type HostProperties, SCALE_ATTRIBUTE, THEME_ATTRIBUTE } from "./ground.js";
 
 export type { Theme } from "../tokens.js";
-export { GROUND_CSS, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE } from "./ground.js";
+export { GROUND_CSS, ground, type HostProperties, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE } from "./ground.js";
 
 /** The stylesheet's layers, in cascade order: a later layer wins over an earlier one. */
 export const LAYERS = ["tokens", "primitives", "patterns"] as const;
@@ -29,12 +30,13 @@ export const SURFACE_ATTRIBUTE = "data-loupe-surface";
 /**
  * The one stylesheet a surface adopts, every rule in a layer: the ground, then the
  * primitives, then `patterns`, the consumer's compositions of them. With none, the
- * system alone, with its top layer declared and empty.
+ * system alone, with its top layer declared and empty. `properties` are the consumer's
+ * own tokens, declared on the host in the `tokens` layer after the system's (`ground()`).
  */
-export function stylesheet(patterns = ""): string {
+export function stylesheet(patterns = "", properties: HostProperties = {}): string {
   return [
     `@layer ${LAYERS.join(", ")};`,
-    `@layer tokens {${GROUND_CSS}}`,
+    `@layer tokens {${ground(properties)}}`,
     `@layer primitives {\n${PRIMITIVES_CSS}\n}`,
     `@layer patterns {\n${patterns}\n}`,
   ].join("\n");

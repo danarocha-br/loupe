@@ -6,7 +6,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { OUTLINE_WORDS } from "../../panel-view/index.js";
-import { PAGE } from "@loupe/ui/tokens";
+import { PAGE } from "../tokens.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { CHANGE_OUTLINE, HOVER_OUTLINE, OUTLINES, PICK_OUTLINE, PICK_TAG, PICK_TAG_INSPECT_ONLY } from "../samples.js";

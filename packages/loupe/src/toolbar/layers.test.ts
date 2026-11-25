@@ -230,6 +230,19 @@ describe("the layers' import rule", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("lets panel-view take from the patterns only their tokens, never a pattern", () => {
+    // The Toolbar's own tokens sit with the patterns (ADR 0011); panel-view reads the map's hue count from them.
+    const tokens = [path.join(patterns, "tokens.ts"), path.join(patterns, "tokens.js")];
+    const offenders = sources(panelView)
+      .filter((file) => !isTest(file))
+      .flatMap((file) =>
+        imports(readFileSync(file, "utf8"))
+          .filter((found) => !found.typeOnly && found.specifier.startsWith(".") && inside(patterns, resolved(file, found.specifier)) && !tokens.includes(resolved(file, found.specifier)))
+          .map((found) => `${path.relative(src, file)} → ${found.specifier}`),
+      );
+    expect(offenders).toEqual([]);
+  });
+
   it("keeps the Server Actions out of panel-view: the flags store and its actions for types only", () => {
     // panel-view is what the workbench draws its samples with; it must not pull a request in.
     const actions = ["flags-store", "flags-server"].flatMap((name) => [path.join(toolbar, `${name}.ts`), path.join(toolbar, `${name}.js`)]);

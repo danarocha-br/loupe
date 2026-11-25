@@ -6,7 +6,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRIMITIVES_CSS } from "../index.js";
-import { adoptStylesheet, GROUND_CSS, LAYERS, stylesheet, Surface, SYSTEM_STYLESHEET } from "./index.js";
+import { adoptStylesheet, GROUND_CSS, ground, LAYERS, stylesheet, Surface, SYSTEM_STYLESHEET } from "./index.js";
 import { cleanup, renderInSurface } from "./render.fixture.js";
 
 const PATTERNS_CSS = "[data-example] { color: var(--ink); }";
@@ -39,6 +39,19 @@ describe("the surface's stylesheet", () => {
   it("is the system alone, its top layer empty, when the consumer brings none", () => {
     expect(SYSTEM_STYLESHEET).toBe(stylesheet(""));
     expect(SYSTEM_STYLESHEET.endsWith("@layer patterns {\n\n}")).toBe(true);
+  });
+
+  it("declares a consumer's own tokens on the host, after the system's, in the light block that holds the unthemed ones", () => {
+    const own = stylesheet(PATTERNS_CSS, { "brand-hue-0": "#D2577A", "brand-mark": "rgba(0, 0, 0, 0.2)" });
+    const light = own.match(/:host \{[^}]*\}/)?.[0] ?? "";
+    expect(light).toContain("--ease-thumb: cubic-bezier(0.2, 0.8, 0.2, 1);");
+    expect(light.indexOf("--brand-hue-0: #D2577A; --brand-mark: rgba(0, 0, 0, 0.2); color-scheme: light;")).toBeGreaterThan(light.indexOf("--ease-thumb"));
+    expect(own.match(/:host\(\[data-loupe-theme="dark"\]\) \{[^}]*\}/)?.[0]).not.toContain("--brand-");
+    // None given, the ground is the system's own.
+    expect(stylesheet(PATTERNS_CSS, {})).toBe(STYLESHEET);
+    expect(GROUND_CSS).toBe(ground());
+    expect(GROUND_CSS).not.toContain("--page-");
+    expect(GROUND_CSS).not.toContain("--map-hue-");
   });
 
   it("is in the shadow root, which says Loupe's words are English", () => {

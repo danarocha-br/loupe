@@ -89,6 +89,29 @@ describe("the package boundary", () => {
     expect(named.map((file) => path.relative(src, file))).toEqual([]);
   });
 
+  it("keeps the workbench to this package, React and its dev server: it draws the system as Loupe would, and imports nothing of Loupe's", () => {
+    // The workbench (ADR 0011) draws `src` from beside it: a path into the package, never out of it.
+    const workbench = path.join(pkg, "workbench");
+    const offending = readdirSync(workbench, { recursive: true, encoding: "utf8" })
+      .filter((file) => /\.(c|m)?tsx?$/.test(file))
+      .map((file) => path.join(workbench, file))
+      .flatMap((file) => {
+        const code = readFileSync(file, "utf8");
+        const named = /@danarocha\/loupe\b/.test(code) ? [`${path.relative(pkg, file)} names Loupe`] : [];
+        const allowed = isTest(file) ? TEST_TOOLS : /^(vite|node:[\w/]+)$/;
+        return [
+          ...named,
+          ...specifiers(code)
+            .filter((specifier) => {
+              if (specifier.startsWith(".")) return !path.resolve(path.dirname(file), specifier.replace(/\?.*$/, "")).startsWith(pkg + path.sep);
+              return !(/^(react|react-dom)(\/|$)/.test(specifier) || allowed.test(specifier));
+            })
+            .map((specifier) => `${path.relative(pkg, file)} → ${specifier}`),
+        ];
+      });
+    expect(offending).toEqual([]);
+  });
+
   it("is private, and its entries are files in src", () => {
     expect(manifest.private).toBe(true);
     for (const [entry, target] of Object.entries(manifest.exports as Record<string, string>)) {
