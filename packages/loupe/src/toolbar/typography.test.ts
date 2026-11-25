@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isolate, reachText } from "./panel-view/words.js";
 import { STYLESHEET as CSS } from "./surface/index.js";
 import { FONT, font, leading, TYPE, TYPE_PROPERTIES, type TypeRole } from "@loupe/ui/tokens";
+import { PAGE_TYPE } from "./patterns/tokens.js";
 
 const steps = Object.entries(TYPE) as [TypeRole, (typeof TYPE)[TypeRole]][];
 
@@ -45,6 +46,15 @@ describe("the toolbar's type (typography review 2026-11-20)", () => {
     // The primitives read it: a literal `letter-spacing: 0.02em` in their CSS would drift from the token.
     expect(CSS).toContain("letter-spacing: var(--tracking-tag-mono)");
     expect(CSS).toContain("letter-spacing: var(--tracking-annotation)");
+  });
+
+  it("declares the page's own steps on the host, and the pick tag reads its step whole", () => {
+    // Label on a 17px line: the ratio the tag was drawn with by hand, 1.5455, now from the step.
+    expect(leading(PAGE_TYPE.pick)).toBe(1.5455);
+    expect(CSS).toContain(`--page-pick-font: ${font(PAGE_TYPE.pick)};`);
+    expect(CSS).toMatch(/\[data-pick-tag\] \{[^}]*font: var\(--page-pick-font\);/);
+    // No rule sets a pattern's line height apart from its step for the pick tag.
+    expect(CSS).not.toContain("line-height: 1.5455");
   });
 
   it("writes every font size in a rule through the reader-scaled unit, never a bare px", () => {
