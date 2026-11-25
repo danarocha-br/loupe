@@ -45,9 +45,14 @@ describe("the workbench", () => {
   });
 
   it("writes none of the shell's frame rules again: its frame.css holds what only the patterns' states draw", () => {
-    const selectors = (css: string) => [...css.matchAll(/^([^/{}\n][^{}]*?)\s*\{/gm)].map((match) => match[1] as string);
-    expect(selectors(FRAMES_CSS).length).toBeGreaterThan(5);
-    expect(selectors(FRAME_CSS).filter((selector) => selectors(FRAMES_CSS).includes(selector))).toEqual([]);
+    // Each rule's selector, comments left out, so a file's first rule is read like the rest.
+    const selectors = (css: string) => [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{/g)].map((match) => (match[1] as string).trim());
+    const shared = selectors(FRAMES_CSS);
+    expect(shared[0]).toBe(".wb-ground");
+    expect(selectors(FRAME_CSS)).not.toContain(".wb-ground");
+    expect(selectors(FRAME_CSS).filter((selector) => shared.includes(selector))).toEqual([]);
+    // Would catch the first rule of either file written again.
+    expect(selectors(`/* a note */\n.wb-ground { gap: 0; }\n${FRAME_CSS}`).filter((selector) => shared.includes(selector))).toEqual([".wb-ground"]);
   });
 
   for (const { id, States } of PATTERNS) {
