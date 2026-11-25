@@ -74,6 +74,12 @@ import { keepUndoWhile, offerUndo, recordsKey, takeUndo, type UndoOffer, useUndo
 type PanelProps = {
   debug: LoupeDebug;
   view: PanelView;
+  /**
+   * The page's version. The view keeps its objects while what it shows is unchanged
+   * (`panel-view/share.ts`), so this is what tells the panel the page moved: the
+   * dialogs it reads under itself, and the Overrides an undo offer waits on.
+   */
+  version: number;
   column: Column;
   picking: boolean;
   onTool(mode: SelectMode): void;
@@ -101,14 +107,14 @@ function useFocusWasHere(middle: RefObject<HTMLDivElement | null>): RefObject<bo
   return was;
 }
 
-export function Panel({ debug, view, column, picking, onTool, onHide, closing, theme, onTheme }: PanelProps) {
+export function Panel({ debug, view, version, column, picking, onTool, onHide, closing, theme, onTheme }: PanelProps) {
   const store = useToolbarStore();
   const mode = useToolbar((state) => state.mode);
   const marksHidden = useToolbar((state) => state.marksHidden);
   const middle = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const peeking = usePeek();
-  const covered = useCoveredDialog(column);
+  const covered = useCoveredDialog(column, version);
   const notices = view.notices.map((notice) => <Notice key={notice.kind} notice={notice} words={COMMAND_WORDS} onCopy={copyToClipboard} />);
   // The notices' cards come and go with the view; what they say is announced from here.
   useAnnounceChange(view.announcements.alert, { politeness: "assertive" });
@@ -151,7 +157,7 @@ export function Panel({ debug, view, column, picking, onTool, onHide, closing, t
           <StatusStrip parts={strip} />
         </>
       }
-      footer={<Footer debug={debug} footer={view.footer} theme={theme} onTheme={onTheme} />}
+      footer={<Footer debug={debug} footer={view.footer} version={version} theme={theme} onTheme={onTheme} />}
     >
       {body.kind === "list" ? (
         <ComponentList debug={debug} body={body} notices={notices} heading={heading} onTool={onTool} mode={mode} picking={picking} />
@@ -191,8 +197,12 @@ function usePeek(): boolean {
   return peeking;
 }
 
-/** Whether a dialog of the app's, fixed to the viewport, reaches under the docked panel. Read on every redraw. */
-function useCoveredDialog(column: Column): boolean {
+/**
+ * Whether a dialog of the app's, fixed to the viewport, reaches under the docked panel.
+ * Read on every redraw, and the page's `version` makes one each time an element comes
+ * or goes, a dialog that is no Instance included.
+ */
+function useCoveredDialog(column: Column, _version: number): boolean {
   if (typeof document === "undefined" || !column.docked) return false;
   const edge = window.innerWidth - column.width;
   return [...document.querySelectorAll('[role="dialog"], [role="alertdialog"]')].some((dialog) => {
@@ -460,13 +470,20 @@ function Inspector({ debug, mode, view, body, notices, heading }: Part<Inspector
  * The footer: how many changes the Proposal will list and the states it shows, Reset
  * all, the undo offer after a reset, light or dark, and Copy Proposal.
  */
-function Footer({ debug, footer, theme, onTheme }: Pick<PanelProps, "debug" | "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
+function Footer({
+  debug,
+  footer,
+  version,
+  theme,
+  onTheme,
+}: Pick<PanelProps, "debug" | "version" | "theme" | "onTheme"> & { footer: PanelView["footer"] }) {
   const offer = useUndoOffer();
   useFooterAnnouncements(offer, footer.countText);
-  // The offer stays until the Overrides move on from what the drop left (undo.ts).
+  // The offer stays until the Overrides move on from what the drop left (undo.ts). Every
+  // change to them moves the page's version; the footer's counts may read the same.
   useEffect(() => {
     if (offer !== null) keepUndoWhile(recordsKey(debug));
-  });
+  }, [offer, version, debug]);
   // Reset all goes disabled once it has acted: focus moves to its Undo, the next thing to do.
   const undoButton = useRef<HTMLButtonElement>(null);
   const focusUndo = useRef(false);

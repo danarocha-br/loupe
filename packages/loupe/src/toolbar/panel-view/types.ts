@@ -23,9 +23,22 @@ export type PanelInput = {
   selected: string | null;
   /** The scope the user picked. `PanelView.scope` says which one applies. */
   scope: Scope;
-  /** The memory the last call returned. */
-  seen: SeenComponents;
-};
+} & (
+  | {
+      /**
+       * The view the last call returned, or null for the first. Its `seen` is the memory
+       * this call starts from, and every part of the new view deeply equal to its part
+       * is that same object, so a pattern given it can skip its render (`share.ts`).
+       */
+      previous: PanelView | null;
+      seen?: undefined;
+    }
+  | {
+      /** The memory to start from, without a last view to share with. */
+      seen: SeenComponents;
+      previous?: undefined;
+    }
+);
 
 /** An Instance a scope reaches, and whether it was left out of it. */
 export type Member = { id: string; out: boolean };

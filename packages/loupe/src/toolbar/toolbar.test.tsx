@@ -159,6 +159,24 @@ const ringKinds = () => [...shadow().querySelectorAll<HTMLElement>("[data-ring]"
 const variants = () => ["ana", "bia", "caio", "dani"].map((name) => pageButton(name).dataset.variant);
 
 describe("the Toolbar", () => {
+  it("says a dialog of the app's runs under the docked panel as it opens, and stops as it closes", async () => {
+    await mount();
+    const strip = () => shadow().querySelector("[data-sheet]")?.textContent ?? "";
+    expect(strip()).not.toContain("runs under the panel");
+    // Not an Instance: no row of the panel's data changes as it comes and goes, only the page.
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    dialog.getBoundingClientRect = () => new DOMRect(window.innerWidth - 300, 100, 300, 200);
+    act(() => document.body.append(dialog));
+    await settle();
+    await settle();
+    expect(strip()).toContain("A dialog on the page runs under the panel");
+    act(() => dialog.remove());
+    await settle();
+    await settle();
+    expect(strip()).not.toContain("runs under the panel");
+  });
+
   it("redraws the list as a menu mounts and unmounts", async () => {
     await mount();
     expect(panelText()).toContain("Button ×5");
@@ -454,6 +472,25 @@ describe("controls at This instance", () => {
     await settle();
     expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("");
     expect(loupe.props(BIA).overrides).toEqual({ children: "Bianca" });
+  });
+
+  it("ends the undo offer when another Override changes, though the footer's counts read the same", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+      loupe.set(BIA, "variant", "default");
+    });
+    await select(ANA);
+    await clickInPanel(panelButton("Reset this Instance"));
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("Reset 1 OverrideUndo");
+    // Bia's Override takes another value: still one change, the same reset target, so
+    // the footer's data is the last view's own (panel-view/share.ts). The offer ends
+    // all the same: putting Ana's back now would no longer be undoing the last drop.
+    act(() => loupe.set(BIA, "variant", "ghost"));
+    await settle();
+    await settle();
+    expect(shadow().querySelector("[data-footer-undo]")?.textContent).toBe("");
+    expect(loupe.records().map((record) => record.target)).toEqual([{ scope: "instance", id: BIA }]);
   });
 
   it("offers Reset this Instance for a selected Instance that isn't mounted, through discard", async () => {

@@ -21,7 +21,7 @@ import { useInstanceMeta } from "./instance-meta.js";
 import { useLayerStatus } from "./notices.js";
 import { createPageSignal, PageSignalContext, usePageVersion } from "./page-signal.js";
 import { Panel } from "./panel.js";
-import { type PanelView, panelView, type SeenComponents } from "./panel-view/index.js";
+import { type PanelView, panelView } from "./panel-view/index.js";
 import { type SelectMode, usePicker } from "./picker.js";
 import { startTrackers } from "./start.js";
 import { scopeOf, useToolbar, useToolbarStore } from "./toolbar-store.js";
@@ -40,18 +40,22 @@ export type ToolbarOpenProps = {
 };
 
 /**
- * What the panel shows, from `panelView()`. "Appears on interaction" remembers components
- * across page versions: `panelView()` takes what it returned last time and returns the
- * next, kept in a ref read while rendering. That is why this is a hook of its own: React
- * Compiler skips a function that reads a ref in render, and the skip stays here rather
- * than taking `ToolbarOpen` with it, whose memoised `<Panel>` keeps a hover from
+ * What the panel shows, from `panelView()`. It takes what it returned last time and
+ * returns the next: "Appears on interaction" remembers components across page versions,
+ * and every row, group and word object that didn't change keeps its identity, so the
+ * patterns given them skip their render (`panel-view/share.ts`). The last view is kept
+ * in a ref read while rendering. That is why this is a hook of its own: React Compiler
+ * skips a function that reads a ref in render, and the skip stays here rather than
+ * taking `ToolbarOpen` with it, whose memoised `<Panel>` keeps a hover from
  * re-rendering the whole Panel (ADR 0003, `hover-render.test.tsx`).
  */
 function usePanelView(debug: LoupeDebug, layer: LayerStatus | null, selected: string | null, scope: Scope, version: number): PanelView {
-  const seen = useRef<SeenComponents>({ route: "", components: new Set() });
+  const last = useRef<PanelView | null>(null);
   // `version` is the trigger: it moves whenever the registry or the page changes.
-  const view = useMemo(() => panelView({ debug, layer, selected, scope, seen: seen.current }), [debug, layer, selected, scope, version]);
-  seen.current = view.seen;
+  const view = useMemo(() => {
+    return panelView({ debug, layer, selected, scope, previous: last.current });
+  }, [debug, layer, selected, scope, version]);
+  last.current = view;
   return view;
 }
 
@@ -115,6 +119,7 @@ export function ToolbarOpen({ host, column, onHide, closing, theme, onTheme, onS
       <Panel
         debug={debug}
         view={view}
+        version={version}
         column={column}
         picking={picker.picking}
         onTool={tool}
