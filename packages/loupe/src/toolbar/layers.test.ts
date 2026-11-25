@@ -5,8 +5,9 @@
 // - Nothing in Loupe imports UI SDK: the primitives' interface is Loupe's own.
 // - Nothing in Loupe reaches into `packages/ui` by a path: only through `@loupe/ui`'s
 //   entries, the same list in its `package.json`, the tsconfigs and `vite.config.ts`.
-// - No shipped module imports a test-only entry (`@loupe/ui/testing`, `/listen`, `/jsdom-gaps`).
-// - A pattern imports only `@loupe/ui` (the primitives and the tokens), other patterns and
+// - No shipped module imports a test-only entry, one whose target is a `.fixture`
+//   (`@loupe/ui/testing`, `/listen`, `/jsdom-gaps`): `isTestEntry`, as the build decides it.
+// - A pattern imports only `@loupe/ui` and `@loupe/ui/tokens` (the primitives and the tokens), other patterns and
 //   `panel-view`'s types: never a value from `panel-view/` (its words come in its props),
 //   never `runtime/`, a view, or UI SDK. Its tests may draw in the surface and take
 //   panel-view's words for sample data, never reach `runtime/` or a view.
@@ -16,7 +17,7 @@ import { parse } from "jsonc-parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { uiEntries } from "../../vite.config.js";
+import { isTestEntry, uiEntries } from "../../vite.config.js";
 
 const toolbar = path.dirname(fileURLToPath(import.meta.url));
 const src = path.resolve(toolbar, "..");
@@ -25,9 +26,19 @@ const uiPackage = path.resolve(pkg, "..", "ui");
 const patterns = path.join(toolbar, "patterns");
 const panelView = path.join(toolbar, "panel-view");
 
-/** `@loupe/ui`'s entries a shipped module may import, and the ones only tests may. */
-const TEST_ENTRIES = ["@loupe/ui/testing", "@loupe/ui/listen", "@loupe/ui/jsdom-gaps"];
-const isShippedEntry = (specifier: string) => specifier in uiEntries() && !TEST_ENTRIES.includes(specifier);
+/** `@loupe/ui`'s entries a shipped module may import: those whose target isn't a `.fixture` (the build's own rule, `isTestEntry`). */
+const isShippedEntry = (specifier: string) => {
+  const target = uiEntries()[specifier];
+  return target !== undefined && !isTestEntry(target);
+};
+const isTestOnlyEntry = (specifier: string) => {
+  const target = uiEntries()[specifier];
+  return target !== undefined && isTestEntry(target);
+};
+/** What a pattern may take from `@loupe/ui`: the primitives and the tokens, not the surface or the announcer's module, which are the views'. */
+const PATTERN_ENTRIES = ["@loupe/ui", "@loupe/ui/tokens"];
+/** A path as the tsconfigs write it, with `/` on any platform. */
+const posix = (file: string) => file.split(path.sep).join("/");
 
 const sources = (dir: string) =>
   readdirSync(dir, { recursive: true, encoding: "utf8" })
@@ -66,12 +77,12 @@ const resolved = (file: string, specifier: string) => path.resolve(path.dirname(
 
 /**
  * What a pattern's file imports that a pattern may not: anything outside `@loupe/ui`'s
- * shipped entries, the patterns, React and its own CSS, and any value from `panel-view/`.
+ * primitives and tokens, the patterns, React and its own CSS, and any value from `panel-view/`.
  */
 function patternOffenders(file: string, code: string): string[] {
   return imports(code)
     .filter(({ specifier, typeOnly }) => {
-      if (!specifier.startsWith(".")) return !(/^(react|react-dom)(\/|$)/.test(specifier) || isShippedEntry(specifier));
+      if (!specifier.startsWith(".")) return !(/^(react|react-dom)(\/|$)/.test(specifier) || PATTERN_ENTRIES.includes(specifier));
       const target = resolved(file, specifier);
       if (inside(panelView, target)) return !typeOnly;
       return !inside(patterns, target);
@@ -124,7 +135,7 @@ describe("the layers' import rule", () => {
   it("ships no test-only entry: a module that isn't a test imports none", () => {
     const offenders = loupeSources()
       .filter((file) => !isTest(file))
-      .flatMap((file) => specifiers(file).filter((s) => TEST_ENTRIES.includes(s)).map((s) => `${path.relative(src, file)} → ${s}`));
+      .flatMap((file) => specifiers(file).filter(isTestOnlyEntry).map((s) => `${path.relative(src, file)} → ${s}`));
     expect(offenders).toEqual([]);
   });
 
@@ -134,14 +145,22 @@ describe("the layers' import rule", () => {
     const entries = uiEntries();
     const source = tsconfigPaths("tsconfig.json");
     expect(Object.keys(source).sort()).toEqual(Object.keys(entries).sort());
-    for (const [specifier, target] of Object.entries(entries)) expect(source[specifier], specifier).toEqual([path.relative(pkg, target)]);
+    for (const [specifier, target] of Object.entries(entries)) expect(source[specifier], specifier).toEqual([posix(path.relative(pkg, target))]);
     // The build reads the package's own .d.ts, of every entry that ships.
     const built = tsconfigPaths("tsconfig.build.json");
     expect(Object.keys(built).sort()).toEqual(Object.keys(entries).filter(isShippedEntry).sort());
     for (const specifier of Object.keys(built)) {
       const target = path.relative(path.join(uiPackage, "src"), entries[specifier] as string).replace(/\.tsx?$/, ".d.ts");
-      expect(built[specifier], specifier).toEqual([path.join("..", "ui", "dist", target)]);
+      expect(built[specifier], specifier).toEqual([posix(path.join("..", "ui", "dist", target))]);
     }
+  });
+
+  it("leaves @loupe/ui's build to loupe's: the root build skips it, so one task writes packages/ui/dist", () => {
+    // Loupe's build runs `pnpm --dir ../ui build` first; with no dependency between the two, a
+    // recursive build that also ran @loupe/ui's would race it on the same dist (review of #87).
+    const root = JSON.parse(readFileSync(path.join(pkg, "..", "..", "package.json"), "utf8"));
+    expect(JSON.parse(readFileSync(path.join(pkg, "package.json"), "utf8")).scripts.build).toMatch(/^pnpm --dir \.\.\/ui build && /);
+    expect(root.scripts.build).toMatch(/^pnpm -r --filter '!@loupe\/ui' build$/);
   });
 
   it("keeps a pattern to @loupe/ui, other patterns and panel-view's types", () => {
@@ -176,6 +195,8 @@ describe("the layers' import rule", () => {
       // The package by a path, a test's entry, and the surface's internals: not a pattern's.
       'import { Chip } from "../../../../../ui/src/chip-group/chip-group.js";',
       'import { renderInSurface } from "@loupe/ui/testing";',
+      'import { attachSurface } from "@loupe/ui/surface";',
+      'import { Announcer } from "@loupe/ui/announcer";',
     ].join("\n");
     expect(patternOffenders(file, code).map((offender) => offender.split(" → ")[1])).toEqual([
       "../../panel-view/index.js",
@@ -190,6 +211,8 @@ describe("the layers' import rule", () => {
       "../../toolbar-store.js",
       "../../../../../ui/src/chip-group/chip-group.js",
       "@loupe/ui/testing",
+      "@loupe/ui/surface",
+      "@loupe/ui/announcer",
       // Dynamic imports are read after the statements.
       "../../panel.js",
     ]);

@@ -37,8 +37,9 @@ const uiDist = path.resolve(pkg, "..", "ui", "dist");
  */
 function packagesImported(code: string): string[] {
   const found = new Set<string>();
-  for (const match of code.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s*"([^"./][^"]*)";|^\s*import\s*"([^"./][^"]*)";|\b(?:import|require)\(\s*"([^"./$][^"]*)"\s*\)/gm)) {
-    const specifier = (match[1] ?? match[2] ?? match[3]) as string;
+  // Either quote: Vite and tsc6 write double ones, but nothing promises it.
+  for (const match of code.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s*(["'])([^"'./$][^"']*)\1;|^\s*import\s*(["'])([^"'./$][^"']*)\3;|\b(?:import|require)\(\s*(["'])([^"'./$][^"']*)\5\s*\)/gm)) {
+    const specifier = (match[2] ?? match[4] ?? match[6]) as string;
     if (specifier.startsWith("node:")) continue;
     found.add(specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : (specifier.split("/")[0] as string));
   }
@@ -246,8 +247,21 @@ describe("@loupe/ui, inside dist", () => {
   });
 
   it("would catch a package imported and not declared", () => {
-    const code = ['import { x } from "@loupe/ui/tokens";', 'import {\n  a,\n  b,\n} from "lodash/fp";', 'const t = await import("typescript");', "const m = `require(\"${NPM_PACKAGE}\")`;"].join("\n");
-    expect(packagesImported(code)).toEqual(["@loupe/ui", "lodash", "typescript"]);
+    const code = [
+      'import { x } from "@loupe/ui/tokens";',
+      'import {\n  a,\n  b,\n} from "lodash/fp";',
+      'const t = await import("typescript");',
+      "const m = `require(\"${NPM_PACKAGE}\")`;",
+      // Code Loupe writes into a host's files, from a template: not an import of its own.
+      'import { Button } from "${ADAPTER}";',
+      // Single quotes, and a lazy Node-side import of a devDependency: a host wouldn't have it.
+      "import { y } from 'magic-string';",
+      "const formats = await import('ajv-formats');",
+      "const z = require('@babel/core');",
+      "import 'side-effect';",
+      "const n = require('node:fs');",
+    ].join("\n");
+    expect(packagesImported(code)).toEqual(["@loupe/ui", "lodash", "typescript", "magic-string", "ajv-formats", "@babel/core", "side-effect"]);
   });
 });
 

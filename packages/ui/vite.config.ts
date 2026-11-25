@@ -7,7 +7,7 @@
 // Compiler behave the same in tests as in `dist`.
 
 import { readdirSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import babel from "@rolldown/plugin-babel";
 import { defineConfig, type PluginOption, type UserConfig } from "vite";
@@ -31,10 +31,14 @@ export function entries(): Record<string, string> {
 /** React Compiler's options, as Loupe's (`packages/loupe/vite.config.ts`). */
 export const REACT_COMPILER_OPTIONS = { target: "19" } as const;
 
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** The package's source, matched whichever separator the id uses (Vite's `/`, or Windows' `\`). */
+const SOURCE_FILE = new RegExp(`^${src.split(/[\\/]/).map(escaped).join("[\\\\/]")}[\\\\/][^?]*\\.tsx?$`);
+
 /** React Compiler, on every component of the package: none reads React internals. */
 export function reactCompiler(): PluginOption {
   return babel({
-    include: [new RegExp(`^${src.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\\\/][^?]*\\.tsx?$`)],
+    include: [SOURCE_FILE],
     exclude: [/[\\/]node_modules[\\/]/, /\.test\.tsx?$/, /\0/],
     plugins: [["babel-plugin-react-compiler", REACT_COMPILER_OPTIONS]],
   });
@@ -67,8 +71,5 @@ export function config(entry: Record<string, string>, outDir: string): UserConfi
     },
   };
 }
-
-/** Where a source module lands in `dist`: `src/chip-group/chip-group.tsx` → `chip-group/chip-group.js`. */
-export const distPath = (source: string) => relative(src, source).split(sep).join("/").replace(SOURCE, ".js");
 
 export default defineConfig(config(entries(), "dist"));

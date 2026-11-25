@@ -12,7 +12,6 @@
     "paths": {
       "@loupe/ui": ["../ui/src/index.ts"],
       "@loupe/ui/announcer": ["../ui/src/announcer/announcer.tsx"],
-      "@loupe/ui/styles": ["../ui/src/styles.ts"],
       "@loupe/ui/surface": ["../ui/src/surface/index.tsx"],
       "@loupe/ui/tokens": ["../ui/src/tokens.ts"],
       "@loupe/ui/testing": ["../ui/src/surface/render.fixture.tsx"],

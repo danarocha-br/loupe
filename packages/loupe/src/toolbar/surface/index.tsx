@@ -7,12 +7,12 @@
 //   any primitive or pattern inside a real shadow root;
 // - `useTheme()`, light or dark as the reader last chose it.
 
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { attachSurface, Surface as SystemSurface, stylesheet, SWITCHING_ATTRIBUTE, type Theme, THEME_ATTRIBUTE } from "@loupe/ui/surface";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { attachSurface, Surface as SystemSurface, type SurfaceProps, stylesheet, SWITCHING_ATTRIBUTE, type Theme, THEME_ATTRIBUTE } from "@loupe/ui/surface";
 import { HOST_ATTRIBUTE, THEME_KEY } from "../styles.js";
 import { PATTERNS_CSS } from "../patterns/styles.js";
 
-export { LAYERS, SURFACE_ATTRIBUTE, SurfaceBoundary, type Theme } from "@loupe/ui/surface";
+export { SurfaceBoundary, type Theme } from "@loupe/ui/surface";
 
 /**
  * The one stylesheet every surface of the Toolbar adopts, every rule in a layer: the
@@ -38,14 +38,7 @@ export function useToolbarSurface(): ShadowRoot | null {
  * The in-place adapter: draws `children` inside a real shadow root, under `STYLESHEET`,
  * at a theme and, for the workbench, a text size of the reader's choosing.
  */
-export function Surface(props: {
-  theme?: Theme;
-  /** The reader's default text size in px, as their browser setting would make it: 20 for a larger one. */
-  textSize?: number;
-  /** Names the frame, for a page that draws several. */
-  label?: string;
-  children: ReactNode;
-}) {
+export function Surface(props: Omit<SurfaceProps, "stylesheet">) {
   return <SystemSurface {...props} stylesheet={STYLESHEET} />;
 }
 

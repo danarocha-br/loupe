@@ -6,7 +6,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRIMITIVES_CSS } from "../index.js";
-import { GROUND_CSS, LAYERS, stylesheet, Surface, SYSTEM_STYLESHEET } from "./index.js";
+import { adoptStylesheet, GROUND_CSS, LAYERS, stylesheet, Surface, SYSTEM_STYLESHEET } from "./index.js";
 import { cleanup, renderInSurface } from "./render.fixture.js";
 
 const PATTERNS_CSS = "[data-example] { color: var(--ink); }";
@@ -52,6 +52,48 @@ describe("the surface's stylesheet", () => {
   it("draws a dark surface under the host's theme attribute", () => {
     const screen = renderInSurface(<p>Hello</p>, { theme: "dark" });
     expect(screen.host.getAttribute("data-loupe-theme")).toBe("dark");
+  });
+});
+
+describe("a surface whose stylesheet changes", () => {
+  const RED = "p { color: red; }";
+  const BLUE = "p { color: blue; }";
+
+  it("replaces its <style>, never stacks one, red then blue then red again", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    const draw = (css: string) => act(() => root.render(<Surface stylesheet={css}><p>Hi</p></Surface>));
+    const styles = () => [...(container.querySelector("[data-loupe-surface]")?.shadowRoot?.querySelectorAll("style") ?? [])].map((s) => s.textContent);
+    draw(RED);
+    draw(BLUE);
+    expect(styles()).toEqual([BLUE]);
+    draw(RED);
+    expect(styles()).toEqual([RED]);
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("swaps its constructed sheet in place, and keeps any other sheet the root holds", () => {
+    class Sheet {
+      text = "";
+      replaceSync(css: string) {
+        this.text = css;
+      }
+    }
+    const other = new Sheet();
+    const doc = { defaultView: { CSSStyleSheet: Sheet } };
+    const shadow = { ownerDocument: doc, adoptedStyleSheets: [] as Sheet[] } as unknown as ShadowRoot & { adoptedStyleSheets: Sheet[] };
+    const texts = () => (shadow.adoptedStyleSheets as unknown as Sheet[]).map((sheet) => sheet.text);
+    adoptStylesheet(shadow, RED);
+    shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, other as unknown as CSSStyleSheet] as never;
+    other.text = "other";
+    adoptStylesheet(shadow, BLUE);
+    expect(texts()).toEqual([BLUE, "other"]);
+    adoptStylesheet(shadow, RED);
+    expect(texts()).toEqual([RED, "other"]);
+    adoptStylesheet(shadow, RED);
+    expect(texts()).toEqual([RED, "other"]);
   });
 });
 

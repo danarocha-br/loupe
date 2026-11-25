@@ -2,8 +2,8 @@
 // The Toolbar's surface (surface/): the design system's stylesheet with the patterns' layer
 // on top (ADR 0010), the one every surface of the Toolbar adopts.
 
+import { PRIMITIVES_CSS } from "@loupe/ui";
 import { GROUND_CSS, stylesheet } from "@loupe/ui/surface";
-import { PRIMITIVES_CSS } from "@loupe/ui/styles";
 import { afterEach, describe, expect, it } from "vitest";
 import { PATTERNS_CSS } from "../patterns/styles.js";
 import { STYLESHEET } from "./index.js";

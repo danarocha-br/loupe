@@ -8,7 +8,6 @@
   "exports": {
     ".": "./src/index.ts",
     "./announcer": "./src/announcer/announcer.tsx",
-    "./styles": "./src/styles.ts",
     "./surface": "./src/surface/index.tsx",
     "./tokens": "./src/tokens.ts",
     "./testing": "./src/surface/render.fixture.tsx",
@@ -18,7 +17,7 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
-    "test": "vitest run",
+    "test": "vitest run --exclude src/build.test.ts",
     "typecheck": "tsc6 --noEmit"
   },
   "dependencies": {

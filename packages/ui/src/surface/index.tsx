@@ -46,9 +46,15 @@ export const SYSTEM_STYLESHEET: string = stylesheet();
 /** One constructed sheet per document and stylesheet, shared by every surface in it. */
 const sheets = new WeakMap<Document, Map<string, CSSStyleSheet>>();
 
+/** The sheet, or the `<style>`, each shadow root took from `adoptStylesheet`: replaced when the stylesheet changes, never stacked. */
+const ownedSheet = new WeakMap<ShadowRoot, CSSStyleSheet>();
+const ownedStyle = new WeakMap<ShadowRoot, HTMLStyleElement>();
+
 /**
  * Gives a shadow root `css`: adopted where the browser can construct a sheet, so every
- * surface shares a single parsed one; a `<style>` otherwise (jsdom).
+ * surface shares a single parsed one; a `<style>` otherwise (jsdom). A second call with
+ * other `css` replaces what the first put there, in its place, and leaves any other sheet
+ * the root holds alone.
  */
 export function adoptStylesheet(shadow: ShadowRoot, css: string): void {
   const doc = shadow.ownerDocument;
@@ -66,15 +72,27 @@ export function adoptStylesheet(shadow: ShadowRoot, css: string): void {
         sheet.replaceSync(css);
         byCss.set(css, sheet);
       }
-      if (!shadow.adoptedStyleSheets.includes(sheet)) shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
+      const adopted = [...shadow.adoptedStyleSheets];
+      const previous = ownedSheet.get(shadow);
+      const at = previous ? adopted.indexOf(previous) : -1;
+      if (at >= 0) adopted[at] = sheet;
+      else if (!adopted.includes(sheet)) adopted.push(sheet);
+      shadow.adoptedStyleSheets = adopted;
+      ownedSheet.set(shadow, sheet);
       return;
     } catch {
       // A browser that has the API but refuses the sheet: the element below always works.
     }
   }
+  const previous = ownedStyle.get(shadow);
+  if (previous?.parentNode === shadow) {
+    previous.textContent = css;
+    return;
+  }
   const style = doc.createElement("style");
   style.textContent = css;
   shadow.prepend(style);
+  ownedStyle.set(shadow, style);
 }
 
 /** A host's shadow root with `css`, its language and the reader's text size. */

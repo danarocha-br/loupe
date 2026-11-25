@@ -615,7 +615,7 @@ The toolbar is built in four layers (ADR 0003). Each imports only from the layer
 
 **The import rule.**
 - `@loupe/ui` imports nothing from Loupe: only itself, React and UI SDK, and in its tests their tools. Its tests draw in its own surface's test host (`@loupe/ui/testing`). `packages/ui/src/boundary.test.ts` holds it.
-- Nothing in Loupe imports UI SDK, nor reaches into `packages/ui` by a path: only through `@loupe/ui`'s entries (`@loupe/ui`, `/tokens`, `/surface`, `/styles`, `/announcer`, and for tests `/testing`, `/listen`, `/jsdom-gaps`), which no shipped module of Loupe imports. The pin of UI SDK is `@loupe/ui`'s, repeated in `@danarocha/loupe`'s dependencies because `dist/ui` imports it.
+- Nothing in Loupe imports UI SDK, nor reaches into `packages/ui` by a path: only through `@loupe/ui`'s entries (`@loupe/ui`, `/tokens`, `/surface`, `/announcer`, and for tests `/testing`, `/listen`, `/jsdom-gaps`), which no shipped module of Loupe imports. The pin of UI SDK is `@loupe/ui`'s, repeated in `@danarocha/loupe`'s dependencies because `dist/ui` imports it.
 - A pattern imports only `@loupe/ui` (the primitives and the tokens), other patterns and `panel-view`'s types (`import type`, never a value): not UI SDK, `runtime/`, a view or the Toolbar's store. Its tests draw in the surface's test host and may take panel-view's words for sample data (`patterns/samples.ts`, which the workbench draws too).
 - `src/toolbar/layers.test.ts` fails when any of Loupe's side breaks.
 

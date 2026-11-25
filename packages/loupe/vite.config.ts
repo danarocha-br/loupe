@@ -25,6 +25,8 @@ const src = join(root, "src");
 const ui = join(root, "..", "ui");
 const uiSrc = join(ui, "src");
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** `@loupe/ui`'s source, as a pattern that matches its files whichever separator the id uses (Vite's `/`, or Windows' `\`). */
+const UI_SOURCE = new RegExp(`^${uiSrc.split(/[\\/]/).map(escaped).join("[\\\\/]")}[\\\\/][^?]*\\.tsx?$`);
 
 /** `@loupe/ui`'s entries, each to its source file: `@loupe/ui/surface` → `…/ui/src/surface/index.tsx`. */
 export function uiEntries(): Record<string, string> {
@@ -36,6 +38,9 @@ export function uiEntries(): Record<string, string> {
   }
   return found;
 }
+
+/** An entry only tests may import: its target is a `.fixture` file, which no build ships. */
+export const isTestEntry = (target: string) => /\.fixture\.tsx?$/.test(target);
 
 /** Where a `@loupe/ui` source module is built, in `dist/ui` (relative to `dist`): `…/ui/src/tokens.ts` → `ui/tokens.js`. */
 export const uiDistPath = (source: string) => `ui/${relative(uiSrc, source).split(sep).join("/").replace(/\.tsx?$/, ".js")}`;
@@ -62,7 +67,7 @@ function loupeUi(): Plugin {
       const target = uiEntries()[source];
       if (!target) return null;
       if (!building) return target;
-      if (/\.fixture\.tsx?$/.test(target)) this.error(`${source} is for tests, and is never shipped.`);
+      if (isTestEntry(target)) this.error(`${source} is for tests, and is never shipped.`);
       return { id: join(src, uiDistPath(target)), external: "relative" };
     },
   };
@@ -73,12 +78,15 @@ function loupeUi(): Plugin {
  * the `.d.ts` tsc6 wrote at it, `@loupe/ui/tokens` → `../ui/tokens.js`, so nothing in
  * `dist` names the private package. `src/build.test.ts` checks both.
  */
-function vendorUi(outDir: string): Plugin {
+function vendorUi(): Plugin {
+  let out = "";
   return {
     name: "loupe:vendor-ui",
     apply: "build",
+    configResolved(config) {
+      out = resolve(config.root, config.build.outDir);
+    },
     writeBundle() {
-      const out = resolve(root, outDir);
       const target = join(out, "ui");
       rmSync(target, { recursive: true, force: true });
       cpSync(join(ui, "dist"), target, { recursive: true });
@@ -158,7 +166,7 @@ export const REACT_COMPILER_OPTIONS = { target: "19" } as const;
  */
 export function reactCompiler(): PluginOption {
   return babel({
-    include: [/[\\/]src[\\/]toolbar[\\/][^?]*\.tsx?$/, new RegExp(`^${escaped(uiSrc)}[\\\\/][^?]*\\.tsx?$`)],
+    include: [/[\\/]src[\\/]toolbar[\\/][^?]*\.tsx?$/, UI_SOURCE],
     exclude: [/[\\/]node_modules[\\/]/, /\.test\.tsx?$/, /\0/],
     plugins: [["babel-plugin-react-compiler", REACT_COMPILER_OPTIONS]],
   });
@@ -231,4 +239,4 @@ export function browserConfig(entry: Record<string, string>, outDir: string): Us
 }
 
 const dist = browserConfig(browserEntries(), "dist");
-export default defineConfig({ ...dist, plugins: [...(dist.plugins ?? []), vendorUi("dist")] });
+export default defineConfig({ ...dist, plugins: [...(dist.plugins ?? []), vendorUi()] });

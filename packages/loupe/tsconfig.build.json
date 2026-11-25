@@ -8,7 +8,6 @@
     "paths": {
       "@loupe/ui": ["../ui/dist/index.d.ts"],
       "@loupe/ui/announcer": ["../ui/dist/announcer/announcer.d.ts"],
-      "@loupe/ui/styles": ["../ui/dist/styles.d.ts"],
       "@loupe/ui/surface": ["../ui/dist/surface/index.d.ts"],
       "@loupe/ui/tokens": ["../ui/dist/tokens.d.ts"]
     }
