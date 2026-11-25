@@ -7,12 +7,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { axeViolations, cleanup, renderInSurface } from "@loupe/ui/testing";
+import { FRAMES_CSS } from "@loupe/ui/workbench";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PATTERNS_CSS } from "../src/styles.js";
 import { STYLESHEET } from "../src/stylesheet.js";
 import FRAME_CSS from "./frame.css?inline";
 import { PATTERNS } from "./patterns.js";
-import { WORKBENCH_STYLESHEET } from "./stylesheet.js";
+import { WORKBENCH_CSS, WORKBENCH_STYLESHEET } from "./stylesheet.js";
 
 const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src");
 
@@ -38,9 +39,15 @@ describe("the workbench", () => {
   });
 
   it("draws in the Toolbar's stylesheet, its frame layout after the patterns' CSS, in their layer", () => {
-    expect(WORKBENCH_STYLESHEET.endsWith(`@layer patterns {\n${PATTERNS_CSS}\n${FRAME_CSS}\n}`)).toBe(true);
+    expect(WORKBENCH_STYLESHEET.endsWith(`@layer patterns {\n${PATTERNS_CSS}\n${WORKBENCH_CSS}\n}`)).toBe(true);
     // Everything before the frames is the Toolbar's own sheet.
-    expect(WORKBENCH_STYLESHEET.replace(`\n${FRAME_CSS}\n}`, "\n}")).toBe(STYLESHEET);
+    expect(WORKBENCH_STYLESHEET.replace(`\n${WORKBENCH_CSS}\n}`, "\n}")).toBe(STYLESHEET);
+  });
+
+  it("writes none of the shell's frame rules again: its frame.css holds what only the patterns' states draw", () => {
+    const selectors = (css: string) => [...css.matchAll(/^([^/{}\n][^{}]*?)\s*\{/gm)].map((match) => match[1] as string);
+    expect(selectors(FRAMES_CSS).length).toBeGreaterThan(5);
+    expect(selectors(FRAME_CSS).filter((selector) => selectors(FRAMES_CSS).includes(selector))).toEqual([]);
   });
 
   for (const { id, States } of PATTERNS) {

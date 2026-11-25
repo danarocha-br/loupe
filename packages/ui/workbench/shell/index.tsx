@@ -13,11 +13,18 @@ import { type ComponentType, StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Card } from "../../src/index.js";
 import { Surface, type Theme } from "../../src/surface/index.js";
+import FRAMES_CSS from "./frames.css?inline";
 import { Markdown } from "./markdown.js";
 import PAGE_CSS from "./workbench.css?inline";
 
 export { Frame, Glyph, States } from "./frame.js";
-export { Markdown } from "./markdown.js";
+
+/**
+ * The frames' layout every workbench shares (`frames.css`): the ground, the card or bare
+ * section, each state's frame, and the lines and lists the states draw in. A package's
+ * stylesheet puts it in its top layer, before its own frame rules.
+ */
+export { FRAMES_CSS };
 
 /** One page of a workbench: a primitive, or a pattern, in its states. */
 export type Page = {
@@ -40,7 +47,7 @@ export type WorkbenchOptions = {
   /** What its pages are, the nav's name: `Primitives`. */
   nav: string;
   pages: readonly Page[];
-  /** The stylesheet every surface adopts: the package's, its frames' layout in the top layer (`.wb-ground`, `.wb-bare`, `.wb-card`). */
+  /** The stylesheet every surface adopts: the package's, with `FRAMES_CSS` and its own frames' layout in the top layer. */
   stylesheet: string;
   /** Where a page's folder is, before its id: `packages/ui/src/`. */
   folder: string;
@@ -53,7 +60,14 @@ const TEXT_SIZES = [16, 20];
 
 /** What the address names: one page by its folder, or every one. */
 function useRoute(): string {
-  const read = () => decodeURIComponent(location.hash.slice(1)) || "all";
+  const read = () => {
+    // A fragment that isn't valid percent-encoding (`#%`) names no page: every one shows.
+    try {
+      return decodeURIComponent(location.hash.slice(1)) || "all";
+    } catch {
+      return "all";
+    }
+  };
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const change = () => setRoute(read());

@@ -1,0 +1,16 @@
+/* The frames' layout inside a surface, every workbench's (`FRAMES_CSS`): the ground a page's
+   states stand on, in a card or bare (`index.tsx`), each state's frame and its title
+   (`frame.tsx`), and the lists, lines, notes and pairs the states of both packages draw in.
+   A package's workbench puts these in its stylesheet's top layer, before its own frame rules.
+   Values from the tokens. */
+.wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
+.wb-card { gap: 16px; }
+.wb-bare { display: flex; flex-direction: column; gap: var(--space-row); padding: var(--space-card) var(--space-sheet); }
+.wb-states { display: flex; flex-direction: column; gap: 16px; }
+.wb-row { display: flex; flex-direction: column; gap: 8px; }
+.wb-row > h3 { font: var(--font-label); color: var(--muted); }
+.wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
+.wb-list { list-style: none; margin: 0; padding: 0; }
+.wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
+.wb-note { font: var(--font-meta); color: var(--faint); }
+.wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

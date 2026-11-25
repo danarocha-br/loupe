@@ -1,18 +1,7 @@
 import { Frame, States } from "@loupe/ui/workbench";
 import { Breakable, DotTitle, HeldKey, HeldValues, hovering, Keys, Meta, StatusChip, TagChip } from "../../src/index.js";
-import { HELD, LIST_SUMMARY, MISSING_NOTICE, STALE_NOTICE, WORDS } from "../../src/samples.js";
+import { HELD, LIST_SUMMARY, MISSING_NOTICE, STALE_NOTICE, STATUSES, TAGS, WORDS } from "../../src/samples.js";
 import { useSaid } from "./said.js";
-
-/** Each of `panelView()`'s tags, in its words. */
-const TAGS = [
-  { kind: "server", text: "On the server" },
-  { kind: "suspended", text: "Held for review" },
-  { kind: "not-mounted", text: "No Instance mounted" },
-  { kind: "stale", text: "Source changed" },
-  { kind: "left-out", text: "Left out" },
-  { kind: "left-out-unmounted", text: "Left out · not mounted" },
-  { kind: "not-visible", text: "Not visible now" },
-] as const;
 
 /** The marks the patterns share: deltas, status chips, tags, names that break, held values, dot titles, a count, a hue. */
 export function MarksStates() {
@@ -27,10 +16,9 @@ export function MarksStates() {
       </Frame>
       <Frame title="StatusChip: Supported with its tick, Inspect only, Not generated yet, a plain status">
         <div className="wb-marks">
-          <StatusChip status={{ kind: "supported", text: "Supported" }} check />
-          <StatusChip status={{ kind: "inspect-only", text: "Inspect only" }} />
-          <StatusChip status={{ kind: "not-generated", text: "Not generated yet" }} />
-          <StatusChip status={{ text: "Not on the page now" }} />
+          {STATUSES.map((status) => (
+            <StatusChip key={status.text} status={status} check={status.kind === "supported"} />
+          ))}
         </div>
       </Frame>
       <Frame title="TagChip: each kind in its look">

@@ -54,7 +54,8 @@ const isTest = (file: string) => /\.(test|fixture)\.tsx?$/.test(file);
 const inside = (dir: string, target: string) => target === dir || target.startsWith(dir + path.sep);
 const resolved = (file: string, specifier: string) => path.resolve(path.dirname(file), specifier.replace(/\?.*$/, ""));
 const REACT = /^(react|react-dom)(\/|$)/;
-const TEST_TOOLS = /^(vitest|@testing-library\/(dom|user-event)|axe-core|node:[\w/]+)$/;
+/** What a test may import besides the package: axe reaches it through `@loupe/ui/testing`, never on its own. */
+const TEST_TOOLS = /^(vitest|@testing-library\/(dom|user-event)|node:[\w/]+)$/;
 /** The sample data: the tests' and the workbench's, never a shipped module's. */
 const samples = [path.join(src, "samples.ts"), path.join(src, "samples.js")];
 

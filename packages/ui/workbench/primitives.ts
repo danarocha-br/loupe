@@ -34,11 +34,8 @@ import { TagStates } from "./states/tag.js";
 import { ToggleStates } from "./states/toggle.js";
 import type { Page } from "./shell/index.js";
 
-/** A primitive's page: its folder in `src/` (`#chip-group`), its name, its `.md` and its states. */
-export type Primitive = Page;
-
 /** In the order DESIGN.md's Layers lists them: the controls, the marks, the surfaces, the icons, the announcer. */
-export const PRIMITIVES: Primitive[] = [
+export const PRIMITIVES: Page[] = [
   { id: "chip-group", name: "ChipGroup", doc: CHIP_GROUP_MD, States: ChipGroupStates },
   { id: "fold", name: "Fold", doc: FOLD_MD, States: FoldStates },
   { id: "button", name: "Button", doc: BUTTON_MD, States: ButtonStates },

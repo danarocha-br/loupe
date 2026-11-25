@@ -1,19 +1,9 @@
-/* The workbench's own layout inside a surface: the stylesheet's top layer, where a consumer's
-   patterns would go (`stylesheet(FRAME_CSS)`), so it stands on the ground and the primitives
-   as a pattern does. Values from the tokens. */
-.wb-ground { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sheet); background: var(--ground); }
-.wb-card { gap: 16px; }
-.wb-bare { display: flex; flex-direction: column; gap: var(--space-row); padding: var(--space-card) var(--space-sheet); }
-.wb-states { display: flex; flex-direction: column; gap: 16px; }
-.wb-row { display: flex; flex-direction: column; gap: 8px; }
-.wb-row > h3 { font: var(--font-label); color: var(--muted); }
-.wb-ground [data-card] h3 { font: var(--font-title); letter-spacing: var(--tracking-title); }
-.wb-list { list-style: none; margin: 0; padding: 0; }
-.wb-pairs { padding: 0 var(--space-gutter) var(--space-inset) 42px; }
+/* This workbench's own frames inside a surface: the stylesheet's top layer, where a consumer's
+   patterns would go (`stylesheet.ts`), after the frames' layout every workbench shares
+   (`shell/frames.css`), so it stands on the ground and the primitives as a pattern does.
+   Values from the tokens. */
 .wb-note-text { display: flex; flex-direction: column; gap: var(--space-xs); }
 .wb-note-text p { font: var(--font-paragraph); color: var(--muted); }
-.wb-note { font: var(--font-meta); color: var(--faint); }
-.wb-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .wb-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; font: var(--font-title); color: var(--ink); }
 .wb-fold-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; font: var(--font-title); color: var(--ink); }
 .wb-fold-row [data-fold-chevron] { color: var(--muted); }

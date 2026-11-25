@@ -29,6 +29,7 @@ import type {
   PropItem,
   SheetWords,
   StatusTag,
+  StatusText,
   Tag,
   Write,
 } from "./view.js";
@@ -312,6 +313,10 @@ export const PROP_ITEMS: readonly PropItem[] = [VARIANT, SIZE, CHILDREN, DISABLE
 
 const SUPPORTED: StatusTag = { kind: "supported", text: "Supported" };
 const NOT_VISIBLE: Tag = { kind: "not-visible", text: "Not visible now" };
+const NOT_MOUNTED: Tag = { kind: "not-mounted", text: "No Instance mounted" };
+const LEFT_OUT: Tag = { kind: "left-out", text: "Left out" };
+const ON_THE_SERVER: Tag = { kind: "server", text: "On the server" };
+const NOT_ON_THE_PAGE: StatusText = { text: "Not on the page now" };
 
 /** The Inspector's identity for that Button: everything `panelView()` decides for the block. */
 export const IDENTITY: IdentityView = {
@@ -341,7 +346,7 @@ export const IDENTITY: IdentityView = {
 export const GONE: IdentityView = {
   component: null,
   page: null,
-  status: { text: "Not on the page now" },
+  status: NOT_ON_THE_PAGE,
   keys: [],
   name: "Button",
   nameTitle: ID,
@@ -350,7 +355,7 @@ export const GONE: IdentityView = {
   whereTitle: ID,
   id: null,
   note: "It shows here again when it mounts. To keep a menu or dialog open, select it and press Hold open.",
-  tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
+  tags: [NOT_MOUNTED],
   chips: [],
   held: ['variant "outline"', 'children ""'],
   notGenerated: null,
@@ -360,12 +365,29 @@ export const GONE: IdentityView = {
 /** The same Button, never generated: the warning says what to run. */
 export const NOT_GENERATED: StatusTag = { kind: "not-generated", text: "Not generated yet" };
 
+/** A component Loupe draws but can't change. */
+const INSPECT_ONLY_STATUS: StatusTag = { kind: "inspect-only", text: "Inspect only" };
+
+/** Every status chip's look: Supported (drawn with its tick), Inspect only, Not generated yet, and a plain status. */
+export const STATUSES: readonly StatusText[] = [SUPPORTED, INSPECT_ONLY_STATUS, NOT_GENERATED, NOT_ON_THE_PAGE];
+
+/** One tag of each kind `panelView()` writes, in its words. */
+export const TAGS: readonly Tag[] = [
+  ON_THE_SERVER,
+  { kind: "suspended", text: "Held for review" },
+  NOT_MOUNTED,
+  { kind: "stale", text: "Source changed" },
+  LEFT_OUT,
+  { kind: "left-out-unmounted", text: "Left out · not mounted" },
+  NOT_VISIBLE,
+];
+
 const member = (id: string, name: string, out = false): MembersView["members"][number] => ({
   id,
   label: id,
   name,
   out,
-  tag: out ? { kind: "left-out", text: "Left out" } : null,
+  tag: out ? LEFT_OUT : null,
   toggle: out ? "include" : "exclude",
 });
 
@@ -413,7 +435,7 @@ export const PAGE_MEMBERS: MembersView = {
       toggle: { action: "exclude", ids: ["eva", "fia", "gil"] },
     },
   ],
-  server: [{ id: "footer", label: "Footer Button", tag: { kind: "server", text: "On the server" } }],
+  server: [{ id: "footer", label: "Footer Button", tag: ON_THE_SERVER }],
   reset: { target: { scope: "page", route: "/billing", component: "Button" }, enabled: false },
 };
 
@@ -502,7 +524,7 @@ export const MENU_ITEM_GROUP: GroupItem = {
       name: null,
       keys: [2],
       mounted: false,
-      tags: [{ kind: "not-mounted", text: "No Instance mounted" }],
+      tags: [NOT_MOUNTED],
       values: ['children "Remover" · Current "Remove" (last seen)'],
       block: null,
     },

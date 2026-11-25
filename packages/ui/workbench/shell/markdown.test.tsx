@@ -38,6 +38,16 @@ describe("the workbench's Markdown", () => {
     expect(top[1]?.textContent).toBe("ref: the card's element");
   });
 
+  it("draws numbered steps as an ordered list, a bulleted list nested in one as its own", () => {
+    // As prop-row.md writes "What it draws, in order".
+    const doc = draw("Intro:\n1. **The line**: the delta\n2. **The change line**,\n   under it\n3. **The control**\n  - chips\n4. **Under the control**\n\nAfter.");
+    const steps = doc.querySelectorAll(":scope > ol > li");
+    expect([...steps].map((step) => step.querySelector("strong")?.textContent)).toEqual(["The line", "The change line", "The control", "Under the control"]);
+    expect(steps[1]?.textContent).toBe("The change line, under it");
+    expect(steps[2]?.querySelectorAll("ul > li")).toHaveLength(1);
+    expect([...doc.querySelectorAll(":scope > p")].map((p) => p.textContent)).toEqual(["Intro:", "After."]);
+  });
+
   it("draws a table, a pipe inside code staying in its cell", () => {
     const doc = draw("| Attribute | Draws |\n| --- | --- |\n| `data-a` · `a|b` | A block. |");
     expect([...doc.querySelectorAll("th")].map((cell) => cell.textContent)).toEqual(["Attribute", "Draws"]);

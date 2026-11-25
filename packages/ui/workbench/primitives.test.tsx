@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { stylesheet } from "../src/surface/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../src/surface/render.fixture.js";
-import FRAME_CSS from "./frame.css?inline";
 import { PRIMITIVES } from "./primitives.js";
+import { WORKBENCH_CSS, WORKBENCH_STYLESHEET } from "./stylesheet.js";
 
 const src = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "src");
 
@@ -36,14 +36,15 @@ describe("the workbench", () => {
   });
 
   it("puts its frame layout in the top layer, where a consumer's patterns go", () => {
-    expect(stylesheet(FRAME_CSS).endsWith(`@layer patterns {\n${FRAME_CSS}\n}`)).toBe(true);
+    expect(WORKBENCH_STYLESHEET).toBe(stylesheet(WORKBENCH_CSS));
+    expect(WORKBENCH_STYLESHEET.endsWith(`@layer patterns {\n${WORKBENCH_CSS}\n}`)).toBe(true);
   });
 
   for (const { id, States } of PRIMITIVES) {
     it(`draws ${id}'s states in a surface, light and dark, with nothing axe objects to`, async () => {
       const failed = vi.spyOn(console, "error");
       for (const theme of ["light", "dark"] as const) {
-        const screen = renderInSurface(<States />, { theme, stylesheet: stylesheet(FRAME_CSS) });
+        const screen = renderInSurface(<States />, { theme, stylesheet: WORKBENCH_STYLESHEET });
         expect(screen.shadow.querySelector(".wb-states"), `${id}, ${theme}`).not.toBeNull();
         expect(await axeViolations(screen.host), `${id}, ${theme}`).toEqual([]);
         screen.unmount();

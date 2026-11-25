@@ -4,10 +4,9 @@
 // 0012). `pnpm --filter @loupe/ui dev` serves it; nothing here ships, and nothing here imports
 // Loupe (boundary.test.ts).
 
-import { stylesheet } from "../src/surface/index.js";
-import FRAME_CSS from "./frame.css?inline";
 import { PRIMITIVES } from "./primitives.js";
 import { mountWorkbench } from "./shell/index.js";
+import { WORKBENCH_STYLESHEET } from "./stylesheet.js";
 
 mountWorkbench({
   title: "@loupe/ui",
@@ -15,7 +14,7 @@ mountWorkbench({
   nav: "Primitives",
   pages: PRIMITIVES,
   // The system's stylesheet with the workbench's frame layout as its top layer, where a consumer's patterns go.
-  stylesheet: stylesheet(FRAME_CSS),
+  stylesheet: WORKBENCH_STYLESHEET,
   folder: "packages/ui/src/",
   storage: "loupe-ui-workbench",
 });
