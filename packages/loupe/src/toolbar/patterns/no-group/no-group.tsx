@@ -2,10 +2,10 @@
 // with no call site to group by. It is selected alone, and says why; the page is still one
 // press away when that scope applies (ScopeSection's move button).
 //
-// It draws panel-view's `NoGroupView` and builds none: the move goes out through `onScope`.
+// It draws `panelView()`'s `NoGroupView` and builds none: the move goes out through `onScope`.
 // See no-group.md.
 
-import type { NoGroupView, Scope } from "../../panel-view/index.js";
+import type { NoGroupView, Scope } from "../view.js";
 import { ScopeMoveButton } from "../scope-section/scope-section.js";
 
 export type NoGroupProps = {

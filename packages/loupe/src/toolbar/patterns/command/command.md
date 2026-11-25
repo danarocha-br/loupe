@@ -3,8 +3,8 @@
 A command for the reader to run, with Copy (DESIGN.md "Notices and status", PER-140). The Toolbar names commands and never runs them (PER-100 §5). It stands at the foot of a notice, and in Feature flags' "why" for the one fix made in a file.
 
 ```tsx
-<CommandLine text={notice.command} words={COMMAND_WORDS} onCopy={copyToClipboard} />
-<CommandLine text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} words={COMMAND_WORDS} onCopy={copyToClipboard} />
+<CommandLine text={notice.command} words={commandWords} onCopy={copyToClipboard} />
+<CommandLine text="FLAGS_SECRET=… in .env.local" copy="FLAGS_SECRET=" prompt={false} words={commandWords} onCopy={copyToClipboard} />
 ```
 
 ## Interface
@@ -12,7 +12,7 @@ A command for the reader to run, with Copy (DESIGN.md "Notices and status", PER-
 - `text`: the command as shown, its spaces kept as written (a quoted path's run of spaces stays).
 - `copy`: what Copy puts on the clipboard, when it differs from `text`.
 - `prompt`: the `$` before it; off for a line that isn't a shell command.
-- `words`: panel-view's `CommandWords`: `prompt`, `copy`, `copied`, `failed`, and `refused`, what to do when the clipboard refuses it.
+- `words`: `panelView()`'s `CommandWords`: `prompt`, `copy`, `copied`, `failed`, and `refused`, what to do when the clipboard refuses it.
 - `onCopy(text)`: the view's copy. It returns a promise that rejects, or throws, when the clipboard refuses it.
 
 ## States

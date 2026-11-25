@@ -3,7 +3,7 @@
 The components seen on this page that have no Instance mounted now, such as a menu's items or a dialog's parts (DESIGN.md "On this page"): a row each, its name and how to get it on screen to inspect it.
 
 ```tsx
-<AppearsOnInteraction components={body.interaction} words={LIST_WORDS} />
+<AppearsOnInteraction components={body.interaction} words={listWords} />
 ```
 
 ## Interface

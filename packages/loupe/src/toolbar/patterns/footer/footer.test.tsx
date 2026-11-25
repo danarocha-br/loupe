@@ -5,10 +5,9 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FOOTER_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { FOOTER, FOOTER_EMPTY, UNDO_OFFER } from "../samples.js";
+import { FOOTER, FOOTER_EMPTY, UNDO_OFFER, WORDS } from "../samples.js";
 import { PanelFooter, type PanelFooterProps } from "./footer.js";
 import CSS from "./footer.css?inline";
 
@@ -17,7 +16,7 @@ afterEach(cleanup);
 function draw(props: Partial<PanelFooterProps> = {}) {
   const calls = { onResetAll: vi.fn(), onUndo: vi.fn(), onTheme: vi.fn() };
   const screen = renderInSurface(
-    <PanelFooter footer={FOOTER} words={FOOTER_WORDS} undo={null} theme="light" copy={<button type="button">Copy Proposal</button>} {...calls} {...props} />,
+    <PanelFooter footer={FOOTER} words={WORDS.footer} undo={null} theme="light" copy={<button type="button">Copy Proposal</button>} {...calls} {...props} />,
   );
   return { screen, ...calls };
 }
@@ -55,7 +54,7 @@ describe("PanelFooter", () => {
     expect(undo.closest("[data-footer-undo]")?.textContent).toBe(`${UNDO_OFFER}Undo`);
     await user.click(undo);
     expect(onUndo).toHaveBeenCalledTimes(1);
-    screen.rerender(<PanelFooter footer={FOOTER} words={FOOTER_WORDS} undo={null} theme="light" copy={null} onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} />);
+    screen.rerender(<PanelFooter footer={FOOTER} words={WORDS.footer} undo={null} theme="light" copy={null} onResetAll={() => {}} onUndo={() => {}} onTheme={() => {}} />);
     expect(screen.shadow.querySelector("[data-footer-undo]")?.textContent).toBe("");
   });
 
@@ -64,13 +63,13 @@ describe("PanelFooter", () => {
     const { screen, onTheme } = draw();
     const theme = screen.getByRole("button", { name: "Dark theme" });
     expect(theme.getAttribute("aria-pressed")).toBe("false");
-    expect(theme.getAttribute("title")).toBe(FOOTER_WORDS.theme.toDark);
+    expect(theme.getAttribute("title")).toBe(WORDS.footer.theme.toDark);
     await user.click(theme);
     expect(onTheme).toHaveBeenCalledTimes(1);
     cleanup();
     const dark = draw({ theme: "dark" }).screen.getByRole("button", { name: "Dark theme" });
     expect(dark.getAttribute("aria-pressed")).toBe("true");
-    expect(dark.getAttribute("title")).toBe(FOOTER_WORDS.theme.toLight);
+    expect(dark.getAttribute("title")).toBe(WORDS.footer.theme.toLight);
   });
 
   it("draws Copy Proposal in its slot, after the theme", () => {

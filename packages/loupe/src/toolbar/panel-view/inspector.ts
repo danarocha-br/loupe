@@ -11,7 +11,8 @@ import { instanceRecord, type Page } from "./page.js";
 import type { Reads } from "./reads.js";
 import { type Editing, instanceProp, scopeProp } from "./rows.js";
 import { fallbacks, labelsOf, membersView, scopeChips, type ScopeView, scopeView } from "./scopes.js";
-import type { GoneBody, InspectOnlyView, InspectorBody, NoGroupView, PropItem, ScopeOption, Tag } from "./types.js";
+import type { GoneBody, InspectorBody, ScopeOption } from "./types.js";
+import type { InspectOnlyView, NoGroupView, PropItem, Tag } from "../patterns/view.js";
 import { instanceVerdict } from "./verdict.js";
 import {
   callSiteText,

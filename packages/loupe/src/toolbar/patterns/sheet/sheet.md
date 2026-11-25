@@ -8,7 +8,7 @@ The panel's sheet (DESIGN.md "Layout", "Opening and closing"): a grey sheet in t
   peeking={peeking}
   closing={closing}
   width={column.width - 16}
-  words={SHEET_WORDS}
+  words={sheetWords}
   middleRef={middle}
   header={<><PanelHeader … /><StatusStrip … /></>}
   footer={<PanelFooter … />}
@@ -25,7 +25,7 @@ The view keeps what moves it: it measures the column (`dock.ts`), holds Alt for 
 - `peeking`: Alt held, to see through to what runs under the column.
 - `closing`: Hide was pressed: the drawer slides out, and the sheet is inert meanwhile.
 - `width`: its width in px, the column's less its 8px inset.
-- `words`: panel-view's `SheetWords`, its name.
+- `words`: `panelView()`'s `SheetWords`, its name.
 - `middleRef`: the middle, which the view scrolls back to the top on a new selection.
 - `header`, `footer`, `children`: the header card and its strip, the footer card, and the middle's cards.
 

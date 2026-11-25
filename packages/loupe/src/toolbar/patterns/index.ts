@@ -1,10 +1,12 @@
-// The toolbar's patterns (ADR 0003, DESIGN.md "Layers"): primitives composed, taking
-// panel-view's types. Each lives in its own folder: the component, its CSS in the
-// stylesheet's `patterns` layer, its tests and a `.md`.
+// The toolbar's patterns (ADR 0003, 0012, DESIGN.md "Layers"): primitives composed, taking
+// their own contract's types (`view.ts`). Each lives in its own folder: the component, its
+// CSS in the stylesheet's `patterns` layer, its tests and a `.md`.
 //
 // The import rule: a pattern imports only `@loupe/ui` (the primitives and the tokens),
-// other patterns and `panel-view`'s types (never a value from it), and draws the words
-// panel-view decided; it builds none, and makes no write: its callbacks do, in the view.
+// other patterns, the Toolbar's tokens (`tokens.ts`) and its contract (`view.ts`); nothing
+// from `panel-view`, which is the adapter that fits Loupe's runtime to the contract. It
+// draws the words `panelView()` decided; it builds none, and makes no write: its callbacks
+// do, in the view.
 // `@loupe/ui` imports nothing from Loupe, a pattern least of all.
 // `src/toolbar/layers.test.ts` and `@loupe/ui`'s `boundary.test.ts` hold both.
 

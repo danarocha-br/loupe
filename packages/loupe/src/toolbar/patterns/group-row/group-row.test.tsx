@@ -5,10 +5,10 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type GroupItem, INSPECTOR_WORDS } from "../../panel-view/index.js";
+import type { GroupItem } from "../view.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { BUTTON_GROUP, MENU_ITEM_GROUP } from "../samples.js";
+import { BUTTON_GROUP, MENU_ITEM_GROUP, WORDS } from "../samples.js";
 import { GroupRow } from "./group-row.js";
 import CSS from "./group-row.css?inline";
 
@@ -18,7 +18,7 @@ function draw(group: GroupItem, lit = false) {
   const calls = { onPoint: vi.fn(), onSite: vi.fn(), onInstance: vi.fn(), onHover: vi.fn() };
   const screen = renderInSurface(
     <ul aria-label="Components on this page">
-      <GroupRow group={group} lit={lit} words={INSPECTOR_WORDS} {...calls} />
+      <GroupRow group={group} lit={lit} words={WORDS.inspector} {...calls} />
     </ul>,
   );
   const row = screen.getByRole("listitem");
@@ -90,8 +90,8 @@ describe("GroupRow", () => {
     const calls = { onPoint: () => {}, onSite: () => {}, onInstance: () => {}, onHover: () => {} };
     const screen = renderInSurface(
       <ul aria-label="Components on this page">
-        <GroupRow group={BUTTON_GROUP} lit={false} words={INSPECTOR_WORDS} {...calls} />
-        <GroupRow group={MENU_ITEM_GROUP} lit words={INSPECTOR_WORDS} {...calls} />
+        <GroupRow group={BUTTON_GROUP} lit={false} words={WORDS.inspector} {...calls} />
+        <GroupRow group={MENU_ITEM_GROUP} lit words={WORDS.inspector} {...calls} />
       </ul>,
     );
     expect(await axeViolations(screen.host)).toEqual([]);

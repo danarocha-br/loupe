@@ -5,16 +5,16 @@ What Loupe draws over the app, outside the panel (DESIGN.md "On the page", "Pick
 ```tsx
 <PageOutline kind="ring" box={outline(ring)} quiet={false} tag={{ text: labelText(ring), ...labelPlace(ring) }} />
 <ChangeOutline keys="1 3" box={outline(pin)} quiet={quiet(pin.id)} />
-<PickTag ref={tagRef} id={id} name="Button" detail="4 from this call site" words={OUTLINE_WORDS} place={tagPlace(…)} />
+<PickTag ref={tagRef} id={id} name="Button" detail="4 from this call site" words={outlineWords} place={tagPlace(…)} />
 ```
 
-The view (`highlight.tsx`) reads the page and measures each box, again whenever the page signal says one may have moved; it places the tags (`labelPlace`, `tagPlace`), and times a change's outlines (they linger, then step back). The patterns draw those boxes and panel-view's words (`OutlineWords`). A pattern never reads the page.
+The view (`highlight.tsx`) reads the page and measures each box, again whenever the page signal says one may have moved; it places the tags (`labelPlace`, `tagPlace`), and times a change's outlines (they linger, then step back). The patterns draw those boxes and `panelView()`'s words (`OutlineWords`). A pattern never reads the page.
 
 ## Interface
 
 - `PageOutline`: `kind` (`ring`, `member`, `out`, `hover`, `pick`), `box` (its place in the window, already stood off the Instance by 3px), `quiet`, and `tag`: the selected Instance's size tag (`text`, and whether it goes `below` the outline and from its `start`), or null.
 - `ChangeOutline`: `keys` (the numbers of the changes that reach it, "1 3"), `box`, `quiet`.
-- `PickTag`: `id` (the Instance it names), `name`, `detail` (or null), `place` (its top left), `words` (panel-view's `OutlineWords`), and `ref`, from which the view reads its size.
+- `PickTag`: `id` (the Instance it names), `name`, `detail` (or null), `place` (its top left), `words` (`panelView()`'s `OutlineWords`), and `ref`, from which the view reads its size.
 
 ## States
 

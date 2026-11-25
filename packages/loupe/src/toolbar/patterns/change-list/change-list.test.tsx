@@ -5,10 +5,9 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LIST_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { CHANGES } from "../samples.js";
+import { CHANGES, WORDS } from "../samples.js";
 import { ChangeList } from "./change-list.js";
 import CSS from "./change-list.css?inline";
 
@@ -16,7 +15,7 @@ afterEach(cleanup);
 
 function draw(changes = CHANGES) {
   const calls = { onSelect: vi.fn(), onHover: vi.fn() };
-  return { screen: renderInSurface(<ChangeList changes={changes} words={LIST_WORDS} {...calls} />), ...calls };
+  return { screen: renderInSurface(<ChangeList changes={changes} words={WORDS.list} {...calls} />), ...calls };
 }
 
 describe("ChangeList", () => {

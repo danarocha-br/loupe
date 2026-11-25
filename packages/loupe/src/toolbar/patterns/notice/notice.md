@@ -5,16 +5,16 @@ A notice is a card over the panel's content that says something the reader shoul
 An Instance's note is not a card (One Card Deep): a row of the Inspector's card, with the info glyph, that says once why nothing on the Instance can change.
 
 ```tsx
-{view.notices.map((notice) => <Notice key={notice.kind} notice={notice} words={COMMAND_WORDS} onCopy={copyToClipboard} />)}
+{view.notices.map((notice) => <Notice key={notice.kind} notice={notice} words={commandWords} onCopy={copyToClipboard} />)}
 {body.note && <InstanceNote note={body.note} />}
 ```
 
 ## Interface
 
 - `Notice`:
-  - `notice`: panel-view's `NoticeView`: `kind`, `tone` (`alert` or `amber`), `title`, `meta`, `body`, `rows` (`{ key, text, value, valueTitle }`, `key` telling the lines apart, a value at the line's right with its tooltip), `command`.
+  - `notice`: `panelView()`'s `NoticeView`: `kind`, `tone` (`alert` or `amber`), `title`, `meta`, `body`, `rows` (`{ key, text, value, valueTitle }`, `key` telling the lines apart, a value at the line's right with its tooltip), `command`.
   - `words` and `onCopy`: the command's, as CommandLine takes them.
-- `InstanceNote`: `note`, panel-view's `{ title, body }`.
+- `InstanceNote`: `note`, `panelView()`'s `{ title, body }`.
 
 ## States
 

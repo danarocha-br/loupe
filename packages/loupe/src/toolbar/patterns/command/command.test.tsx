@@ -6,10 +6,9 @@
 import { userEvent } from "@testing-library/user-event";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COMMAND_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { listen } from "@loupe/ui/listen";
-import { COMMAND, SECRET_LINE } from "../samples.js";
+import { COMMAND, SECRET_LINE, WORDS } from "../samples.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { CommandLine } from "./command.js";
 import CSS from "./command.css?inline";
@@ -23,7 +22,7 @@ describe("CommandLine", () => {
   it("shows the command as written after a hidden prompt, and copies it", async () => {
     const user = userEvent.setup({ document });
     const onCopy = vi.fn(() => Promise.resolve());
-    const screen = renderInSurface(<CommandLine text={COMMAND} words={COMMAND_WORDS} onCopy={onCopy} />);
+    const screen = renderInSurface(<CommandLine text={COMMAND} words={WORDS.command} onCopy={onCopy} />);
     expect(screen.getByText(COMMAND, { normalizer: (text) => text }).textContent).toBe(COMMAND);
     expect(screen.getByText("$").getAttribute("aria-hidden")).toBe("true");
     await user.click(screen.getByRole("button", { name: "Copy" }));
@@ -34,7 +33,7 @@ describe("CommandLine", () => {
   it("copies what it was told to, without a prompt, and steps back from Copied", async () => {
     vi.useFakeTimers();
     const onCopy = vi.fn(() => Promise.resolve());
-    const screen = renderInSurface(<CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={COMMAND_WORDS} onCopy={onCopy} />);
+    const screen = renderInSurface(<CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={WORDS.command} onCopy={onCopy} />);
     expect(screen.queryByText("$")).toBeNull();
     await act(async () => screen.getByRole("button", { name: "Copy" }).click());
     expect(onCopy).toHaveBeenCalledWith(SECRET_LINE.copy);
@@ -48,7 +47,7 @@ describe("CommandLine", () => {
     const screen = renderInSurface(
       <CommandLine
         text={COMMAND}
-        words={COMMAND_WORDS}
+        words={WORDS.command}
         onCopy={() => {
           // A clipboard that isn't there throws rather than rejects.
           throw new TypeError("navigator.clipboard is undefined");
@@ -58,13 +57,13 @@ describe("CommandLine", () => {
     const heard = listen(screen.shadow);
     await user.click(screen.getByRole("button", { name: "Copy" }));
     expect(screen.getByRole("button", { name: "Copy failed" })).toBeTruthy();
-    expect(screen.getByText(COMMAND_WORDS.refused).tagName).toBe("P");
+    expect(screen.getByText(WORDS.command.refused).tagName).toBe("P");
     await act(async () => await new Promise((resolve) => setTimeout(resolve, 200)));
-    expect(heard.assertive).toEqual([COMMAND_WORDS.refused]);
+    expect(heard.assertive).toEqual([WORDS.command.refused]);
   });
 
   it("has no axe violations", async () => {
-    const screen = renderInSurface(<CommandLine text={COMMAND} words={COMMAND_WORDS} onCopy={() => Promise.resolve()} />);
+    const screen = renderInSurface(<CommandLine text={COMMAND} words={WORDS.command} onCopy={() => Promise.resolve()} />);
     expect(await axeViolations(screen.host)).toEqual([]);
   });
 });

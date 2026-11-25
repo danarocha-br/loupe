@@ -5,10 +5,9 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LIST_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { HELD, HELD_META } from "../samples.js";
+import { HELD, HELD_META, WORDS } from "../samples.js";
 import { HeldForReview } from "./held-for-review.js";
 import CSS from "./held-for-review.css?inline";
 
@@ -16,7 +15,7 @@ afterEach(cleanup);
 
 function draw(items = HELD) {
   const onDiscard = vi.fn();
-  const screen = renderInSurface(<HeldForReview items={items} meta={HELD_META} words={LIST_WORDS} onDiscard={onDiscard} />);
+  const screen = renderInSurface(<HeldForReview items={items} meta={HELD_META} words={WORDS.list} onDiscard={onDiscard} />);
   return { screen, onDiscard };
 }
 

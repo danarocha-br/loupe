@@ -5,18 +5,17 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { INSPECTOR_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { PropRow } from "../prop-row/prop-row.js";
-import { INSPECT_ONLY, INSPECT_ONLY_SHARED } from "../samples.js";
+import { INSPECT_ONLY, INSPECT_ONLY_SHARED, WORDS } from "../samples.js";
 import { InspectOnly } from "./inspect-only.js";
 import CSS from "./inspect-only.css?inline";
 
 afterEach(cleanup);
 
 const calls = { onSet: () => {}, onText: () => {}, onReset: () => {}, onSelect: () => {}, onHover: () => {} };
-const row = (item: (typeof INSPECT_ONLY.rows)[number]) => <PropRow key={item.name} item={item} look="pair" words={INSPECTOR_WORDS} {...calls} />;
+const row = (item: (typeof INSPECT_ONLY.rows)[number]) => <PropRow key={item.name} item={item} look="pair" words={WORDS.inspector} {...calls} />;
 
 describe("InspectOnly", () => {
   it("folds to one button that names its props, and opens to their rows", async () => {

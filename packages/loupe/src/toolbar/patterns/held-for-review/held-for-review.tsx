@@ -4,15 +4,15 @@
 // what it names and Discard, why it is held, and what it would set. Nothing here opens a
 // menu or a dialog to reach one.
 //
-// It draws panel-view's held records and `ListWords`, and builds none: Discard goes out
+// It draws `panelView()`'s held records and `ListWords`, and builds none: Discard goes out
 // through `onDiscard`, which makes the write in the view. See held-for-review.md.
 
-import type { ListBody, ListWords, ScopeTarget } from "../../panel-view/index.js";
+import type { HeldItem, ListWords, ScopeTarget } from "../view.js";
 import { Button, Card, CardHead, Row } from "@loupe/ui";
 import { DotTitle, HeldValues, Meta } from "../marks/marks.js";
 
 export type HeldForReviewProps = {
-  items: ListBody["suspended"];
+  items: HeldItem[];
   /** "2 · apply to nothing". */
   meta: string;
   words: Pick<ListWords, "held">;

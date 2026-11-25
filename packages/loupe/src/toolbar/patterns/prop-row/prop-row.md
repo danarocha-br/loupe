@@ -5,7 +5,7 @@ One prop of the Inspector, as `panelView()` decided it (DESIGN.md "Property rows
 ```tsx
 <PropRow
   item={item}
-  words={INSPECTOR_WORDS}
+  words={inspectorWords}
   onSet={(write, value) => debug.set(write.id, write.prop, value, write.scope)}
   onText={(write, text) => debug.set(write.id, write.prop, text, write.scope)}
   oneLine={singleLine}
@@ -17,7 +17,7 @@ One prop of the Inspector, as `panelView()` decided it (DESIGN.md "Property rows
 
 ## Interface
 
-- `item`: panel-view's `PropItem`. `words`: panel-view's `InspectorWords`. It draws both and builds no word of its own.
+- `item`: `panelView()`'s `PropItem`. `words`: `panelView()`'s `InspectorWords`. It draws both and builds no word of its own.
 - `look`: `inset` (the Inspector's card, with `PROP_ICONS[item.glyph]` in the glyph column) or `pair` (Inspect only: name and value side by side, no glyph).
 - `onSet(write, value)`: a chip chosen, or a switch turned. `onText(write, text)`: label text as typed, after `oneLine`. `oneLine(text)`: the view's rule for one line (a line break becomes a space); the field shows its result too, so a pasted break never waits in the field for a blur. `onReset(write)`: Reset pressed. `onSelect(id)`: "1 of 4 keeps its own value" pressed. `onHover(ids)`: those Instances outlined while the pointer or focus is on the note; `[]` clears.
 

@@ -3,10 +3,10 @@
 // it changes from and to, and what it reaches. A row selects what it changed and outlines
 // on the page every Instance it reaches; one whose Instances aren't mounted is off.
 //
-// It draws panel-view's `ChangeItem`s and `ListWords` and builds none: selecting and
+// It draws `panelView()`'s `ChangeItem`s and `ListWords` and builds none: selecting and
 // outlining go out through its callbacks. See change-list.md.
 
-import type { ChangeItem, ListWords } from "../../panel-view/index.js";
+import type { ChangeItem, ListWords } from "../view.js";
 import { Card, CardHead } from "@loupe/ui";
 import { ChangeKey, hovering, Meta } from "../marks/marks.js";
 

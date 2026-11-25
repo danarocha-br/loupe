@@ -5,10 +5,9 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COPY_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { COPIED_TITLE, REFUSED } from "../samples.js";
+import { COPIED_TITLE, REFUSED, WORDS } from "../samples.js";
 import { CopySplit, type CopySplitProps, CopyToast, DetailsForm, type DetailsFormProps, NotCopied } from "./copy-flow.js";
 import CSS from "./copy-flow.css?inline";
 
@@ -16,7 +15,7 @@ afterEach(cleanup);
 
 function split(props: Partial<CopySplitProps> = {}) {
   const calls = { onCopy: vi.fn(), onDetails: vi.fn() };
-  const screen = renderInSurface(<CopySplit state="idle" busy={false} disabled={false} expanded={false} words={COPY_WORDS} {...calls} {...props} />);
+  const screen = renderInSurface(<CopySplit state="idle" busy={false} disabled={false} expanded={false} words={WORDS.copy} {...calls} {...props} />);
   return { screen, ...calls };
 }
 
@@ -25,7 +24,7 @@ describe("CopySplit", () => {
     const user = userEvent.setup({ document });
     const { screen, onCopy, onDetails } = split();
     const main = screen.getByRole("button", { name: "Copy Proposal" });
-    expect(main.getAttribute("title")).toBe(COPY_WORDS.mainTitle);
+    expect(main.getAttribute("title")).toBe(WORDS.copy.mainTitle);
     await user.click(main);
     expect(onCopy).toHaveBeenCalledTimes(1);
     const chevron = screen.getByRole("button", { name: "Copy with details" });
@@ -39,7 +38,7 @@ describe("CopySplit", () => {
     const { screen } = split({ state: "copied", expanded: true });
     expect(screen.getByRole("button", { name: "Copied" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy with details" }).getAttribute("aria-expanded")).toBe("true");
-    screen.rerender(<CopySplit state="failed" busy={false} disabled={false} expanded={false} words={COPY_WORDS} onCopy={() => {}} onDetails={() => {}} />);
+    screen.rerender(<CopySplit state="failed" busy={false} disabled={false} expanded={false} words={WORDS.copy} onCopy={() => {}} onDetails={() => {}} />);
     expect(screen.getByRole("button", { name: "Not copied" })).toBeTruthy();
     expect(screen.shadow.querySelector("[data-copy-split]")?.getAttribute("data-state")).toBe("failed");
   });
@@ -61,7 +60,7 @@ describe("CopySplit", () => {
 
 function form(props: Partial<DetailsFormProps> = {}) {
   const calls = { onTitle: vi.fn(), onDesigner: vi.fn(), onSubmit: vi.fn() };
-  const screen = renderInSurface(<DetailsForm title={COPIED_TITLE} designer="" missing={false} busy={false} words={COPY_WORDS} {...calls} {...props} />);
+  const screen = renderInSurface(<DetailsForm title={COPIED_TITLE} designer="" missing={false} busy={false} words={WORDS.copy} {...calls} {...props} />);
   return { screen, ...calls };
 }
 
@@ -73,7 +72,7 @@ describe("DetailsForm", () => {
     expect(title.value).toBe(COPIED_TITLE);
     expect(title.required).toBe(true);
     const designer = screen.getByRole("textbox", { name: "Designer optional" }) as HTMLInputElement;
-    expect(designer.placeholder).toBe(COPY_WORDS.designerHint);
+    expect(designer.placeholder).toBe(WORDS.copy.designerHint);
     await user.type(designer, "D");
     expect(onDesigner).toHaveBeenLastCalledWith("D");
     await user.type(title, "!");
@@ -91,7 +90,7 @@ describe("DetailsForm", () => {
   it("says a missing title under its field, and describes the field with it", async () => {
     const { screen } = form({ title: "", missing: true });
     const title = screen.getByRole("textbox", { name: "Title" });
-    expect(screen.getByText(COPY_WORDS.titleMissing).hasAttribute("data-field-error")).toBe(true);
+    expect(screen.getByText(WORDS.copy.titleMissing).hasAttribute("data-field-error")).toBe(true);
     expect(await axeViolations(screen.host)).toEqual([]);
     expect(title.getAttribute("aria-invalid")).toBe("true");
   });
@@ -104,13 +103,13 @@ describe("DetailsForm", () => {
 });
 
 describe("NotCopied", () => {
-  const said = COPY_WORDS.notCopiedText(REFUSED.reason, true);
+  const said = WORDS.copy.notCopiedText(REFUSED.reason, true);
 
   it("says why under its heading, holds the Proposal to copy by hand, and selects it all", async () => {
     const user = userEvent.setup({ document });
     const onRetry = vi.fn();
-    const screen = renderInSurface(<NotCopied said={said} text={REFUSED.text} busy={false} words={COPY_WORDS} onRetry={onRetry} />);
-    expect(screen.getByRole("heading", { level: 3, name: COPY_WORDS.notCopied })).toBeTruthy();
+    const screen = renderInSurface(<NotCopied said={said} text={REFUSED.text} busy={false} words={WORDS.copy} onRetry={onRetry} />);
+    expect(screen.getByRole("heading", { level: 3, name: WORDS.copy.notCopied })).toBeTruthy();
     expect(screen.getByText(said).tagName).toBe("P");
     const text = screen.getByRole("textbox", { name: "The Proposal" }) as HTMLTextAreaElement;
     expect(text.readOnly).toBe(true);
@@ -124,7 +123,7 @@ describe("NotCopied", () => {
   });
 
   it("offers only another try when the Proposal wasn't built", async () => {
-    const screen = renderInSurface(<NotCopied said={REFUSED.reason} text="" busy words={COPY_WORDS} onRetry={() => {}} />);
+    const screen = renderInSurface(<NotCopied said={REFUSED.reason} text="" busy words={WORDS.copy} onRetry={() => {}} />);
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Try again"]);
     expect(screen.getByRole("button", { name: "Try again" }).getAttribute("aria-disabled")).toBe("true");
@@ -135,17 +134,17 @@ describe("NotCopied", () => {
 
 describe("CopyToast", () => {
   it("shows what went, the title isolated, and stays out of the accessibility tree", async () => {
-    const screen = renderInSurface(<CopyToast title={COPIED_TITLE} words={COPY_WORDS} />);
+    const screen = renderInSurface(<CopyToast title={COPIED_TITLE} words={WORDS.copy} />);
     const toast = screen.shadow.querySelector("[data-copy-toast]") as HTMLElement;
     expect(toast.getAttribute("aria-hidden")).toBe("true");
     expect(toast.querySelector("[data-toast-line]")?.textContent).toBe(`Copied “${COPIED_TITLE}”`);
     expect(toast.querySelector("bdi")?.textContent).toBe(COPIED_TITLE);
-    expect(toast.querySelector("[data-toast-sub]")?.textContent).toBe(COPY_WORDS.pasteIt);
+    expect(toast.querySelector("[data-toast-sub]")?.textContent).toBe(WORDS.copy.pasteIt);
     expect(await axeViolations(screen.host)).toEqual([]);
   });
 
   it("says in words what the toast shows, for the announcer", () => {
-    expect(COPY_WORDS.copiedText(COPIED_TITLE)).toBe(`Copied “${COPIED_TITLE}”. ${COPY_WORDS.pasteIt}.`);
+    expect(WORDS.copy.copiedText(COPIED_TITLE)).toBe(`Copied “${COPIED_TITLE}”. ${WORDS.copy.pasteIt}.`);
   });
 });
 

@@ -2,9 +2,9 @@
 // that have no Instance mounted now, such as a menu's items or a dialog's parts. A row each:
 // its name, and how to get it on screen to inspect it.
 //
-// It draws panel-view's component names and `ListWords`, and builds none. See interaction.md.
+// It draws `panelView()`'s component names and `ListWords`, and builds none. See interaction.md.
 
-import type { ListWords } from "../../panel-view/index.js";
+import type { ListWords } from "../view.js";
 import { Card, CardHead, Row } from "@loupe/ui";
 import { Meta } from "../marks/marks.js";
 

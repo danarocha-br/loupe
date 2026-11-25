@@ -4,12 +4,12 @@
 // and a name that breaks only between its words.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { INSPECTOR_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { MAP_HUES } from "../tokens.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { Breakable, ChangeKey, HeldKey, Keys, StatusChip, TagChip } from "./marks.js";
 import CSS from "./marks.css?inline";
+import { WORDS } from "../samples.js";
 
 afterEach(cleanup);
 
@@ -17,21 +17,21 @@ describe("Marks", () => {
   it("names a change's delta as the change it numbers, and hides a held State prop's empty one", async () => {
     const screen = renderInSurface(
       <p>
-        <ChangeKey n={2} words={INSPECTOR_WORDS} /> <HeldKey words={INSPECTOR_WORDS} /> variant
+        <ChangeKey n={2} words={WORDS.inspector} /> <HeldKey words={WORDS.inspector} /> variant
       </p>,
     );
     const delta = screen.getByRole("img", { name: "Change 2" });
     expect([delta.textContent, delta.getAttribute("title")]).toEqual(["2", "Change 2 in the Proposal"]);
     expect(screen.getAllByRole("img")).toHaveLength(1);
-    expect(screen.getByTitle(INSPECTOR_WORDS.heldTitle).getAttribute("aria-hidden")).toBe("true");
+    expect(screen.getByTitle(WORDS.inspector.heldTitle).getAttribute("aria-hidden")).toBe("true");
     expect(await axeViolations(screen.host)).toEqual([]);
   });
 
   it("sets an Instance's change numbers side by side, and nothing when none reach it", () => {
     const screen = renderInSurface(
       <>
-        <Keys keys={[1, 3]} words={INSPECTOR_WORDS} />
-        <Keys keys={[]} words={INSPECTOR_WORDS} />
+        <Keys keys={[1, 3]} words={WORDS.inspector} />
+        <Keys keys={[]} words={WORDS.inspector} />
       </>,
     );
     expect(screen.getAllByRole("img").map((delta) => delta.getAttribute("aria-label"))).toEqual(["Change 1", "Change 3"]);

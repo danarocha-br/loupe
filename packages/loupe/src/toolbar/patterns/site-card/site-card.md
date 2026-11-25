@@ -13,7 +13,7 @@ A call site of a component, in an opened row of "On this page" (DESIGN.md "On th
 
 ## Interface
 
-- `site`: panel-view's `CallSiteItem`: `label` ("member-row-menu.tsx:37"), `names` ("Ana Souza, Bruno Lima +2"), `inspect`, the card's name for a screen reader, `instances` (each `{ id, label, inspect }`), `ids`, and `supported` (false draws the inspect-only eye).
+- `site`: `panelView()`'s `CallSiteItem`: `label` ("member-row-menu.tsx:37"), `names` ("Ana Souza, Bruno Lima +2"), `inspect`, the card's name for a screen reader, `instances` (each `{ id, label, inspect }`), `ids`, and `supported` (false draws the inspect-only eye).
 - `onSite(site)`: the card pressed. The view decides the mode: Select multiple when the call site has several Instances.
 - `onInstance(id)`: a dot pressed.
 - `onHover(ids)`: the card outlines its call site, a dot its one Instance; empty as it is left.

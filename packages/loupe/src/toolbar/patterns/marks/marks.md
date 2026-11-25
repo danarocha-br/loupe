@@ -1,9 +1,9 @@
 # Marks
 
-The small marks the Inspector's patterns and the list share: a change's delta, an Instance's row of them, a held State prop's empty delta, a verdict's status chip, a tag in panel-view's words, a name that breaks only between its words, a held record's values, a card title that leads with a dot, the count beside a card's title, and a component's hue. Primitives composed (Delta, Dot, Tag, the check icon); each takes panel-view's data and the Inspector's words. And `hovering()`, the handlers a row spreads to outline what it names on the page.
+The small marks the Inspector's patterns and the list share: a change's delta, an Instance's row of them, a held State prop's empty delta, a verdict's status chip, a tag in `panelView()`'s words, a name that breaks only between its words, a held record's values, a card title that leads with a dot, the count beside a card's title, and a component's hue. Primitives composed (Delta, Dot, Tag, the check icon); each takes `panelView()`'s data and the Inspector's words. And `hovering()`, the handlers a row spreads to outline what it names on the page.
 
 ```tsx
-<Keys keys={body.keys} words={INSPECTOR_WORDS} />
+<Keys keys={body.keys} words={inspectorWords} />
 <StatusChip status={body.verdict.status} check />
 <TagChip tag={{ kind: "not-visible", text: "Not visible now" }} />
 <Breakable text="AlertDialogContent" />
@@ -18,9 +18,9 @@ The small marks the Inspector's patterns and the list share: a change's delta, a
 
 - `ChangeKey`: `n` and `words` (`change(n)` gives its name, "Change 2", and its tooltip). `HeldKey`: `words` (`heldTitle`). `Keys`: `keys` and `words`; nothing when `keys` is empty.
 - `StatusChip`: `status` (`{ kind?, text }`: a verdict's kind, or none for a plain status such as "Not on the page now"), `title`, and `check`, which leads Supported with a tick.
-- `TagChip`: `tag`, one of panel-view's `Tag`s; its kind picks the Tag look.
+- `TagChip`: `tag`, one of `panelView()`'s `Tag`s; its kind picks the Tag look.
 - `Breakable`: `text`; a `<wbr>` where a lower-case letter or digit meets a capital.
-- `HeldValues`: `values`, panel-view's lines for a held record ('variant "outline" · Current "ghost" (last seen)'), a list item each.
+- `HeldValues`: `values`, `panelView()`'s lines for a held record ('variant "outline" · Current "ghost" (last seen)'), a list item each.
 - `DotTitle`: `tone` (a Dot tone: `alert`, `amber`, `ring`…) and its words, which may be a heading.
 - `Meta`: its words, the count at the right of a card's head.
 - `hovering(onHover, ids)`: `onMouseOver` and `onFocus` call `onHover(ids)`; `onMouseLeave` and `onBlur` call it with none. `onMouseOver`, not `onMouseEnter`: React drops an enter that comes straight from an App Router page.

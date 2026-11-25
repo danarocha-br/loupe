@@ -3,19 +3,19 @@
 // details; the details' form, a title and a designer; a refused copy's body, why, the
 // Proposal's text to copy by hand and another try; and the toast once a copy lands.
 //
-// They draw panel-view's words (`CopyWords`) and build none. They make no copy: each calls
+// They draw `panelView()`'s words (`CopyWords`) and build none. They make no copy: each calls
 // back, and the view runs the copy, keeps its state (which half opened the popover, the
 // timers that turn the button back and take the toast away, the form's text), places the
 // popovers and hands focus back, and says each copy and refusal. See copy-flow.md.
 
 import { type Ref, useRef } from "react";
-import type { CopyWords } from "../../panel-view/index.js";
+import type { CopyWords } from "../view.js";
 import { AlertIcon, Button, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, Field, ResetIcon } from "@loupe/ui";
 
 /** The split button's state: ready, a copy landed (green, for a moment), or the main half's copy refused (amber). */
 export type CopyState = "idle" | "copied" | "failed";
 
-/** The main half's icon in each state; its words are panel-view's. */
+/** The main half's icon in each state; its words are `panelView()`'s. */
 const ICONS = {
   idle: <CopyIcon size={16} />,
   copied: <CheckIcon size={16} />,

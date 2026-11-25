@@ -1,11 +1,11 @@
 # Identity
 
-The top of the Inspector card, which says what is selected (DESIGN.md "Identity"); the same block heads "Not on the page now". It draws what panel-view decided, in the Inspector's words, and places the view's actions.
+The top of the Inspector card, which says what is selected (DESIGN.md "Identity"); the same block heads "Not on the page now". It draws what `panelView()` decided, in the Inspector's words, and places the view's actions.
 
 ```tsx
 <Identity
   identity={body.identity}
-  words={INSPECTOR_WORDS}
+  words={inspectorWords}
   onBack={() => select(null)}
   nameLang={appLang()}
   heading={heading}
@@ -16,7 +16,7 @@ The top of the Inspector card, which says what is selected (DESIGN.md "Identity"
 
 ## Interface
 
-- `identity`: panel-view's `IdentityView`, the Inspector's or "Not on the page now"'s:
+- `identity`: `panelView()`'s `IdentityView`, the Inspector's or "Not on the page now"'s:
   - `component` (null when the headline is the component), `page`, `status` (a verdict or a plain status), `keys`;
   - `name`, `nameTitle`, and `ownName`, true when the name is the app's own words;
   - `where`: `{ file, line }`, after a file icon, the line set apart; or one line of words. `whereTitle`, `id` (null once gone);
