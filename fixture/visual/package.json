@@ -5,7 +5,7 @@
   "description": "The visual check: records every @loupe/ui workbench page and the Toolbar's states on the fixture, on a base commit and on the working tree, and diffs the two. Run it from the root: `pnpm visual`.",
   "type": "module",
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.12"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

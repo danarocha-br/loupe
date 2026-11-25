@@ -26,6 +26,9 @@ export type Report = { compared: number; scenes: SceneReport[]; added: string[];
 /** The verdict: the scenes that differ, and those the head no longer has. */
 export const failures = (report: Report) => report.scenes.length + report.removed.length;
 
+/** Nothing was compared: the check couldn't run, which is neither a pass nor a difference. */
+export const empty = (report: Report) => report.compared === 0 && report.removed.length === 0;
+
 const readScenes = (dir: string): string[] => (existsSync(manifestFile(dir)) ? JSON.parse(readFileSync(manifestFile(dir), "utf8")) : []);
 const readScene = (dir: string, scene: string): Recording => JSON.parse(readFileSync(sceneFile(dir, scene), "utf8"));
 
@@ -174,7 +177,7 @@ export async function compare(baseDir: string, headDir: string, diffDir: string,
 export function markdown(report: Report, title: string): string {
   const lines = [`# ${title}`, ""];
   const failed = failures(report);
-  lines.push(failed ? `**${failed} scene(s) differ.**` : "**No difference.**", "");
+  lines.push(empty(report) ? "**Nothing was compared: the check couldn't run.**" : failed ? `**${failed} scene(s) differ.**` : "**No difference.**", "");
   lines.push(`Compared ${report.compared} scenes: ${report.elements} elements and ${report.images} screenshots.`, "");
   if (report.removed.length) lines.push("## Scenes only in the base", "", ...report.removed.map((s) => `- ${s}`), "");
   if (report.added.length) lines.push("## Scenes only in the head (new, not compared)", "", ...report.added.map((s) => `- ${s}`), "");

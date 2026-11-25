@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { compare, failures, markdown } from "./compare.ts";
+import { compare, empty, failures, markdown } from "./compare.ts";
 import { record } from "./record.ts";
 import { assertFixtureFree, stopAll } from "./servers.ts";
 
@@ -128,7 +128,7 @@ async function main(): Promise<number> {
   const text = markdown(report, title);
   writeFileSync(join(WORK, "report.md"), text);
 
-  if (report.compared === 0 && report.removed.length === 0) {
+  if (empty(report)) {
     throw new Error(only ? `--only ${only} selects no scene that both sides have: nothing was compared` : "nothing was compared: neither side recorded a scene");
   }
   const failed = failures(report);

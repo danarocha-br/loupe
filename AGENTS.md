@@ -35,7 +35,7 @@ A refactor keeps the layout identical to main. Prove it with `pnpm visual` befor
 - the Toolbar on the fixture, light and dark: the pill, hovered, then the hand harness's ten states, from the list to Hide marks (`toolbar/<theme>/…`), and the sheet over the page at 700 × 860 (`overlay/<theme>/…`);
 - the fixture's `/workbench`, every pattern in each frame, and under forced colours (`patterns`, `patterns@forced`).
 
-It needs Node 22.6 or later (the repo's `.nvmrc`) and, once per machine, Playwright's Chromium:
+It needs Node 22.12 or later (the repo's `.nvmrc`; Vite's floor on 22) and, once per machine, Playwright's Chromium:
 
 ```bash
 pnpm --filter @fixture/visual exec playwright install --only-shell chromium
