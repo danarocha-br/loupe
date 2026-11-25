@@ -6,7 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FlagsCard } from "./flags.js";
 import { cleanup, renderInSurface } from "./surface/render.fixture.js";
-import { listen } from "./ui/announcer/announcer.fixture.js";
+import { listen } from "@loupe/ui/listen";
 import { decryptJwe } from "./flags-crypto.js";
 import { type FlagRequest, type FlagsResult, readPreview, writePreview } from "./flags-preview.js";
 import { flagsView, loadFlags, previewedFlags, setFlagSource } from "./flags-store.js";

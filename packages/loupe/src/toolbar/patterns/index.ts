@@ -2,11 +2,11 @@
 // panel-view's types. Each lives in its own folder: the component, its CSS in the
 // stylesheet's `patterns` layer, its tests and a `.md`.
 //
-// The import rule: a pattern imports only `ui/`, the tokens, other patterns and
-// `panel-view`'s types (never a value from it), and draws the words panel-view decided; it
-// builds none, and makes no write: its callbacks do, in the view. Nothing in `ui/` imports
-// a pattern.
-// `src/toolbar/ui/layers.test.ts` holds both.
+// The import rule: a pattern imports only `@loupe/ui` (the primitives and the tokens),
+// other patterns and `panel-view`'s types (never a value from it), and draws the words
+// panel-view decided; it builds none, and makes no write: its callbacks do, in the view.
+// `@loupe/ui` imports nothing from Loupe, a pattern least of all.
+// `src/toolbar/layers.test.ts` and `@loupe/ui`'s `boundary.test.ts` hold both.
 
 export { ChangeList, type ChangeListProps } from "./change-list/change-list.js";
 export { CommandLine, type CommandLineProps } from "./command/command.js";

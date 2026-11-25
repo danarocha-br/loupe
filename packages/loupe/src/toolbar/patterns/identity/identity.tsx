@@ -9,7 +9,7 @@
 
 import type { ReactNode, Ref } from "react";
 import type { IdentityView, InspectorWords } from "../../panel-view/index.js";
-import { BackIcon, Button, Dot, ElbowIcon, FileIcon, Tag } from "../../ui/index.js";
+import { BackIcon, Button, Dot, ElbowIcon, FileIcon, Tag } from "@loupe/ui";
 import { Breakable, Keys, StatusChip, TagChip } from "../marks/marks.js";
 
 export type IdentityProps = {

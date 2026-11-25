@@ -5,7 +5,7 @@
 // It draws panel-view's component names and `ListWords`, and builds none. See interaction.md.
 
 import type { ListWords } from "../../panel-view/index.js";
-import { Card, CardHead, Row } from "../../ui/index.js";
+import { Card, CardHead, Row } from "@loupe/ui";
 import { Meta } from "../marks/marks.js";
 
 export type AppearsOnInteractionProps = {

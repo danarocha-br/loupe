@@ -19,11 +19,11 @@ import { columnWidthFor, releaseColumn, reserveColumn, useColumn } from "./dock.
 import { Launcher } from "./launcher.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import { useFocusShortcut } from "./shortcut.js";
-import { DURATION } from "./tokens.js";
+import { DURATION } from "@loupe/ui/tokens";
 import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
 import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
 import { createToolbarStore, ToolbarStoreContext } from "./toolbar-store.js";
-import { Announcer } from "./ui/announcer/announcer.js";
+import { Announcer } from "@loupe/ui/announcer";
 
 export type { Theme } from "./surface/index.js";
 

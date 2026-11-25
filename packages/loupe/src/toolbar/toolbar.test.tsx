@@ -19,7 +19,7 @@ import { OPEN_KEY } from "./launcher-place.js";
 import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
 import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
-import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
+import { type Heard, listen } from "@loupe/ui/listen";
 import { dismissUndo } from "./undo.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

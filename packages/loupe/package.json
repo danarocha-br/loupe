@@ -44,7 +44,7 @@
     "directory": "packages/loupe"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
+    "build": "pnpm --dir ../ui build && rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
     "prepack": "pnpm run build",
     "test": "vitest run",
     "typecheck": "tsc6 --noEmit"

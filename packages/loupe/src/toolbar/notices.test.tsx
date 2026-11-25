@@ -16,7 +16,7 @@ import COMMAND_CSS from "./patterns/command/command.css?inline";
 import IDENTITY_CSS from "./patterns/identity/identity.css?inline";
 import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
-import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
+import { type Heard, listen } from "@loupe/ui/listen";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

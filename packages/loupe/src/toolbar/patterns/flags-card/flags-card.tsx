@@ -26,7 +26,7 @@ import {
   RowAction,
   RowLine,
   RowName,
-} from "../../ui/index.js";
+} from "@loupe/ui";
 import { CommandLine } from "../command/command.js";
 import { Meta } from "../marks/marks.js";
 

@@ -26,7 +26,7 @@ import {
   Switch,
   Tag,
   useAnnounceChange,
-} from "../../ui/index.js";
+} from "@loupe/ui";
 import { Breakable, ChangeKey, HeldKey } from "../marks/marks.js";
 
 export type PropRowProps = {

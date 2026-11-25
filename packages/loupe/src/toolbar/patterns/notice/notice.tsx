@@ -9,7 +9,7 @@
 // panel says each notice through its live regions, so the card carries no role. See notice.md.
 
 import type { CommandWords, InspectorBody, NoticeView } from "../../panel-view/index.js";
-import { Card, CardHead, InfoIcon, Row, RowLine, RowValue } from "../../ui/index.js";
+import { Card, CardHead, InfoIcon, Row, RowLine, RowValue } from "@loupe/ui";
 import { CommandLine } from "../command/command.js";
 import { DotTitle, Meta } from "../marks/marks.js";
 

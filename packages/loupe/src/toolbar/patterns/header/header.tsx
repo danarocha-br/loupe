@@ -22,7 +22,7 @@ import {
   SelectManyIcon,
   Toggle,
   Wordmark,
-} from "../../ui/index.js";
+} from "@loupe/ui";
 
 /** The select tools are chips of a radio group drawn as Button's round tool. */
 const TOOL_LOOK = lookAttributes({ look: "tool", iconOnly: true });

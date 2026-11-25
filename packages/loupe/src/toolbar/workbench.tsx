@@ -7,7 +7,6 @@
 // `<LoupeMount />` loads the Toolbar; a host never imports it.
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { InfoIcon, PROP_ICONS, ResetIcon } from "./ui/icon/icon.js";
 import {
   COMMAND_WORDS,
   COPY_WORDS,
@@ -111,9 +110,12 @@ import {
   FoldChevron,
   FoldPanel,
   FoldTrigger,
+  InfoIcon,
   Kbd,
   Popover,
   PopoverPanel,
+  PROP_ICONS,
+  ResetIcon,
   Row,
   RowAction,
   RowLine,
@@ -124,7 +126,7 @@ import {
   Toggle,
   type Politeness,
   useAnnounce,
-} from "./ui/index.js";
+} from "@loupe/ui";
 
 /** Whether a media feature the frame depends on is on in this browser right now. */
 function useMedia(query: string): boolean {

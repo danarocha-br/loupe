@@ -31,7 +31,7 @@ import {
 import { LAUNCHER_WORDS } from "./panel-view/chrome.js";
 import { LauncherPill } from "./patterns/launcher/launcher.js";
 import { SHORTCUT_ARIA, shortcutLabel } from "./shortcut.js";
-import { DURATION } from "./tokens.js";
+import { DURATION } from "@loupe/ui/tokens";
 
 export type { Rect };
 

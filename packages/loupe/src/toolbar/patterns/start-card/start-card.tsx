@@ -9,7 +9,7 @@
 
 import type { Ref } from "react";
 import type { ListWords, SelectMode } from "../../panel-view/index.js";
-import { Card, Chip, ChipGroup } from "../../ui/index.js";
+import { Card, Chip, ChipGroup } from "@loupe/ui";
 
 /** The tiles, in the header's order. */
 const MODES: readonly SelectMode[] = ["one", "many"];

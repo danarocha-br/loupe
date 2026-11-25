@@ -8,7 +8,7 @@
 
 import { Fragment, type ReactNode } from "react";
 import type { InspectorWords, StatusText, Tag as TagText } from "../../panel-view/index.js";
-import { CheckIcon, Delta, Dot, type DotTone, Tag, type TagLook } from "../../ui/index.js";
+import { CheckIcon, Delta, Dot, type DotTone, Tag, type TagLook } from "@loupe/ui";
 
 /**
  * A prop's or a component's name, free to break only where its words meet:

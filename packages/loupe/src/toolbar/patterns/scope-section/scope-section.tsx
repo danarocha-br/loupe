@@ -8,7 +8,7 @@
 // go out through its callbacks. See scope-section.md.
 
 import type { InspectorWords, MemberItem, MembersView, Scope, ScopeMove } from "../../panel-view/index.js";
-import { Button, Fold, FoldChevron, FoldPanel, FoldTrigger, LayersIcon, ResetIcon, Tag, WidenIcon } from "../../ui/index.js";
+import { Button, Fold, FoldChevron, FoldPanel, FoldTrigger, LayersIcon, ResetIcon, Tag, WidenIcon } from "@loupe/ui";
 import { Breakable, hovering, TagChip } from "../marks/marks.js";
 
 /** As many dots as the meter can show: past this, the words alone say how far it reaches. */
