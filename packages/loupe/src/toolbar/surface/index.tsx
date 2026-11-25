@@ -5,8 +5,8 @@
 // - `STYLESHEET`, `@loupe/patterns/stylesheet`'s: the system's with the patterns' layer on
 //   top, and the Toolbar's own tokens (`@loupe/patterns/tokens`) on the host;
 // - `useToolbarSurface()`, the Toolbar's: a host on the body, so the app's CSS can't reach it;
-// - `<Surface>`, a host in place under `STYLESHEET`, for a test or the workbench page to draw
-//   any primitive or pattern inside a real shadow root;
+// - `<Surface>`, a host in place under `STYLESHEET`, to draw any primitive or pattern inside a
+//   real shadow root as the Toolbar does (the packages' workbenches draw in `@loupe/ui`'s own);
 // - `useTheme()`, light or dark as the reader last chose it.
 
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
@@ -39,7 +39,7 @@ export function useToolbarSurface(): ShadowRoot | null {
 
 /**
  * The in-place adapter: draws `children` inside a real shadow root, under `STYLESHEET`,
- * at a theme and, for the workbench, a text size of the reader's choosing.
+ * at a theme and a text size of the reader's choosing.
  */
 export function Surface(props: Omit<SurfaceProps, "stylesheet">) {
   return <SystemSurface {...props} stylesheet={STYLESHEET} />;
