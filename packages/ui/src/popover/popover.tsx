@@ -4,7 +4,7 @@
 // outside), the panel its place, its caret and where focus goes. See popover.md.
 
 import { PopoverContent, Popover as SdkPopover } from "@ui-sdk/react/popover";
-import { createContext, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createContext, type CSSProperties, type ReactNode, type RefObject, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { DataAttributes } from "../data-attributes.js";
 
 export type PopoverProps = {
@@ -65,22 +65,63 @@ export function Popover({ open, onOpenChange, inside, children }: PopoverProps) 
   );
 }
 
+/** What the box stands over, and that element's width, which the box takes less its insets. */
+type Over = { element: HTMLElement; width: number };
+
+/**
+ * The anchor's border-box width in its own CSS pixels, which is what the box's CSS width
+ * means. Its client rect is drawn at whatever zoom or transform is around it, and the box,
+ * inside the same, would be scaled twice. Fractional where the computed width is the laid-out
+ * one; `offsetWidth` where it isn't (`auto` on an inline element), as UI SDK checks its own.
+ */
+function layoutWidth(element: HTMLElement): number {
+  const style = getComputedStyle(element);
+  const px = (name: string) => parseFloat(style.getPropertyValue(name)) || 0;
+  const edges = style.boxSizing === "border-box" ? 0 : px("padding-left") + px("padding-right") + px("border-left-width") + px("border-right-width");
+  const width = parseFloat(style.width) + edges;
+  return Math.abs(width - element.offsetWidth) < 1 ? width : element.offsetWidth;
+}
+
+/** `element` as it measures now: `last` itself while that hasn't changed, so React skips the render. */
+function measure(last: Over | null, element: HTMLElement): Over {
+  const width = layoutWidth(element);
+  return last?.element === element && last.width === width ? last : { element, width };
+}
+
 /** The box: a dialog over its anchor, with a caret on its foot. Mounted only while open. */
 export function PopoverPanel({ label, anchor, returnFocus, initialFocus, caret = "center", className, children, ...data }: PopoverPanelProps) {
   // Read as it opens, before paint: an anchor around the panel has no element yet when the panel mounts.
+  // Its width comes in the same render, and the box mounts only once both are known: UI SDK
+  // places it as it mounts, and again only on its next frame, which a throttled tab may not
+  // run for a second. Mounted sooner, the box stood at the viewport's corner until then; sized
+  // by UI SDK's `--anchor-width`, which comes after that first measure, it stood off-centre.
+  // Each open measures afresh: what was read last time is cleared as it closes, since the
+  // anchor may have changed width since then with nothing yet observed.
   const open = useContext(Open);
-  const [over, setOver] = useState<HTMLElement | null>(null);
+  const [over, setOver] = useState<Over | null>(null);
   useLayoutEffect(() => {
-    if (open) setOver(anchor.current);
+    const element = open ? anchor.current : null;
+    if (!element) {
+      setOver(null);
+      return;
+    }
+    setOver((last) => measure(last, element));
+    // While it is open, the width follows the anchor.
+    if (typeof ResizeObserver === "undefined") return;
+    const resize = new ResizeObserver(() => setOver((last) => (last?.element === element ? measure(last, element) : last)));
+    resize.observe(element);
+    return () => resize.disconnect();
   }, [open, anchor]);
   const box = useRef<HTMLDivElement>(null);
+  if (!over) return null;
   return (
     <PopoverContent
       {...data}
       side="top"
       align="center"
       sideOffset={10}
-      anchor={over}
+      anchor={over.element}
+      style={{ "--popover-anchor-width": `${over.width}px` } as CSSProperties}
       // UI SDK selects a text field's value as it focuses it: the panel focuses its own.
       initialFocus="none"
       finalFocus={() => returnFocus.current}

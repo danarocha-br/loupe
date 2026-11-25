@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { OUTLINE_WORDS } from "../../panel-view/index.js";
 import { PAGE } from "../tokens.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
-import { expectPatternCss } from "../css.fixture.js";
+import { expectPatternCss, forcedColorRules, selectorsOf } from "../css.fixture.js";
 import { CHANGE_OUTLINE, HOVER_OUTLINE, OUTLINES, PICK_OUTLINE, PICK_TAG, PICK_TAG_INSPECT_ONLY } from "../samples.js";
 import { ChangeOutline, PageOutline, PickTag } from "./page-marks.js";
 import CSS from "./page-marks.css?inline";
@@ -87,6 +87,19 @@ describe("the page's marks", () => {
 describe("the page's marks' CSS", () => {
   it("sits in the patterns layer, written against attributes, its values the tokens'", () => {
     expectPatternCss(CSS);
+  });
+
+  it("keeps its forced colours on the marks it draws: the tags' borders, the left-out dashes apart, no wash", () => {
+    const screen = drawOutlines();
+    const forced = forcedColorRules(CSS);
+    expect(forced).toEqual([
+      { selector: "[data-ring-label], [data-pick-tag]", declares: { border: "1px solid transparent" } },
+      { selector: '[data-ring="out"], [data-ring="hover"]', declares: { "border-color": "GrayText" } },
+      { selector: '[data-ring="pick"]', declares: { background: "none" } },
+    ]);
+    for (const rule of forced) {
+      for (const selector of selectorsOf(rule.selector)) expect(screen.shadow.querySelector(selector), selector).not.toBeNull();
+    }
   });
 
   it("draws in the page's own tokens, the same in either panel theme", () => {
