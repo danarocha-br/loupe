@@ -1,6 +1,6 @@
 # The page's marks: PageOutline, ChangeOutline, PickTag
 
-What Loupe draws over the app, outside the panel (DESIGN.md "On the page", "Picking"). They sit on the app, not on the panel, so their colours are the page's fixed tokens (`--page-*`), the same in either panel theme.
+What Loupe draws over the app, outside the panel (DESIGN.md "On the page", "Picking"). They sit on the app, not on the panel, so their colours, and the pick tag's type, are the page's fixed tokens (`--page-*`), the same in either panel theme.
 
 ```tsx
 <PageOutline kind="ring" box={outline(ring)} quiet={false} tag={{ text: labelText(ring), ...labelPlace(ring) }} />
@@ -27,7 +27,7 @@ The view (`highlight.tsx`) reads the page and measures each box, again whenever 
 | `data-quiet` | Stepped back once its change has landed: it fades out over `--duration-quiet`. |
 | `data-ring-label` | The size tag: 18px high on the outline's top right, `--radius-page-tag`, `--page-ink` with `--page-on-ink` figures in Label, tabular, `--page-tag-shadow`. |
 | `data-below`, `data-at-start` | Under the outline near the window's top; from its left where ending at its right would run off the left edge. |
-| `data-pick-tag`, `data-pick-detail` | The pick tag: a `--page-band` pill in Label on a 17px line, `--page-on-band`, `--page-pick-shadow`; its detail at 400 in `--page-on-band-muted`. |
+| `data-pick-tag`, `data-pick-detail` | The pick tag: a `--page-band` pill in `--page-pick-font` (Label on a 17px line, so 21px high), `--page-on-band`, `--page-pick-shadow`; its detail at 400 in `--page-on-band-muted`. |
 
 Reduced motion takes the fades away: marks come and go at once.
 

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { COLOR, type ColorRole, FONT, RADIUS, SPACE, TYPE, type TypeRole } from "@loupe/ui/tokens";
-import { MAP_HUES, PAGE } from "./patterns/tokens.js";
+import { COLOR, type ColorRole, FONT, RADIUS, SPACE, TYPE, type TypeStyle } from "@loupe/ui/tokens";
+import { MAP_HUES, PAGE, PAGE_TYPE } from "./patterns/tokens.js";
 
 // DESIGN.md stays written by hand; this only checks that its front matter says what the module does.
 
@@ -69,9 +69,14 @@ describe("DESIGN.md's front matter agrees with the tokens module", () => {
     expect(section(name)).toEqual(written);
   });
 
-  it("writes the same type scale", () => {
+  it("writes the same type scale, then the page's own steps", () => {
+    // The system's steps by role, then the Toolbar's (`PAGE_TYPE`) as `page-<name>`, like its colours.
+    const steps: [string, TypeStyle][] = [
+      ...Object.entries(TYPE),
+      ...Object.entries(PAGE_TYPE).map(([name, style]): [string, TypeStyle] => [`page-${name}`, style]),
+    ];
     const written = Object.fromEntries(
-      (Object.entries(TYPE) as [TypeRole, (typeof TYPE)[TypeRole]][]).map(([role, style]) => [
+      steps.map(([role, style]) => [
         role.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`),
         {
           fontFamily: FONT[style.family],
@@ -79,8 +84,8 @@ describe("DESIGN.md's front matter agrees with the tokens module", () => {
           fontWeight: style.weight,
           // A step whose line is its size is written unitless.
           lineHeight: style.lineHeight === style.size ? 1 : `${style.lineHeight}px`,
-          ...("tracking" in style ? { letterSpacing: style.tracking } : {}),
-          ...("tabular" in style && style.tabular ? { fontFeature: '"tnum"' } : {}),
+          ...(style.tracking !== undefined ? { letterSpacing: style.tracking } : {}),
+          ...(style.tabular ? { fontFeature: '"tnum"' } : {}),
         },
       ]),
     );
