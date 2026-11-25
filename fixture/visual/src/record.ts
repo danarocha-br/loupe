@@ -7,7 +7,8 @@
 //   has fired: the landing ring's `data-quiet` (LINGER, 2s), the sheet's close fallback, the
 //   theme switch, an announcement. Then the snapshot is retaken until two in a row are equal;
 // - transitions, animations and the caret are off in every root (`freeze`);
-// - the mouse rests in a corner of the page unless the scene is a hover.
+// - the mouse rests in a corner of the page unless the scene is a hover;
+// - Chromium rasters a whole tile whenever it rasters one (`BROWSER_ARGS`).
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { type Browser, type BrowserContext, type BrowserContextOptions, chromium, type ElementHandle, type Locator, type Page } from "playwright";
@@ -27,6 +28,17 @@ const CONTEXT: BrowserContextOptions = {
   forcedColors: "none",
 };
 const CLOCK_TIME = new Date("2026-01-15T12:00:00Z");
+
+/**
+ * Partial raster off. With it on, Chromium repaints only the rectangle of a tile that changed,
+ * clipped to it, and a blur or a path's antialiased edge across the clip comes out a few levels
+ * apart from a whole tile's raster. Where the clip falls hangs on which frames were drawn on the
+ * way, which varies from run to run: PropRow's Delta triangles (10 pixels, up to 6/255, a
+ * capture taken partly below the window, whose tiles are rastered then) and the Toolbar's
+ * header in 06-inspector on Linux (6 pixels in a band across the Sheet's edge and the
+ * wordmark). Off, a tile's pixels depend on what it draws, not on how it got there.
+ */
+const BROWSER_ARGS = ["--disable-partial-raster"];
 
 /** The pages whose clock has stopped: from their first capture on. */
 const paused = new WeakSet<Page>();
@@ -302,7 +314,7 @@ async function workbench(r: Recorder, url: string, name: Workbench): Promise<voi
 export async function record(root: string, out: string, only?: string): Promise<void> {
   mkdirSync(out, { recursive: true });
   const servers: Server[] = [];
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: BROWSER_ARGS });
   try {
     const recorder = new Recorder(browser, out, only);
     for (const name of ["ui", "patterns"] as const) {
