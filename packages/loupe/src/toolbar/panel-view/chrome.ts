@@ -5,7 +5,7 @@
 
 import type { LauncherWords, OutlineWords, SheetWords } from "@loupe/patterns";
 
-/** The collapsed pill's words (patterns/view.ts `LauncherWords`). */
+/** The collapsed pill's words (the patterns' contract, `LauncherWords`). */
 export const LAUNCHER_WORDS: LauncherWords = {
   label: "Show Loupe",
   title: (shortcut) => `Show Loupe (${shortcut} focuses it) · drag it anywhere, or to a side to keep it there`,
@@ -19,10 +19,10 @@ export const LAUNCHER_WORDS: LauncherWords = {
  */
 export const PANEL_FAILED = "Loupe couldn’t open. Show it again to try once more.";
 
-/** The sheet's name (patterns/view.ts `SheetWords`). */
+/** The sheet's name (the patterns' contract, `SheetWords`). */
 export const SHEET_WORDS: SheetWords = { label: "Loupe" };
 
-/** The page's marks' words (patterns/view.ts `OutlineWords`): "Button · 32 × 32", and " · " before the pick tag's detail. */
+/** The page's marks' words (the patterns' contract, `OutlineWords`): "Button · 32 × 32", and " · " before the pick tag's detail. */
 export const OUTLINE_WORDS: OutlineWords = {
   size: (name, width, height) => `${name} · ${width} × ${height}`,
   detailLead: " · ",

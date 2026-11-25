@@ -115,7 +115,7 @@ export const TEXT = {
   fromRootToReadProps: "from the repo root to read its props.",
 } as const;
 
-/** The Inspector's patterns' words (patterns/view.ts `InspectorWords`). */
+/** The Inspector's patterns' words (the patterns' contract, `InspectorWords`). */
 export const INSPECTOR_WORDS: InspectorWords = {
   change: (n) => ({ label: `Change ${n}`, title: `Change ${n} in the Proposal` }),
   heldTitle: "Held by your Override: shown as a state in the Proposal",
@@ -140,7 +140,7 @@ export const INSPECTOR_WORDS: InspectorWords = {
   resetInstance: "Reset this Instance",
 };
 
-/** The list's patterns' words (patterns/view.ts `ListWords`). */
+/** The list's patterns' words (the patterns' contract, `ListWords`). */
 export const LIST_WORDS: ListWords = {
   start: { title: TEXT.startTitle, body: TEXT.startBody, tools: "Start selecting" },
   tools: {
@@ -162,7 +162,7 @@ export const LIST_WORDS: ListWords = {
   change: INSPECTOR_WORDS.change,
 };
 
-/** A command's Copy button (patterns/view.ts `CommandWords`). */
+/** A command's Copy button (the patterns' contract, `CommandWords`). */
 export const COMMAND_WORDS: CommandWords = {
   prompt: "$ ",
   copy: "Copy",
@@ -172,7 +172,7 @@ export const COMMAND_WORDS: CommandWords = {
   refused: "Couldn’t reach the clipboard. Select the command and copy it.",
 };
 
-/** The header's words and its status strip's (patterns/view.ts `HeaderWords`). */
+/** The header's words and its status strip's (the patterns' contract, `HeaderWords`). */
 export const HEADER_WORDS: HeaderWords = {
   pageLead: "/ ",
   tools: LIST_WORDS.tools,
@@ -203,7 +203,7 @@ export function stripParts({ picking, mode, covered, marksHidden }: StripState):
 /** What the strip says as one line, each key by name: for the announcer, which says it as it changes. */
 export const stripText = (parts: readonly StripPart[] | null) => (parts ? parts.map((part) => (typeof part === "string" ? part : part.key)).join("") : "");
 
-/** The footer's words beside its count (patterns/view.ts `FooterWords`). */
+/** The footer's words beside its count (the patterns' contract, `FooterWords`). */
 export const FOOTER_WORDS: FooterWords = {
   resetAll: "Reset all",
   undo: "Undo",
@@ -215,7 +215,7 @@ const COPIED = "Copied";
 const PASTE_IT = "Paste it into your coding agent";
 const QUOTE = { open: " “", close: "”" };
 
-/** Copy Proposal's words (patterns/view.ts `CopyWords`). */
+/** Copy Proposal's words (the patterns' contract, `CopyWords`). */
 export const COPY_WORDS: CopyWords = {
   idle: "Copy Proposal",
   copied: COPIED,
