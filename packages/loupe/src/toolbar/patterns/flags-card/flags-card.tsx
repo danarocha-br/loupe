@@ -3,12 +3,12 @@
 // as one radio group, and what shows now; Clear on a flag previewed, and Clear flag
 // previews under them all. While previews are off, one line says so, and why once opened.
 //
-// It draws panel-view's `FlagsCardView` and builds no words. It writes nothing: a preview
+// It draws `panelView()`'s `FlagsCardView` and builds no words. It writes nothing: a preview
 // and a clear go out through its callbacks, which ask the flags store, in the view; `busy`
 // is the view's while a write is out. See flags-card.md.
 
 import type { Ref } from "react";
-import type { CommandWords, FlagRowView, FlagsCardView, FlagValue } from "../../panel-view/index.js";
+import type { CommandWords, FlagRowView, FlagsCardView, FlagValue } from "../view.js";
 import {
   Button,
   Card,

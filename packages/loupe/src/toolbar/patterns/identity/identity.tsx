@@ -4,16 +4,16 @@
 // acting on it, the not-generated warning and the actions that can act on it; and at its
 // foot, the adapted Instances it is inside. The same block heads "Not on the page now".
 //
-// It draws panel-view's `IdentityView`, in its words, and builds none. The actions are the
+// It draws `panelView()`'s `IdentityView`, in its words, and builds none. The actions are the
 // view's (they write, and offer to undo): it places them. See identity.md.
 
 import type { ReactNode, Ref } from "react";
-import type { IdentityView, InspectorWords } from "../../panel-view/index.js";
+import type { IdentityView, InspectorWords } from "../view.js";
 import { BackIcon, Button, Dot, ElbowIcon, FileIcon, Tag } from "@loupe/ui";
 import { Breakable, Keys, StatusChip, TagChip } from "../marks/marks.js";
 
 export type IdentityProps = {
-  /** What panel-view decided the block says: the Inspector's, or "Not on the page now"'s. */
+  /** What `panelView()` decided the block says: the Inspector's, or "Not on the page now"'s. */
   identity: IdentityView;
   words: InspectorWords;
   /** Back to the list. */

@@ -1,6 +1,6 @@
 "use client";
 
-// The patterns' workbench (ADR 0003, 0011): each pattern with sample panel-view data, inside
+// The patterns' workbench (ADR 0003, 0011): each pattern with its sample data, inside
 // the same shadow-root surface the Toolbar uses, in light and dark, under forced colours,
 // with reduced motion and at a larger text size. The primitives have a workbench of their
 // own, in their package (`pnpm --filter @loupe/ui dev`). `@danarocha/loupe/workbench` exists
@@ -17,10 +17,10 @@ import {
   LAUNCHER_WORDS,
   LIST_WORDS,
   OUTLINE_WORDS,
-  type SelectMode,
   SHEET_WORDS,
   stripParts,
 } from "./panel-view/index.js";
+import type { SelectMode } from "./patterns/view.js";
 import {
   AppearsOnInteraction,
   ChangeList,

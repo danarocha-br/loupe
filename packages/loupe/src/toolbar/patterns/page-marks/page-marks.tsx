@@ -5,12 +5,12 @@
 // change reached, for a moment as it lands. PickTag names the Instance under the pointer.
 //
 // They draw boxes and words the view decided and build none: the view (highlight.tsx) reads
-// the page, measures each box, places the tags and times a change's outlines; panel-view
+// the page, measures each box, places the tags and times a change's outlines; `panelView()`
 // words them (`OutlineWords`). Marks for the eye only: the panel says what is selected and
 // what a change reached, so each is hidden from assistive technology. See page-marks.md.
 
 import type { Ref } from "react";
-import type { OutlineWords } from "../../panel-view/index.js";
+import type { OutlineWords } from "../view.js";
 
 /**
  * `ring`: the selected Instance, solid and tagged; `member`: another Instance the selection

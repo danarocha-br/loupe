@@ -10,7 +10,7 @@ Select multiple, on an Instance with no call site to group by (DESIGN.md "Scope 
 
 ## Interface
 
-- `noGroup`: panel-view's `NoGroupView`: `text`, why it is alone, and `widen`, the `ScopeMove` to the page or null.
+- `noGroup`: `panelView()`'s `NoGroupView`: `text`, why it is alone, and `widen`, the `ScopeMove` to the page or null.
 - `onScope(scope)`: the move pressed. Widened, NoGroup goes, so the view moves focus to the heading.
 
 ## States

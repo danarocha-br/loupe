@@ -3,7 +3,7 @@
 The list's first card, with nothing selected (DESIGN.md "Start"): "What do you want to change?", a line under it, and the two select tools as tiles side by side, each showing what its tool does.
 
 ```tsx
-<StartCard words={LIST_WORDS} mode={mode} armed={picking} onTool={onTool} headingRef={heading} />
+<StartCard words={listWords} mode={mode} armed={picking} onTool={onTool} headingRef={heading} />
 ```
 
 ## Interface

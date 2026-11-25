@@ -5,11 +5,10 @@
 // where the panel says what is selected and what a change reached.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { OUTLINE_WORDS } from "../../panel-view/index.js";
 import { PAGE } from "../tokens.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss, forcedColorRules, selectorsOf } from "../css.fixture.js";
-import { CHANGE_OUTLINE, HOVER_OUTLINE, OUTLINES, PICK_OUTLINE, PICK_TAG, PICK_TAG_INSPECT_ONLY } from "../samples.js";
+import { CHANGE_OUTLINE, HOVER_OUTLINE, OUTLINES, PICK_OUTLINE, PICK_TAG, PICK_TAG_INSPECT_ONLY, WORDS } from "../samples.js";
 import { ChangeOutline, PageOutline, PickTag } from "./page-marks.js";
 import CSS from "./page-marks.css?inline";
 
@@ -24,7 +23,7 @@ const drawOutlines = () =>
       <PageOutline {...HOVER_OUTLINE} />
       <PageOutline {...PICK_OUTLINE} />
       <ChangeOutline {...CHANGE_OUTLINE} quiet={false} />
-      <PickTag {...PICK_TAG} words={OUTLINE_WORDS} />
+      <PickTag {...PICK_TAG} words={WORDS.outline} />
     </>,
   );
 
@@ -63,14 +62,14 @@ describe("the page's marks", () => {
     expect(screen.shadow.querySelector("[data-ring]")?.hasAttribute("data-quiet")).toBe(true);
   });
 
-  it("names the Instance under the pointer, with what a click would do beyond it, in panel-view's words", () => {
-    const screen = renderInSurface(<PickTag {...PICK_TAG} words={OUTLINE_WORDS} />);
+  it("names the Instance under the pointer, with what a click would do beyond it, in `panelView()`'s words", () => {
+    const screen = renderInSurface(<PickTag {...PICK_TAG} words={WORDS.outline} />);
     const tag = screen.shadow.querySelector<HTMLElement>("[data-pick-tag]");
     expect(tag?.dataset.pickTag).toBe(PICK_TAG.id);
     expect(tag?.textContent).toBe("Button · 4 from this call site");
     expect(tag?.querySelector("[data-pick-detail]")?.textContent).toBe(" · 4 from this call site");
     expect([tag?.style.top, tag?.style.left]).toEqual(["14px", "24px"]);
-    screen.rerender(<PickTag {...PICK_TAG_INSPECT_ONLY} detail={null} words={OUTLINE_WORDS} />);
+    screen.rerender(<PickTag {...PICK_TAG_INSPECT_ONLY} detail={null} words={WORDS.outline} />);
     expect(tag?.textContent).toBe("Badge");
     expect(tag?.querySelector("[data-pick-detail]")).toBeNull();
   });

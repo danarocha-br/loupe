@@ -7,7 +7,7 @@
 // It draws `MembersView` in the Inspector's words, and builds none: a box, Widen and Reset
 // go out through its callbacks. See scope-section.md.
 
-import type { InspectorWords, MemberItem, MembersView, Scope, ScopeMove } from "../../panel-view/index.js";
+import type { InspectorWords, MemberItem, MembersView, Scope, ScopeMove } from "../view.js";
 import { Button, Fold, FoldChevron, FoldPanel, FoldTrigger, LayersIcon, ResetIcon, Tag, WidenIcon } from "@loupe/ui";
 import { Breakable, hovering, TagChip } from "../marks/marks.js";
 

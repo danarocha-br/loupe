@@ -7,10 +7,9 @@
 import { userEvent } from "@testing-library/user-event";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INSPECTOR_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { GONE, IDENTITY, NOT_GENERATED } from "../samples.js";
+import { GONE, IDENTITY, NOT_GENERATED, WORDS } from "../samples.js";
 import { Identity } from "./identity.js";
 import CSS from "./identity.css?inline";
 
@@ -21,9 +20,9 @@ describe("Identity", () => {
     const user = userEvent.setup({ document });
     const onBack = vi.fn();
     const heading = createRef<HTMLHeadingElement>();
-    const screen = renderInSurface(<Identity words={INSPECTOR_WORDS} onBack={onBack} heading={heading} nameLang="pt-BR" identity={IDENTITY} />);
+    const screen = renderInSurface(<Identity words={WORDS.inspector} onBack={onBack} heading={heading} nameLang="pt-BR" identity={IDENTITY} />);
     const back = screen.getByRole("button", { name: "All components" });
-    expect(back.getAttribute("title")).toBe(INSPECTOR_WORDS.back.title);
+    expect(back.getAttribute("title")).toBe(WORDS.inspector.back.title);
     await user.click(back);
     expect(onBack).toHaveBeenCalledOnce();
     expect(screen.getByText("Button").textContent).toBe("Button");
@@ -36,7 +35,7 @@ describe("Identity", () => {
   });
 
   it("says where it is written, its line set apart, and its path and key on hover", () => {
-    const screen = renderInSurface(<Identity words={INSPECTOR_WORDS} onBack={() => {}} identity={IDENTITY} />);
+    const screen = renderInSurface(<Identity words={WORDS.inspector} onBack={() => {}} identity={IDENTITY} />);
     const where = screen.getByTestId("instance-id");
     expect([where.textContent, where.getAttribute("title"), where.getAttribute("data-id")]).toEqual([
       "member-row-menu.tsx:37 · use 2 of 3",
@@ -47,17 +46,17 @@ describe("Identity", () => {
   });
 
   it("says only the exceptions: its tags and the scopes acting on it", () => {
-    const screen = renderInSurface(<Identity words={INSPECTOR_WORDS} onBack={() => {}} identity={IDENTITY} />);
+    const screen = renderInSurface(<Identity words={WORDS.inspector} onBack={() => {}} identity={IDENTITY} />);
     expect(screen.getByTestId("chips").textContent).toBe("Not visible now" + "Also in All on page");
     cleanup();
-    const bare = renderInSurface(<Identity words={INSPECTOR_WORDS} onBack={() => {}} identity={{ ...IDENTITY, tags: [], chips: [] }} />);
+    const bare = renderInSurface(<Identity words={WORDS.inspector} onBack={() => {}} identity={{ ...IDENTITY, tags: [], chips: [] }} />);
     expect(bare.queryByTestId("chips")).toBeNull();
   });
 
   it("lists the Instances it is inside, outermost first, each a button that selects it", async () => {
     const user = userEvent.setup({ document });
     const onCrumb = vi.fn();
-    const screen = renderInSurface(<Identity words={INSPECTOR_WORDS} onBack={() => {}} onCrumb={onCrumb} identity={IDENTITY} />);
+    const screen = renderInSurface(<Identity words={WORDS.inspector} onBack={() => {}} onCrumb={onCrumb} identity={IDENTITY} />);
     const inside = screen.getByTestId("inside");
     expect(inside.textContent?.startsWith("Inside")).toBe(true);
     const crumbs = [...inside.querySelectorAll("button")].map((button) => button.textContent);
@@ -68,7 +67,7 @@ describe("Identity", () => {
 
   it("warns when its component isn't generated, with the command that would read it", () => {
     const screen = renderInSurface(
-      <Identity words={INSPECTOR_WORDS} onBack={() => {}} identity={{ ...IDENTITY, notGenerated: { tag: NOT_GENERATED, command: "npx loupe generate" } }} />,
+      <Identity words={WORDS.inspector} onBack={() => {}} identity={{ ...IDENTITY, notGenerated: { tag: NOT_GENERATED, command: "npx loupe generate" } }} />,
     );
     expect(screen.getByTestId("not-generated").textContent).toBe("Not generated yet Run npx loupe generate from the repo root to read its props.");
   });
@@ -76,7 +75,7 @@ describe("Identity", () => {
   it("places the view's actions, and heads a gone Instance with what it still holds", () => {
     const screen = renderInSurface(
       <Identity
-        words={INSPECTOR_WORDS}
+        words={WORDS.inspector}
         onBack={() => {}}
         nameLang="pt-BR"
         identity={{ ...GONE, note: "It shows here again when it mounts.", held: ['variant: "outline"'] }}
@@ -96,8 +95,8 @@ describe("Identity", () => {
   it("passes axe, at the Inspector and once gone", async () => {
     const screen = renderInSurface(
       <>
-        <Identity words={INSPECTOR_WORDS} onBack={() => {}} identity={{ ...IDENTITY, notGenerated: { tag: NOT_GENERATED, command: "npx loupe generate" } }} />
-        <Identity words={INSPECTOR_WORDS} onBack={() => {}} identity={GONE} />
+        <Identity words={WORDS.inspector} onBack={() => {}} identity={{ ...IDENTITY, notGenerated: { tag: NOT_GENERATED, command: "npx loupe generate" } }} />
+        <Identity words={WORDS.inspector} onBack={() => {}} identity={GONE} />
       </>,
     );
     expect(await axeViolations(screen.host)).toEqual([]);

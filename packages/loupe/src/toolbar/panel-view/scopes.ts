@@ -8,7 +8,8 @@ import { identityOf } from "../../runtime/registry.js";
 import { inScope, PRECEDENCE, reachOf, recordsFor, type Scope, type ScopeTarget, type Source, targetAt } from "../../runtime/store.js";
 import { formatCurrent } from "../format.js";
 import type { AppValue, Reads } from "./reads.js";
-import type { Member, MemberItem, MembersView, ScopeOption, SiteItem } from "./types.js";
+import type { Member, ScopeOption } from "./types.js";
+import type { MemberItem, MembersView, SiteItem } from "../patterns/view.js";
 import {
   groupName,
   instancesText,

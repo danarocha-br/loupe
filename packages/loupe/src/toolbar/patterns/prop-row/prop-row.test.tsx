@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// PropRow, by role, inside a real shadow root (ADR 0003): a prop's row as panel-view
+// PropRow, by role, inside a real shadow root (ADR 0003): a prop's row as `panelView()`
 // decided it. Its delta, name and tags on the line; the change line; chips, a switch or a
 // one-line field, each writing through its callbacks; Reset, which keeps focus in the row;
 // the holding notice; and who keeps their own value.
@@ -7,10 +7,10 @@
 import { userEvent } from "@testing-library/user-event";
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INSPECTOR_WORDS, type PropItem } from "../../panel-view/index.js";
+import type { PropItem } from "../view.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { CHILDREN, DISABLED, OPEN, PROP_ITEMS, SIZE, TONE_AT_SCOPE, TYPE_INSPECT_ONLY, VARIANT } from "../samples.js";
+import { CHILDREN, DISABLED, OPEN, PROP_ITEMS, SIZE, TONE_AT_SCOPE, TYPE_INSPECT_ONLY, VARIANT, WORDS } from "../samples.js";
 import { PropRow, type PropRowProps } from "./prop-row.js";
 import CSS from "./prop-row.css?inline";
 
@@ -20,7 +20,7 @@ const setup = () => userEvent.setup({ document });
 
 function draw(item: PropItem, props: Partial<PropRowProps> = {}) {
   const calls = { onSet: vi.fn(), onText: vi.fn(), onReset: vi.fn(), onSelect: vi.fn(), onHover: vi.fn() };
-  const screen = renderInSurface(<PropRow item={item} words={INSPECTOR_WORDS} {...calls} {...props} />);
+  const screen = renderInSurface(<PropRow item={item} words={WORDS.inspector} {...calls} {...props} />);
   return { screen, ...calls };
 }
 
@@ -130,7 +130,7 @@ describe("PropRow", () => {
     const { screen } = draw(TYPE_INSPECT_ONLY, { look: "pair" });
     const row = screen.shadow.querySelector<HTMLElement>("[data-prop=type]") as HTMLElement;
     expect([row.getAttribute("data-row"), row.querySelector("[data-row-glyph]")]).toEqual(["pair", null]);
-    expect(screen.getByTitle(INSPECTOR_WORDS.defaultTitle).textContent).toBe('"button"');
+    expect(screen.getByTitle(WORDS.inspector.defaultTitle).textContent).toBe('"button"');
     expect(screen.getByTitle("The library sets it on every Button.").textContent).toBe("set by the library");
   });
 
@@ -139,9 +139,9 @@ describe("PropRow", () => {
     const screen = renderInSurface(
       <>
         {[...PROP_ITEMS, TONE_AT_SCOPE].map((item) => (
-          <PropRow key={item.name} item={item} words={INSPECTOR_WORDS} {...calls} />
+          <PropRow key={item.name} item={item} words={WORDS.inspector} {...calls} />
         ))}
-        <PropRow item={TYPE_INSPECT_ONLY} look="pair" words={INSPECTOR_WORDS} {...calls} />
+        <PropRow item={TYPE_INSPECT_ONLY} look="pair" words={WORDS.inspector} {...calls} />
       </>,
     );
     expect(await axeViolations(screen.host)).toEqual([]);

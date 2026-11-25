@@ -7,10 +7,13 @@
 //   entries, the same list in its `package.json`, the tsconfigs and `vite.config.ts`.
 // - No shipped module imports a test-only entry, one whose target is a `.fixture`
 //   (`@loupe/ui/testing`, `/listen`, `/jsdom-gaps`): `isTestEntry`, as the build decides it.
-// - A pattern imports only `@loupe/ui` and `@loupe/ui/tokens` (the primitives and the tokens), other patterns and
-//   `panel-view`'s types: never a value from `panel-view/` (its words come in its props),
-//   never `runtime/`, a view, or UI SDK. Its tests may draw in the surface and take
-//   panel-view's words for sample data, never reach `runtime/` or a view.
+// - A pattern imports only `@loupe/ui` and `@loupe/ui/tokens` (the primitives and the tokens), other patterns,
+//   the Toolbar's tokens (`patterns/tokens.ts`) and the patterns' contract (`patterns/view.ts`):
+//   nothing from `panel-view/`, not even a type (ADR 0012: `panelView()` is the adapter, and
+//   depends on the contract, never the other way), never `runtime/`, a view, or UI SDK. Its
+//   tests may also draw in the surface; they spell out their words (`patterns/samples.ts`)
+//   and name no `*_WORDS` constant, nor does a pattern's `.md`.
+// - panel-view takes from the patterns only their tokens and their contract, never a pattern.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { parse } from "jsonc-parser";
@@ -25,6 +28,10 @@ const pkg = path.resolve(src, "..");
 const uiPackage = path.resolve(pkg, "..", "ui");
 const patterns = path.join(toolbar, "patterns");
 const panelView = path.join(toolbar, "panel-view");
+/** The patterns' sample data, which their tests and the workbench draw: never a pattern's. */
+const samples = [path.join(patterns, "samples.ts"), path.join(patterns, "samples.js")];
+/** The two modules of `patterns/` that panel-view may take: the Toolbar's tokens and the patterns' contract. */
+const sharedModules = ["tokens", "view"].flatMap((name) => [path.join(patterns, `${name}.ts`), path.join(patterns, `${name}.js`)]);
 
 /** `@loupe/ui`'s entries a shipped module may import: those whose target isn't a `.fixture` (the build's own rule, `isTestEntry`). */
 const isShippedEntry = (specifier: string) => {
@@ -77,15 +84,16 @@ const resolved = (file: string, specifier: string) => path.resolve(path.dirname(
 
 /**
  * What a pattern's file imports that a pattern may not: anything outside `@loupe/ui`'s
- * primitives and tokens, the patterns, React and its own CSS, and any value from `panel-view/`.
+ * primitives and tokens, the patterns (their tokens and their contract among them), React
+ * and its own CSS. `panel-view/` is outside, types and all; the samples are the tests'.
  */
 function patternOffenders(file: string, code: string): string[] {
   return imports(code)
-    .filter(({ specifier, typeOnly }) => {
+    .filter(({ specifier }) => {
       if (!specifier.startsWith(".")) return !(/^(react|react-dom)(\/|$)/.test(specifier) || PATTERN_ENTRIES.includes(specifier));
+      // Inside `patterns/`, but not the samples or a fixture: those are the tests'.
       const target = resolved(file, specifier);
-      if (inside(panelView, target)) return !typeOnly;
-      return !inside(patterns, target);
+      return !inside(patterns, target) || samples.includes(target) || /\.(test|fixture)\.(t|j)sx?$/.test(target);
     })
     .map(({ specifier }) => `${path.relative(src, file)} → ${specifier}`);
 }
@@ -163,7 +171,7 @@ describe("the layers' import rule", () => {
     expect(root.scripts.build).toMatch(/^pnpm -r --filter '!@loupe\/ui' build$/);
   });
 
-  it("keeps a pattern to @loupe/ui, other patterns and panel-view's types", () => {
+  it("keeps a pattern to @loupe/ui, other patterns, the Toolbar's tokens and the patterns' contract", () => {
     const offenders = sources(patterns)
       .filter((file) => !isTest(file))
       .flatMap((file) => patternOffenders(file, readFileSync(file, "utf8")));
@@ -173,6 +181,10 @@ describe("the layers' import rule", () => {
   it("would catch a pattern that reaches past them", () => {
     const file = path.join(patterns, "example", "example.tsx");
     const code = [
+      'import type { PropItem } from "../view.js";',
+      'import { PAGE } from "../tokens.js";',
+      'import { HELD } from "../samples.js";',
+      'import { renderPatterns } from "../css.fixture.js";',
       'import type { PropItem } from "../../panel-view/index.js";',
       'import { TEXT } from "../../panel-view/index.js";',
       'import { type Write } from "../../panel-view/types.js";',
@@ -199,6 +211,9 @@ describe("the layers' import rule", () => {
       'import { Announcer } from "@loupe/ui/announcer";',
     ].join("\n");
     expect(patternOffenders(file, code).map((offender) => offender.split(" → ")[1])).toEqual([
+      "../samples.js",
+      "../css.fixture.js",
+      "../../panel-view/index.js",
       "../../panel-view/index.js",
       "../../panel-view/types.js",
       "@ui-sdk/react",
@@ -208,6 +223,7 @@ describe("the layers' import rule", () => {
       "../../panel-view/index.js",
       "@ui-sdk/react",
       "../../controls.js",
+      "../../panel-view/types.js",
       "../../toolbar-store.js",
       "../../../../../ui/src/chip-group/chip-group.js",
       "@loupe/ui/testing",
@@ -218,8 +234,8 @@ describe("the layers' import rule", () => {
     ]);
   });
 
-  it("keeps the patterns' tests off runtime/ and the views", () => {
-    const allowed = [patterns, panelView, path.join(toolbar, "surface")];
+  it("keeps the patterns' tests off panel-view, runtime/ and the views", () => {
+    const allowed = [patterns, path.join(toolbar, "surface")];
     const offenders = sources(patterns)
       .filter(isTest)
       .flatMap((file) =>
@@ -230,15 +246,31 @@ describe("the layers' import rule", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("lets panel-view take from the patterns only their tokens, never a pattern", () => {
+  it("keeps the words panelView() decides out of the patterns: their samples spell them out", () => {
+    // ADR 0012: no pattern, test, sample or `.md` names panel-view's words; `panel-view/samples.test.ts`
+    // holds the samples' words equal to them.
+    const constants = ["words.ts", "chrome.ts"].flatMap((file) =>
+      [...readFileSync(path.join(panelView, file), "utf8").matchAll(/^export const ([A-Z_]+_WORDS)\b/gm)].map((match) => match[1] as string),
+    );
+    const named = new RegExp(`\\b(${constants.join("|")})\\b`, "g");
+    const files = readdirSync(patterns, { recursive: true, encoding: "utf8" }).filter((file) => /\.(tsx?|md)$/.test(file));
+    const offenders = files.flatMap((file) =>
+      [...readFileSync(path.join(patterns, file), "utf8").matchAll(named)].map((match) => `${path.join("toolbar", "patterns", file)} → ${match[0]}`),
+    );
+    expect(constants).toHaveLength(9);
+    expect(files.length).toBeGreaterThan(0);
+    expect(offenders).toEqual([]);
+  });
+
+  it("lets panel-view take from the patterns only their tokens and their contract, never a pattern", () => {
     // The Toolbar's own tokens sit with the patterns (ADR 0011); panel-view reads the map's hue count from them.
-    const tokens = [path.join(patterns, "tokens.ts"), path.join(patterns, "tokens.js")];
+    // The contract is what `panelView()` returns (ADR 0012), so the adapter imports it, types and all.
     const offenders = sources(panelView)
       .filter((file) => !isTest(file))
       .flatMap((file) =>
-        imports(readFileSync(file, "utf8"))
-          .filter((found) => !found.typeOnly && found.specifier.startsWith(".") && inside(patterns, resolved(file, found.specifier)) && !tokens.includes(resolved(file, found.specifier)))
-          .map((found) => `${path.relative(src, file)} → ${found.specifier}`),
+        specifiers(file)
+          .filter((specifier) => specifier.startsWith(".") && inside(patterns, resolved(file, specifier)) && !sharedModules.includes(resolved(file, specifier)))
+          .map((specifier) => `${path.relative(src, file)} → ${specifier}`),
       );
     expect(offenders).toEqual([]);
   });

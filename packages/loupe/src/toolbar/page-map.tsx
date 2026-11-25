@@ -6,7 +6,8 @@ import { useContext, useEffect, useRef, useState } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { appLang } from "./app-lang.js";
 import { boxesOf, PageSignalContext, type PageSignal } from "./page-signal.js";
-import { type GroupItem, LIST_WORDS } from "./panel-view/index.js";
+import { LIST_WORDS } from "./panel-view/index.js";
+import type { GroupItem } from "./patterns/view.js";
 import { type MapBox, PageMap } from "./patterns/index.js";
 
 /** How long the page has to stay still before the map reads its boxes again. */

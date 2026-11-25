@@ -3,11 +3,11 @@
 // can change. Folded, the row names them; one cause for them all is said once, under the
 // row, instead of a tag on every row. The props the library sets fold under the rest.
 //
-// It draws panel-view's `InspectOnlyView` and builds no words. Each prop's row is the
+// It draws `panelView()`'s `InspectOnlyView` and builds no words. Each prop's row is the
 // view's (`row`), as the Inspector's other rows are. See inspect-only.md.
 
 import { type ReactNode, useState } from "react";
-import type { InspectOnlyView, PropItem } from "../../panel-view/index.js";
+import type { InspectOnlyView, PropItem } from "../view.js";
 import { Fold, FoldChevron, FoldPanel, FoldTrigger, PROP_ICONS, Row, RowLine, RowName, RowValue, Tag } from "@loupe/ui";
 import { Meta } from "../marks/marks.js";
 

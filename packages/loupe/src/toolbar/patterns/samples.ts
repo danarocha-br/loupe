@@ -1,32 +1,173 @@
-// Sample panel-view data for the patterns: what `panelView()` would hand them for a
-// MemberRowMenu Button on /billing, at This instance and at its call site, and for the
-// list of /billing with nothing selected, and for the panel's chrome around them. The
-// patterns' tests draw it, and so does the fixture's `/workbench` page, beside the words
-// (panel-view's `INSPECTOR_WORDS`, `LIST_WORDS`, `HEADER_WORDS`, `FOOTER_WORDS` and
-// `COPY_WORDS`, which the caller passes). Data only: no words a pattern would draw by
-// itself, and nothing that writes.
+// Sample data for the patterns, in their contract's types (`view.ts`): what `panelView()`
+// would hand them for a MemberRowMenu Button on /billing, at This instance and at its call
+// site, and for the list of /billing with nothing selected, and for the panel's chrome
+// around them; and the words it decides, spelled out (`WORDS`). The patterns' tests draw
+// it, and so does the fixture's `/workbench` page. Data only: nothing that writes.
 
 import type {
   CallSiteItem,
   ChangeItem,
+  CommandWords,
+  CopyWords,
   FlagsCardView,
+  FooterView,
+  FooterWords,
   GroupItem,
+  HeaderWords,
+  HeldItem,
   IdentityView,
+  InspectorWords,
   InspectOnlyView,
   InstanceItem,
-  ListBody,
+  LauncherWords,
+  ListWords,
   MembersView,
   NoGroupView,
-  FooterView,
   NoticeView,
+  OutlineWords,
   PropItem,
+  SheetWords,
   StatusTag,
   Tag,
   Write,
-} from "../panel-view/index.js";
+} from "./view.js";
 import type { LauncherPillProps } from "./launcher/launcher.js";
 import type { MapBox } from "./page-map/page-map.js";
 import type { OutlineBox, PageOutlineProps } from "./page-marks/page-marks.js";
+
+/** "Change 1" and its tooltip: the Inspector's and the list's. */
+const change = (n: number) => ({ label: `Change ${n}`, title: `Change ${n} in the Proposal` });
+
+/** The select tools, as the list's start and the header name them. */
+const TOOLS: ListWords["tools"] = {
+  one: {
+    label: "Select one",
+    hint: "Click one thing on the page",
+    title: "Select one: click an Instance on the page to change it alone (Esc cancels)",
+  },
+  many: {
+    label: "Select multiple",
+    hint: "Every Instance from one call site",
+    title: "Select multiple: click an Instance on the page to change every one from the same call site (Esc cancels)",
+  },
+};
+
+/**
+ * The words `panelView()` decides whatever is on the page, spelled out (ADR 0012): what a
+ * view passes each pattern as `words`. A loupe test (`panel-view/samples.test.ts`) holds
+ * each bundle equal to `panelView()`'s own, so no test or workbench draws stale copy.
+ */
+export const WORDS: {
+  inspector: InspectorWords;
+  list: ListWords;
+  header: HeaderWords;
+  footer: FooterWords;
+  copy: CopyWords;
+  command: CommandWords;
+  launcher: LauncherWords;
+  sheet: SheetWords;
+  outline: OutlineWords;
+} = {
+  inspector: {
+    change,
+    heldTitle: "Held by your Override: shown as a state in the Proposal",
+    empty: "empty",
+    state: "State prop",
+    current: "App value:",
+    defaultTitle: "The component’s default: the call site doesn’t set it",
+    appTag: "app",
+    appValue: "the app’s value",
+    designDefault: "the design system’s default",
+    back: { label: "All components", title: "Back to every component on this page (Esc)" },
+    inside: "Inside",
+    run: "Run",
+    fromRootToReadProps: "from the repo root to read its props.",
+    untick: "Untick one to leave it out. It keeps its own value.",
+    picked: "picked",
+    resetScope: "Reset this scope",
+    serverRendered: "Server-rendered",
+    leftOutUnmounted: "Left out, not mounted",
+    legend: { shown: "Shows now", app: "App’s value", default: "Default" },
+    hold: { off: (prop) => `Hold ${prop}`, on: (prop) => `Holding ${prop} · Release` },
+    resetInstance: "Reset this Instance",
+  },
+  list: {
+    start: { title: "What do you want to change?", body: "Pick it right on the page, or start from what this page uses most.", tools: "Start selecting" },
+    tools: TOOLS,
+    onPage: { title: "On this page", rows: "Components on this page", map: "Page map" },
+    held: { title: "Held for review", discard: "Discard" },
+    interaction: {
+      title: "Appears on interaction",
+      meta: "Not on screen yet",
+      seen: "Seen on this page, not mounted now. Select its menu or dialog and press Hold open to inspect it.",
+    },
+    changes: { title: "Changes", meta: "numbered as in the Proposal" },
+    change,
+  },
+  header: {
+    pageLead: "/ ",
+    tools: TOOLS,
+    select: "Select",
+    marks: {
+      label: "Hide marks",
+      hide: "Hide marks: take Loupe’s outlines off the page, to judge the change as it will ship. The selection stays.",
+      show: "Show marks: outline the selection on the page again",
+    },
+    hide: { label: "Hide panel", title: "Hide the panel" },
+    strip: {
+      pick: {
+        one: ["Click an Instance on the page", " · ", { key: "Esc" }, " cancels"],
+        many: ["Click an Instance: every one from its call site is selected", " · ", { key: "Esc" }, " cancels"],
+      },
+      covered: ["A dialog on the page runs under the panel · hold ", { key: "Alt" }, " to see through"],
+      marksHidden: ["Outlines are hidden on the page"],
+    },
+  },
+  footer: {
+    resetAll: "Reset all",
+    undo: "Undo",
+    offer: {
+      reset: (count) => `Reset ${count} ${count === 1 ? "Override" : "Overrides"}`,
+      discard: (count) => `Discarded ${count} ${count === 1 ? "held Override" : "held Overrides"}`,
+    },
+    theme: { label: "Dark theme", toLight: "Switch to light", toDark: "Switch to dark" },
+  },
+  copy: {
+    idle: "Copy Proposal",
+    copied: "Copied",
+    failed: "Not copied",
+    mainTitle: "Copy the Proposal for your coding agent or an engineer",
+    detailsTitle: "Copy with a title and a designer",
+    details: "Copy with details",
+    title: "Title",
+    designer: "Designer",
+    optional: "optional",
+    designerHint: "Who is asking for this?",
+    copyWith: "Copy with these details",
+    titleMissing: "Give the Proposal a title: it heads the text your coding agent reads.",
+    notCopied: "Couldn’t copy automatically",
+    selectAll: "Select all",
+    retry: "Try again",
+    proposal: "The Proposal",
+    pasteIt: "Paste it into your coding agent",
+    quote: { open: " “", close: "”" },
+    copiedText: (title) => `Copied “${title}”. Paste it into your coding agent.`,
+    notCopiedText: (reason, withText) => (withText ? `${reason} Your Proposal is below.` : reason),
+  },
+  command: {
+    prompt: "$ ",
+    copy: "Copy",
+    copied: "Copied",
+    failed: "Copy failed",
+    refused: "Couldn’t reach the clipboard. Select the command and copy it.",
+  },
+  launcher: {
+    label: "Show Loupe",
+    title: (shortcut) => `Show Loupe (${shortcut} focuses it) · drag it anywhere, or to a side to keep it there`,
+  },
+  sheet: { label: "Loupe" },
+  outline: { size: (name, width, height) => `${name} · ${width} × ${height}`, detailLead: " · " },
+};
 
 const ID = "app/billing/member-row-menu.tsx › MemberRowMenu › Button[1]#caio";
 const write = (prop: string, scope: Write["scope"] = "instance"): Write => ({ id: ID, prop, scope });
@@ -166,7 +307,7 @@ export const PROP_ITEMS: readonly PropItem[] = [VARIANT, SIZE, CHILDREN, DISABLE
 const SUPPORTED: StatusTag = { kind: "supported", text: "Supported" };
 const NOT_VISIBLE: Tag = { kind: "not-visible", text: "Not visible now" };
 
-/** The Inspector's identity for that Button: everything panel-view decides for the block. */
+/** The Inspector's identity for that Button: everything `panelView()` decides for the block. */
 export const IDENTITY: IdentityView = {
   component: "Button",
   page: "Billing",
@@ -405,7 +546,7 @@ export const MAP_BOXES: ReadonlyMap<string, MapBox> = new Map([
 ]);
 
 /** Records Suspended for review: a call site whose total changed, and an id that names two Instances. */
-export const HELD: ListBody["suspended"] = [
+export const HELD: HeldItem[] = [
   {
     target: { scope: "group", anchor: "app/billing/invite-form.tsx › InviteForm › Button[1]" },
     label: "All from invite-form.tsx › InviteForm › Button[1]",

@@ -6,7 +6,7 @@ One component on the page, a row of "On this page" (DESIGN.md "On this page", Ro
 <GroupRow
   group={group}
   lit={lit === group.component}
-  words={INSPECTOR_WORDS}
+  words={inspectorWords}
   onPoint={point}
   onSite={(site) => select(site.select, site.ids.length > 1 ? "many" : undefined)}
   onInstance={(id) => select(id)}
@@ -16,7 +16,7 @@ One component on the page, a row of "On this page" (DESIGN.md "On this page", Ro
 
 ## Interface
 
-- `group`: panel-view's `GroupItem`: `component`, `count` ("×7"), `share`, `hue`, `inspectOnly`, `verdict` (a "Not generated yet" status chip, with `statusTitle`), `notes` (`overrides`, `stale`, `not-mounted`), `sitesText`, `sites` and `instances`.
+- `group`: `panelView()`'s `GroupItem`: `component`, `count` ("×7"), `share`, `hue`, `inspectOnly`, `verdict` (a "Not generated yet" status chip, with `statusTitle`), `notes` (`overrides`, `stale`, `not-mounted`), `sitesText`, `sites` and `instances`.
 - `lit`: its component is pointed at, here or on the page map.
 - `words`: the Inspector's `change`, for the change numbers an unmounted Instance holds.
 - `onPoint(group | null)`, `onSite(site)`, `onInstance(id)`, `onHover(ids)`.

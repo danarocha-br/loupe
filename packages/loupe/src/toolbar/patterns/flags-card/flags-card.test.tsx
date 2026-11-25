@@ -5,10 +5,9 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { COMMAND_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { FLAGS, FLAGS_CROWDED, FLAGS_OFF } from "../samples.js";
+import { FLAGS, FLAGS_CROWDED, FLAGS_OFF, WORDS } from "../samples.js";
 import { FlagsCard } from "./flags-card.js";
 import CSS from "./flags-card.css?inline";
 
@@ -16,7 +15,7 @@ afterEach(cleanup);
 
 function draw(flags = FLAGS, busy = false) {
   const calls = { onPreview: vi.fn(), onClear: vi.fn(), onClearAll: vi.fn(), onCopy: vi.fn(() => Promise.resolve()) };
-  return { screen: renderInSurface(<FlagsCard flags={flags} busy={busy} words={COMMAND_WORDS} {...calls} />), ...calls };
+  return { screen: renderInSurface(<FlagsCard flags={flags} busy={busy} words={WORDS.command} {...calls} />), ...calls };
 }
 
 describe("FlagsCard", () => {

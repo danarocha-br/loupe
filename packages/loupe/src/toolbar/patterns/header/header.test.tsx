@@ -5,10 +5,9 @@
 
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { HEADER_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
 import { expectPatternCss } from "../css.fixture.js";
-import { HEADER_PAGE } from "../samples.js";
+import { HEADER_PAGE, WORDS } from "../samples.js";
 import { PanelHeader, type PanelHeaderProps, StatusStrip } from "./header.js";
 import CSS from "./header.css?inline";
 
@@ -16,7 +15,7 @@ afterEach(cleanup);
 
 function draw(props: Partial<PanelHeaderProps> = {}) {
   const calls = { onTool: vi.fn(), onMarks: vi.fn(), onHide: vi.fn() };
-  const screen = renderInSurface(<PanelHeader page={HEADER_PAGE} mode="one" armed={false} marksHidden={false} words={HEADER_WORDS} {...calls} {...props} />);
+  const screen = renderInSurface(<PanelHeader page={HEADER_PAGE} mode="one" armed={false} marksHidden={false} words={WORDS.header} {...calls} {...props} />);
   return { screen, ...calls };
 }
 
@@ -43,7 +42,7 @@ describe("PanelHeader", () => {
     expect(group.contains(one) && group.contains(many)).toBe(true);
     expect(one.getAttribute("aria-checked")).toBe("true");
     expect(many.getAttribute("aria-checked")).toBe("false");
-    expect(many.getAttribute("title")).toBe(HEADER_WORDS.tools.many.title);
+    expect(many.getAttribute("title")).toBe(WORDS.header.tools.many.title);
     await user.click(many);
     expect(onTool).toHaveBeenCalledWith("many");
   });
@@ -59,13 +58,13 @@ describe("PanelHeader", () => {
     const { screen, onMarks } = draw();
     const marks = screen.getByRole("button", { name: "Hide marks" });
     expect(marks.getAttribute("aria-pressed")).toBe("false");
-    expect(marks.getAttribute("title")).toBe(HEADER_WORDS.marks.hide);
+    expect(marks.getAttribute("title")).toBe(WORDS.header.marks.hide);
     await user.click(marks);
     expect(onMarks).toHaveBeenCalledTimes(1);
     cleanup();
     const hidden = draw({ marksHidden: true }).screen.getByRole("button", { name: "Hide marks" });
     expect(hidden.getAttribute("aria-pressed")).toBe("true");
-    expect(hidden.getAttribute("title")).toBe(HEADER_WORDS.marks.show);
+    expect(hidden.getAttribute("title")).toBe(WORDS.header.marks.show);
   });
 
   it("hides the panel through its callback", async () => {
@@ -86,7 +85,7 @@ describe("PanelHeader", () => {
 
 describe("StatusStrip", () => {
   it("says what the page is doing, its keys in kbd, and keeps its region while it says nothing", async () => {
-    const screen = renderInSurface(<StatusStrip parts={HEADER_WORDS.strip.pick.one} />);
+    const screen = renderInSurface(<StatusStrip parts={WORDS.header.strip.pick.one} />);
     expect(screen.shadow.querySelector("[data-strip]")?.textContent).toBe("Click an Instance on the page · Esc cancels");
     expect(screen.shadow.querySelector("kbd")?.textContent).toBe("Esc");
     expect(await axeViolations(screen.host)).toEqual([]);

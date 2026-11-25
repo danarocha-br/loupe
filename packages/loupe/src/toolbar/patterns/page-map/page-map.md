@@ -7,7 +7,7 @@ The page map in "On this page" (DESIGN.md "On this page", ADR 0006): every compo
   groups={body.groups}
   boxes={boxes}
   lit={lit}
-  words={LIST_WORDS}
+  words={listWords}
   nameLang={appLang()}
   onPoint={point}
   onSelect={(id) => select(id)}
@@ -18,7 +18,7 @@ The view measures the page (`page-map.tsx`, `PageMapView`: each mounted Instance
 
 ## Interface
 
-- `groups`: panel-view's `GroupItem`s, most used first. A block is drawn for each Instance with a `block` (mounted) and a box; its tooltip is the group's `mapTitle` ("Button ×7"), its hue the group's `hue`.
+- `groups`: `panelView()`'s `GroupItem`s, most used first. A block is drawn for each Instance with a `block` (mounted) and a box; its tooltip is the group's `mapTitle` ("Button ×7"), its hue the group's `hue`.
 - `boxes`: each Instance's box on the page (`MapBox`: left, top, width, height), by id.
 - `lit`: the component pointed at, here or on its row.
 - `words`: `onPage.map`, the toolbar's name ("Page map"). `nameLang`: the app's language, for what an Instance shows.

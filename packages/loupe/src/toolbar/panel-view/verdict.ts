@@ -12,7 +12,7 @@ import type { InstanceRow } from "../../runtime/debug.js";
 import type { Inspection } from "../../runtime/inspect.js";
 import type { ComponentGroup, Page } from "./page.js";
 import type { Reads } from "./reads.js";
-import type { InspectOnlyReason, Verdict } from "./types.js";
+import type { InspectOnlyReason, Verdict } from "../patterns/view.js";
 import { inspectOnlyTag, REASON_TEXT, SUPPORTED } from "./words.js";
 
 /** The order reasons are checked in: a later one is closer to Supported. */

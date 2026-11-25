@@ -1,12 +1,12 @@
 # ScopeSection
 
-Select multiple's scope (DESIGN.md "Scope (Select multiple)"): who a group or page change reaches. It draws panel-view's `MembersView` in the Inspector's words.
+Select multiple's scope (DESIGN.md "Scope (Select multiple)"): who a group or page change reaches. It draws `panelView()`'s `MembersView` in the Inspector's words.
 
 ```tsx
 <ScopeSection
   members={body.members}
   selected={body.id}
-  words={INSPECTOR_WORDS}
+  words={inspectorWords}
   nameLang={appLang()}
   onScope={setScope}
   onReset={(target) => dropUndoably(debug, target)}

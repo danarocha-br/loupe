@@ -5,7 +5,7 @@
 //
 // It draws `InspectorWords`' legend and builds none. See legend.md.
 
-import type { InspectorWords } from "../../panel-view/index.js";
+import type { InspectorWords } from "../view.js";
 
 export type LegendProps = {
   words: Pick<InspectorWords, "legend">;

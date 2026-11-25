@@ -5,7 +5,7 @@
 // It draws where the view puts it and builds no word: the view (launcher.tsx) owns the
 // pointer, the drag, the docking maths and the timers, and says through attributes what
 // the pill is doing (`data-edge`, `data-dragging`, `data-settling`, `data-leaving`), which
-// its CSS times. Its words are panel-view's (`LauncherWords`). See launcher.md.
+// its CSS times. Its words are `panelView()`'s (`LauncherWords`). See launcher.md.
 //
 // Imported by its own path, never through `patterns/index.js`: the collapsed pill loads no
 // other pattern.
@@ -34,7 +34,7 @@ export type LauncherPillProps = Omit<ComponentPropsWithoutRef<"button">, "classN
   at: { x: number; y: number };
   /** How far each side's body stands off the window's edge: the pill's gap to that side, and more once parked. */
   gaps: Record<PillSide, number>;
-  /** panel-view's `LauncherWords`, the tooltip's shortcut filled in. */
+  /** `panelView()`'s `LauncherWords`, the tooltip's shortcut filled in. */
   words: { label: string; title: string };
   ref?: Ref<HTMLButtonElement>;
 };

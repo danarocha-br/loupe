@@ -3,10 +3,10 @@
 // every Instance from the call site, a dot one of them. One of the two things lifted inside
 // a card (the One Card Deep Rule): it is itself a button.
 //
-// It draws panel-view's `CallSiteItem`, its words included, and builds none: picking and
+// It draws `panelView()`'s `CallSiteItem`, its words included, and builds none: picking and
 // pointing go out through its callbacks. See site-card.md.
 
-import type { CallSiteItem } from "../../panel-view/index.js";
+import type { CallSiteItem } from "../view.js";
 import { ChevronIcon, EyeIcon } from "@loupe/ui";
 import { hovering } from "../marks/marks.js";
 

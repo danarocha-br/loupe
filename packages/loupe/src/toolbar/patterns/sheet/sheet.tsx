@@ -5,11 +5,11 @@
 //
 // It draws what the view says through attributes and builds no word: the view measures
 // the column, holds Alt for a peek, and slides the drawer out on Hide and waits for it
-// (index.tsx); the CSS times the drawer from `data-closing`. Its name is panel-view's
+// (index.tsx); the CSS times the drawer from `data-closing`. Its name is `panelView()`'s
 // (`SheetWords`). See sheet.md.
 
 import type { ReactNode, Ref } from "react";
-import type { SheetWords } from "../../panel-view/index.js";
+import type { SheetWords } from "../view.js";
 
 export type SheetProps = {
   /** In the column the page makes room for; false over the page, where the window is too narrow for one. */

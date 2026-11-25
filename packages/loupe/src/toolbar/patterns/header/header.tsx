@@ -3,12 +3,12 @@
 // (the select tools as one radio group, Hide marks, Hide), and the strip under it that says
 // what the page is doing: picking, a dialog of the app's under the panel, the marks hidden.
 //
-// Both draw panel-view's words (`HeaderWords`) and build none. They write nothing: a tool,
+// Both draw `panelView()`'s words (`HeaderWords`) and build none. They write nothing: a tool,
 // Hide marks and Hide call back, and the view picks, hides and says the strip as it
 // changes. See header.md.
 
 import type { ReactNode } from "react";
-import type { HeaderWords, Scope, SelectMode, StripPart } from "../../panel-view/index.js";
+import type { HeaderWords, Scope, SelectMode, StripPart } from "../view.js";
 import {
   Button,
   Chip,

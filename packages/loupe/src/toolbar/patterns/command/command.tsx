@@ -7,7 +7,7 @@
 // writes to the clipboard, and its promise says whether it could. See command.md.
 
 import { useEffect, useState } from "react";
-import type { CommandWords } from "../../panel-view/index.js";
+import type { CommandWords } from "../view.js";
 import { Button, CopyIcon, useAnnounce } from "@loupe/ui";
 
 export type CommandLineProps = {

@@ -3,7 +3,7 @@
 The list's main card (DESIGN.md "On this page"): "On this page" with its count, the page map flush under the head, then a row per component, most used first. It lays out what the view gives it, so the view composes PageMap and GroupRow and measures the page for the map.
 
 ```tsx
-<OnThisPage words={LIST_WORDS} summary={body.summary} map={<PageMapView … />}>
+<OnThisPage words={listWords} summary={body.summary} map={<PageMapView … />}>
   {body.groups.map((group) => <GroupRow key={group.component} group={group} … />)}
 </OnThisPage>
 ```
