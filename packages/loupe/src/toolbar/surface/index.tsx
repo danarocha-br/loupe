@@ -1,7 +1,8 @@
 // The Toolbar's surface: Loupe's adapters over the design system's (`@loupe/ui/surface`,
 // ADR 0003, 0010). The shadow root, the layered stylesheet, the reader's text size, the
 // language and the boundary are the package's; what is the Toolbar's is here:
-// - `STYLESHEET`, the system's with the patterns' layer on top;
+// - `STYLESHEET`, the system's with the patterns' layer on top, and the Toolbar's own
+//   tokens (patterns/tokens.ts) on the host;
 // - `useToolbarSurface()`, the Toolbar's: a host on the body, so the app's CSS can't reach it;
 // - `<Surface>`, a host in place under `STYLESHEET`, for a test or the workbench page to draw
 //   any primitive or pattern inside a real shadow root;
@@ -11,14 +12,16 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { attachSurface, Surface as SystemSurface, type SurfaceProps, stylesheet, SWITCHING_ATTRIBUTE, type Theme, THEME_ATTRIBUTE } from "@loupe/ui/surface";
 import { HOST_ATTRIBUTE, THEME_KEY } from "../styles.js";
 import { PATTERNS_CSS } from "../patterns/styles.js";
+import { PATTERN_PROPERTIES } from "../patterns/tokens.js";
 
 export { SurfaceBoundary, type Theme } from "@loupe/ui/surface";
 
 /**
  * The one stylesheet every surface of the Toolbar adopts, every rule in a layer: the
- * ground, then the primitives, then the patterns. No view writes a rule of its own.
+ * ground, with the Toolbar's own tokens on the host after the system's, then the
+ * primitives, then the patterns. No view writes a rule of its own.
  */
-export const STYLESHEET: string = stylesheet(PATTERNS_CSS);
+export const STYLESHEET: string = stylesheet(PATTERNS_CSS, PATTERN_PROPERTIES);
 
 /** The Toolbar's adapter: a host element on the body with an open shadow root. */
 export function useToolbarSurface(): ShadowRoot | null {

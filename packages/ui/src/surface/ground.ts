@@ -4,7 +4,7 @@
 // in a shadow root, so the app's CSS can't reach it and none of it reaches the app. System
 // faces only: a shadow root can't load a web font.
 
-import { FONT, hostDeclarations, size } from "../tokens.js";
+import { declare, FONT, hostDeclarations, size } from "../tokens.js";
 
 /** On the host: `light` or `dark`. Loupe's own name, so an app's `[data-theme]` CSS never matches it. */
 export const THEME_ATTRIBUTE = "data-loupe-theme";
@@ -17,14 +17,23 @@ export const SCALE_ATTRIBUTE = "data-loupe-scale";
 
 const { sans: SANS } = FONT;
 
+/** A consumer's own custom properties, by name without the `--`: the same in either theme. */
+export type HostProperties = Readonly<Record<string, string>>;
+
 /**
  * The ground every layer stands on, the stylesheet's \`tokens\` layer (surface/): the host's
  * custom properties from tokens.ts, and the elements' defaults. In a layer below the
  * primitives, so a reset here (\`button { padding: 0 }\`) never undoes a primitive's rule.
+ *
+ * \`properties\` are the consumer's own named values, the same in either theme (Loupe's
+ * page marks and map hues, ADR 0011): declared on the host after the system's, in the
+ * light block, which holds every value that doesn't change with the theme.
  */
-export const GROUND_CSS = `
+export const ground = (properties: HostProperties = {}): string => {
+  const own = Object.keys(properties).length > 0 ? ` ${declare(properties)}` : "";
+  return `
 /* Left to right in any app: \`all\` leaves direction alone, so an RTL page would half-mirror the panel. App text keeps dir="auto". */
-:host { all: initial; direction: ltr; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; --loupe-px: 1px; ${hostDeclarations("light")} color-scheme: light; }
+:host { all: initial; direction: ltr; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; --loupe-px: 1px; ${hostDeclarations("light")}${own} color-scheme: light; }
 /* The reader's default text size, over 16: \`all: initial\` left the host at \`medium\`. */
 :host([data-loupe-scale]) { --loupe-px: calc(1em / 16); }
 :host([data-loupe-theme="dark"]) { ${hostDeclarations("dark")} color-scheme: dark; }
@@ -47,3 +56,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 /* Focus shows the same ring everywhere; a part that draws its own keeps an outline forced colours draw (forced-colors.test.ts). */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 `;
+};
+
+/** The system's ground alone: no consumer's properties. */
+export const GROUND_CSS: string = ground();

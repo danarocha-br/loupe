@@ -1,10 +1,11 @@
-// Loupe's tokens: every value its stylesheet draws from, by role (ADR 0003, 0010).
-// Colour and shadow come per theme, light and dark; the page's marks and the map's hues
-// are named values the same in either; type, space, radius and motion are one scale each.
-// The surface's ground declares them on the host as custom properties (`hostDeclarations`,
-// surface/ground.ts), and Loupe's contrast and type tests read them here. Loupe's DESIGN.md
+// The design system's tokens: every value its primitives draw from, by role (ADR 0003,
+// 0010, 0011). Colour and shadow come per theme, light and dark; type, space, radius and
+// motion are one scale each. The surface's ground declares them on the host as custom
+// properties (`hostDeclarations`, surface/ground.ts), and Loupe's contrast and type tests
+// read them here. A product's own named values (Loupe's page marks and map hues) are the
+// product's: it declares them through `stylesheet(patterns, properties)`. Loupe's DESIGN.md
 // front matter is written by hand and its design-md.test.ts fails when it disagrees with
-// this module.
+// this module and Loupe's own.
 
 export type Theme = "light" | "dark";
 
@@ -189,39 +190,6 @@ export const SHADOW: Record<Theme, Record<ShadowRole, string>> = {
   },
 };
 
-/** The page's marks don't follow the panel's theme: they sit on the app, in its light. */
-export const PAGE = {
-  /** The Instances a selection reaches besides the one picked: dashed. */
-  line: "#FE9992",
-  /** The one picked, solid, and its size tag. */
-  ink: "#FE4437",
-  fill: "rgba(254, 68, 55, 0.12)",
-  band: "#1B2220",
-  /** Not applied: a left-out or hovered Instance's grey dashes. */
-  hover: "#6F7472",
-  /**
-   * The size tag's figures on `ink`: the band's near-black, 4.7:1. White was 3.4:1 (PER-245).
-   */
-  onInk: "#1B2220",
-  /** The pick tag's name on `band`, and its detail. */
-  onBand: "#F0F0F0",
-  onBandMuted: "rgba(240, 240, 240, 0.62)",
-  /** The white keyline that lifts the selection's outline off any page. */
-  halo: "rgba(255, 255, 255, 0.85)",
-} as const;
-
-/** The page's tags' lift, fixed like the marks' colours: the size tag's, and the pick tag's, a touch deeper. */
-export const PAGE_SHADOW = {
-  tag: "0 1px 2px rgba(27, 34, 32, 0.2)",
-  pick: "0 1px 2px rgba(27, 34, 32, 0.24)",
-} as const;
-
-/**
- * The page map's hues, one per component in the list's order (page-map.tsx): categories,
- * not roles, so they are named values like the page's marks, the same in either theme.
- */
-export const MAP_HUES = ["#D2577A", "#3D7FD9", "#7A9A2E", "#A05ED1", "#8276CF", "#27917E", "#D08A16"] as const;
-
 /** The two system stacks: a shadow root can't load a web font. */
 export const FONT = {
   sans: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`,
@@ -397,7 +365,8 @@ export const EASE = {
   thumb: "cubic-bezier(0.2, 0.8, 0.2, 1)",
 } as const;
 
-const declare = (properties: Record<string, string>) =>
+/** Custom properties as declarations: `{ ink: "#0A0A0A" }` → `--ink: #0A0A0A;`, one space between. */
+export const declare = (properties: Readonly<Record<string, string>>): string =>
   Object.entries(properties)
     .map(([name, value]) => `--${name}: ${value};`)
     .join(" ");
@@ -425,9 +394,8 @@ export const TYPE_PROPERTIES: Record<string, string> = {
 /**
  * The host's custom properties for one theme: its colours and shadows. The light block
  * also carries what doesn't change with the theme (`--space-*`, `--radius-*`,
- * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`, the map's `--map-hue-*`, and
- * the page's marks, `--page-*` and `--page-*-shadow`, which sit on the app in its light):
- * the dark block only overrides the themed ones.
+ * `--duration-*`, `--ease-*`, `--font-*`, `--tracking-*`): the dark block only overrides
+ * the themed ones. A consumer's own properties follow the light block's (surface/ground.ts).
  */
 export function hostDeclarations(theme: Theme): string {
   const themed = declare({ ...COLOR[theme], ...SHADOW[theme] });
@@ -438,9 +406,6 @@ export function hostDeclarations(theme: Theme): string {
     ...prefixed("duration", DURATION, "ms"),
     ...prefixed("ease", EASE),
     ...TYPE_PROPERTIES,
-    ...prefixed("map-hue", Object.fromEntries(MAP_HUES.entries())),
-    ...prefixed("page", Object.fromEntries(Object.entries(PAGE).map(([name, value]) => [kebab(name), value]))),
-    ...Object.fromEntries(Object.entries(PAGE_SHADOW).map(([name, value]) => [`page-${name}-shadow`, value])),
   });
   return `${themed} ${scales}`;
 }

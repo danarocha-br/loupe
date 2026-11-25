@@ -16,6 +16,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "dev": "vite --config workbench/vite.config.ts",
     "build": "rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
     "test": "vitest run --exclude src/build.test.ts",
     "typecheck": "tsc6 --noEmit"

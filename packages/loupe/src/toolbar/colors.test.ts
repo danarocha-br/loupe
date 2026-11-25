@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STYLESHEET } from "./surface/index.js";
-import { COLOR, PAGE, SHADOW } from "@loupe/ui/tokens";
+import { COLOR, SHADOW } from "@loupe/ui/tokens";
+import { PAGE } from "./patterns/tokens.js";
 
 const LIGHT = COLOR.light;
 const DARK = COLOR.dark;
