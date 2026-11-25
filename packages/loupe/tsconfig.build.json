@@ -3,7 +3,14 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    // @loupe/ui's own build has written these; Vite copies them into dist/ui (ADR 0010).
+    "paths": {
+      "@loupe/ui": ["../ui/dist/index.d.ts"],
+      "@loupe/ui/announcer": ["../ui/dist/announcer/announcer.d.ts"],
+      "@loupe/ui/surface": ["../ui/dist/surface/index.d.ts"],
+      "@loupe/ui/tokens": ["../ui/dist/tokens.d.ts"]
+    }
   },
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.fixture.ts", "src/**/*.fixture.tsx"]
 }

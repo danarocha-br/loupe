@@ -8,7 +8,7 @@
 // through `onDiscard`, which makes the write in the view. See held-for-review.md.
 
 import type { ListBody, ListWords, ScopeTarget } from "../../panel-view/index.js";
-import { Button, Card, CardHead, Row } from "../../ui/index.js";
+import { Button, Card, CardHead, Row } from "@loupe/ui";
 import { DotTitle, HeldValues, Meta } from "../marks/marks.js";
 
 export type HeldForReviewProps = {

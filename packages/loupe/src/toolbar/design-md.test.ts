@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { COLOR, type ColorRole, FONT, MAP_HUES, PAGE, RADIUS, SPACE, TYPE, type TypeRole } from "./tokens.js";
+import { COLOR, type ColorRole, FONT, MAP_HUES, PAGE, RADIUS, SPACE, TYPE, type TypeRole } from "@loupe/ui/tokens";
 
 // DESIGN.md stays written by hand; this only checks that its front matter says what the module does.
 

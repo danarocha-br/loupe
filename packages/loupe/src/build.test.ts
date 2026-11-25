@@ -1,6 +1,7 @@
 // The build (ADR 0004): tsc6 builds the Node side and every `.d.ts`, then Vite
-// rewrites the browser side's `.js`, one file per module. These tests read `dist`,
-// so they run after a build: `pnpm build` ends with them, and CI builds first.
+// rewrites the browser side's `.js`, one file per module, and ships `@loupe/ui`'s own
+// build in `dist/ui` (ADR 0010). These tests read `dist`, so they run after a build:
+// `pnpm build` ends with them, and CI builds first.
 
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -25,6 +26,25 @@ function filesUnder(dir: string): string[] {
 
 const jsFiles = () => filesUnder(".").filter((file) => file.endsWith(".js") || file.endsWith(".cjs"));
 const isBrowserSide = (file: string) => file === "mount.js" || /^(runtime|toolbar)\//.test(file);
+/** `@loupe/ui`, shipped as its own build made it (ADR 0010). */
+const isUi = (file: string) => file.startsWith("ui/");
+const uiDist = path.resolve(pkg, "..", "ui", "dist");
+
+/**
+ * The packages a built module imports, by name: what a host has to install. Statements
+ * and `import()` or `require()` of a literal; a specifier written inside a template is
+ * code Loupe writes into the host's files, not an import of its own.
+ */
+function packagesImported(code: string): string[] {
+  const found = new Set<string>();
+  // Either quote: Vite and tsc6 write double ones, but nothing promises it.
+  for (const match of code.matchAll(/^\s*(?:import|export)\b[^;]*?\bfrom\s*(["'])([^"'./$][^"']*)\1;|^\s*import\s*(["'])([^"'./$][^"']*)\3;|\b(?:import|require)\(\s*(["'])([^"'./$][^"']*)\5\s*\)/gm)) {
+    const specifier = (match[2] ?? match[4] ?? match[6]) as string;
+    if (specifier.startsWith("node:")) continue;
+    found.add(specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : (specifier.split("/")[0] as string));
+  }
+  return [...found];
+}
 
 /** The relative specifiers a built module imports, statically or dynamically. */
 function relativeImports(code: string): string[] {
@@ -70,6 +90,7 @@ describe("dist", () => {
 
   it("is built by Vite on the browser side, one file per source module", () => {
     const built = new Set(jsFiles().filter(isBrowserSide));
+    expect(jsFiles().filter((file) => !isBrowserSide(file) && !isUi(file) && /^\/\/ src\//m.test(read(file)))).toEqual([]);
     // A `.css` file imported as a string is a module of its own too: `chip-group.css.js`.
     const stylesheets = readdirSync(path.join(pkg, "src", "toolbar"), { recursive: true, encoding: "utf8" })
       .filter((file) => file.endsWith(".css"))
@@ -132,8 +153,9 @@ describe("dist", () => {
       expect(pill, panel).not.toContain(panel);
     }
     // The primitives and UI SDK are the panel's: the pill adopts the stylesheet's strings alone (ui/styles.js).
-    for (const primitive of ["toolbar/ui/index.js", "toolbar/ui/chip-group/chip-group.js"]) expect(pill, primitive).not.toContain(primitive);
-    expect(pill).toContain("toolbar/ui/chip-group/chip-group.css.js");
+    for (const primitive of ["ui/index.js", "ui/chip-group/chip-group.js"]) expect(pill, primitive).not.toContain(primitive);
+    expect(pill).toContain("ui/styles.js");
+    expect(pill).toContain("ui/chip-group/chip-group.css.js");
     for (const file of pill) expect(read(file), file).not.toMatch(/from\s*"@ui-sdk\//);
     expect(read("toolbar/start.js")).toMatch(/\bimport\(\s*"\.\/open\.js"\s*\)/);
     expect(closure("toolbar/index.js")).toContain("toolbar/panel.js");
@@ -174,7 +196,7 @@ describe("dist", () => {
     expect(next).not.toMatch(/^\s*(import|export)\s/m);
     expect(read("bin.js").startsWith("#!/usr/bin/env node\n")).toBe(true);
 
-    for (const file of jsFiles().filter((file) => !isBrowserSide(file))) {
+    for (const file of jsFiles().filter((file) => !isBrowserSide(file) && !isUi(file))) {
       expect(read(file), file).not.toMatch(/^\/\/ src\//m);
     }
   });
@@ -187,10 +209,59 @@ describe("dist", () => {
     expect(compiled("toolbar/index.js")).toBe(true);
     expect(compiled("toolbar/open.js")).toBe(true);
     expect(compiled("toolbar/picker.js")).toBe(true);
-    expect(compiled("toolbar/ui/chip-group/chip-group.js")).toBe(true);
+    // @loupe/ui's own build compiled it (ADR 0010).
+    expect(compiled("ui/chip-group/chip-group.js")).toBe(true);
+    expect(compiled("ui/surface/index.js")).toBe(true);
     for (const file of jsFiles().filter((file) => file.startsWith("runtime/") || file === "mount.js")) {
       expect(compiled(file), file).toBe(false);
     }
+  });
+});
+
+// ADR 0010: @loupe/ui is private. A published package must never depend on an unpublished one.
+describe("@loupe/ui, inside dist", () => {
+  it("is @loupe/ui's own build, copied whole into dist/ui", () => {
+    const theirs = readdirSync(uiDist, { recursive: true, encoding: "utf8" })
+      .map((file) => file.split(path.sep).join("/"))
+      .filter((file) => statSync(path.join(uiDist, file)).isFile());
+    expect(filesUnder("ui").sort()).toEqual(theirs.map((file) => `ui/${file}`).sort());
+    for (const file of theirs) expect(read(`ui/${file}`), file).toBe(readFileSync(path.join(uiDist, file), "utf8"));
+  });
+
+  it("is reached by relative paths: nothing in dist names @loupe/ui, nor the package's folder", () => {
+    for (const file of filesUnder(".")) expect(read(file), file).not.toMatch(/@loupe\/ui|packages\/ui|\/ui\/(src|dist)\//);
+    // The toolbar reaches it: the panel's primitives, the pill's stylesheet, the tokens.
+    expect(read("toolbar/patterns/footer/footer.js")).toContain('from "../../../ui/index.js"');
+    expect(read("toolbar/surface/index.js")).toContain('from "../../ui/surface/index.js"');
+    expect(read("toolbar/patterns/marks/marks.d.ts")).toContain('from "../../../ui/index.js"');
+  });
+
+  it("imports only packages @danarocha/loupe depends on, so a host's install has them", () => {
+    const manifest = JSON.parse(readFileSync(path.join(pkg, "package.json"), "utf8"));
+    const declared = new Set([...Object.keys(manifest.dependencies), ...Object.keys(manifest.peerDependencies)]);
+    const imported = new Set(filesUnder(".").filter((file) => /\.(c?js|d\.c?ts)$/.test(file)).flatMap((file) => packagesImported(read(file))));
+    expect([...imported].filter((name) => !declared.has(name))).toEqual([]);
+    // dist/ui brings UI SDK with it: Loupe repeats @loupe/ui's pin (ADR 0010).
+    expect(imported).toContain("@ui-sdk/react");
+    expect(JSON.stringify(manifest)).not.toContain("@loupe/ui");
+  });
+
+  it("would catch a package imported and not declared", () => {
+    const code = [
+      'import { x } from "@loupe/ui/tokens";',
+      'import {\n  a,\n  b,\n} from "lodash/fp";',
+      'const t = await import("typescript");',
+      "const m = `require(\"${NPM_PACKAGE}\")`;",
+      // Code Loupe writes into a host's files, from a template: not an import of its own.
+      'import { Button } from "${ADAPTER}";',
+      // Single quotes, and a lazy Node-side import of a devDependency: a host wouldn't have it.
+      "import { y } from 'magic-string';",
+      "const formats = await import('ajv-formats');",
+      "const z = require('@babel/core');",
+      "import 'side-effect';",
+      "const n = require('node:fs');",
+    ].join("\n");
+    expect(packagesImported(code)).toEqual(["@loupe/ui", "lodash", "typescript", "magic-string", "ajv-formats", "@babel/core", "side-effect"]);
   });
 });
 

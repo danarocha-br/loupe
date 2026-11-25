@@ -8,7 +8,7 @@
 
 import { type ReactNode, useState } from "react";
 import type { InspectOnlyView, PropItem } from "../../panel-view/index.js";
-import { Fold, FoldChevron, FoldPanel, FoldTrigger, PROP_ICONS, Row, RowLine, RowName, RowValue, Tag } from "../../ui/index.js";
+import { Fold, FoldChevron, FoldPanel, FoldTrigger, PROP_ICONS, Row, RowLine, RowName, RowValue, Tag } from "@loupe/ui";
 import { Meta } from "../marks/marks.js";
 
 export type InspectOnlyProps = {

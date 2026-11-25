@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isolate, reachText } from "./panel-view/words.js";
 import { STYLESHEET as CSS } from "./surface/index.js";
-import { FONT, font, leading, TYPE, TYPE_PROPERTIES, type TypeRole } from "./tokens.js";
+import { FONT, font, leading, TYPE, TYPE_PROPERTIES, type TypeRole } from "@loupe/ui/tokens";
 
 const steps = Object.entries(TYPE) as [TypeRole, (typeof TYPE)[TypeRole]][];
 

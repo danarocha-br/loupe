@@ -11,7 +11,7 @@ import type { Reads } from "./reads.js";
 import type { InstanceRow } from "../../runtime/debug.js";
 import type { CallSiteItem, ChangeItem, GroupItem, InstanceItem, ListBody, StateItem, Tag } from "./types.js";
 import { componentVerdict } from "./verdict.js";
-import { MAP_HUES } from "../tokens.js";
+import { MAP_HUES } from "@loupe/ui/tokens";
 import {
   blockLead,
   heldValues,

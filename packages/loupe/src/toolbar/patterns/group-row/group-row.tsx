@@ -7,7 +7,7 @@
 // unmounted Instance go out through its callbacks. See group-row.md.
 
 import type { CallSiteItem, GroupItem, InspectorWords } from "../../panel-view/index.js";
-import { Dot, EyeIcon, Fold, FoldChevron, FoldPanel, FoldTrigger } from "../../ui/index.js";
+import { Dot, EyeIcon, Fold, FoldChevron, FoldPanel, FoldTrigger } from "@loupe/ui";
 import { Breakable, HeldValues, Keys, StatusChip, TagChip } from "../marks/marks.js";
 import { SiteCard } from "../site-card/site-card.js";
 

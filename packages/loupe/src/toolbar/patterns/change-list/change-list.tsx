@@ -7,7 +7,7 @@
 // outlining go out through its callbacks. See change-list.md.
 
 import type { ChangeItem, ListWords } from "../../panel-view/index.js";
-import { Card, CardHead } from "../../ui/index.js";
+import { Card, CardHead } from "@loupe/ui";
 import { ChangeKey, hovering, Meta } from "../marks/marks.js";
 
 export type ChangeListProps = {

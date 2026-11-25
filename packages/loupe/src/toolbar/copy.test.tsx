@@ -13,7 +13,7 @@ import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { BLOCKED } from "./copy.js";
 import { COPY_WORDS } from "./panel-view/index.js";
-import { type Heard, listen } from "./ui/announcer/announcer.fixture.js";
+import { type Heard, listen } from "@loupe/ui/listen";
 import { OPEN_KEY } from "./launcher-place.js";
 import { loadPanel } from "./start.js";
 

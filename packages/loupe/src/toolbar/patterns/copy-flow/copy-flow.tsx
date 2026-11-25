@@ -10,7 +10,7 @@
 
 import { type Ref, useRef } from "react";
 import type { CopyWords } from "../../panel-view/index.js";
-import { AlertIcon, Button, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, Field, ResetIcon } from "../../ui/index.js";
+import { AlertIcon, Button, CheckIcon, ChevronUpIcon, CopyIcon, ExclaimIcon, Field, ResetIcon } from "@loupe/ui";
 
 /** The split button's state: ready, a copy landed (green, for a moment), or the main half's copy refused (amber). */
 export type CopyState = "idle" | "copied" | "failed";

@@ -7,7 +7,7 @@
 // pointing go out through its callbacks. See site-card.md.
 
 import type { CallSiteItem } from "../../panel-view/index.js";
-import { ChevronIcon, EyeIcon } from "../../ui/index.js";
+import { ChevronIcon, EyeIcon } from "@loupe/ui";
 import { hovering } from "../marks/marks.js";
 
 export type SiteCardProps = {

@@ -21,7 +21,7 @@ import { attempt, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
-import { Button, Card, Toggle, useAnnounce, useAnnounceChange } from "./ui/index.js";
+import { Button, Card, Toggle, useAnnounce, useAnnounceChange } from "@loupe/ui";
 import {
   COMMAND_WORDS,
   FOOTER_WORDS,

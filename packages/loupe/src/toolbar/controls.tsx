@@ -9,7 +9,7 @@ import { singleLine } from "../runtime/label-text.js";
 import { INSPECTOR_WORDS, type PropItem } from "./panel-view/index.js";
 import { PropRow } from "./patterns/index.js";
 import type { SelectMode } from "./picker.js";
-import type { RowLook } from "./ui/index.js";
+import type { RowLook } from "@loupe/ui";
 
 /**
  * The Instance can unmount between a frame and a click (its menu closes, say). The

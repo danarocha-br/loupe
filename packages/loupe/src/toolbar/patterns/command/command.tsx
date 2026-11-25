@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { CommandWords } from "../../panel-view/index.js";
-import { Button, CopyIcon, useAnnounce } from "../../ui/index.js";
+import { Button, CopyIcon, useAnnounce } from "@loupe/ui";
 
 export type CommandLineProps = {
   /** The command as shown, its spaces kept as written. */

@@ -8,7 +8,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { COMMAND_WORDS } from "../../panel-view/index.js";
 import { axeViolations, cleanup, renderInSurface } from "../../surface/render.fixture.js";
-import { listen } from "../../ui/announcer/announcer.fixture.js";
+import { listen } from "@loupe/ui/listen";
 import { COMMAND, SECRET_LINE } from "../samples.js";
 import { expectPatternCss } from "../css.fixture.js";
 import { CommandLine } from "./command.js";

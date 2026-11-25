@@ -1,98 +1,24 @@
-// The surface: the shadow root Loupe draws in, and everything it carries with it:
-// the stylesheet, the theme, the reader's text size and the language (ADR 0003,
-// the architecture review's candidate 3). Two adapters use it:
+// The Toolbar's surface: Loupe's adapters over the design system's (`@loupe/ui/surface`,
+// ADR 0003, 0010). The shadow root, the layered stylesheet, the reader's text size, the
+// language and the boundary are the package's; what is the Toolbar's is here:
+// - `STYLESHEET`, the system's with the patterns' layer on top;
 // - `useToolbarSurface()`, the Toolbar's: a host on the body, so the app's CSS can't reach it;
-// - `<Surface>`, a host in place, for a test or the workbench page to draw any primitive
-//   inside a real shadow root, under the same stylesheet.
-// Whatever renders in a surface does so inside `SurfaceBoundary`: a throw takes the
-// surface down, never the host's layout. And beside the `Announcer`'s two live regions,
-// mounted with the surface, before anything in it has something to say.
+// - `<Surface>`, a host in place under `STYLESHEET`, for a test or the workbench page to draw
+//   any primitive or pattern inside a real shadow root;
+// - `useTheme()`, light or dark as the reader last chose it.
 
-import { Component, type CSSProperties, type ErrorInfo, type ReactNode, useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { GROUND_CSS, HOST_ATTRIBUTE, SCALE_ATTRIBUTE, SWITCHING_ATTRIBUTE, THEME_ATTRIBUTE, THEME_KEY } from "../styles.js";
-// The announcer's own module, not `ui/index.js`: the collapsed pill loads no primitive's component.
-import { Announcer } from "../ui/announcer/announcer.js";
-import { PRIMITIVES_CSS } from "../ui/styles.js";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { attachSurface, Surface as SystemSurface, type SurfaceProps, stylesheet, SWITCHING_ATTRIBUTE, type Theme, THEME_ATTRIBUTE } from "@loupe/ui/surface";
+import { HOST_ATTRIBUTE, THEME_KEY } from "../styles.js";
 import { PATTERNS_CSS } from "../patterns/styles.js";
 
-export type Theme = "light" | "dark";
-
-/** The stylesheet's layers, in cascade order: a later layer wins over an earlier one. */
-export const LAYERS = ["tokens", "primitives", "patterns"] as const;
-
-/** On a host `<Surface>` draws: a workbench frame or a test's. */
-export const SURFACE_ATTRIBUTE = "data-loupe-surface";
+export { SurfaceBoundary, type Theme } from "@loupe/ui/surface";
 
 /**
- * The one stylesheet every surface adopts, every rule in a layer: the ground, then the
- * primitives, then the patterns. No view writes a rule of its own.
+ * The one stylesheet every surface of the Toolbar adopts, every rule in a layer: the
+ * ground, then the primitives, then the patterns. No view writes a rule of its own.
  */
-export const STYLESHEET: string = [
-  `@layer ${LAYERS.join(", ")};`,
-  `@layer tokens {${GROUND_CSS}}`,
-  `@layer primitives {\n${PRIMITIVES_CSS}\n}`,
-  `@layer patterns {\n${PATTERNS_CSS}\n}`,
-].join("\n");
-
-/** One constructed sheet per document, shared by every surface in it. */
-const sheets = new WeakMap<Document, CSSStyleSheet>();
-
-/**
- * Gives a shadow root the stylesheet: adopted where the browser can construct one,
- * so every surface shares a single parsed sheet; a `<style>` otherwise (jsdom).
- */
-export function adoptStylesheet(shadow: ShadowRoot): void {
-  const doc = shadow.ownerDocument;
-  const View = doc.defaultView as (Window & { CSSStyleSheet?: typeof CSSStyleSheet }) | null;
-  if (View?.CSSStyleSheet && "adoptedStyleSheets" in shadow && "replaceSync" in View.CSSStyleSheet.prototype) {
-    try {
-      let sheet = sheets.get(doc);
-      if (!sheet) {
-        sheet = new View.CSSStyleSheet();
-        sheet.replaceSync(STYLESHEET);
-        sheets.set(doc, sheet);
-      }
-      if (!shadow.adoptedStyleSheets.includes(sheet)) shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
-      return;
-    } catch {
-      // A browser that has the API but refuses the sheet: the element below always works.
-    }
-  }
-  const style = doc.createElement("style");
-  style.textContent = STYLESHEET;
-  shadow.prepend(style);
-}
-
-/** A host's shadow root with the stylesheet, its language and the reader's text size. */
-export function attachSurface(host: HTMLElement): ShadowRoot {
-  // Loupe's words are English whatever the app's `lang`: a screen reader reads them in an English voice.
-  host.setAttribute("lang", "en");
-  if (registerTextScale()) host.setAttribute(SCALE_ATTRIBUTE, "");
-  const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
-  adoptStylesheet(shadow);
-  return shadow;
-}
-
-type PropertyRegistry = { registerProperty?(definition: { name: string; syntax: string; inherits: boolean; initialValue: string }): void };
-
-/**
- * Registers `--loupe-px` as a length, so `calc(1em / 16)` on the host resolves there,
- * once, to the reader's default text size over 16, and every font size follows it
- * (tokens.ts `size()`). True once it is registered, by this mount or an earlier one;
- * false where the browser can't, and the sizes then stay as written.
- */
-export function registerTextScale(): boolean {
-  const registry = (window as unknown as { CSS?: PropertyRegistry }).CSS;
-  if (typeof registry?.registerProperty !== "function") return false;
-  try {
-    registry.registerProperty({ name: "--loupe-px", syntax: "<length>", inherits: true, initialValue: "1px" });
-    return true;
-  } catch (error) {
-    // Registered already: a second surface, or a Fast Refresh.
-    return error instanceof DOMException && error.name === "InvalidModificationError";
-  }
-}
+export const STYLESHEET: string = stylesheet(PATTERNS_CSS);
 
 /** The Toolbar's adapter: a host element on the body with an open shadow root. */
 export function useToolbarSurface(): ShadowRoot | null {
@@ -100,7 +26,7 @@ export function useToolbarSurface(): ShadowRoot | null {
   useEffect(() => {
     const host = document.createElement("div");
     host.setAttribute(HOST_ATTRIBUTE, "");
-    const shadow = attachSurface(host);
+    const shadow = attachSurface(host, STYLESHEET);
     document.body.append(host);
     setRoot(shadow);
     return () => host.remove();
@@ -109,39 +35,11 @@ export function useToolbarSurface(): ShadowRoot | null {
 }
 
 /**
- * The in-place adapter: draws `children` inside a real shadow root, under the same
- * stylesheet, at a theme and, for the workbench, a text size of the reader's choosing.
+ * The in-place adapter: draws `children` inside a real shadow root, under `STYLESHEET`,
+ * at a theme and, for the workbench, a text size of the reader's choosing.
  */
-export function Surface({
-  theme = "light",
-  textSize,
-  label,
-  children,
-}: {
-  theme?: Theme;
-  /** The reader's default text size in px, as their browser setting would make it: 20 for a larger one. */
-  textSize?: number;
-  /** Names the frame, for a page that draws several. */
-  label?: string;
-  children: ReactNode;
-}) {
-  const [shadow, setShadow] = useState<ShadowRoot | null>(null);
-  const attach = useCallback((host: HTMLDivElement | null) => {
-    if (host) setShadow(attachSurface(host));
-  }, []);
-  // On the host, an outer style wins over `:host { all: initial }`: the size the scale reads.
-  const style: CSSProperties | undefined = textSize ? { fontSize: `${textSize}px` } : undefined;
-  return (
-    <div ref={attach} {...{ [SURFACE_ATTRIBUTE]: "", [THEME_ATTRIBUTE]: theme }} aria-label={label} role={label ? "group" : undefined} style={style}>
-      {shadow &&
-        createPortal(
-          <SurfaceBoundary>
-            <Announcer>{children}</Announcer>
-          </SurfaceBoundary>,
-          shadow,
-        )}
-    </div>
-  );
+export function Surface(props: Omit<SurfaceProps, "stylesheet">) {
+  return <SystemSurface {...props} stylesheet={STYLESHEET} />;
 }
 
 /** Storage can throw (a private window, blocked site data): the OS preference decides then. */
@@ -197,24 +95,4 @@ export function useTheme(host: HTMLElement, probe: string): [Theme, () => void] 
     }
   }, [theme]);
   return [theme, toggle];
-}
-
-/**
- * Catches a throw from anything drawn in a surface, so it stops at Loupe: the surface
- * goes blank and says why in the console, once, and the host's page carries on.
- */
-export class SurfaceBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-
-  static getDerivedStateFromError(): { failed: boolean } {
-    return { failed: true };
-  }
-
-  componentDidCatch(error: unknown, info: ErrorInfo): void {
-    console.error("Loupe hit an error and stepped aside; the page is unaffected.", error, info.componentStack);
-  }
-
-  render(): ReactNode {
-    return this.state.failed ? null : this.props.children;
-  }
 }

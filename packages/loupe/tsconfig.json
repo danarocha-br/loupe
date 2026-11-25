@@ -5,7 +5,19 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // @loupe/ui is private and bundled into dist/ui, so package.json never names it (ADR 0010):
+    // its entries are reached by path. Its source here; its built .d.ts in tsconfig.build.json.
+    // `src/toolbar/layers.test.ts` holds both lists to its package.json's exports.
+    "paths": {
+      "@loupe/ui": ["../ui/src/index.ts"],
+      "@loupe/ui/announcer": ["../ui/src/announcer/announcer.tsx"],
+      "@loupe/ui/surface": ["../ui/src/surface/index.tsx"],
+      "@loupe/ui/tokens": ["../ui/src/tokens.ts"],
+      "@loupe/ui/testing": ["../ui/src/surface/render.fixture.tsx"],
+      "@loupe/ui/listen": ["../ui/src/announcer/announcer.fixture.ts"],
+      "@loupe/ui/jsdom-gaps": ["../ui/src/surface/jsdom-gaps.fixture.ts"]
+    }
   },
   "include": ["src"]
 }

@@ -9,7 +9,7 @@
 
 import type { ReactNode, Ref } from "react";
 import type { FooterView, FooterWords } from "../../panel-view/index.js";
-import { Button, ContrastIcon, Dot, ResetIcon, Toggle } from "../../ui/index.js";
+import { Button, ContrastIcon, Dot, ResetIcon, Toggle } from "@loupe/ui";
 
 export type PanelFooterProps = {
   /** panel-view's footer: the count and its words, the held chip, and what Reset all discards. */

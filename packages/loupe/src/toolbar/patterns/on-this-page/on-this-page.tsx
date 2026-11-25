@@ -7,7 +7,7 @@
 
 import type { ReactNode } from "react";
 import type { ListWords } from "../../panel-view/index.js";
-import { Card, CardHead } from "../../ui/index.js";
+import { Card, CardHead } from "@loupe/ui";
 import { Meta } from "../marks/marks.js";
 
 export type OnThisPageProps = {

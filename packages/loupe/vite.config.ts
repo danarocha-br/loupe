@@ -6,12 +6,13 @@
 // - `"use client"` and `"use server"` stay first in their own files;
 // - the toolbar and `@danarocha/loupe/runtime` reach the same runtime files;
 // - `process.env.NODE_ENV` is left for the host's bundler to fold;
-// - the Node side (`next.cjs`, `bin`, the loader, ...) is tsc6's output, untouched.
+// - the Node side (`next.cjs`, `bin`, the loader, ...) is tsc6's output, untouched;
+// - `@loupe/ui`, private, is shipped inside `dist/ui` and named nowhere in `dist` (ADR 0010).
 //
 // Vitest loads this file too (`vitest.config.ts`), so a `.css?inline` import and
 // React Compiler behave the same in tests as in `dist`.
 
-import { readdirSync } from "node:fs";
+import { cpSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import babel from "@rolldown/plugin-babel";
@@ -19,6 +20,92 @@ import { defineConfig, type Plugin, type PluginOption, type UserConfig } from "v
 
 const root = dirname(fileURLToPath(import.meta.url));
 const src = join(root, "src");
+
+/** `@loupe/ui`, the design system (ADR 0010): a private workspace package, bundled into `dist/ui`. */
+const ui = join(root, "..", "ui");
+const uiSrc = join(ui, "src");
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** `@loupe/ui`'s source, as a pattern that matches its files whichever separator the id uses (Vite's `/`, or Windows' `\`). */
+const UI_SOURCE = new RegExp(`^${uiSrc.split(/[\\/]/).map(escaped).join("[\\\\/]")}[\\\\/][^?]*\\.tsx?$`);
+
+/** `@loupe/ui`'s entries, each to its source file: `@loupe/ui/surface` → `…/ui/src/surface/index.tsx`. */
+export function uiEntries(): Record<string, string> {
+  const manifest = JSON.parse(readFileSync(join(ui, "package.json"), "utf8")) as { exports: Record<string, string> };
+  const found: Record<string, string> = {};
+  for (const [entry, target] of Object.entries(manifest.exports)) {
+    if (entry === "./package.json") continue;
+    found[entry === "." ? "@loupe/ui" : `@loupe/ui/${entry.slice(2)}`] = join(ui, target);
+  }
+  return found;
+}
+
+/** An entry only tests may import: its target is a `.fixture` file, which no build ships. */
+export const isTestEntry = (target: string) => /\.fixture\.tsx?$/.test(target);
+
+/** Where a `@loupe/ui` source module is built, in `dist/ui` (relative to `dist`): `…/ui/src/tokens.ts` → `ui/tokens.js`. */
+export const uiDistPath = (source: string) => `ui/${relative(uiSrc, source).split(sep).join("/").replace(/\.tsx?$/, ".js")}`;
+
+const UI_SPECIFIER = /^@loupe\/ui(?:\/[\w-]+)?$/;
+
+/**
+ * `@loupe/ui`, reached by path, since `package.json` never names it (ADR 0010). In tests
+ * and in a dev server, an entry is its source, which Vite transforms with Loupe's own.
+ * In the build it stays external, rendered as a relative path into `dist/ui`, as
+ * `nodeSideExternal` renders the Node side: `dist` mirrors `src`, and `dist/ui` sits
+ * where a `src/ui` would. A test-only entry in a shipped module fails the build.
+ */
+function loupeUi(): Plugin {
+  let building = false;
+  return {
+    name: "loupe:ui",
+    enforce: "pre",
+    configResolved(config) {
+      building = config.command === "build";
+    },
+    resolveId(source) {
+      if (!UI_SPECIFIER.test(source)) return null;
+      const target = uiEntries()[source];
+      if (!target) return null;
+      if (!building) return target;
+      if (isTestEntry(target)) this.error(`${source} is for tests, and is never shipped.`);
+      return { id: join(src, uiDistPath(target)), external: "relative" };
+    },
+  };
+}
+
+/**
+ * Ships `@loupe/ui`: copies its `dist` (its own build, ADR 0010) into `dist/ui`, then points
+ * the `.d.ts` tsc6 wrote at it, `@loupe/ui/tokens` → `../ui/tokens.js`, so nothing in
+ * `dist` names the private package. `src/build.test.ts` checks both.
+ */
+function vendorUi(): Plugin {
+  let out = "";
+  return {
+    name: "loupe:vendor-ui",
+    apply: "build",
+    configResolved(config) {
+      out = resolve(config.root, config.build.outDir);
+    },
+    writeBundle() {
+      const target = join(out, "ui");
+      rmSync(target, { recursive: true, force: true });
+      cpSync(join(ui, "dist"), target, { recursive: true });
+      const entries = uiEntries();
+      for (const file of readdirSync(out, { recursive: true, encoding: "utf8" })) {
+        if (!/\.d\.c?ts$/.test(file) || file.startsWith(`ui${sep}`)) continue;
+        const full = join(out, file);
+        const code = readFileSync(full, "utf8");
+        const rewritten = code.replace(/(["'])(@loupe\/ui(?:\/[\w-]+)?)\1/g, (whole, quote: string, specifier: string) => {
+          const entry = entries[specifier];
+          if (!entry) return whole;
+          const path = relative(dirname(full), join(out, uiDistPath(entry))).split(sep).join("/");
+          return `${quote}${path.startsWith(".") ? path : `./${path}`}${quote}`;
+        });
+        if (rewritten !== code) writeFileSync(full, rewritten);
+      }
+    },
+  };
+}
 
 /** The browser side, as `src`-relative directories and files. */
 const BROWSER = ["mount.ts", "runtime", "toolbar"];
@@ -72,10 +159,14 @@ function nodeSideExternal(): Plugin {
 /** React Compiler's options, here and in `toolbar/compiled.test.ts`, which checks what it compiles. */
 export const REACT_COMPILER_OPTIONS = { target: "19" } as const;
 
-/** React Compiler, on `toolbar/` only. `runtime/` reads React internals while it renders. */
+/**
+ * React Compiler, on `toolbar/` only. `runtime/` reads React internals while it renders.
+ * And on `@loupe/ui`'s source, which tests and a dev server load as it is: its own build
+ * compiles what `dist/ui` ships (ADR 0010).
+ */
 export function reactCompiler(): PluginOption {
   return babel({
-    include: [/[\\/]src[\\/]toolbar[\\/][^?]*\.tsx?$/],
+    include: [/[\\/]src[\\/]toolbar[\\/][^?]*\.tsx?$/, UI_SOURCE],
     exclude: [/[\\/]node_modules[\\/]/, /\.test\.tsx?$/, /\0/],
     plugins: [["babel-plugin-react-compiler", REACT_COMPILER_OPTIONS]],
   });
@@ -109,13 +200,14 @@ function sourceMark(): Plugin {
   };
 }
 
-const isBare = (id: string) => !id.startsWith(".") && !id.startsWith("\0") && !isAbsolute(id);
+/** A package the host installs, left as it is written. Not `@loupe/ui`: `loupeUi()` points it into `dist/ui`. */
+const isBare = (id: string) => !id.startsWith(".") && !id.startsWith("\0") && !isAbsolute(id) && !UI_SPECIFIER.test(id);
 
 /** The build, for any set of entries: `dist` gets the browser side; a test builds a probe. */
 export function browserConfig(entry: Record<string, string>, outDir: string): UserConfig {
   return {
     root,
-    plugins: [nodeSideExternal(), reactCompiler(), sourceMark()],
+    plugins: [loupeUi(), nodeSideExternal(), reactCompiler(), sourceMark()],
     oxc: { include: /\.[cm]?tsx?$/, jsx: { runtime: "automatic" } },
     build: {
       outDir,
@@ -146,4 +238,5 @@ export function browserConfig(entry: Record<string, string>, outDir: string): Us
   };
 }
 
-export default defineConfig(browserConfig(browserEntries(), "dist"));
+const dist = browserConfig(browserEntries(), "dist");
+export default defineConfig({ ...dist, plugins: [...(dist.plugins ?? []), vendorUi()] });
