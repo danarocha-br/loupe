@@ -14,6 +14,7 @@ import { createRoot } from "react-dom/client";
 import { Card } from "../../src/index.js";
 import { Surface, type Theme } from "../../src/surface/index.js";
 import FRAMES_CSS from "./frames.css?inline";
+import { STYLESHEET_EVENT } from "./hot.js";
 import { Markdown } from "./markdown.js";
 import PAGE_CSS from "./workbench.css?inline";
 
@@ -236,14 +237,28 @@ export function Workbench(options: WorkbenchOptions) {
   );
 }
 
-/** Draws a package's workbench into the page's `#root`, with the page's own CSS. */
-export function mountWorkbench(options: WorkbenchOptions): void {
+/**
+ * Draws a package's workbench into the page's `#root`, with the page's own CSS. Gives back
+ * a way to draw it again with new pages, for a package's `main.tsx` to take an edit of its
+ * states in place; the stylesheet it takes again itself, from the dev server (`../vite.ts`).
+ * Drawn again, the page keeps its state: the reader's settings, an open Fold, focus.
+ */
+export function mountWorkbench(options: WorkbenchOptions): (next: Partial<WorkbenchOptions>) => void {
   const style = document.createElement("style");
   style.textContent = PAGE_CSS;
   document.head.append(style);
-  createRoot(document.getElementById("root") as HTMLElement).render(
-    <StrictMode>
-      <Workbench {...options} />
-    </StrictMode>,
-  );
+  const root = createRoot(document.getElementById("root") as HTMLElement);
+  let current = options;
+  const draw = (next: Partial<WorkbenchOptions>) => {
+    current = { ...current, ...next };
+    root.render(
+      <StrictMode>
+        <Workbench {...current} />
+      </StrictMode>,
+    );
+  };
+  draw({});
+  // A `.css` edit: every surface swaps its sheet in place (`adoptStylesheet`), and nothing else renders anew.
+  import.meta.hot?.on(STYLESHEET_EVENT, (stylesheet: string) => draw({ stylesheet }));
+  return draw;
 }

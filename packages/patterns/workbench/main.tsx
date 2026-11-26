@@ -8,7 +8,7 @@ import { mountWorkbench } from "@loupe/ui/workbench";
 import { PATTERNS } from "./patterns.js";
 import { WORKBENCH_STYLESHEET } from "./stylesheet.js";
 
-mountWorkbench({
+const draw = mountWorkbench({
   title: "@loupe/patterns",
   intro: "Every pattern in each of its states, with its sample data, light and dark, inside the real surface.",
   nav: "Patterns",
@@ -16,4 +16,9 @@ mountWorkbench({
   stylesheet: WORKBENCH_STYLESHEET,
   folder: "packages/patterns/src/",
   storage: "loupe-patterns-workbench",
+});
+
+// An edit of a pattern's states or its sample data draws them again in place, the reader's settings and the page's state kept.
+import.meta.hot?.accept("./patterns.js", (next) => {
+  if (next) draw({ pages: next.PATTERNS as typeof PATTERNS });
 });

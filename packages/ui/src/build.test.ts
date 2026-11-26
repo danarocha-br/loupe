@@ -44,6 +44,11 @@ describe("dist", () => {
     }
   });
 
+  it("holds nothing of the workbench's dev server: no React Refresh, no HMR", () => {
+    // `workbench/vite.ts` adds them to the workbench alone; the build's config has neither.
+    for (const file of files()) expect(read(file), file).not.toMatch(/\$Refresh(Reg|Sig)\$|react-refresh|import\.meta\.hot/);
+  });
+
   it("runs React Compiler on the components", () => {
     const compiled = (file: string) => /from\s*"react\/compiler-runtime"/.test(read(file));
     expect(compiled("chip-group/chip-group.js")).toBe(true);
