@@ -115,6 +115,8 @@ describe("Announcer", () => {
     wait(WRITE_AFTER_MS);
     await Promise.resolve();
     expect(screen.getByRole("alert").textContent).toBe("Couldn’t copy.");
+    // The first commit's message landed through the replay, once, and the next one after it.
+    expect(heard.assertive).toEqual(["Loupe couldn’t open.", "Couldn’t copy."]);
     expect(heard.polite).toEqual(["Copied"]);
   });
 
