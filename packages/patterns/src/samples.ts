@@ -95,14 +95,14 @@ export const WORDS: {
     serverRendered: "Server-rendered",
     leftOutUnmounted: "Left out, not mounted",
     legend: { shown: "Shows now", app: "App’s value", default: "Default" },
-    hold: { off: (prop) => `Hold ${prop}`, on: (prop) => `Holding ${prop} · Release` },
+    hold: (prop) => `Hold ${prop}`,
     resetInstance: "Reset this Instance",
   },
   list: {
     start: { title: "What do you want to change?", body: "Pick it right on the page, or start from what this page uses most.", tools: "Start selecting" },
     tools: TOOLS,
     onPage: { title: "On this page", rows: "Components on this page", map: "Page map" },
-    held: { title: "Held for review", discard: "Discard" },
+    held: { title: "Held for review", discard: "Discard", discardName: (label) => `Discard ${label}` },
     interaction: {
       title: "Appears on interaction",
       meta: "Not on screen yet",
@@ -166,11 +166,14 @@ export const WORDS: {
     copy: "Copy",
     copied: "Copied",
     failed: "Copy failed",
+    copiedText: (command) => `Copied “${command}”`,
     refused: "Couldn’t reach the clipboard. Select the command and copy it.",
   },
   launcher: {
     label: "Show Loupe",
     title: (shortcut) => `Show Loupe (${shortcut} focuses it) · drag it anywhere, or to a side to keep it there`,
+    keys: "The arrow keys move it to the side of the window they point at.",
+    docked: { top: "Docked at the top", right: "Docked on the right", bottom: "Docked at the bottom", left: "Docked on the left" },
   },
   sheet: { label: "Loupe" },
   outline: { size: (name, width, height) => `${name} · ${width} × ${height}`, detailLead: " · " },
@@ -229,7 +232,7 @@ export const VARIANT: PropItem = {
   source: "from This instance",
   control: options("variant", ["solid", "ghost", "outline", "link"], "outline", { isDefault: "solid" }),
   current: null,
-  reset: { label: "Reset", write: write("variant"), inNotice: false },
+  reset: { label: "Reset", name: "Reset variant", write: write("variant"), inNotice: false },
 };
 
 /** The app's own value, from a group Override: its change line names where it comes from. */
@@ -269,7 +272,7 @@ export const CHILDREN: PropItem = {
   change: { from: '"Remove"', to: '""' },
   source: "from This instance",
   control: { kind: "text", key: "instance", write: write("children"), value: "" },
-  reset: { label: "Reset", write: write("children"), inNotice: false },
+  reset: { label: "Reset", name: "Reset Text", write: write("children"), inNotice: false },
 };
 
 /** A State prop the app tried to close while an Override holds it open: the notice carries Reset. */
@@ -288,7 +291,7 @@ export const OPEN: PropItem = {
     after: ".",
     text: "Your Override holds this at true; the app tried to set false.",
   },
-  reset: { label: "Reset", write: write("open"), inNotice: true },
+  reset: { label: "Reset", name: "Reset open", write: write("open"), inNotice: true },
 };
 
 /** At a scope: the members differ, and one keeps its own value. */

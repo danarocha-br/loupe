@@ -35,7 +35,8 @@ export function HeldForReview({ items, meta, words, onDiscard }: HeldForReviewPr
           <Row key={JSON.stringify(item.target)} as="li" look="item" data-held-item="">
             <div data-held-target="">
               <span>{item.label}</span>
-              <Button size="small" onClick={() => onDiscard(item.target)}>
+              {/* Named by what it drops: each record's Discard would read the same. */}
+              <Button size="small" aria-label={words.held.discardName(item.label)} onClick={() => onDiscard(item.target)}>
                 {words.held.discard}
               </Button>
             </div>

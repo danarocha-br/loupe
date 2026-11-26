@@ -32,6 +32,7 @@ import { LAUNCHER_WORDS } from "./panel-view/chrome.js";
 import { LauncherPill } from "@loupe/patterns/launcher";
 import { SHORTCUT_ARIA, shortcutLabel } from "./shortcut.js";
 import { DURATION } from "@loupe/ui/tokens";
+import { useAnnounce } from "@loupe/ui/announcer";
 
 export type { Rect };
 
@@ -102,6 +103,7 @@ export function pillRect(): Rect {
 
 export function Launcher({ onOpen, onPreload, leaving = false }: { onOpen(): void; onPreload?(): void; leaving?: boolean }) {
   const viewport = useViewport();
+  const announce = useAnnounce();
   const [place, setPlace] = useState<Place>(storedPlace);
   const [held, setHeld] = useState<Held | null>(null);
   // Pointer moves can outrun a render: each reads the drag as the last one left it.
@@ -211,6 +213,8 @@ export function Launcher({ onOpen, onPreload, leaving = false }: { onOpen(): voi
     const at = centreOf(place, viewport);
     travel();
     settle(glue(edge, along(edge, at.x, at.y), viewport));
+    // Nothing on screen says where it went to a keyboard that can't see it: said.
+    announce(LAUNCHER_WORDS.docked[edge]);
   };
 
   return (
@@ -221,7 +225,7 @@ export function Launcher({ onOpen, onPreload, leaving = false }: { onOpen(): voi
       leaving={leaving}
       at={{ x: round(centre.x - BODY.width / 2), y: round(centre.y - BODY.height / 2) }}
       gaps={gaps}
-      words={{ label: LAUNCHER_WORDS.label, title: LAUNCHER_WORDS.title(shortcutLabel()) }}
+      words={{ label: LAUNCHER_WORDS.label, title: LAUNCHER_WORDS.title(shortcutLabel()), keys: LAUNCHER_WORDS.keys }}
       aria-keyshortcuts={SHORTCUT_ARIA}
       tabIndex={leaving ? -1 : undefined}
       // About to be opened: the panel's module starts loading, so the click doesn't wait for it.

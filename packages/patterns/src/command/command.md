@@ -12,7 +12,7 @@ A command for the reader to run, with Copy (DESIGN.md "Notices and status", PER-
 - `text`: the command as shown, its spaces kept as written (a quoted path's run of spaces stays).
 - `copy`: what Copy puts on the clipboard, when it differs from `text`.
 - `prompt`: the `$` before it; off for a line that isn't a shell command.
-- `words`: `panelView()`'s `CommandWords`: `prompt`, `copy`, `copied`, `failed`, and `refused`, what to do when the clipboard refuses it.
+- `words`: `panelView()`'s `CommandWords`: `prompt`, `copy`, `copied`, `failed`, `copiedText(command)`, what a screen reader hears once a copy lands, and `refused`, what to do when the clipboard refuses it.
 - `onCopy(text)`: the view's copy. It returns a promise that rejects, or throws, when the clipboard refuses it.
 
 ## States
@@ -28,9 +28,9 @@ A command for the reader to run, with Copy (DESIGN.md "Notices and status", PER-
 ## ARIA and keys
 
 - The `$` is hidden: it isn't part of the command.
-- Copy is a button named by what it says now. A refusal is shown under the command and said once, assertively, by the announcer, each time it happens.
+- Copy is a button named by what it says now. A copy that lands is said once, politely, by the announcer (`copiedText`, with what went on the clipboard), since a focused button's new name isn't read. A refusal is shown under the command and said once, assertively, by the announcer, each time it happens.
 - Tab reaches Copy; Enter or Space presses it.
 
 ## Tests
 
-`command.test.tsx`: the command as written and copied, a copy that differs from what is shown, Copied stepping back, a refusal shown and announced, and axe.
+`command.test.tsx`: the command as written and copied, a copy that differs from what is shown, Copied stepping back, a copy said as it lands, a refusal shown and announced, and axe.

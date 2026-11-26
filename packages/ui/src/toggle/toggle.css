@@ -3,7 +3,7 @@
  * UI SDK's `[data-pressed]` and the toggle's own `[data-unmarked]`. In the `primitives` layer.
  */
 
-/* A soft pill pressed holds something: salmon, with its ring ("Holding open · Release"). */
+/* A soft pill pressed holds something: salmon, with its ring (Hold open while it holds). */
 [data-toggle][data-look="soft"][data-pressed]:not([data-unmarked]) { background: var(--shown); color: var(--on-shown); box-shadow: inset 0 0 0 1px var(--shown-edge); }
 
 /* A tool pressed is filled `sunk` with a `primary` icon (Hide marks). */

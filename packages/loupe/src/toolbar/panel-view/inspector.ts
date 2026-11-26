@@ -30,8 +30,10 @@ import {
   pageName,
   scopeMoveLabel,
   scopeMoveVerb,
+  scopeSaid,
   TAGS,
   TEXT,
+  THIS_INSTANCE,
   unmountedTag,
   whereText,
 } from "./words.js";
@@ -164,6 +166,9 @@ export function inspectorBody(
     crumbs,
     editing: editing ? { resetInstanceEnabled: recorded, scopes, noGroup: scopes && noGroupOf(scopes) } : null,
     members,
+    said: members
+      ? { scope: members.name, text: scopeSaid(members.name, members.countText), reach: members.countText }
+      : { scope: THIS_INSTANCE, text: scopeSaid(THIS_INSTANCE, null), reach: null },
     note,
     coverage: {
       editable,

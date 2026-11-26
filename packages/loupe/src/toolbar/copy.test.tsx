@@ -116,6 +116,8 @@ async function openDetails(): Promise<void> {
 async function change(): Promise<void> {
   act(() => loupe.set(instanceId(ROW, "ana"), "variant", "outline", "group"));
   await settle();
+  // The footer's count is said a moment later: a copy pressed before then is said with it, in one message.
+  await until(() => heard.polite.includes("1 change"));
 }
 
 // The open panel's module, loaded before the first test, so that one opens in the click as the rest do.
@@ -173,7 +175,6 @@ describe("Copy Proposal (Copy flow v2 · A: a split button and a small popover)"
     expect(shadow().querySelector("[data-copy-split]")?.getAttribute("data-state")).toBe("copied");
     expect(toast()?.textContent).toBe("Copied “Button variant in MemberRow”Paste it into your coding agent");
     // The toast is for the eye: the announcer says it, once.
-    // The footer's count may have been said before it ("1 change"): the copy is said once.
     await until(() => copied().length > 0);
     expect(copied()).toEqual(["Copied “Button variant in MemberRow”. Paste it into your coding agent."]);
     expect(heard.assertive).toEqual([]);

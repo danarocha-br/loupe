@@ -34,12 +34,13 @@ export type LauncherPillProps = Omit<ComponentPropsWithoutRef<"button">, "classN
   at: { x: number; y: number };
   /** How far each side's body stands off the window's edge: the pill's gap to that side, and more once parked. */
   gaps: Record<PillSide, number>;
-  /** `panelView()`'s `LauncherWords`, the tooltip's shortcut filled in. */
-  words: { label: string; title: string };
+  /** `panelView()`'s `LauncherWords`, the tooltip's shortcut filled in: its name, tooltip, and what its arrow keys do. */
+  words: { label: string; title: string; keys: string };
   ref?: Ref<HTMLButtonElement>;
 };
 
 export function LauncherPill({ edge, dragging, settling, leaving, at, gaps, words, ref, ...rest }: LauncherPillProps) {
+  const keys = `loupe-launcher-keys-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <button
       {...rest}
@@ -53,7 +54,12 @@ export function LauncherPill({ edge, dragging, settling, leaving, at, gaps, word
       style={{ translate: `${at.x}px ${at.y}px` }}
       aria-label={words.label}
       title={words.title}
+      // Its arrow keys, which nothing on screen says: the description a screen reader reads after its name.
+      aria-describedby={keys}
     >
+      <span id={keys} hidden>
+        {words.keys}
+      </span>
       <Goo gaps={gaps} />
       <span data-launcher-mark="">
         <LoupeL />

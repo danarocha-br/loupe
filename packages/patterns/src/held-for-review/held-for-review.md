@@ -10,7 +10,7 @@ The records Suspended for review (DESIGN.md "On this page", PER-95): a call site
 
 - `items`: `panelView()`'s held records, each `{ target, label, why, values }`. Nothing is drawn while there are none.
 - `meta`: "2 · apply to nothing".
-- `words`: `held` (`title`, "Held for review"; `discard`, "Discard").
+- `words`: `held` (`title`, "Held for review"; `discard`, "Discard"; `discardName(label)`, its name, "Discard All from member-row-menu.tsx:37").
 - `onDiscard(target)`: Discard pressed. The view drops the record, offers it back, and moves focus to its heading, since the card may go with its last record.
 
 ## States
@@ -27,7 +27,7 @@ Under it, what it would set (Marks' `HeldValues`).
 
 ## ARIA and keys
 
-The title is a level-3 heading; the records are a list. Discard is a small Button; Tab reaches each, Enter or Space presses it.
+The title is a level-3 heading; the records are a list. Discard is a small Button that shows "Discard" and is named by the record it drops ("Discard All from member-row-menu.tsx:37"), so a list of them doesn't read as one name repeated; Tab reaches each, Enter or Space presses it.
 
 ## Tests
 

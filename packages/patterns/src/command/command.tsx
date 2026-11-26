@@ -1,7 +1,8 @@
 // CommandLine (ADR 0003, DESIGN.md "Notices and status"): a command for the reader to run,
 // in mono after a `$`, with Copy (PER-140). The Toolbar names commands and never runs them
-// (PER-100 §5). Copy says whether it worked; a refusal stays under the command, and is said
-// once by the announcer, since it says what to do instead.
+// (PER-100 §5). Copy says whether it worked, and the announcer says what it put on the
+// clipboard; a refusal stays under the command, and is said once, assertively, since it
+// says what to do instead.
 //
 // It draws the command and `CommandWords` and builds none. The copy is the view's: `onCopy`
 // writes to the clipboard, and its promise says whether it could. See command.md.
@@ -48,7 +49,11 @@ export function CommandLine({ text, copy = text, prompt = true, words, onCopy }:
             Promise.resolve()
               .then(() => onCopy(copy))
               .then(
-                () => setCopied(true),
+                () => {
+                  setCopied(true);
+                  // The button's new name isn't read while focus stays on it: what landed is said.
+                  announce(words.copiedText(copy));
+                },
                 () => {
                   setCopied(false);
                   // Each refusal, a second one too: what to do instead.

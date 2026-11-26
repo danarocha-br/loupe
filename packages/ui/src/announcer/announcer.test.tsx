@@ -115,6 +115,69 @@ describe("Announcer", () => {
     expect(heard.polite).toEqual(["2 changes"]);
   });
 
+  it("joins what two places say in one commit into one message, in order, so neither is lost", async () => {
+    const first: { announce?: Announce } = {};
+    const second: { announce?: Announce } = {};
+    const screen = renderInSurface(
+      <>
+        <Speaker into={first} />
+        <Speaker into={second} />
+      </>,
+    );
+    const heard = listen(screen.shadow);
+    act(() => {
+      first.announce?.("Reset 2 Overrides");
+      second.announce?.("Scope: All on page. Reaches 7 of 7.");
+      second.announce?.("Couldn’t copy.", { politeness: "assertive" });
+    });
+    wait(WRITE_AFTER_MS);
+    await Promise.resolve();
+    expect(screen.getByRole("status").textContent).toBe("Reset 2 Overrides. Scope: All on page. Reaches 7 of 7.");
+    expect(heard.polite).toEqual(["Reset 2 Overrides. Scope: All on page. Reaches 7 of 7."]);
+    // Polite and assertive stay apart.
+    expect(heard.assertive).toEqual(["Couldn’t copy."]);
+  });
+
+  it("says the same words from two places once, and a place's newer message in its own place", async () => {
+    const first: { announce?: Announce } = {};
+    const second: { announce?: Announce } = {};
+    const screen = renderInSurface(
+      <>
+        <Speaker into={first} />
+        <Speaker into={second} />
+      </>,
+    );
+    const heard = listen(screen.shadow);
+    act(() => {
+      first.announce?.("1 change");
+      second.announce?.("Docked on the left");
+      first.announce?.("2 changes");
+      second.announce?.("Docked on the left");
+    });
+    wait(WRITE_AFTER_MS);
+    await Promise.resolve();
+    expect(heard.polite).toEqual(["2 changes. Docked on the left"]);
+  });
+
+  it("joins the messages a commit of hooks says as their text changes", async () => {
+    function Two() {
+      const [on, setOn] = useState(false);
+      useAnnounceChange(on ? "Outlines are hidden on the page" : "");
+      useAnnounceChange(on ? "Reset 1 Override" : "");
+      return (
+        <button type="button" onClick={() => setOn(true)}>
+          Both
+        </button>
+      );
+    }
+    const screen = renderInSurface(<Two />);
+    const heard = listen(screen.shadow);
+    act(() => screen.getByRole("button", { name: "Both" }).click());
+    wait(WRITE_AFTER_MS);
+    await Promise.resolve();
+    expect(heard.polite).toEqual(["Outlines are hidden on the page. Reset 1 Override"]);
+  });
+
   it("announces shown text as it changes, never as it mounts, and an offer each time it is made", async () => {
     const screen = renderInSurface(<Counter initial={3} />);
     const heard = listen(screen.shadow);

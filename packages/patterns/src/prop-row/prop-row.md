@@ -42,5 +42,5 @@ The chips are a radio group named by the prop, one Tab stop: arrow keys move, Sp
 
 ## Keys
 
-- **Reset** keeps focus in the row: it moves to the chips' checked chip, the switch or the field.
+- **Reset** shows "Reset" (or "Reset to group value", "Reset to page value") and is named by the prop it resets, after that (`reset.name`: "Reset variant", "Reset to group value for variant"), so a card of them doesn't read as one name repeated; beside a switch, icon-only, that name is its hidden text. It keeps focus in the row: it moves to the chips' checked chip, the switch or the field.
 - **Enter** in the text field does nothing: label text is one line.

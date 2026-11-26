@@ -24,11 +24,12 @@ const REAL: Record<keyof typeof WORDS, unknown> = {
 const PROBES: Record<string, unknown[][]> = {
   "inspector.change": [[1], [12]],
   "list.change": [[1], [12]],
-  "inspector.hold.off": [["open"]],
-  "inspector.hold.on": [["open"]],
+  "inspector.hold": [["open"]],
   "footer.offer.reset": [[1], [2]],
   "footer.offer.discard": [[1], [3]],
   "copy.copiedText": [["Quieter menus"]],
+  "command.copiedText": [["pnpm exec loupe generate"]],
+  "list.held.discardName": [["All from member-row-menu.tsx:37"]],
   "copy.notCopiedText": [
     ["The page isn’t focused.", true],
     ["The page isn’t focused.", false],
