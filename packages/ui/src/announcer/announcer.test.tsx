@@ -4,10 +4,10 @@
 // written, so the same one twice is read twice; emptied again a while later; and
 // nothing announced for what a view shows as it mounts.
 
-import { act, StrictMode, useLayoutEffect, useState } from "react";
+import { act, useLayoutEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations, cleanup, renderInSurface } from "../surface/render.fixture.js";
-import { type Announce, Announcer, CLEAR_AFTER_MS, useAnnounce, useAnnounceChange, WRITE_AFTER_MS } from "./announcer.js";
+import { type Announce, CLEAR_AFTER_MS, useAnnounce, useAnnounceChange, WRITE_AFTER_MS } from "./announcer.js";
 import { listen } from "./announcer.fixture.js";
 
 afterEach(() => {
@@ -100,34 +100,22 @@ describe("Announcer", () => {
       return null;
     }
     const into: { announce?: Announce } = {};
-    const host = document.createElement("div");
-    document.body.append(host);
-    const shadow = host.attachShadow({ mode: "open" });
-    const container = document.createElement("div");
-    shadow.append(container);
-    const { createRoot } = await import("react-dom/client");
-    const root = createRoot(container);
-    act(() =>
-      root.render(
-        <StrictMode>
-          <Announcer>
-            <Failing />
-            <Speaker into={into} />
-          </Announcer>
-        </StrictMode>,
-      ),
+    const screen = renderInSurface(
+      <>
+        <Failing />
+        <Speaker into={into} />
+      </>,
+      { strict: true },
     );
-    const heard = listen(shadow);
+    const heard = listen(screen.shadow);
     wait(WRITE_AFTER_MS);
     act(() => into.announce?.("Couldn’t copy.", { politeness: "assertive" }));
     wait(WRITE_AFTER_MS);
     act(() => into.announce?.("Copied"));
     wait(WRITE_AFTER_MS);
     await Promise.resolve();
-    expect(shadow.querySelector('[role="alert"]')?.textContent).toBe("Couldn’t copy.");
+    expect(screen.getByRole("alert").textContent).toBe("Couldn’t copy.");
     expect(heard.polite).toEqual(["Copied"]);
-    act(() => root.unmount());
-    host.remove();
   });
 
   it("reads the same message twice when it is announced twice", () => {

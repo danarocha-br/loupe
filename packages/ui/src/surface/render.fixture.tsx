@@ -4,7 +4,7 @@
 
 import { type BoundFunctions, type queries, within } from "@testing-library/dom";
 import axe from "axe-core";
-import { act, type ReactNode } from "react";
+import { act, type ReactNode, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Surface, SURFACE_ATTRIBUTE, type Theme } from "./index.js";
 
@@ -19,16 +19,26 @@ export type Rendered = BoundFunctions<typeof queries> & {
 
 const mounted = new Set<() => void>();
 
-/** Draws `ui` in a surface on the body; `cleanup()` (or `unmount()`) takes it away. */
-export function renderInSurface(ui: ReactNode, { theme = "light", stylesheet }: { theme?: Theme; stylesheet?: string } = {}): Rendered {
+/**
+ * Draws `ui` in a surface on the body; `cleanup()` (or `unmount()`) takes it away. `strict`
+ * draws the surface itself under Strict Mode, so its own effects (the Announcer's) run, are
+ * cleaned up and run again on mount, as in a host's development build.
+ */
+export function renderInSurface(
+  ui: ReactNode,
+  { theme = "light", stylesheet, strict = false }: { theme?: Theme; stylesheet?: string; strict?: boolean } = {},
+): Rendered {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const draw = (next: ReactNode) => act(() => root.render(
+  const draw = (next: ReactNode) => {
+    const surface = (
       <Surface stylesheet={stylesheet} theme={theme}>
         {next}
-      </Surface>,
-    ));
+      </Surface>
+    );
+    act(() => root.render(strict ? <StrictMode>{surface}</StrictMode> : surface));
+  };
   draw(ui);
   const host = container.querySelector<HTMLElement>(`[${SURFACE_ATTRIBUTE}]`);
   if (!host?.shadowRoot) throw new Error("The surface has no shadow root.");
