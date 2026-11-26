@@ -3,8 +3,14 @@
 // The selected Instance gets a solid outline, tagged with its component and size
 // ("Button · 32 × 32"); at a group or page scope every other Instance it reaches is
 // dashed, and one left out is dashed grey (PER-134). The boxes are read again when
-// the page signal says one may have moved (`page-signal.ts`): a scroll, a resize, a
-// new version, and every frame of a menu's or a dialog's animation, never on a still page.
+// the page signal says one may have moved (`page-signal.ts`): a resize, a new version,
+// every frame of a menu's or a dialog's animation, and a scroll once it has settled,
+// never on a still page. While a scroll runs, the marks move with it: read once as it
+// starts, they are shifted by how far their scroller has gone (a `translate` on each,
+// no render), unless one sits in a fixed or sticky box, or apart from the others, and
+// can't follow it; then they are read on every frame of it, as on an animation's.
+// Followed, what covers an Instance (`inView`) is looked for as the scroll starts and
+// again once it settles, not on each frame.
 //
 // A change lands, then steps back: when a value changes, every Instance it reaches
 // is outlined for a moment (`LINGER`), and then its outline fades, the selection's
@@ -21,7 +27,8 @@
 // outlines and the changes', even before they fade; what follows the pointer, a
 // pick's preview or a hovered row's outline, still shows.
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { pageWidth } from "./dock.js";
 import { type Member, OUTLINE_WORDS, sameMembers } from "./panel-view/index.js";
@@ -82,6 +89,22 @@ export function tagPlace(ring: Box, tag: { width: number; height: number }, page
   const left = Math.max(TAG_EDGE, Math.min(ring.left, page.width - TAG_EDGE - tag.width));
   return { top, left };
 }
+
+/**
+ * Whether a node moves exactly as far as its scroller scrolls: no fixed or sticky box
+ * between them, and, in a scroller other than the page's, no absolute one, whose
+ * containing block can be outside it.
+ */
+function scrollsWith(node: Element, scroller: Element, page: boolean): boolean {
+  for (let at: Element | null = node; at !== null && at !== scroller; at = at.parentElement) {
+    const { position } = getComputedStyle(at);
+    if (position === "fixed" || position === "sticky" || (!page && position === "absolute")) return false;
+  }
+  return true;
+}
+
+/** How a scroll moves the marks, from the offset its scroller had when they were read: all with it, or none. */
+type Follow = { scroller: Element; left: number; top: number; moves: boolean };
 
 const sameBoxes = <T extends { key: string; top: number; left: number }>(a: T[], b: T[]) =>
   a.length === b.length &&
@@ -163,6 +186,15 @@ export function Highlight({
   const marksHidden = useToolbar((state) => state.marksHidden);
   const [rings, setRings] = useState<Ring[]>([]);
   const [pins, setPins] = useState<Mark[]>([]);
+  // The marks drawn on the page, which a scroll moves until they are read again.
+  const drawn = useRef(new Set<HTMLElement>());
+  const draw = useCallback((node: HTMLElement | null) => {
+    if (node === null) return;
+    drawn.current.add(node);
+    return () => {
+      drawn.current.delete(node);
+    };
+  }, []);
   const picked = useHovered(pick?.hovered ?? NOT_PICKING);
   const mode = pick?.mode ?? "one";
   // `version` is the trigger: the call site's Instances change with the page.
@@ -222,11 +254,22 @@ export function Highlight({
       setPins([]);
       return;
     }
-    const measure = () => {
+    const shift = (x: number, y: number) => {
+      const by = x === 0 && y === 0 ? "" : `${x}px ${y}px`;
+      for (const mark of drawn.current) mark.style.translate = by;
+    };
+    // The nodes the marks were read from, and how the scroll running moves them: null
+    // when none runs, "read" when they are read on each of its frames.
+    let nodes: Element[] = [];
+    let follow: Follow | "read" | null = null;
+    /** Reads the boxes; `now` draws them before the frame is painted, where they are, unshifted. */
+    const measure = (now = false) => {
+      const read: Element[] = [];
       const next = targets.flatMap((one, index): Ring[] => {
         const boxes = signal.boxes(one.id);
         // The selection's outline isn't drawn over an app's menu or dialog that covers it.
         if (one.kind !== "pick" && one.kind !== "hover" && boxes[0] && !inView(boxes[0], HOST_ATTRIBUTE)) return [];
+        for (const box of boxes) read.push(box.node);
         // The label goes on the largest box, the one a designer reads as the Instance.
         return boxes.map(({ node: _node, ...box }, nth) => ({
           ...box,
@@ -240,24 +283,76 @@ export function Highlight({
       const nextPins = keyed.flatMap((one): Mark[] => {
         const [box] = signal.boxes(one.id);
         if (!box || !inView(box, HOST_ATTRIBUTE)) return [];
-        const { node: _node, ...rest } = box;
+        const { node, ...rest } = box;
+        read.push(node);
         return [{ ...rest, key: one.id, id: one.id, text: one.text }];
       });
-      // The same rings can change hands: in Select multiple, the tag moves between members.
-      setRings((previous) =>
-        sameBoxes(previous, next) &&
-        previous.every((ring, i) => ring.label === next[i]?.label && ring.tag?.name === next[i]?.tag?.name && ring.tag?.detail === next[i]?.tag?.detail)
-          ? previous
-          : next,
-      );
-      setPins((previous) => (sameBoxes(previous, nextPins) && previous.every((pin, i) => pin.text === nextPins[i]?.text) ? previous : nextPins));
+      nodes = read;
+      const commit = () => {
+        // The same rings can change hands: in Select multiple, the tag moves between members.
+        setRings((previous) =>
+          sameBoxes(previous, next) &&
+          previous.every((ring, i) => ring.label === next[i]?.label && ring.tag?.name === next[i]?.tag?.name && ring.tag?.detail === next[i]?.tag?.detail)
+            ? previous
+            : next,
+        );
+        setPins((previous) => (sameBoxes(previous, nextPins) && previous.every((pin, i) => pin.text === nextPins[i]?.text) ? previous : nextPins));
+      };
+      if (!now) return commit();
+      flushSync(commit);
+      shift(0, 0);
+    };
+    /** How a scroll of this scroller moves the marks just read. */
+    const following = (scroller: Element): Follow | "read" => {
+      const doc = scroller.ownerDocument;
+      const page = scroller === (doc.scrollingElement ?? doc.documentElement);
+      const inside = nodes.filter((node) => scroller.contains(node));
+      // Every one moves with it, or none does (a scroller beside them): else each frame is read,
+      // as is the page's own scroll of nodes it doesn't hold (in a shadow root).
+      if (inside.length > 0 && (inside.length < nodes.length || !inside.every((node) => scrollsWith(node, scroller, page)))) return "read";
+      if (inside.length === 0 && page) return "read";
+      return { scroller, left: scroller.scrollLeft, top: scroller.scrollTop, moves: inside.length > 0 };
+    };
+    const onScroll = (scrollers: ReadonlySet<Element>) => {
+      if (follow === "read") return measure();
+      const [scroller] = scrollers;
+      if (follow !== null && scrollers.size === 1 && scroller === follow.scroller) {
+        if (follow.moves) shift(follow.left - scroller.scrollLeft, follow.top - scroller.scrollTop);
+        return;
+      }
+      // A scroll starts, or another scroller takes it on: the boxes are read where they are now.
+      measure(true);
+      follow = scrollers.size === 1 && scroller ? following(scroller) : "read";
+    };
+    // Once it settles, they are read again, and drawn unshifted in the same frame.
+    const onLayout = () => {
+      const now = follow !== null && follow !== "read" && follow.moves;
+      follow = null;
+      measure(now);
     };
     measure();
-    return signal.onLayout(measure);
+    const stopLayout = signal.onLayout(onLayout);
+    const stopScroll = signal.onScroll(onScroll);
+    return () => {
+      stopLayout();
+      stopScroll();
+      shift(0, 0);
+    };
   }, [signal, selected, selectedLabel, hoveredKey, membersKey, marksKey, version, preview, marksHidden]);
 
   // The pick tag is placed from its own size, read once its text has rendered.
-  const tagRef = useRef<HTMLDivElement>(null);
+  const tagRef = useRef<HTMLDivElement | null>(null);
+  const drawTag = useCallback(
+    (node: HTMLDivElement | null) => {
+      tagRef.current = node;
+      const stop = draw(node);
+      return () => {
+        tagRef.current = null;
+        stop?.();
+      };
+    },
+    [draw],
+  );
   const [tagSize, setTagSize] = useState({ width: 0, height: 0 });
   const tagged = rings.find((ring) => ring.tag !== null);
   useLayoutEffect(() => {
@@ -289,6 +384,7 @@ export function Highlight({
         return (
           <PageOutline
             key={ring.key}
+            ref={draw}
             kind={ring.kind}
             box={outline(ring)}
             quiet={steps}
@@ -298,7 +394,7 @@ export function Highlight({
       })}
       {tagged?.tag && (
         <PickTag
-          ref={tagRef}
+          ref={drawTag}
           id={tagged.id}
           name={tagged.tag.name}
           detail={tagged.tag.detail}
@@ -309,7 +405,7 @@ export function Highlight({
       {pins
         .filter((pin) => !selectionOutlined.has(pin.id))
         .map((pin) => (
-          <ChangeOutline key={pin.key} keys={pin.text} box={outline(pin)} quiet={quiet(pin.id)} />
+          <ChangeOutline key={pin.key} ref={draw} keys={pin.text} box={outline(pin)} quiet={quiet(pin.id)} />
         ))}
     </>
   );

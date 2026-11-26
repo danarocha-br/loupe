@@ -9,9 +9,14 @@
 //   version costs at most one walk, however many views ask.
 // - Layout ticks come on a version, any other change to the page's DOM (a text, an
 //   attribute: neither changes which Instances there are, either can move a box), a
-//   scroll, a resize, a watched node changing size, and every frame while the page
-//   plays an animation or a transition, which moves boxes without resizing
-//   anything. A still page is never measured.
+//   resize, a watched node changing size, a scroll once it has settled, and every
+//   frame while the page plays an animation or a transition, which moves boxes
+//   without resizing anything. A still page is never measured.
+// - While a scroll runs, scroll ticks come instead, at most once a frame, with the
+//   scrollers that moved: a view that follows the scroll (`highlight.tsx`) moves what
+//   it drew by their offsets, and measures again on the layout tick that ends it. A
+//   view that only settles (`page-map.tsx`) hears the one tick, and the page's
+//   animations aren't looked for on every frame of it.
 // - It is dormant until a view wakes it (the open panel) and again once none holds
 //   it: no observer, no listener, nothing read. Collapsed, the Toolbar costs the
 //   page only what the runtime must do on each commit (`runtime/registry.ts`).
@@ -23,13 +28,26 @@ import { onRegistryChange, pageChanged, registry, watchPage } from "../runtime/r
 export type Box = { top: number; left: number; width: number; height: number };
 export type NodeBox = Box & { node: Element };
 
+/**
+ * When a scroll has settled: `endMs` after its `scrollend` with no scroll since (a
+ * scroll by script, one step a frame, ends at every step), or `quietMs` after its last
+ * scroll event where `scrollend` never comes. Tests shorten them.
+ */
+export const SCROLL_SETTLE = { endMs: 50, quietMs: 150 };
+
 export type PageSignal = {
   /** The page's version as last published: it moves at most once a frame, only while awake. */
   version(): number;
   /** Called after the version moves. */
   subscribe(listener: () => void): () => void;
-  /** Called when a box on the page may have moved, at most once a frame, only while awake. */
+  /** Called when a box on the page may have moved, at most once a frame, only while awake; a scroll calls it once, as it settles. */
   onLayout(listener: () => void): () => void;
+  /**
+   * Called while the page scrolls, at most once a frame, only while awake, with the
+   * scrollers that moved since: an element, or the document's `scrollingElement`.
+   * `onLayout` follows once the scroll settles.
+   */
+  onScroll(listener: (scrollers: ReadonlySet<Element>) => void): () => void;
   /**
    * The boxes worth outlining among an Instance's nodes, largest first, measured
    * once per task however many views ask. While awake, its nodes are watched for
@@ -57,11 +75,17 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
   const view = doc.defaultView;
   const versionListeners = new Set<() => void>();
   const layoutListeners = new Set<() => void>();
+  const scrollListeners = new Set<(scrollers: ReadonlySet<Element>) => void>();
   let published = registry().version;
   let holders = 0;
   let sleep: (() => void) | null = null;
   let versionFrame = 0;
   let layoutFrame = 0;
+  let scrollFrame = 0;
+  /** The scrollers that moved since the last scroll tick. */
+  const scrolled = new Set<Element>();
+  /** While a scroll runs, the timer that settles it. */
+  let settle: ReturnType<typeof setTimeout> | undefined;
 
   const frame = (callback: () => void): number =>
     view?.requestAnimationFrame ? view.requestAnimationFrame(callback) : (setTimeout(callback, 16) as unknown as number);
@@ -118,6 +142,36 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
     for (const listener of [...versionListeners]) listener();
     requestLayout();
   };
+  const runScroll = () => {
+    scrollFrame = 0;
+    measured = null;
+    const scrollers: ReadonlySet<Element> = new Set(scrolled);
+    scrolled.clear();
+    for (const listener of [...scrollListeners]) listener(scrollers);
+  };
+  const settled = () => {
+    settle = undefined;
+    scrolled.clear();
+    requestLayout();
+  };
+  /** A scroll of the page: a tick for those that follow it, and its end held off until it settles. */
+  const onScrollEvent = (event: Event) => {
+    // The document's scroll comes from the document or the window.
+    const target = event.target as Node | null;
+    const scroller = target?.nodeType === 1 ? (target as Element) : (doc.scrollingElement ?? doc.documentElement);
+    if (own(scroller)) return;
+    clearTimeout(settle);
+    settle = setTimeout(settled, SCROLL_SETTLE.quietMs);
+    if (scrollListeners.size === 0) return;
+    scrolled.add(scroller);
+    if (scrollFrame === 0) scrollFrame = frame(runScroll);
+  };
+  const onScrollEnd = () => {
+    if (settle === undefined) return;
+    clearTimeout(settle);
+    settle = setTimeout(settled, SCROLL_SETTLE.endMs);
+  };
+
   const requestVersion = () => {
     if (sleep === null || versionFrame !== 0) return;
     versionFrame = frame(publish);
@@ -174,8 +228,10 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
       }
       requestLayout();
     };
-    const events = ["scroll", "resize", "transitionrun", "animationstart"] as const;
+    const events = ["resize", "transitionrun", "animationstart"] as const;
     for (const type of events) view?.addEventListener(type, onEvent, { capture: true, passive: true });
+    view?.addEventListener("scroll", onScrollEvent, { capture: true, passive: true });
+    view?.addEventListener("scrollend", onScrollEnd, { capture: true, passive: true });
     return () => {
       unwatch();
       stopRegistry();
@@ -185,9 +241,15 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
       observed.clear();
       fresh.clear();
       for (const type of events) view?.removeEventListener(type, onEvent, { capture: true });
+      view?.removeEventListener("scroll", onScrollEvent, { capture: true });
+      view?.removeEventListener("scrollend", onScrollEnd, { capture: true });
+      clearTimeout(settle);
+      settle = undefined;
+      scrolled.clear();
       cancel(versionFrame);
       cancel(layoutFrame);
-      versionFrame = layoutFrame = 0;
+      cancel(scrollFrame);
+      versionFrame = layoutFrame = scrollFrame = 0;
     };
   };
 
@@ -203,6 +265,12 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
       layoutListeners.add(listener);
       return () => {
         layoutListeners.delete(listener);
+      };
+    },
+    onScroll(listener) {
+      scrollListeners.add(listener);
+      return () => {
+        scrollListeners.delete(listener);
       };
     },
     boxes(id) {

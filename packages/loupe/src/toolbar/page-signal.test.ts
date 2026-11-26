@@ -9,7 +9,7 @@ import { createAdapter } from "../runtime/adapter.js";
 import { debugOf, type LoupeDebug } from "../runtime/debug.js";
 import { registry } from "../runtime/registry.js";
 import { resetLoupe } from "../runtime/slot.js";
-import { createPageSignal, type PageSignal } from "./page-signal.js";
+import { createPageSignal, type PageSignal, SCROLL_SETTLE } from "./page-signal.js";
 
 // Every walk of the page starts by finding its React roots: counting those counts walks.
 const walks = vi.hoisted(() => ({ count: 0 }));
@@ -57,6 +57,8 @@ const doc = document as unknown as Record<string, unknown>;
 const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 /** Past the frame the signal publishes in. */
 const nextFrame = () => act(() => new Promise((resolve) => setTimeout(resolve, 40)));
+/** Past a scroll's settling after its `scrollend`, and the frame that follows. */
+const afterSettling = () => act(() => new Promise((resolve) => setTimeout(resolve, SCROLL_SETTLE.endMs + 50)));
 
 beforeEach(() => {
   resetLoupe();
@@ -167,7 +169,7 @@ describe("the page signal, awake", () => {
     sleep();
   });
 
-  it("reads boxes on a scroll, not on a still page", async () => {
+  it("reads boxes once a scroll settles, not on a still page", async () => {
     const sleep = wake();
     const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
     const measure = vi.fn(() => signal.boxes(loupe.list()[0]?.id ?? ""));
@@ -178,10 +180,88 @@ describe("the page signal, awake", () => {
     window.dispatchEvent(new Event("scroll"));
     window.dispatchEvent(new Event("scroll"));
     await nextFrame();
+    // Still scrolling: a view that only settles hears nothing yet.
+    expect(measure).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event("scrollend"));
+    await afterSettling();
     expect(measure).toHaveBeenCalledTimes(1);
     expect(rect).toHaveBeenCalled();
     stop();
     rect.mockRestore();
+    sleep();
+  });
+
+  it("ticks once a frame while a scroll runs, with the scrollers that moved, and reads nothing itself", async () => {
+    const sleep = wake();
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    const heard: Element[][] = [];
+    const layout = vi.fn();
+    const list = document.createElement("div");
+    container.append(list);
+    await nextFrame();
+    const stopScroll = signal.onScroll((scrollers) => heard.push([...scrollers]));
+    const stopLayout = signal.onLayout(layout);
+    for (let step = 0; step < 3; step++) {
+      document.dispatchEvent(new Event("scroll"));
+      document.dispatchEvent(new Event("scroll"));
+      if (step === 2) list.dispatchEvent(new Event("scroll"));
+      await nextFrame();
+    }
+    const page = document.scrollingElement ?? document.documentElement;
+    expect(heard).toEqual([[page], [page], [page, list]]);
+    expect(layout).not.toHaveBeenCalled();
+    expect(rect).not.toHaveBeenCalled();
+    stopScroll();
+    stopLayout();
+    list.remove();
+    rect.mockRestore();
+    sleep();
+  });
+
+  it("settles a scroll by script, which ends at every step, once it stops; and one with no scrollend, once it is quiet", async () => {
+    const sleep = wake();
+    const layout = vi.fn();
+    const stop = signal.onLayout(layout);
+    signal.onScroll(() => {});
+    for (let step = 0; step < 4; step++) {
+      window.dispatchEvent(new Event("scroll"));
+      document.dispatchEvent(new Event("scrollend"));
+      await nextTask();
+    }
+    expect(layout).not.toHaveBeenCalled();
+    await afterSettling();
+    expect(layout).toHaveBeenCalledTimes(1);
+    // A browser with no `scrollend`.
+    window.dispatchEvent(new Event("scroll"));
+    await act(() => new Promise((resolve) => setTimeout(resolve, SCROLL_SETTLE.endMs + 10)));
+    expect(layout).toHaveBeenCalledTimes(1);
+    await act(() => new Promise((resolve) => setTimeout(resolve, SCROLL_SETTLE.quietMs)));
+    expect(layout).toHaveBeenCalledTimes(2);
+    // A stray scrollend, with no scroll before it, settles nothing.
+    document.dispatchEvent(new Event("scrollend"));
+    await afterSettling();
+    expect(layout).toHaveBeenCalledTimes(2);
+    stop();
+    sleep();
+  });
+
+  it("looks for the page's animations once a scroll settles, not on each of its frames", async () => {
+    const sleep = wake();
+    const getAnimations = vi.fn((): Animation[] => []);
+    (document as { getAnimations?: () => Animation[] }).getAnimations = getAnimations;
+    const stopLayout = signal.onLayout(() => {});
+    const stopScroll = signal.onScroll(() => {});
+    for (let step = 0; step < 4; step++) {
+      window.dispatchEvent(new Event("scroll"));
+      await nextFrame();
+    }
+    expect(getAnimations).not.toHaveBeenCalled();
+    document.dispatchEvent(new Event("scrollend"));
+    await afterSettling();
+    expect(getAnimations).toHaveBeenCalledTimes(1);
+    delete (document as { getAnimations?: () => Animation[] }).getAnimations;
+    stopLayout();
+    stopScroll();
     sleep();
   });
 

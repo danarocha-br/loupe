@@ -8,13 +8,13 @@ What Loupe draws over the app, outside the panel (DESIGN.md "On the page", "Pick
 <PickTag ref={tagRef} id={id} name="Button" detail="4 from this call site" words={outlineWords} place={tagPlace(…)} />
 ```
 
-The view (`highlight.tsx`) reads the page and measures each box, again whenever the page signal says one may have moved; it places the tags (`labelPlace`, `tagPlace`), and times a change's outlines (they linger, then step back). The patterns draw those boxes and `panelView()`'s words (`OutlineWords`). A pattern never reads the page.
+The view (`highlight.tsx`) reads the page and measures each box, again whenever the page signal says one may have moved; while the page scrolls it moves the marks it drew by the scroll (their `translate`, through each one's `ref`) and measures them again once the scroll settles; it places the tags (`labelPlace`, `tagPlace`), and times a change's outlines (they linger, then step back). The patterns draw those boxes and `panelView()`'s words (`OutlineWords`). A pattern never reads the page.
 
 ## Interface
 
-- `PageOutline`: `kind` (`ring`, `member`, `out`, `hover`, `pick`), `box` (its place in the window, already stood off the Instance by 3px), `quiet`, and `tag`: the selected Instance's size tag (`text`, and whether it goes `below` the outline and from its `start`), or null.
-- `ChangeOutline`: `keys` (the numbers of the changes that reach it, "1 3"), `box`, `quiet`.
-- `PickTag`: `id` (the Instance it names), `name`, `detail` (or null), `place` (its top left), `words` (`panelView()`'s `OutlineWords`), and `ref`, from which the view reads its size.
+- `PageOutline`: `kind` (`ring`, `member`, `out`, `hover`, `pick`), `box` (its place in the window, already stood off the Instance by 3px), `quiet`, `tag`: the selected Instance's size tag (`text`, and whether it goes `below` the outline and from its `start`), or null, and `ref`, through which the view moves it with a scroll.
+- `ChangeOutline`: `keys` (the numbers of the changes that reach it, "1 3"), `box`, `quiet`, and `ref`, as PageOutline's.
+- `PickTag`: `id` (the Instance it names), `name`, `detail` (or null), `place` (its top left), `words` (`panelView()`'s `OutlineWords`), and `ref`, from which the view reads its size and through which it moves the tag with a scroll.
 
 ## States
 
