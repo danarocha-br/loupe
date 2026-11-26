@@ -11,7 +11,7 @@ import { appValue, formatCurrent } from "../format.js";
 import type { Reads } from "./reads.js";
 import { type Counted, isSuspended, keepingOwn, type ScopeLabels, type ScopeView, valueCounts } from "./scopes.js";
 import type { Control, PropGlyph, PropItem, Write } from "@loupe/patterns";
-import { countsText, EXPLAIN, heldNotice, keepingText, NOT_SET, REASON_TITLES, RESET, RESET_TO, sameOnAll, sourceText, THE_APP, THIS_CALL_SITE, valueText } from "./words.js";
+import { countsText, EXPLAIN, heldNotice, keepingText, NOT_SET, REASON_TITLES, RESET, RESET_NAME, RESET_TO, sameOnAll, sourceText, THE_APP, THIS_CALL_SITE, valueText } from "./words.js";
 
 /** A mounted, browser-rendered, adapted Instance while Overrides are on: what its rows can edit. */
 export type Editing = {
@@ -119,10 +119,14 @@ export function instanceProp(row: PropRow, editing: Editing | null): PropItem {
     key: editing && source && source !== "app" ? (editing.keyAt[source] ?? null) : null,
     change: fromOverride ? { from: valueText(row).text, to: formatCurrent(value) } : null,
     held: tried ? heldNotice(held.value, held.appTried) : null,
-    reset:
-      editing && overridden && write ? { label: RESET_TO[editing.fallback[row.name] ?? "instance"], write, inNotice: tried } : null,
+    reset: editing && overridden && write ? resetOf(editing.fallback[row.name] ?? "instance", row.label, write, tried) : null,
     keeping: null,
   };
+}
+
+/** A row's Reset at This instance: back to the scope's value underneath, or the app's, named by its prop. */
+function resetOf(to: Scope, prop: string, write: Write, inNotice: boolean): PropItem["reset"] {
+  return { label: RESET_TO[to], name: RESET_NAME[to](prop), write, inNotice };
 }
 
 /**
@@ -175,7 +179,7 @@ export function scopeProp(row: PropRow, id: string, view: ScopeView, reads: Read
         }
       : null,
     held: null,
-    reset: overridden && !suspended ? { label: RESET, write, inNotice: false } : null,
+    reset: overridden && !suspended ? { label: RESET, name: RESET_NAME.instance(row.label), write, inNotice: false } : null,
     keeping: nearest === undefined ? null : { text: keepingText(keeping.length, inScope), ids: keeping, select: nearest },
   };
 }

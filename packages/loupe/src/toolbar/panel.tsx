@@ -194,7 +194,7 @@ export function Panel({ debug, view, version, column, picking, onTool, onHide, c
   useFocusFollows(middle, heading, { opened, kind: body.kind }, store);
   // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer as they change.
   const strip = stripParts({ picking, mode, covered, marksHidden });
-  useAnnounceChange(stripText(strip));
+  useStripAnnouncement(stripText(strip), marksHidden);
   return (
     <Sheet
       docked={column.docked}
@@ -230,6 +230,23 @@ export function Panel({ debug, view, version, column, picking, onTool, onHide, c
       )}
     </Sheet>
   );
+}
+
+/**
+ * The status strip's words, said as they change, except when Hide marks changed them:
+ * the toggle reads its own pressed state, so "Outlines are hidden on the page" would be
+ * said twice. Brought back by something else (a pick ended, a dialog gone), it is said.
+ */
+function useStripAnnouncement(text: string, marksHidden: boolean): void {
+  const announce = useAnnounce();
+  const last = useRef({ text, marksHidden });
+  useEffect(() => {
+    const seen = last.current;
+    if (seen.text === text && seen.marksHidden === marksHidden) return;
+    const toggled = seen.marksHidden !== marksHidden;
+    last.current = { text, marksHidden };
+    if (seen.text !== text && !toggled) announce(text);
+  });
 }
 
 /**
@@ -425,6 +442,7 @@ function Inspector({ debug, mode, view, body, notices, heading }: Part<Inspector
   // At This instance the State prop's own switch holds it; at a wider scope that switch can't, so the button does.
   const holdButton = hold && view.scope !== "instance" ? hold : null;
   const resetInstance = body.editing?.resetInstanceEnabled === true;
+  useScopeAnnouncement(body.id, body.said);
   const row = (item: PropItem) => <PropRowView key={item.name} item={item} look="pair" debug={debug} onSelect={store.select} onHover={store.hover} />;
   const propRow = (item: PropItem) => <PropRowView key={item.name} item={item} debug={debug} onSelect={store.select} onHover={store.hover} />;
   return (
@@ -453,7 +471,8 @@ function Inspector({ debug, mode, view, body, notices, heading }: Part<Inspector
                       )
                     }
                   >
-                    {holdButton.held ? INSPECTOR_WORDS.hold.on(holdButton.prop) : INSPECTOR_WORDS.hold.off(holdButton.prop)}
+                    {/* One name, held or not: the toggle says pressed, and draws it in salmon. */}
+                    {INSPECTOR_WORDS.hold(holdButton.prop)}
                   </Toggle>
                 )}
                 {resetInstance && <ResetInstance debug={debug} id={body.id} enabled />}
@@ -499,6 +518,30 @@ function Inspector({ debug, mode, view, body, notices, heading }: Part<Inspector
       </Card>
     </>
   );
+}
+
+/**
+ * The selection's scope, said as it moves (Widen, Narrow, Select multiple's Widen to the
+ * page) with how far it reaches, and how far it reaches as a box leaves an Instance out or
+ * brings it back: the box reads its own state, not the scope's. A new selection says its
+ * scope only when it is wider than the Instance (a call site's card, a pick with Select
+ * multiple): the heading focus goes to names the Instance alone.
+ */
+function useScopeAnnouncement(id: string, said: InspectorBody["said"]): void {
+  const announce = useAnnounce();
+  // No selection seen yet: the Inspector mounts with the selection the list made, a new one.
+  const last = useRef<{ id: string | null; said: InspectorBody["said"] }>({ id: null, said });
+  useEffect(() => {
+    const seen = last.current;
+    if (seen.id === id && seen.said === said) return;
+    last.current = { id, said };
+    if (seen.id !== id) {
+      if (said.reach !== null) announce(said.text);
+      return;
+    }
+    if (seen.said.scope !== said.scope) announce(said.text);
+    else if (said.reach !== null && seen.said.reach !== said.reach) announce(said.reach);
+  });
 }
 
 /**

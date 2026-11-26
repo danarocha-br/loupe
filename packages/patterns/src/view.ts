@@ -227,6 +227,8 @@ export type CommandWords = {
   copy: string;
   copied: string;
   failed: string;
+  /** What a screen reader hears once the copy lands: what went on the clipboard. */
+  copiedText(command: string): string;
   /** Said under the command, and by the announcer, when the clipboard refuses it. */
   refused: string;
 };
@@ -242,8 +244,8 @@ export type ListWords = {
   tools: Record<SelectMode, { label: string; hint: string; title: string }>;
   /** "On this page": its title, its rows' list, and the page map's toolbar. */
   onPage: { title: string; rows: string; map: string };
-  /** "Held for review": its title, and the button that drops a held record. */
-  held: { title: string; discard: string };
+  /** "Held for review": its title, the button that drops a held record, and that button's name, what it drops after "Discard". */
+  held: { title: string; discard: string; discardName(label: string): string };
   /** "Appears on interaction": its title, what it counts, and what each row says under its name. */
   interaction: { title: string; meta: string; seen: string };
   /** The change list: its title, and what it says of its numbers. */
@@ -364,8 +366,8 @@ export type InspectorWords = {
   leftOutUnmounted: string;
   /** What a chip's marks mean, said once under the options. */
   legend: { shown: string; app: string; default: string };
-  /** At a wider scope, the button that holds a State prop: "Hold open", and once held "Holding open · Release". */
-  hold: { off(prop: string): string; on(prop: string): string };
+  /** At a wider scope, the toggle that holds a State prop: "Hold open", held or not (it is pressed while it holds). */
+  hold(prop: string): string;
   /** Drops the selected Instance's own Overrides. */
   resetInstance: string;
 };
@@ -456,7 +458,8 @@ export type PropItem = {
   /** `text`: the whole sentence, for the announcer; the rest draws it with its values in `code`. */
   held: { before: string; value: string; middle: string; tried: string; after: string; text: string } | null;
   /** `inNotice`: Reset sits in the held notice, not on the row's line. */
-  reset: { label: string; write: Write; inNotice: boolean } | null;
+  /** Reset: what it shows, and its name, the prop it resets after that ("Reset variant"), so a row's Reset tells apart from the next. */
+  reset: { label: string; name: string; write: Write; inNotice: boolean } | null;
   /** The members a narrower scope keeps at their own value; `select` is the one the note selects. */
   keeping: { text: string; ids: string[]; select: string } | null;
 };
@@ -515,7 +518,16 @@ export type FlagRowView = {
 };
 
 /** The collapsed pill's words (DESIGN.md "Collapsed"): its name, and its tooltip, which names the focus shortcut. */
-export type LauncherWords = { label: string; title(shortcut: string): string };
+/**
+ * The collapsed pill's words: its name, its tooltip, what its arrow keys do (its
+ * description, for a screen reader), and the side it docked on, said as a key docks it.
+ */
+export type LauncherWords = {
+  label: string;
+  title(shortcut: string): string;
+  keys: string;
+  docked: Record<"top" | "right" | "bottom" | "left", string>;
+};
 
 /** The sheet's name: the panel is a region of the page called this. */
 export type SheetWords = { label: string };
@@ -523,8 +535,12 @@ export type SheetWords = { label: string };
 /** The page's marks' words (DESIGN.md "On the page"): the selected Instance's size tag, and what leads the pick tag's detail. */
 export type OutlineWords = { size(name: string, width: number, height: number): string; detailLead: string };
 
-/** A record Suspended for review, as "Held for review" lists it: what it applies to, its name, why it is held, and what it holds. */
-export type HeldItem = { target: ScopeTarget; label: string; why: string; values: string[] };
+/**
+ * A record Suspended for review, as "Held for review" lists it: what it applies to, its name,
+ * what it names in full (its file's path included, for its Discard's name: two short names
+ * can be the same), why it is held, and what it holds.
+ */
+export type HeldItem = { target: ScopeTarget; label: string; full: string; why: string; values: string[] };
 
 /** Why nothing on an Instance can change here, said once: its title and its body. */
 export type InstanceNoteView = { title: string; body: string };

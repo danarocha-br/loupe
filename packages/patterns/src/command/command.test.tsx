@@ -42,6 +42,18 @@ describe("CommandLine", () => {
     expect(screen.getByRole("button", { name: "Copy" })).toBeTruthy();
   });
 
+  it("says what it put on the clipboard once the copy lands, politely, each time", async () => {
+    const user = userEvent.setup({ document });
+    const screen = renderInSurface(<CommandLine text={SECRET_LINE.text} copy={SECRET_LINE.copy} prompt={false} words={WORDS.command} onCopy={() => Promise.resolve()} />);
+    const heard = listen(screen.shadow);
+    await user.click(screen.getByRole("button", { name: "Copy" }));
+    await act(async () => await new Promise((resolve) => setTimeout(resolve, 200)));
+    await user.click(screen.getByRole("button", { name: "Copied" }));
+    await act(async () => await new Promise((resolve) => setTimeout(resolve, 200)));
+    expect(heard.polite).toEqual([`Copied “${SECRET_LINE.copy}”`, `Copied “${SECRET_LINE.copy}”`]);
+    expect(heard.assertive).toEqual([]);
+  });
+
   it("says what to do when the clipboard refuses it, under the command and once by the announcer, and keeps saying it", async () => {
     const user = userEvent.setup({ document });
     const screen = renderInSurface(

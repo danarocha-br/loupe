@@ -21,14 +21,14 @@ A button that stays pressed: Hide marks in the header, Hold open at a scope, lig
 
 | Attribute | Set by | Draws |
 | --- | --- | --- |
-| `data-pressed` | UI SDK | On a soft pill: `shown` salmon with its `shown-edge` ring ("Holding open · Release"). On a tool: filled `sunk` with a `primary` icon. |
+| `data-pressed` | UI SDK | On a soft pill: `shown` salmon with its `shown-edge` ring (Hold open while it holds). On a tool: filled `sunk` with a `primary` icon. |
 | `data-unmarked` | Toggle | Pressed draws nothing on the button. |
 
 Under forced colours a marked pressed toggle is `Highlight` on `HighlightText`, so pressed stays visible when the fills drop.
 
 ## ARIA and keys
 
-- A native `button` with `aria-pressed`. Keep its name the same in both states where the design allows: a screen reader says pressed or not. (Hold open's words change, as the design draws them.)
+- A native `button` with `aria-pressed`. Keep its name the same in both states: a screen reader says pressed or not, and a name that changed with the state would say it twice, or contradict it. Hold open reads "Hold open" held or not; its salmon says it holds.
 - **Enter** and **Space** press it. **Escape** is not its.
 
 ## Tests

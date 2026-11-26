@@ -73,14 +73,14 @@ describe("Toggle", () => {
     const screen = renderInSurface(
       <>
         <Toggle pressed onPressedChange={() => {}} size="small">
-          Holding open
+          Hold open
         </Toggle>
         <Toggle pressed onPressedChange={() => {}} size="large" iconOnly marksPressed={false}>
           <span className="sr-only">Dark theme</span>
         </Toggle>
       </>,
     );
-    const holding = screen.getByRole("button", { name: "Holding open", pressed: true });
+    const holding = screen.getByRole("button", { name: "Hold open", pressed: true });
     expect([holding.getAttribute("data-look"), holding.getAttribute("data-size"), holding.hasAttribute("data-unmarked")]).toEqual(["soft", "small", false]);
     const theme = screen.getByRole("button", { name: "Dark theme", pressed: true });
     expect([theme.getAttribute("data-size"), theme.hasAttribute("data-icon-only"), theme.hasAttribute("data-unmarked")]).toEqual(["large", true, true]);

@@ -16,7 +16,7 @@ export function ToggleStates() {
             <span className="sr-only">Hide marks</span>
           </Toggle>
           <Toggle size="small" pressed={held} onPressedChange={setHeld}>
-            {held ? "Holding open · Release" : "Hold open"}
+            Hold open
           </Toggle>
           <Toggle size="large" iconOnly marksPressed={false} pressed={dark} onPressedChange={setDark} title="Dark theme">
             <Glyph />

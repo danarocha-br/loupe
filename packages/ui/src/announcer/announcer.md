@@ -14,7 +14,7 @@ useAnnounceChange(offer?.text ?? "", { key: offer }); // said each time it is ma
 ## Interface
 
 - `Announcer`: the surface mounts it around what it draws (`surface/index.tsx` here, and Loupe's `src/toolbar/index.tsx`). It renders its children, then the two regions.
-- `useAnnounce()` returns `announce(text, { politeness })`. Empty text, or text that is only spaces, says nothing. Outside a surface it does nothing and throws nothing.
+- `useAnnounce()` returns `announce(text, { politeness })`, bound to the place that called it. Empty text, or text that is only spaces, says nothing. Outside a surface it does nothing and throws nothing.
 - `useAnnounceChange(text, { politeness, key })` says `text` each time it changes, or each time `key` changes when one is given, unless it is empty. What a view shows as it mounts is read with the view, so it isn't said.
 - For tests, `announcer.fixture.ts` exports `listen(root)`: it finds the regions by role in a surface's shadow root (and throws unless there is exactly one of each), and records each message written, by politeness, oldest first.
 
@@ -38,7 +38,7 @@ Text on screen can stay on screen (the status strip, the footer's count and undo
 | The message is written | `WRITE_AFTER_MS` (100ms) later | the same text twice is two additions, read twice: two copies of the same title are two messages (UI SDK's `announce()` waits the same) |
 | The message is emptied | `CLEAR_AFTER_MS` (7s) after it was written | someone reading line by line doesn't find a stale message at the end of the surface; a busy screen reader has long since queued it |
 
-One region holds one message. A newer one at the same politeness, before the first was written, replaces it: a view that has two things to say at once says them in one message, or says the one that matters. The footer does this: Reset all makes an offer and changes the count in the same moment, and only the offer ("Reset 2 Overrides") is said; the count is said again once the offer is gone.
+What comes in one wait is written as one message, so two views speaking in the same commit are both heard: in the order they came, the same words once, each ended as a sentence (a full stop is added where one has none) so a screen reader pauses between them, as in "Reset 2 Overrides. Scope: All on page. Reaches 7 of 7." Each `useAnnounce()` is a place of its own, and so is each `useAnnounceChange()`: a newer message from the same place, before the first was written, replaces its own (a count that moved twice is said once, at its last value). The wait starts with the first message and isn't put off by the next ones. A view that has two things to say at once may still choose to say only the one that matters: the footer does, when Reset all makes an offer and changes the count in the same moment; only the offer ("Reset 2 Overrides") is said, and the count again once the offer is gone.
 
 Polite and assertive are separate: an assertive message doesn't replace a polite one.
 
@@ -55,4 +55,4 @@ UI SDK's `announce()` and `prepareAnnouncements()` write their regions into `doc
 
 ## Tests
 
-`announcer.test.tsx` draws it inside a real shadow root and queries the regions by role, with fake timers and axe: present and empty before the first message; written after emptying, by politeness; the same message twice read twice; a newer message replacing a pending one; changes said, mounts not; nothing in the host's document. The views' tests listen with `listen()`.
+`announcer.test.tsx` draws it inside a real shadow root and queries the regions by role, with fake timers and axe: present and empty before the first message; written after emptying, by politeness; the same message twice read twice; a newer message from the same place replacing its pending one; two places in one commit joined into one message; changes said, mounts not; nothing in the host's document. The views' tests listen with `listen()`.

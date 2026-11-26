@@ -9,7 +9,7 @@ import { useSaid } from "./said.js";
  */
 export function LauncherStates() {
   const { say, Said } = useSaid();
-  const words = { label: WORDS.launcher.label, title: WORDS.launcher.title("⌘.") };
+  const words = { label: WORDS.launcher.label, title: WORDS.launcher.title("⌘."), keys: WORDS.launcher.keys };
   const open = () => say("open");
   return (
     <States>
