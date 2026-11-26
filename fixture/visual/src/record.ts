@@ -9,14 +9,22 @@
 // - transitions, animations and the caret are off in every root (`freeze`);
 // - the mouse rests in a corner of the page unless the scene is a hover;
 // - Chromium rasters a whole tile whenever it rasters one (`BROWSER_ARGS`).
+//
+// Each Toolbar scene is also audited: axe-core in the page, colour contrast included, on the
+// Loupe roots, after the screenshots (`audit.ts`).
+//
+// The base is recorded leniently: a flow it can't drive (a scene the base predates) is
+// written to `skipped.json` from that step on, and the diff counts its scenes as new. The
+// head is strict: a scene it can't drive stops the check (exit 2).
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { type Browser, type BrowserContext, type BrowserContextOptions, chromium, type ElementHandle, type Locator, type Page } from "playwright";
-import { manifestFile, sceneFile, shotFile } from "./files.ts";
+import { type Audit, audit } from "./audit.ts";
+import { manifestFile, mayselect, sceneFile, selects, shotFile, skippedFile } from "./files.ts";
 import { hasWorkbench, type Server, startFixture, startWorkbench, type Workbench } from "./servers.ts";
 import { freeze, type Snapshot, snapshot } from "./snapshot.ts";
 
-export type Recording = Snapshot & { aria: Record<string, string> };
+export type Recording = Snapshot & { aria: Record<string, string>; axe?: Audit };
 
 const CONTEXT: BrowserContextOptions = {
   viewport: { width: 1280, height: 800 },
@@ -45,19 +53,42 @@ const paused = new WeakSet<Page>();
 
 /**
  * Stops the page's clock, if it still runs, and moves it 3s on, firing every timer due by
- * then; then waits until two snapshots in a row match. The clock stays stopped from the first
- * capture on: the steps between captures happen at one instant of the page's time, and only
- * `runFor` moves it, so no timer (an announcement clearing, a ring going quiet) can fire
- * between the snapshot, the ARIA tree and the screenshots, or land on either side of them.
+ * then. The clock stays stopped from the first capture on: the steps between captures happen
+ * at one instant of the page's time, and only `runFor` moves it, so no timer (an announcement
+ * clearing, a ring going quiet) can fire between the snapshot, the ARIA tree and the
+ * screenshots, or land on either side of them. A scene left out by `--only` still advances
+ * it, so the scenes after it are drawn at the page time a whole run draws them at.
  */
-async function settle(page: Page): Promise<Recording> {
-  if (!paused.has(page)) {
-    // Ahead of now, since the clock still runs while this is asked: `runFor` follows anyway.
-    const now = await page.evaluate(() => Date.now());
-    await page.clock.pauseAt(now + 1000);
-    paused.add(page);
-  }
+async function advance(page: Page): Promise<void> {
+  await pause(page);
   await page.clock.runFor(3000);
+}
+
+/**
+ * Stops the page's clock, if it still runs. The flows after the hand harness's call it as soon
+ * as the page has loaded, so their steps before the first capture happen at one instant too:
+ * Reset all announces twice, 2s apart, and a clock left running would let the second land
+ * before or after the capture by how fast the steps went.
+ */
+async function pause(page: Page): Promise<void> {
+  if (paused.has(page)) return;
+  // Ahead of now, since the clock still runs while this is asked.
+  const now = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(now + 1000);
+  paused.add(page);
+}
+
+/** Loads the fixture, waits for the pill, stops the clock and rests the mouse. */
+async function load(page: Page, url: string): Promise<void> {
+  await page.goto(url);
+  await page.locator("[data-loupe-toolbar] [data-launcher]").first().waitFor();
+  await pause(page);
+  await rest(page);
+}
+
+/** `advance`, then waits until two snapshots in a row match. */
+async function settle(page: Page): Promise<Recording> {
+  await advance(page);
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   let last = "";
   for (let i = 0; i < 40; i++) {
@@ -71,25 +102,49 @@ async function settle(page: Page): Promise<Recording> {
   throw new Error(`${page.url()} never settled: its snapshot kept changing for 6s`);
 }
 
+/**
+ * Moves the stopped clock on 50ms at a time until `done` holds in the page, for a step that
+ * waits on a timer of the app's and on something outside the page (a server's answer):
+ * Copy Proposal's. Stopped, the clock would never get there; running, it would land anywhere.
+ * Where it lands within those 50ms doesn't show: the capture after it runs 3s on, past what
+ * the step waited for and short of what follows it (the toast's 4s).
+ */
+async function until(page: Page, done: () => boolean, what: string): Promise<void> {
+  for (let i = 0; i < 200; i++) {
+    if (await page.evaluate(done)) return;
+    await page.clock.runFor(50);
+    await page.waitForTimeout(25);
+  }
+  const said = await page.evaluate(() => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("footer, [data-footer]")?.textContent ?? "");
+  throw new Error(`${what} never happened in 10s of the page's time; the footer: ${said}`);
+}
+
+/** A flow's step: its scene's name, what brings it about, and whether axe audits it (by default). */
+type Step = [name: string, act: () => Promise<unknown>, audited?: boolean];
+
 class Recorder {
   browser: Browser;
   out: string;
   only: string | undefined;
+  lenient: boolean;
   scenes: string[] = [];
-  constructor(browser: Browser, out: string, only: string | undefined) {
+  /** The scenes a lenient recording couldn't drive, and why. */
+  skipped: Record<string, string> = {};
+  constructor(browser: Browser, out: string, only: string | undefined, lenient: boolean) {
     this.browser = browser;
     this.out = out;
     this.only = only;
+    this.lenient = lenient;
   }
 
-  /** Whether the scene is wanted: `only` is a prefix of scene names. */
+  /** Whether the scene is wanted: `only` lists prefixes of scene names. */
   wanted(scene: string): boolean {
-    return !this.only || scene.startsWith(this.only);
+    return selects(this.only, scene);
   }
 
   /** Whether any scene under `prefix` may be wanted. */
   wants(prefix: string): boolean {
-    return !this.only || prefix.startsWith(this.only) || this.only.startsWith(prefix);
+    return mayselect(this.only, prefix);
   }
 
   async context(options: BrowserContextOptions = {}, storage: Record<string, string> = {}): Promise<BrowserContext> {
@@ -103,10 +158,13 @@ class Recorder {
     return context;
   }
 
-  /** Settles the page, then writes its snapshot, its ARIA tree and a screenshot of each root. */
-  async capture(page: Page, scene: string): Promise<void> {
-    if (!this.wanted(scene)) return;
-    const shot = await settle(page);
+  /**
+   * Settles the page, then writes its snapshot, its ARIA tree and a screenshot of each root;
+   * with `audited`, then axe's violations, last, so nothing it does is in the pictures.
+   */
+  async capture(page: Page, scene: string, audited = false): Promise<void> {
+    if (!this.wanted(scene)) return advance(page);
+    const shot: Recording = await settle(page);
     for (const [name, root] of Object.entries(shot.roots)) {
       const locator: Locator = root.index === undefined ? page.locator("[data-loupe-toolbar]") : page.locator("[data-loupe-surface]").nth(root.index);
       shot.aria[name] = await locator.ariaSnapshot().catch((error: Error) => `(no ARIA snapshot: ${error.message.split("\n")[0]})`);
@@ -114,20 +172,33 @@ class Recorder {
       if (root.index === undefined) await page.screenshot({ path, animations: "disabled", caret: "hide" });
       else await locator.screenshot({ path, animations: "disabled", caret: "hide" });
     }
+    if (audited) shot.axe = await audit(page);
     writeFileSync(sceneFile(this.out, scene), JSON.stringify(shot));
     this.scenes.push(scene);
-    process.stdout.write(`  ${scene}: ${Object.values(shot.roots).reduce((n, r) => n + Object.keys(r.entries).length, 0)} elements\n`);
+    const violations = shot.axe ? `, ${Object.values(shot.axe.failed).reduce((n, nodes) => n + nodes.length, 0)} axe violation(s)` : "";
+    process.stdout.write(`  ${scene}: ${Object.values(shot.roots).reduce((n, r) => n + Object.keys(r.entries).length, 0)} elements${violations}\n`);
   }
 
   /**
    * Drives a flow: each step's action, then its capture. It stops after the last wanted
    * scene, so a focused run (`--only toolbar/light/01-pill`) never fails on a later control.
+   * Leniently, a step that throws skips the rest of the flow's wanted scenes, with the error.
+   * Every scene is audited unless its step says `false` (the peek, see-through by design).
    */
-  async flow(page: Page, prefix: string, steps: [string, () => Promise<unknown>][]): Promise<void> {
+  async flow(page: Page, prefix: string, steps: Step[]): Promise<void> {
+    const wanted = steps.map(([name]) => `${prefix}/${name}`).filter((scene) => this.wanted(scene));
     const last = steps.findLastIndex(([name]) => this.wanted(`${prefix}/${name}`));
-    for (const [name, act] of steps.slice(0, last + 1)) {
-      await act();
-      await this.capture(page, `${prefix}/${name}`);
+    for (const [name, act, audited = true] of steps.slice(0, last + 1)) {
+      try {
+        await act();
+        await this.capture(page, `${prefix}/${name}`, audited);
+      } catch (error) {
+        if (!this.lenient) throw error;
+        const reason = (error instanceof Error ? error.message : String(error)).split("\n")[0]!;
+        for (const scene of wanted.filter((s) => !this.scenes.includes(s))) this.skipped[scene] = reason;
+        process.stdout.write(`  ${prefix}/${name}: couldn't be driven here, so it and the flow's later scenes are new to the diff (${reason})\n`);
+        return;
+      }
     }
   }
 }
@@ -267,6 +338,198 @@ async function overlay(r: Recorder, url: string, theme: "light" | "dark"): Promi
   await context.close();
 }
 
+/** The Toolbar's shadow root's focused element matches `selector`, and `:focus-visible`: a keyboard put it there. */
+async function focused(page: Page, selector: string): Promise<void> {
+  await page.waitForFunction(
+    (selector) => {
+      const active = document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.activeElement;
+      return Boolean(active?.matches(selector) && active.matches(":focus-visible"));
+    },
+    selector,
+    { polling: 100 },
+  );
+}
+
+/** Waits for the Toolbar to draw a button whose label or text starts with `label`, moving the clock on for it. */
+async function hasButton(page: Page, label: string): Promise<void> {
+  const drawn = (label: string) =>
+    [...(document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelectorAll("button") ?? [])].some((b) => (b.getAttribute("aria-label") || b.textContent || "").trim().startsWith(label));
+  for (let i = 0; i < 200; i++) {
+    if (await page.evaluate(drawn, label)) return;
+    await page.clock.runFor(50);
+    await page.waitForTimeout(25);
+  }
+  throw new Error(`the Toolbar never drew a button "${label}"`);
+}
+
+/** Opens the sheet from the pill, as 02-list does. */
+async function openSheet(page: Page): Promise<void> {
+  await rest(page);
+  await click(inToolbar(page, "[data-launcher]"));
+  await inToolbar(page, "[data-sheet]").waitFor();
+}
+
+/** The Inspector on the first Button, as 06-inspector has it. */
+async function inspectFirst(page: Page): Promise<void> {
+  await press(page, "Inspect Button 1 of 7");
+  await inToolbar(page, "[data-prop]").waitFor();
+}
+
+/**
+ * The states the hand harness had no step for: Undo after a reset, the Alt peek, the copy
+ * toast, and Gone (the selected Instance unmounted under the Inspector).
+ */
+async function moreStates(r: Recorder, url: string, theme: "light" | "dark"): Promise<void> {
+  const prefix = `states/${theme}`;
+  if (!r.wants(prefix)) return;
+  const context = await r.context({ colorScheme: theme });
+  // Copy Proposal writes to the clipboard, and its toast says it did.
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(url).origin });
+  const page = await context.newPage();
+  await r.flow(page, prefix, [
+    [
+      // A change, then Reset all: the footer offers to put it back.
+      "undo",
+      async () => {
+        await load(page, url);
+        await openSheet(page);
+        await inspectFirst(page);
+        await click(page.locator('[data-loupe-toolbar] [data-prop] [role="radio"][aria-checked="false"]').first());
+        await hasButton(page, "Reset this Instance");
+        await press(page, "Reset all");
+        await hasButton(page, "Undo");
+      },
+    ],
+    [
+      // A lone Alt, held past PEEK_DELAY (200ms): `settle` runs the clock 3s on with it down.
+      // Not audited: the panel is see-through on purpose, for the page under it.
+      "peek",
+      () => page.keyboard.down("Alt"),
+      false,
+    ],
+    [
+      // Undo taken, then Copy Proposal: its toast, 3s into its 4s.
+      "copy-toast",
+      async () => {
+        await page.keyboard.up("Alt");
+        await press(page, "Undo");
+        // Copy Proposal stays disabled until the footer has counted Undo's change, which it does on a timer.
+        await until(page, () => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("[data-copy]:not([disabled])") != null, "Copy Proposal enabled");
+        await press(page, "Copy Proposal");
+        await until(page, () => Boolean(document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("[data-copy-toast]")), "the copy toast");
+      },
+    ],
+    [
+      // A menu's item selected while the menu is open, then the menu closed with Esc: "Not on the page now".
+      "gone",
+      async () => {
+        // Back to the list, whose page map has a block for each Instance on the page. The menu
+        // opens and closes on the library's timers: the stopped clock is moved on for them.
+        await press(page, "All components");
+        await hasButton(page, "Inspect DropdownMenu 1 of 6");
+        await page.locator('main button[aria-label="Actions for Ana Souza"]').click();
+        await until(page, () => document.querySelector('[role="menu"]') !== null, "Ana's menu open");
+        await rest(page);
+        await hasButton(page, "Inspect DropdownMenuItem 1 of 2");
+        await press(page, "Inspect DropdownMenuItem 1 of 2");
+        await inToolbar(page, "[data-prop]").waitFor();
+        await page.keyboard.press("Escape");
+        await until(page, () => document.querySelector('[role="menu"]') === null, "Ana's menu closed");
+        await page.waitForFunction(() => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.textContent?.includes("Not on the page now"), undefined, { polling: 100 });
+      },
+    ],
+  ]);
+  await context.close();
+}
+
+/**
+ * The reader's settings: a 20px default text size (Chromium's own setting, through CDP, as
+ * the browser's preference would set it), forced colours, and a 320px window (WCAG 1.4.10),
+ * each with the pill, the list and the Inspector.
+ */
+async function settings(r: Recorder, url: string, theme: "light" | "dark"): Promise<void> {
+  const variants: [string, BrowserContextOptions, boolean][] = [
+    ["20px", {}, true],
+    ["forced", { forcedColors: "active" }, false],
+    ["320", { viewport: { width: 320, height: 720 } }, false],
+  ];
+  for (const [name, options, large] of variants) {
+    const prefix = `settings/${theme}/${name}`;
+    if (!r.wants(prefix)) continue;
+    const context = await r.context({ colorScheme: theme, ...options });
+    const page = await context.newPage();
+    await r.flow(page, prefix, [
+      [
+        "pill",
+        async () => {
+          if (large) await (await context.newCDPSession(page)).send("Page.setFontSizes", { fontSizes: { standard: 20 } });
+          await load(page, url);
+        },
+      ],
+      ["list", () => openSheet(page)],
+      ["inspector", () => inspectFirst(page)],
+    ]);
+    await context.close();
+  }
+}
+
+/** The pill docked at each side of the window, halfway along it (`loupe:launcher`, launcher-place.ts). */
+async function pillEdges(r: Recorder, url: string, theme: "light" | "dark"): Promise<void> {
+  for (const edge of ["top", "right", "bottom", "left"]) {
+    const prefix = `pill/${theme}`;
+    if (!r.wanted(`${prefix}/${edge}`)) continue;
+    const context = await r.context({ colorScheme: theme }, { "loupe:launcher": JSON.stringify({ edge, at: 0.5 }) });
+    const page = await context.newPage();
+    await r.flow(page, prefix, [
+      [
+        edge,
+        () => load(page, url),
+      ],
+    ]);
+    await context.close();
+  }
+}
+
+/**
+ * Keyboard focus, from real key presses, so `:focus-visible` matches: Alt+Shift+L to the pill,
+ * then, with the sheet open, to the list's heading, and Tab from there to the first row.
+ */
+async function keyboardFocus(r: Recorder, url: string, theme: "light" | "dark"): Promise<void> {
+  const prefix = `focus/${theme}`;
+  if (!r.wants(prefix)) return;
+  const context = await r.context({ colorScheme: theme });
+  const page = await context.newPage();
+  await r.flow(page, prefix, [
+    [
+      "pill",
+      async () => {
+        await load(page, url);
+        await page.keyboard.press("Alt+Shift+KeyL");
+        await focused(page, "[data-launcher], [data-launcher] *");
+      },
+    ],
+    [
+      "heading",
+      async () => {
+        // Esc gives focus back to the page; the sheet opens; the keys bring focus to its heading.
+        await page.keyboard.press("Escape");
+        await openSheet(page);
+        await page.keyboard.press("Alt+Shift+KeyL");
+        await focused(page, "h1, h2, h3, [data-view-heading]");
+      },
+    ],
+    [
+      "row",
+      async () => {
+        const row = await button(page, "Button ×7");
+        for (let i = 0; i < 60 && !(await row.evaluate((el) => el.matches(":focus"))); i++) await page.keyboard.press("Tab");
+        if (!(await row.evaluate((el) => el.matches(":focus-visible")))) throw new Error('Tab never brought keyboard focus to the "Button ×7" row');
+      },
+    ],
+  ]);
+  await context.close();
+}
+
 /** What tells one package's workbench from another's: its nav's name, and the key the page keeps the reader's settings under. */
 const WORKBENCHES: Record<Workbench, { nav: string; storage: string; what: string }> = {
   ui: { nav: "Primitives", storage: "loupe-ui-workbench", what: "primitive" },
@@ -310,28 +573,34 @@ async function workbench(r: Recorder, url: string, name: Workbench): Promise<voi
   }
 }
 
-/** Records the tree at `root` into `out`; `only` keeps the scenes whose name starts with it. */
-export async function record(root: string, out: string, only?: string): Promise<void> {
+/** The prefixes of the scenes recorded on the fixture: the Toolbar's. */
+const FIXTURE_SCENES = ["toolbar/", "overlay/", "states/", "settings/", "pill/", "focus/"];
+
+/**
+ * Records the tree at `root` into `out`; `only` keeps the scenes whose name starts with it.
+ * `lenient` (the base) skips a flow it can't drive instead of failing: see the head of this file.
+ */
+export async function record(root: string, out: string, only?: string, lenient = false): Promise<void> {
   mkdirSync(out, { recursive: true });
   const servers: Server[] = [];
   const browser = await chromium.launch({ args: BROWSER_ARGS });
   try {
-    const recorder = new Recorder(browser, out, only);
+    const recorder = new Recorder(browser, out, only, lenient);
     for (const name of ["ui", "patterns"] as const) {
       if (!hasWorkbench(root, name) || !recorder.wants(`${name}/`)) continue;
       const server = await startWorkbench(root, name);
       servers.push(server);
       await workbench(recorder, server.url, name);
     }
-    if (["toolbar/", "overlay/"].some((prefix) => recorder.wants(prefix))) {
+    if (FIXTURE_SCENES.some((prefix) => recorder.wants(prefix))) {
       const fixture = await startFixture(root);
       servers.push(fixture);
-      await toolbarStates(recorder, fixture.url, "light");
-      await toolbarStates(recorder, fixture.url, "dark");
-      await overlay(recorder, fixture.url, "light");
-      await overlay(recorder, fixture.url, "dark");
+      for (const scenes of [toolbarStates, overlay, moreStates, settings, pillEdges, keyboardFocus]) {
+        for (const theme of ["light", "dark"] as const) await scenes(recorder, fixture.url, theme);
+      }
     }
     writeFileSync(manifestFile(out), JSON.stringify(recorder.scenes, null, 2));
+    writeFileSync(skippedFile(out), JSON.stringify(recorder.skipped, null, 2));
   } finally {
     await browser.close();
     for (const server of servers) await server.stop();

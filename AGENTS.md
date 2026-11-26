@@ -37,7 +37,12 @@ Primitives are built on UI SDK (`@ui-sdk/react`, `@ui-sdk/core`, pinned to one e
 A refactor keeps the layout identical to main. Prove it with `pnpm visual` before you open the PR, and paste its last line in the description. It records your working tree and its base, `git merge-base HEAD main`, on this machine, and diffs them:
 - every `@loupe/ui` workbench page (`ui/<primitive>`), at 16px, at 20px and under forced colours, each with its light and dark surfaces;
 - every `@loupe/patterns` workbench page (`patterns/<pattern>`), the same way;
-- the Toolbar on the fixture, light and dark: the pill, hovered, then the hand harness's ten states, from the list to Hide marks (`toolbar/<theme>/…`), and the sheet over the page at 700 × 860 (`overlay/<theme>/…`).
+- the Toolbar on the fixture, light and dark:
+  - the pill, hovered, then the hand harness's ten states, from the list to Hide marks (`toolbar/<theme>/…`), and the sheet over the page at 700 × 860 (`overlay/<theme>/…`);
+  - Undo after Reset all, the Alt peek (a lone Alt held past its 200ms), the copy toast, and Gone, an Inspector whose Instance unmounted (`states/<theme>/…`);
+  - the pill, the list and the Inspector at a 20px default text size (Chromium's own setting), under forced colours and in a 320px window (`settings/<theme>/<20px|forced|320>/…`);
+  - the pill docked at each side (`pill/<theme>/<side>`);
+  - keyboard focus from real keys, so `:focus-visible` matches: the pill and the list's heading after Alt+Shift+L, and a row reached by Tab (`focus/<theme>/…`).
 
 It needs Node 22.12 or later (the repo's `.nvmrc`; Vite's floor on 22) and, once per machine, Playwright's Chromium:
 
@@ -49,15 +54,17 @@ On Linux, add `--with-deps` for the browser's system libraries.
 
 For each, every element in a Loupe shadow root: its box (to 0.05px), 85 computed properties, its `::before` and `::after`, its text and ARIA (an `aria-controls` or `aria-labelledby` as the key of the element it names), the root's ARIA tree, and a screenshot of each root compared pixel by pixel. A pixel counts as changed when a channel moves by more than 3/255, since Skia can antialias a rounded corner 1/255 apart between runs; the structure names every colour exactly.
 
-- **It exits 0** with `✓ No difference: …`, 1 when something differs, and 2 when the check couldn't run (a build, a server, a scene that couldn't be driven, or an `--only` that selects nothing). `.visual/report.md` lists every difference, and `.visual/diff/` shows the changed pixels in red.
+Each Toolbar scene is also audited with axe-core in Chromium, on its Loupe roots, with axe's own rules, colour contrast included (the repo's jsdom axe has no colours and leaves it off). One pass per scene, after its screenshots, on the page the recorder has open (`fixture/visual/src/audit.ts`). The peek isn't audited: it is see-through on purpose. A rule that fails nodes in the head, and fails or can't judge more of them there than in the base, fails the check (exit 1); the report lists them under "New axe violations". A violation both sides have doesn't fail it, nor a node axe fails on one side and can't judge (its "incomplete") on the other.
+
+- **It exits 0** with `✓ No difference: …`, 1 when something differs or axe finds something new, and 2 when the check couldn't run (a build, a server, a scene the working tree couldn't drive, or an `--only` that selects nothing). A scene the base can't drive (one it predates) isn't a failure: it is new, and the report says why the base couldn't drive it. `.visual/report.md` lists every difference, and `.visual/diff/` shows the changed pixels in red.
 - **The baseline is made, not committed.** The tokens draw in the system's sans, so a baseline from one OS fails on another. `.visual/base` is a git worktree of the base, installed offline and built. Its recording is kept in `.visual/runs/` under the base's commit and a hash of the recorder, and reused until either changes. The first run takes a few minutes, the next ones about half that.
 - **Options:**
   - `--base <ref>` compares against another ref. The default is `main`, or `origin/main` where there is no local `main`.
-  - `--only <prefix>` records the scenes whose name starts with it, for example `ui/chip-group` or `toolbar/dark`.
+  - `--only <prefix>` records the scenes whose name starts with it, for example `ui/chip-group`, `toolbar/dark` or `states/`; several, separated by commas: `states/,focus/`. A flow's earlier steps still run, and still move the page's clock as a whole run does.
   - `pnpm visual:update` records the base again.
 - **Stop the fixture's `next dev` first.** Next locks a project's dev server, and a build of Loupe under it breaks it. The check says so before it builds anything. It starts its own servers on ports 3300 (`@loupe/ui`'s workbench), 3310 (the fixture) and 3320 (`@loupe/patterns`' workbench), and stops if any of them is taken, so it never measures another checkout's server. Ctrl+C stops them too.
 - **Where a change is meant,** say so in the PR and list what the report shows. CI runs the same check on every pull request: the `visual` job, against `origin/main`, with the report in the job's summary and as an artifact. A meant change passes there once the PR has the `visual-change` label and the job is re-run. The label waives a difference (exit 1), never a check that couldn't run (exit 2).
-- **New noise** gets fixed in the recorder (`fixture/visual/src/`), never by loosening a tolerance. The recorder stops the page's clock at its first capture and runs it 3s ahead at each one, so the landing ring's `data-quiet`, the sheet's close and an announcement have settled and nothing fires mid-capture. It also turns transitions off, measures a box from its section, keyed by the section's heading, so an inserted section moves one box, and turns Chromium's partial raster off, since a tile repainted in part antialiases an edge a few levels apart, by a clip that varies from run to run.
+- **New noise** gets fixed in the recorder (`fixture/visual/src/`), never by loosening a tolerance. The recorder stops the page's clock at its first capture and runs it 3s ahead at each one, so the landing ring's `data-quiet`, the sheet's close and an announcement have settled and nothing fires mid-capture. A step that waits on the app's timers and on something outside the page (Copy Proposal, a menu opening) moves the stopped clock on 50ms at a time until it is done (`until`); axe gets timers of its own, so it never moves the page's. It also turns transitions off, measures a box from its section, keyed by the section's heading, so an inserted section moves one box, and turns Chromium's partial raster off, since a tile repainted in part antialiases an edge a few levels apart, by a clip that varies from run to run.
 
 ## Decisions
 
