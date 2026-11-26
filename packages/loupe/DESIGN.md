@@ -581,7 +581,7 @@ Inside the middle, with nothing selected: the start card, the notices, the chang
 
 Every card's text starts 14px from its left edge, 12px from its top. In the Inspector a row is a 20px glyph column and the content 8px after it, padded 14px; the legend, the "Inside" tree and Inspect only's rows all start 42px in, on the names' edge. Spacing steps are 1, 2, 4, 6, 8, 10, 12, 14 and 16px.
 
-Holding Alt alone fades the panel to 8% opacity and lets clicks through, so an app dialog under the column can be seen. It waits 200ms for the Alt to stay alone (`peek.ts`): another key, a pointer button, the window losing focus or the tab going hidden calls it off, and a text field with focus keeps its Alt, so Loupe's own Alt+Shift+L, Alt+Tab and Option-typing never make the panel flash. A held Alt's repeats never start it again.
+Holding Alt alone fades the panel to 8% opacity and lets clicks through, so an app dialog under the column can be seen. It waits 200ms for the Alt to stay alone (`peek.ts`): another key or a pointer button, held already or pressed during the wait, the window losing focus or the tab going hidden calls it off, and a text field with focus, or given it during the wait, keeps its Alt, so Loupe's own Alt+Shift+L, Alt+Tab and Option-typing never make the panel flash. A held Alt's repeats never start it again.
 
 ## Elevation & Depth
 

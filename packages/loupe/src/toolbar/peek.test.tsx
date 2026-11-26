@@ -80,6 +80,13 @@ function key(type: "keydown" | "keyup", init: KeyboardEventInit) {
 }
 const altDown = (init: KeyboardEventInit = {}) => key("keydown", { key: "Alt", code: "AltLeft", altKey: true, ...init });
 const altUp = () => key("keyup", { key: "Alt", code: "AltLeft" });
+/** A pointer pressed or let go on the page, by its id: a mouse is 1, each finger its own. */
+function pointer(type: "pointerdown" | "pointerup" | "pointercancel", pointerId = 1) {
+  const event = new MouseEvent(type, { bubbles: true, composed: true });
+  Object.defineProperty(event, "pointerId", { value: pointerId });
+  act(() => void document.body.dispatchEvent(event));
+}
+const space = (type: "keydown" | "keyup", init: KeyboardEventInit = {}) => key(type, { key: " ", code: "Space", ...init });
 /** The wait for a lone Alt to stay alone, run out. */
 const wait = (ms = PEEK_DELAY) => act(() => void vi.advanceTimersByTime(ms));
 
@@ -129,6 +136,14 @@ describe("the peek", () => {
     expect(peeking()).toBe(false);
   });
 
+  it("doesn't show when the app moves focus to its field during the wait, as a dialog's autofocus does", async () => {
+    await mount();
+    altDown();
+    act(() => note().focus());
+    wait();
+    expect(peeking()).toBe(false);
+  });
+
   it("doesn't show when a letter follows the Alt, in a field or out of one", async () => {
     await mount();
     altDown();
@@ -149,15 +164,71 @@ describe("the peek", () => {
   it("doesn't show when a pointer button is pressed before the wait is out, and lets clicks through once it shows", async () => {
     await mount();
     altDown();
-    act(() => void document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true })));
+    pointer("pointerdown");
     wait();
     expect(peeking()).toBe(false);
-    act(() => void document.body.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, composed: true })));
+    pointer("pointerup");
     altUp();
 
     altDown();
     wait();
-    act(() => void document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true })));
+    pointer("pointerdown");
+    expect(peeking()).toBe(true);
+  });
+
+  it("doesn't show on an Alt pressed during a press, until every pointer is let go", async () => {
+    await mount();
+    // Two fingers down, one lifted: the other still presses.
+    pointer("pointerdown", 1);
+    pointer("pointerdown", 2);
+    pointer("pointerup", 2);
+    altDown();
+    wait();
+    expect(peeking()).toBe(false);
+    altUp();
+
+    pointer("pointercancel", 1);
+    altDown();
+    wait();
+    expect(peeking()).toBe(true);
+  });
+
+  it("doesn't show on an Alt that joins a key already held, until that key is let go", async () => {
+    await mount();
+    // Space held on an app's canvas, then Alt, before Space's first repeat.
+    space("keydown");
+    altDown();
+    wait(PEEK_DELAY * 5);
+    expect(peeking()).toBe(false);
+    space("keydown", { altKey: true, repeat: true });
+    space("keyup", { altKey: true });
+    // Alt held on alone afterwards is still part of the chord; only a fresh press peeks.
+    wait(PEEK_DELAY * 5);
+    expect(peeking()).toBe(false);
+    altUp();
+
+    altDown();
+    wait();
+    expect(peeking()).toBe(true);
+  });
+
+  it("forgets a key let go while Cmd was held, which sends no keyup on a Mac, when Cmd goes", async () => {
+    await mount();
+    key("keydown", { key: "Meta", code: "MetaLeft", metaKey: true });
+    key("keydown", { key: "k", code: "KeyK", metaKey: true });
+    key("keyup", { key: "Meta", code: "MetaLeft" });
+    altDown();
+    wait();
+    expect(peeking()).toBe(true);
+  });
+
+  it("forgets the keys and pointers held when the window loses focus, whose keyups go elsewhere", async () => {
+    await mount();
+    space("keydown");
+    pointer("pointerdown");
+    act(() => void window.dispatchEvent(new Event("blur")));
+    altDown();
+    wait();
     expect(peeking()).toBe(true);
   });
 
