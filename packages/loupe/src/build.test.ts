@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { build, createServer, type Rolldown } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { browserConfig, browserEntries, pointIntoDist } from "../vite.config.js";
+import { SWAP_MARK, watchRunning } from "../watch.js";
 import probeCss from "../test/fixtures/css-inline/probe.css?inline";
 
 const pkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,6 +87,13 @@ describe("dist", () => {
     if (!existsSync(path.join(dist, "toolbar", "index.js"))) {
       throw new Error("No dist/toolbar/index.js: run `pnpm --filter @danarocha/loupe build` first.");
     }
+  });
+
+  // The watch (`watch.ts`) writes into dist while it runs, and adds its stylesheet swap: the
+  // build owns dist, and this test ends every build, `npm pack`'s too.
+  it("is the build's alone: no watch is running on it, and none has written into it", () => {
+    expect(watchRunning(), "A `pnpm watch` is running on this package: stop it, then build again.").toBeNull();
+    expect(jsFiles().filter((file) => read(file).includes(SWAP_MARK))).toEqual([]);
   });
 
   it("is built by Vite on the browser side, one file per source module", () => {
