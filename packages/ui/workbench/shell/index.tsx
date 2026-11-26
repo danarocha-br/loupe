@@ -59,6 +59,26 @@ export type WorkbenchOptions = {
 const THEMES: Theme[] = ["light", "dark"];
 const TEXT_SIZES = [16, 20];
 
+/** The page around the frames, light or dark: the system's, or the reader's choice. The frames draw both themes whatever it is. */
+export type PageTheme = "system" | Theme;
+const PAGE_THEMES: { value: PageTheme; label: string }[] = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+/** On `<html>` while the reader chooses the page's theme: `workbench.css` sets its `color-scheme` from it. */
+export const PAGE_THEME_ATTRIBUTE = "data-wb-theme";
+
+/** Puts the page's theme on `<html>`, or none for the system's. */
+function usePageTheme(theme: PageTheme): void {
+  useEffect(() => {
+    const html = document.documentElement;
+    if (theme === "system") html.removeAttribute(PAGE_THEME_ATTRIBUTE);
+    else html.setAttribute(PAGE_THEME_ATTRIBUTE, theme);
+    return () => html.removeAttribute(PAGE_THEME_ATTRIBUTE);
+  }, [theme]);
+}
+
 /** What the address names: one page by its folder, or every one. */
 function useRoute(): string {
   const read = () => {
@@ -181,6 +201,8 @@ export function Workbench(options: WorkbenchOptions) {
   const route = useRoute();
   const [textSize, setTextSize] = useKept<number>(storage, "text-size", 16);
   const [doc, setDoc] = useKept<boolean>(storage, "doc", true);
+  const [pageTheme, setPageTheme] = useKept<PageTheme>(storage, "page-theme", "system");
+  usePageTheme(pageTheme);
   const one = pages.find((page) => page.id === route);
   const shown = one ? [one] : pages;
   useEffect(() => {
@@ -209,6 +231,15 @@ export function Workbench(options: WorkbenchOptions) {
             ))}
           </ul>
         </nav>
+        <fieldset>
+          <legend>Page theme</legend>
+          {PAGE_THEMES.map(({ value, label }) => (
+            <label key={value}>
+              <input type="radio" name="page-theme" checked={pageTheme === value} onChange={() => setPageTheme(value)} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
         <fieldset>
           <legend>Reader's text size</legend>
           {TEXT_SIZES.map((size) => (
