@@ -14,13 +14,14 @@
 // It renders `PanelView` (PER-214): every decision and word comes from
 // `panelView()`, and each button makes the `__loupe` call its data names.
 
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 import type { LoupeDebug } from "../runtime/debug.js";
 import type { ScopeTarget } from "../runtime/store.js";
 import { attempt, PropRowView } from "./controls.js";
 import type { Column } from "./dock.js";
 import { CopyFlow } from "./copy-flow.js";
 import { FlagsCard } from "./flags.js";
+import { usePeek } from "./peek.js";
 import { Button, Card, Toggle, useAnnounce, useAnnounceChange } from "@loupe/ui";
 import {
   COMMAND_WORDS,
@@ -229,33 +230,6 @@ export function Panel({ debug, view, version, column, picking, onTool, onHide, c
       )}
     </Sheet>
   );
-}
-
-/**
- * Holding Alt (Option on a Mac) makes the panel see-through, so what runs under it
- * shows: an app's own dialog or toast is fixed to the viewport, not to the page the
- * panel's column narrows.
- */
-function usePeek(): boolean {
-  const [peeking, setPeeking] = useState(false);
-  useEffect(() => {
-    const down = (event: KeyboardEvent) => {
-      if (event.key === "Alt") setPeeking(true);
-    };
-    const up = (event: KeyboardEvent) => {
-      if (event.key === "Alt") setPeeking(false);
-    };
-    const reset = () => setPeeking(false);
-    window.addEventListener("keydown", down, true);
-    window.addEventListener("keyup", up, true);
-    window.addEventListener("blur", reset);
-    return () => {
-      window.removeEventListener("keydown", down, true);
-      window.removeEventListener("keyup", up, true);
-      window.removeEventListener("blur", reset);
-    };
-  }, []);
-  return peeking;
 }
 
 /**
