@@ -13,9 +13,11 @@ export const sceneFile = (dir: string, scene: string) => join(dir, `${slug(scene
 export const shotName = (scene: string, root: string) => `${slug(scene)}~${slug(root)}.png`;
 export const shotFile = (dir: string, scene: string, root: string) => join(dir, shotName(scene, root));
 
-/** Whether `scene` is one `--only` keeps: it starts with one of its prefixes, separated by commas. */
-export const selects = (only: string | undefined, scene: string) => !only || only.split(",").some((prefix) => scene.startsWith(prefix.trim()));
+/** `--only`'s prefixes, separated by commas; an empty one (`states/,`) is no prefix, not every scene. */
+const prefixes = (only: string) => only.split(",").map((p) => p.trim()).filter(Boolean);
+
+/** Whether `scene` is one `--only` keeps: it starts with one of its prefixes. */
+export const selects = (only: string | undefined, scene: string) => !only || prefixes(only).some((prefix) => scene.startsWith(prefix));
 
 /** Whether any scene under `prefix` may be one `--only` keeps. */
-export const mayselect = (only: string | undefined, prefix: string) =>
-  !only || only.split(",").some((p) => prefix.startsWith(p.trim()) || p.trim().startsWith(prefix));
+export const mayselect = (only: string | undefined, prefix: string) => !only || prefixes(only).some((p) => prefix.startsWith(p) || p.startsWith(prefix));

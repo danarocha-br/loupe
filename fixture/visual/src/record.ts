@@ -13,9 +13,10 @@
 // Each Toolbar scene is also audited: axe-core in the page, colour contrast included, on the
 // Loupe roots, after the screenshots (`audit.ts`).
 //
-// The base is recorded leniently: a flow it can't drive (a scene the base predates) is
-// written to `skipped.json` from that step on, and the diff counts its scenes as new. The
-// head is strict: a scene it can't drive stops the check (exit 2).
+// The base is recorded leniently: a flow whose step it can't drive (a control the base predates)
+// is written to `skipped.json` from that step on, and the diff counts its scenes as new. A
+// capture that fails is no missing control, and stops the run on either side. The head is
+// strict: a scene it can't drive stops the check (exit 2).
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { type Browser, type BrowserContext, type BrowserContextOptions, chromium, type ElementHandle, type Locator, type Page } from "playwright";
@@ -193,7 +194,9 @@ class Recorder {
   /**
    * Drives a flow: each step's action, then its capture. It stops after the last wanted
    * scene, so a focused run (`--only toolbar/light/01-pill`) never fails on a later control.
-   * Leniently, a step that throws skips the rest of the flow's wanted scenes, with the error.
+   * Leniently, a step whose action throws skips the rest of the flow's wanted scenes, with the
+   * error: the base has no such control yet. A capture that throws (a screenshot, the audit)
+   * is no missing control, and stops the run on either side.
    * Every scene is audited unless its step says `false` (the peek, see-through by design).
    */
   async flow(page: Page, prefix: string, steps: Step[]): Promise<void> {
@@ -202,7 +205,6 @@ class Recorder {
     for (const [name, act, audited = true] of steps.slice(0, last + 1)) {
       try {
         await act();
-        await this.capture(page, `${prefix}/${name}`, audited);
       } catch (error) {
         if (!this.lenient) throw error;
         const reason = (error instanceof Error ? error.message : String(error)).split("\n")[0]!;
@@ -210,6 +212,7 @@ class Recorder {
         process.stdout.write(`  ${prefix}/${name}: couldn't be driven here, so it and the flow's later scenes are new to the diff (${reason})\n`);
         return;
       }
+      await this.capture(page, `${prefix}/${name}`, audited);
     }
   }
 }
@@ -591,10 +594,11 @@ async function workbench(r: Recorder, url: string, name: Workbench): Promise<voi
 const FIXTURE_SCENES = ["toolbar/", "overlay/", "states/", "settings/", "pill/", "focus/"];
 
 /**
- * Records the tree at `root` into `out`; `only` keeps the scenes whose name starts with it.
- * `lenient` (the base) skips a flow it can't drive instead of failing: see the head of this file.
+ * Records the tree at `root` into `out`; `only` keeps the scenes whose name starts with one of
+ * its prefixes. `lenient` (the base) skips a flow it can't drive instead of failing, and returns
+ * the scenes it skipped: see the head of this file.
  */
-export async function record(root: string, out: string, only?: string, lenient = false): Promise<void> {
+export async function record(root: string, out: string, only?: string, lenient = false): Promise<Record<string, string>> {
   mkdirSync(out, { recursive: true });
   const servers: Server[] = [];
   const browser = await chromium.launch({ args: BROWSER_ARGS });
@@ -615,6 +619,7 @@ export async function record(root: string, out: string, only?: string, lenient =
     }
     writeFileSync(manifestFile(out), JSON.stringify(recorder.scenes, null, 2));
     writeFileSync(skippedFile(out), JSON.stringify(recorder.skipped, null, 2));
+    return recorder.skipped;
   } finally {
     await browser.close();
     for (const server of servers) await server.stop();

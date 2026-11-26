@@ -43,8 +43,11 @@ export type Report = {
 /** The verdict: the scenes that differ or have a new axe violation, and those the head no longer has. */
 export const failures = (report: Report) => new Set([...report.scenes.map((s) => s.scene), ...report.axe.map((s) => s.scene), ...report.removed]).size;
 
-/** Nothing was compared: the check couldn't run, which is neither a pass nor a difference. */
-export const empty = (report: Report) => report.compared === 0 && report.removed.length === 0;
+/**
+ * Nothing was recorded on either side to judge: the check couldn't run, which is neither a pass
+ * nor a difference. A scene the head alone has still counts: it isn't compared, but axe audits it.
+ */
+export const empty = (report: Report) => report.compared === 0 && report.removed.length === 0 && report.added.length === 0;
 
 const readScenes = (dir: string): string[] => (existsSync(manifestFile(dir)) ? JSON.parse(readFileSync(manifestFile(dir), "utf8")) : []);
 const readScene = (dir: string, scene: string): Recording => JSON.parse(readFileSync(sceneFile(dir, scene), "utf8"));
