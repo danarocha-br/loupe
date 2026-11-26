@@ -97,3 +97,5 @@ jobs:
       # After the clean check: it scans .next, which a dev server writes to.
       - name: next dev --webpack anchors call sites
         run: scripts/check-fixture-webpack-anchors.sh
+      - name: LOUPE=0 next dev runs with no loader and no Toolbar
+        run: scripts/check-fixture-loupe-off.sh

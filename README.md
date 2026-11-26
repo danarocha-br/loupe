@@ -446,9 +446,10 @@ date: it stays until you clear it or end the browser session.
 
 - Restart `next dev`: Turbopack caches the loader, especially right after an
   install or a `generate`.
-- In the browser console, check that `window.__loupe` exists. If it doesn't, the
-  loader isn't running: check that the dev server isn't started with
-  `LOUPE=0`, which turns Loupe off.
+- In the browser console, check that `window.__loupe` exists. If it doesn't,
+  Loupe is off: check that the dev server isn't started with `LOUPE=0`, which
+  turns all of it off (the loader, the Toolbar and `window.__loupe`), and that
+  `next.config.ts` still wraps its config with `withLoupe`, which turns it on.
 - Run `/loupe:doctor` and fix what it lists.
 
 ### Everything is inspect-only

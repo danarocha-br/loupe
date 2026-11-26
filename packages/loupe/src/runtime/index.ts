@@ -24,5 +24,7 @@ export type {
 } from "./store.js";
 
 // `window.__loupe` from the first Adapter on, so the console reaches the page
-// before the Toolbar loads.
-if (typeof window !== "undefined") debugOf();
+// before the Toolbar loads. Not under `LOUPE=0 next dev` (`withLoupe` sets
+// LOUPE_SWITCH "off"), where an Adapter imported directly, not through the
+// loader, renders its component as it is (`createAdapter`).
+if (typeof window !== "undefined" && process.env.LOUPE_SWITCH !== "off") debugOf();

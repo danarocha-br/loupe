@@ -104,9 +104,13 @@ describe("withLoupe", () => {
     expect(result.turbopack.rules).toHaveProperty("*.tsx");
   });
 
-  it("stays out of next dev when LOUPE=0", async () => {
+  it("stays out of next dev when LOUPE=0, and tells the mount the Toolbar is off", async () => {
     process.env.LOUPE = "0";
-    expect(await withLoupe(config, options)(PHASE_DEVELOPMENT_SERVER)).toBe(config);
+    const result = await withLoupe({ ...config, env: { HOST: "kept" } }, options)(PHASE_DEVELOPMENT_SERVER);
+    // No loader for either bundler: the config as given, plus the flag the mount folds on.
+    expect(result).toEqual({ ...config, env: { HOST: "kept", LOUPE_SWITCH: "off" } });
+    expect(result).not.toHaveProperty("webpack");
+    expect(result.turbopack.rules).not.toHaveProperty("*.tsx");
   });
 
   it("refuses to merge into an existing *.tsx rule under Turbopack", async () => {
@@ -160,9 +164,9 @@ describe("withLoupe", () => {
     expect(failure?.message).not.toMatch(/^withLoupe:/);
   });
 
-  it("hands the Toolbar's Server Action the paths it resolved", async () => {
+  it("tells the mount the Toolbar is on, and hands its Server Action the paths it resolved", async () => {
     const result = (await withLoupe(config, options)(PHASE_DEVELOPMENT_SERVER)) as { env?: Record<string, string> };
-    expect(result.env).toEqual({ LOUPE_ROOT: dir, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() });
+    expect(result.env).toEqual({ LOUPE_SWITCH: "on", LOUPE_ROOT: dir, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() });
   });
 
   it("fails at startup when the loader can't read another formatVersion, naming the command (PER-85)", async () => {
