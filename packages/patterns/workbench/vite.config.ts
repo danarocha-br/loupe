@@ -6,7 +6,7 @@
 // own module runner, not Node, reads `@loupe/ui`'s config, which is TypeScript in a linked
 // package that Node would load untransformed.
 
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { workbenchConfig } from "@loupe/ui/workbench/vite";
 import { defineConfig } from "vite";
@@ -18,7 +18,6 @@ export default defineConfig(
   workbenchConfig({
     root,
     compiler: reactCompiler(),
-    stylesheet: join(root, "stylesheet.ts"),
     // Beside @loupe/ui's 3200; off the fixture's 3100, the other worktrees' 3101 and the visual check's 3300, 3310 and 3320.
     port: 3201,
   }),

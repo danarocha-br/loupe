@@ -6,8 +6,9 @@
  */
 
 /* A 108px well in the hover wash, a dotted grid every 12px and a hairline ring, set 14px in. */
+/* A stacking context of its own: the blocks' z-index ranks stay inside the well. */
 [data-page-map] {
-  position: relative; height: 108px; margin: var(--space-card) var(--space-gutter) var(--space-inset); overflow: hidden; container-type: size;
+  position: relative; isolation: isolate; height: 108px; margin: var(--space-card) var(--space-gutter) var(--space-inset); overflow: hidden; container-type: size;
   border-radius: var(--radius-well); background-color: var(--hover); box-shadow: inset 0 0 0 1px var(--hairline);
   background-image: radial-gradient(circle at 6px 6px, var(--map-dot) 0.7px, transparent 1.2px); background-size: 12px 12px;
 }

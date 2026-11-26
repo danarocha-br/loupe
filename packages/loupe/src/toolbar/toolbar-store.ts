@@ -16,6 +16,7 @@
 
 import { createContext, useContext, useSyncExternalStore } from "react";
 import type { Scope } from "../runtime/store.js";
+import type { Place } from "./focus-return.js";
 import type { SelectMode } from "./picker.js";
 
 type ToolbarState = {
@@ -47,6 +48,13 @@ export type ToolbarStore = {
   point(group: { component: string; outlineIds: readonly string[] } | null): void;
   /** Light nothing, and leave the outline as it is: the list going clears its light. */
   clearLight(): void;
+  /**
+   * The list's control the selection was made from, where Back and Esc take focus (`panel.tsx`):
+   * kept here, not in the panel, so it lasts as long as the selection, through Hide and Show.
+   * Nothing draws it, so keeping it renders nothing.
+   */
+  opener(): Place | null;
+  keepOpener(place: Place | null): void;
 };
 
 const INITIAL: ToolbarState = { selected: null, mode: "one", widened: false, marksHidden: false, hovered: [], lit: null };
@@ -60,6 +68,7 @@ export function scopeOf(state: Pick<ToolbarState, "mode" | "widened">): Scope {
 
 export function createToolbarStore(): ToolbarStore {
   let state = INITIAL;
+  let opener: Place | null = null;
   const listeners = new Set<() => void>();
   const set = (patch: Partial<ToolbarState>) => {
     const next = { ...state, ...patch };
@@ -84,6 +93,10 @@ export function createToolbarStore(): ToolbarStore {
       set({ lit: group?.component ?? null, ...(sameIds(state.hovered, ids) ? {} : { hovered: ids }) });
     },
     clearLight: () => set({ lit: null }),
+    opener: () => opener,
+    keepOpener: (place) => {
+      opener = place;
+    },
   };
 }
 

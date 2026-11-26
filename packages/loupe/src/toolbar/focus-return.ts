@@ -3,28 +3,31 @@
 // and to a neighbour when the focused control goes from the view it is in. The list is
 // drawn again when it comes back, so a control is kept by what names it, not by its node.
 
-/** A control of the list, by what tells it from its siblings. */
-export type Place = { tag: string; keys: [string, string][]; text: string | null };
+/** A control of the list, by the attributes that name it: never its words, which are the app's and change with an edit. */
+export type Place = { tag: string; keys: [string, string][] };
 
-/** The attributes that name a control in the list: a change's number, an Instance, a call site. */
-const KEYS = ["data-change", "data-instance", "data-site-open"] as const;
+/** The attributes that name a control in the list: a change's number, an Instance (a dot, or a block of the page map), a call site. */
+const KEYS = ["data-change", "data-instance", "data-map-block", "data-site-open"] as const;
+
+/** The list's controls that make a selection: a click on one is where a selection was made from. */
+export const OPENERS = KEYS.map((key) => `[${key}]`).join(", ");
 
 /** What focus could land on: a control that takes it, not one turned off or folded away. */
 const FOCUSABLE = 'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])';
 
+/** Where `element`, one of the `OPENERS`, is: by its keys alone. */
 export function placeOf(element: Element): Place {
   const keys = KEYS.flatMap((key): [string, string][] => {
     const value = element.getAttribute(key);
     return value ? [[key, value]] : [];
   });
-  // With no key (a block of the page map), its words name it: "Inspect Button 2 of 7, Ana Souza".
-  return { tag: element.tagName.toLowerCase(), keys, text: keys.length === 0 ? element.textContent : null };
+  return { tag: element.tagName.toLowerCase(), keys };
 }
 
 /** The control at `place` in `root`, drawn again; null once it has gone. */
 export function findPlace(root: ParentNode, place: Place): HTMLElement | null {
   for (const node of root.querySelectorAll<HTMLElement>(place.tag)) {
-    if (place.keys.every(([key, value]) => node.getAttribute(key) === value) && (place.text === null || node.textContent === place.text)) return node;
+    if (place.keys.length > 0 && place.keys.every(([key, value]) => node.getAttribute(key) === value)) return node;
   }
   return null;
 }
@@ -68,12 +71,12 @@ function firstFocusable(element: Element | null): HTMLElement | null {
 }
 
 /**
- * The focused control went with the page (its Instance unmounted, its change undone):
- * focus goes to what is left of its row, else the row after it, else the row before,
- * so the keyboard stays where it was in the panel rather than falling to the page's
- * `<body>`. Says whether it moved focus.
+ * The focused control can no longer hold focus: it went with the page (its Instance
+ * unmounted), or it was turned off (a change none of whose Instances is mounted). Focus
+ * goes to what is left of its row, else the row after it, else the row before, so the
+ * keyboard stays where it was in the panel rather than falling to the page's `<body>`.
+ * Says whether it moved focus.
  */
 export function focusNeighbour(held: Held): boolean {
-  if (held.element.isConnected) return false;
   return [held.row, held.next, held.previous].some((row) => take(firstFocusable(row)));
 }

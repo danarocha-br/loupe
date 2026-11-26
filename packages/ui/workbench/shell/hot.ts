@@ -3,6 +3,3 @@
 
 /** The event the dev server sends with the whole stylesheet, once a `.css` it is made of changes. */
 export const STYLESHEET_EVENT = "loupe:workbench-stylesheet";
-
-/** The name every workbench's stylesheet module exports its stylesheet under (`workbench/stylesheet.ts`). */
-export const STYLESHEET_EXPORT = "WORKBENCH_STYLESHEET";

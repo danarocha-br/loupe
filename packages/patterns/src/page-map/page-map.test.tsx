@@ -98,6 +98,21 @@ describe("PageMap", () => {
     expect(z(/Button 1 of 3/)).toBeGreaterThan(z(/Card 1 of 1/));
   });
 
+  it("names each block's Instance in data-map-block, for a view to find it again whatever its words", () => {
+    const screen = renderInSurface(<Sheet />);
+    expect(screen.getByRole("button", { name: /Button 2 of 3/ }).getAttribute("data-map-block")).toBe("btn-2");
+  });
+
+  it("keeps focus on a block the page's layout moves to another place in reading order", () => {
+    const screen = renderInSurface(<Sheet />);
+    const block = () => screen.getByRole("button", { name: /Button 1 of 3/ });
+    act(() => block().focus());
+    // The first Button drops below the second: React moves its node, which would lose focus.
+    screen.rerender(<Sheet boxes={new Map([...MAP_BOXES, ["btn-1", { left: 0, top: 50, width: 40, height: 20 }]])} />);
+    expect(screen.getAllByRole("button")[0]?.textContent).toMatch(/Button 2 of 3/);
+    expect(screen.shadow.activeElement).toBe(block());
+  });
+
   it("is one Tab stop, on the first block in reading order", () => {
     // user-event's Tab doesn't walk into a shadow root: the stop is read from `tabIndex`.
     const screen = renderInSurface(<Sheet />);

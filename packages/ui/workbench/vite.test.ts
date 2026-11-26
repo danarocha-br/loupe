@@ -2,10 +2,11 @@
 // are the workbench's alone, never the build's, and the stylesheet it sends again is the one
 // the page draws.
 
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { PluginOption, UserConfig } from "vite";
 import build, { reactCompiler } from "../vite.config.js";
-import { STYLESHEET_EXPORT } from "./shell/hot.js";
 import * as stylesheet from "./stylesheet.js";
 import { workbenchConfig } from "./vite.js";
 
@@ -18,7 +19,7 @@ const names = (config: UserConfig) =>
 
 describe("the workbench's dev server", () => {
   const compiler = reactCompiler();
-  const config = workbenchConfig({ root: "/workbench", compiler, stylesheet: "/workbench/stylesheet.ts", port: 3200 });
+  const config = workbenchConfig({ root: "/workbench", compiler, port: 3200 });
 
   it("adds React Refresh and the stylesheet's swap to the build's React Compiler and JSX", () => {
     expect(names(config)).toEqual(expect.arrayContaining(["vite:react-refresh", "loupe:workbench-stylesheet"]));
@@ -31,7 +32,9 @@ describe("the workbench's dev server", () => {
     expect(names(build).filter((name) => name.startsWith("vite:react") || name.startsWith("loupe:workbench"))).toEqual([]);
   });
 
-  it("swaps in the stylesheet this workbench's surfaces adopt", () => {
-    expect((stylesheet as Record<string, unknown>)[STYLESHEET_EXPORT]).toBe(stylesheet.WORKBENCH_STYLESHEET);
+  it("swaps in the stylesheet this workbench's surfaces adopt, from the stylesheet.ts beside its page", () => {
+    // `swapStylesheet` reads `WORKBENCH_STYLESHEET` from `<root>/stylesheet.ts`: the module the page draws with.
+    expect(typeof stylesheet.WORKBENCH_STYLESHEET).toBe("string");
+    expect(existsSync(fileURLToPath(new URL("./stylesheet.ts", import.meta.url)))).toBe(true);
   });
 });

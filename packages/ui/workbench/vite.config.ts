@@ -3,7 +3,7 @@
 // React Refresh and the stylesheet swapped in place, so an edit keeps the page's state
 // (`vite.ts`). `pnpm --filter @loupe/ui dev`. Never built, never shipped.
 
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { reactCompiler } from "../vite.config.js";
@@ -15,7 +15,6 @@ export default defineConfig(
   workbenchConfig({
     root,
     compiler: reactCompiler(),
-    stylesheet: join(root, "stylesheet.ts"),
     // Off the fixture's 3100 and the other worktrees' 3101.
     port: 3200,
   }),

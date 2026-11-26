@@ -4,7 +4,7 @@
 // written, so the same one twice is read twice; emptied again a while later; and
 // nothing announced for what a view shows as it mounts.
 
-import { act, useState } from "react";
+import { act, useLayoutEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations, cleanup, renderInSurface } from "../surface/render.fixture.js";
 import { type Announce, CLEAR_AFTER_MS, useAnnounce, useAnnounceChange, WRITE_AFTER_MS } from "./announcer.js";
@@ -77,6 +77,18 @@ describe("Announcer", () => {
     wait(CLEAR_AFTER_MS);
     expect(screen.getByRole("status").textContent).toBe("");
     expect(screen.getByRole("alert").textContent).toBe("");
+  });
+
+  it("says what a child announces as it first mounts, before the regions after it are in the page", () => {
+    // A boundary's componentDidCatch, or a layout effect, runs before the regions' refs attach.
+    function Failing() {
+      const announce = useAnnounce();
+      useLayoutEffect(() => announce("Loupe couldn’t open.", { politeness: "assertive" }), [announce]);
+      return null;
+    }
+    const screen = renderInSurface(<Failing />);
+    wait(WRITE_AFTER_MS);
+    expect(screen.getByRole("alert").textContent).toBe("Loupe couldn’t open.");
   });
 
   it("reads the same message twice when it is announced twice", () => {

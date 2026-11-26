@@ -1089,13 +1089,71 @@ describe("keyboard focus (review 2026-11-20)", () => {
     expect(shadow().activeElement).toBe(change());
   });
 
-  it("takes Back to the list's heading when the selection was made on the page", async () => {
+  it("takes Back to the row a selection was clicked from, though focus wasn't in the panel as it was made", async () => {
     await mount();
+    // Clicked, as a pointer does in a browser that doesn't focus a pressed button (Safari).
     await select(BIA);
     expect(shadow().activeElement).toBeNull();
     focusIn(panelButton("All components"));
     await backToList();
+    expect(shadow().activeElement).toBe(componentTrigger("Button"));
+  });
+
+  it("takes Back to the heading after a pick on the page, though the start tile that armed it kept focus", async () => {
+    await mount();
+    const tile = startTile("Select one");
+    focusIn(tile);
+    await clickInPanel(tile);
+    expect(armed()).toBe(true);
+    // The picker keeps the page's press from moving focus: the tile still has it as the pick lands.
+    act(() => {
+      pageButton("caio").dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, composed: true }));
+      pageButton("caio").click();
+    });
+    await settle();
+    expect(panelText()).not.toContain("What do you want to change?");
+    focusIn(panelButton("All components"));
+    await backToList();
     expect(shadow().activeElement).toBe(viewHeading());
+  });
+
+  it("goes back to the change a selection was made from after Hide and Show, the selection kept", async () => {
+    await mount();
+    act(() => {
+      loupe.set(ANA, "variant", "default");
+    });
+    await settle();
+    const change = () => shadow().querySelector<HTMLButtonElement>("button[data-change]") as HTMLButtonElement;
+    focusIn(change());
+    await clickInPanel(change());
+    focusIn(panelButton("Hide panel"));
+    await clickInPanel(panelButton("Hide panel"));
+    await clickInPanel(shadow().querySelector("[data-launcher]") as HTMLElement);
+    expect(shadow().activeElement).toBe(viewHeading());
+    focusIn(panelButton("All components"));
+    await backToList();
+    expect(shadow().activeElement).toBe(change());
+  });
+
+  it("hands focus on from a change row turned off as its Instance unmounts", async () => {
+    await mount();
+    act(() => pageButton("Menu").click());
+    await settle();
+    // A change to the MenuItem alone, then one to Ana: the first goes off as the menu closes.
+    const item = loupe.list("MenuItem")[0]?.id as string;
+    act(() => {
+      loupe.set(item, "children", "Sair");
+      loupe.set(ANA, "variant", "default");
+    });
+    await settle();
+    const rows = () => [...shadow().querySelectorAll<HTMLButtonElement>("button[data-change]")];
+    const menuRow = rows().find((row) => row.textContent?.includes("Sair")) as HTMLButtonElement;
+    focusIn(menuRow);
+    act(() => pageButton("Menu").click());
+    await settle();
+    expect(menuRow.isConnected && menuRow.disabled).toBe(true);
+    expect(document.activeElement).toBe(document.querySelector(`[${HOST_ATTRIBUTE}]`));
+    expect(shadow().activeElement).toBe(rows().find((row) => row !== menuRow));
   });
 
   it("hands focus to the row beside one that goes with the page, rather than dropping it to the page", async () => {
