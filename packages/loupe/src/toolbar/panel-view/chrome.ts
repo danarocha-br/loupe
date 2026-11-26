@@ -11,6 +11,12 @@ export const LAUNCHER_WORDS: LauncherWords = {
   title: (shortcut) => `Show Loupe (${shortcut} focuses it) · drag it anywhere, or to a side to keep it there`,
 };
 
+/**
+ * Said, assertively, when the panel fails to load or to render (ADR 0008): the pill comes
+ * back, and nothing on screen says why. Loupe's own words: no pattern draws them.
+ */
+export const PANEL_FAILED = "Loupe couldn’t open. Show it again to try once more.";
+
 /** The sheet's name (patterns/view.ts `SheetWords`). */
 export const SHEET_WORDS: SheetWords = { label: "Loupe" };
 

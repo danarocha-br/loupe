@@ -59,6 +59,7 @@ import {
   StatusStrip,
 } from "@loupe/patterns";
 import { copyToClipboard } from "./clipboard.js";
+import { findPlace, focusNeighbour, focusPlace, type Held, heldFocus, type Place, placeOf } from "./focus-return.js";
 import { PageMapView } from "./page-map.js";
 import type { SelectMode } from "./picker.js";
 import { type ToolbarStore, useToolbar, useToolbarStore } from "./toolbar-store.js";
@@ -93,17 +94,56 @@ type PanelProps = {
 const PANEL_INSET = 8;
 
 /**
- * Whether focus was in the panel as this render began. Read while rendering, before React
- * swaps the view: once the row that had focus is gone, nothing after the commit can tell
- * that focus was in the panel (review 2026-11-20). A hook of its own because it reads a
- * ref in render: React Compiler skips this hook rather than `Panel`, whose memoised parts
- * keep a peek or Hide marks from re-rendering the list (ADR 0009, as `usePanelView`).
+ * The control focus had in the panel as this render began, or null. Read while rendering,
+ * before React swaps the view: once the row that had focus is gone, nothing after the
+ * commit can tell that focus was in the panel, nor where (review 2026-11-20). A hook of its
+ * own because it reads a ref in render: React Compiler skips this hook rather than `Panel`,
+ * whose memoised parts keep a peek or Hide marks from re-rendering the list (ADR 0009, as
+ * `usePanelView`).
  */
-function useFocusWasHere(middle: RefObject<HTMLDivElement | null>): RefObject<boolean> {
-  const was = useRef(false);
-  const root = middle.current?.getRootNode();
-  was.current = root instanceof ShadowRoot && root.activeElement !== null;
-  return was;
+function useFocusAsDrawn(middle: RefObject<HTMLDivElement | null>): RefObject<Held | null> {
+  const held = useRef<Held | null>(null);
+  held.current = heldFocus(middle.current?.getRootNode());
+  return held;
+}
+
+/** The view the panel drew last: what is open, and the kind of view it is. */
+type Drawn = { opened: string | null; kind: PanelView["body"]["kind"] };
+
+/**
+ * Where focus goes as the panel draws (DESIGN.md "Focus follows the work"), when it was in
+ * the panel: a new selection, or the same one changing kind, takes it to the new view's
+ * heading; back to the list, it goes to the control that made the selection, while that is
+ * drawn, and to the list's heading otherwise; and a focused control that goes from the view
+ * it is in hands it to a neighbour. A pick on the page leaves the app's focus where it is,
+ * and Back after one goes to the heading.
+ */
+function useFocusFollows(middle: RefObject<HTMLDivElement | null>, heading: RefObject<HTMLHeadingElement | null>, drawn: Drawn): void {
+  const held = useFocusAsDrawn(middle);
+  const last = useRef(drawn);
+  // The control a selection was made from, kept from the list until it comes back.
+  const opener = useRef<Place | null>(null);
+  useEffect(() => {
+    const was = last.current;
+    last.current = drawn;
+    const focus = held.current;
+    if (was.opened === drawn.opened && was.kind === drawn.kind) {
+      // The same view: the focused control went with the page, and focus with it, unless
+      // what took it away put focus somewhere already (a reset on the heading).
+      const root = middle.current?.getRootNode();
+      if (!focus || focus.element.isConnected || !(root instanceof ShadowRoot) || root.activeElement !== null) return;
+      if (!focusNeighbour(focus)) heading.current?.focus();
+      return;
+    }
+    // A new view opens at the top.
+    if (middle.current) middle.current.scrollTop = 0;
+    if (was.kind === "list") opener.current = focus ? placeOf(focus.element) : null;
+    const back = drawn.kind === "list" ? opener.current : null;
+    if (drawn.kind === "list") opener.current = null;
+    if (!focus) return;
+    const target = back && middle.current ? findPlace(middle.current, back) : null;
+    if (!target || !focusPlace(target)) heading.current?.focus();
+  });
 }
 
 export function Panel({ debug, view, version, column, picking, onTool, onHide, closing, theme, onTheme }: PanelProps) {
@@ -120,15 +160,9 @@ export function Panel({ debug, view, version, column, picking, onTool, onHide, c
   useAnnounceChange(view.announcements.status);
   const { body } = view;
   const opened = body.kind === "list" ? null : body.id;
-  const focusWasHere = useFocusWasHere(middle);
-  // A new selection, or back to the list, opens at the top. Focus follows it when it
-  // was in the panel: a pick on the page leaves the app's focus where it is. The same
-  // selection changing kind counts too: an Instance that unmounts swaps the Inspector
-  // for Gone (and back when it mounts again), and takes the focused control with it.
-  useEffect(() => {
-    if (middle.current) middle.current.scrollTop = 0;
-    if (focusWasHere.current) heading.current?.focus();
-  }, [opened, body.kind]);
+  // The same selection changing kind counts as a new view: an Instance that unmounts swaps
+  // the Inspector for Gone (and back when it mounts again), and takes the focused control with it.
+  useFocusFollows(middle, heading, { opened, kind: body.kind });
   // The strip's words, once: drawn with their keys in `kbd`, and said by the announcer as they change.
   const strip = stripParts({ picking, mode, covered, marksHidden });
   useAnnounceChange(stripText(strip));

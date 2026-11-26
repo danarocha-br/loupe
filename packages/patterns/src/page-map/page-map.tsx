@@ -78,10 +78,13 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
   const minTop = Math.max(0, Math.min(...all.map((b) => b.top)));
   const pageWidth = Math.max(...all.map((b) => b.left + b.width)) + minLeft;
   const pageHeight = Math.max(...all.map((b) => b.top + b.height)) + minTop;
-  const order = [...blocks].sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left).map((b) => b.id);
+  // Above the blocks larger than it, so a small block inside a large one stays on top to be pointed at.
+  const stack = new Map([...blocks].sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height).map((b, at) => [b.id, at + 1]));
+  // Drawn in the order a page reads, as the arrow keys and "1 of 7" go: a screen reader's
+  // virtual cursor reads the blocks in the DOM's order, and the stacking is `z-index`'s.
+  blocks.sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left);
+  const order = blocks.map((b) => b.id);
   const tabStop = current !== null && order.includes(current) ? current : order[0];
-  // The largest first, so a small block inside a large one stays on top to be pointed at.
-  blocks.sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
   return (
     <div data-page-map="" role="toolbar" aria-label={words.onPage.map} data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
       {/* The page's shape, fit into the well: blocks sit at their place in it. */}
@@ -97,7 +100,7 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
             data-map-block=""
             data-hue={b.group.hue}
             data-lit={lit === b.group.component ? "" : undefined}
-            style={{ left: `${(b.box.left / pageWidth) * 100}%`, top: `${(b.box.top / pageHeight) * 100}%`, width: `${(b.box.width / pageWidth) * 100}%`, height: `${(b.box.height / pageHeight) * 100}%` }}
+            style={{ left: `${(b.box.left / pageWidth) * 100}%`, top: `${(b.box.top / pageHeight) * 100}%`, width: `${(b.box.width / pageWidth) * 100}%`, height: `${(b.box.height / pageHeight) * 100}%`, zIndex: stack.get(b.id) }}
             title={b.group.mapTitle}
             tabIndex={b.id === tabStop ? 0 : -1}
             onMouseOver={() => onPoint(b.group)}
