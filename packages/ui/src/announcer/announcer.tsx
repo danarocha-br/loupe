@@ -47,15 +47,19 @@ export function Announcer({ children }: { children?: ReactNode }) {
   const pending = useRef<Record<Politeness, Pending>>({ polite: {}, assertive: {} });
 
   const announce = useCallback<Announce>((text, { politeness = "polite" } = {}) => {
-    const region = (politeness === "assertive" ? assertive : polite).current;
+    const ref = politeness === "assertive" ? assertive : polite;
     const said = text.replace(/\s+/g, " ").trim();
-    if (!region || said === "") return;
+    if (said === "") return;
     // A newer message replaces one not yet read: one region, one message at a time.
     const timers = pending.current[politeness];
     clearTimeout(timers.write);
     clearTimeout(timers.clear);
-    region.textContent = "";
+    if (ref.current) ref.current.textContent = "";
+    // The region is read when the message is written, not now: a child that fails as it
+    // first mounts says so before the regions, which come after it, are in the page.
     timers.write = setTimeout(() => {
+      const region = ref.current;
+      if (!region) return;
       region.textContent = said;
       timers.clear = setTimeout(() => {
         region.textContent = "";

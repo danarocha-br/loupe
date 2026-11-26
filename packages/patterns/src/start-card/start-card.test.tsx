@@ -76,7 +76,8 @@ describe("StartCard", () => {
 describe("StartCard's CSS", () => {
   it("sits in the patterns layer, written against attributes, its values the tokens'", () => {
     expectPatternCss(CSS);
-    // Focus on the heading draws no ring, but keeps an outline forced colours draw.
-    expect(CSS).toMatch(/\[data-start\] h2:focus \{ outline: 2px solid transparent; \}/);
+    // Focus that lands on the heading by keyboard draws the ground's ring, as the Inspector's
+    // heading does: Alt+Shift+L, Show and Back land here, and a heading with no ring looks as if nothing happened.
+    expect(CSS).not.toMatch(/h2:focus/);
   });
 });

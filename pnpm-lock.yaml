@@ -258,6 +258,9 @@ importers:
       '@types/react-dom':
         specifier: 19.2.3
         version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 6.2.1
+        version: 6.2.1(@rolldown/plugin-babel@0.3.1(@babel/core@7.29.13)(@babel/runtime@8.1.0)(rolldown@1.2.18)(vite@8.3.8(@types/node@22.20.5)(jiti@2.7.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.3.8(@types/node@22.20.5)(jiti@2.7.0))
       axe-core:
         specifier: 4.14.1
         version: 4.14.1
@@ -937,6 +940,22 @@ packages:
       react-dom: '>=19'
     peerDependenciesMeta:
       '@types/react':
+        optional: true
+
+  '@vitejs/plugin-react@6.2.1':
+    resolution: {integrity: sha512-9KyWCij3r0+qLG3Q62vBmv0VyevmYibAtxaCIVK9o0k6CXgaajZRIe8tpfchQcdZArJ5b/7OrIz4W3b2uxVRDA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      '@rolldown/plugin-babel': ^0.1.7 || ^0.2.0 || ^0.3.0
+      babel-plugin-react-compiler: ^1.0.0
+      oxc-transform-react: '>=0.152.0 <0.157.0'
+      vite: ^8.0.0
+    peerDependenciesMeta:
+      '@rolldown/plugin-babel':
+        optional: true
+      babel-plugin-react-compiler:
+        optional: true
+      oxc-transform-react:
         optional: true
 
   '@vitest/expect@4.1.12':
@@ -2220,6 +2239,14 @@ snapshots:
       react-dom: 19.2.4(react@19.2.4)
     optionalDependencies:
       '@types/react': 19.2.14
+
+  '@vitejs/plugin-react@6.2.1(@rolldown/plugin-babel@0.3.1(@babel/core@7.29.13)(@babel/runtime@8.1.0)(rolldown@1.2.18)(vite@8.3.8(@types/node@22.20.5)(jiti@2.7.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.3.8(@types/node@22.20.5)(jiti@2.7.0))':
+    dependencies:
+      '@rolldown/pluginutils': 1.1.0
+      vite: 8.3.8(@types/node@22.20.5)(jiti@2.7.0)
+    optionalDependencies:
+      '@rolldown/plugin-babel': 0.3.1(@babel/core@7.29.13)(@babel/runtime@8.1.0)(rolldown@1.2.18)(vite@8.3.8(@types/node@22.20.5)(jiti@2.7.0))
+      babel-plugin-react-compiler: 1.0.0
 
   '@vitest/expect@4.1.12':
     dependencies:

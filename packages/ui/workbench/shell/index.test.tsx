@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-// The workbench shell (index.tsx): what the address names. A fragment names one page by its
+// The workbench shell (index.tsx): the page's theme, and what the address names. A fragment names one page by its
 // folder; one that isn't valid percent-encoding names none, and every page shows, on load and
 // as the address changes, rather than the page throwing before it draws.
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Page, Workbench } from "./index.js";
+import { type Page, PAGE_THEME_ATTRIBUTE, Workbench } from "./index.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -66,5 +66,31 @@ describe("the workbench shell's address", () => {
     expect(shown()).toEqual(["One"]);
     go("#%E0%A4%A");
     expect(shown()).toEqual(["One", "Two"]);
+  });
+});
+
+describe("the workbench shell's page theme", () => {
+  const radio = (label: string) =>
+    [...container.querySelectorAll<HTMLInputElement>('input[name="page-theme"]')].find((input) => input.parentElement?.textContent === label) as HTMLInputElement;
+  const theme = () => document.documentElement.getAttribute(PAGE_THEME_ATTRIBUTE);
+  afterEach(() => localStorage.removeItem("loupe-test-workbench:page-theme"));
+
+  it("follows the system until the reader chooses, puts the choice on <html>, and keeps it for the next visit", () => {
+    draw();
+    expect(radio("System").checked).toBe(true);
+    expect(theme()).toBeNull();
+    act(() => radio("Dark").click());
+    expect(theme()).toBe("dark");
+    expect(localStorage.getItem("loupe-test-workbench:page-theme")).toBe('"dark"');
+
+    act(() => root.unmount());
+    // Gone with the workbench: nothing of it stays on the page.
+    expect(theme()).toBeNull();
+    container.remove();
+    draw();
+    expect(radio("Dark").checked).toBe(true);
+    expect(theme()).toBe("dark");
+    act(() => radio("System").click());
+    expect(theme()).toBeNull();
   });
 });

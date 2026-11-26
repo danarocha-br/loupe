@@ -98,7 +98,9 @@ describe("the package boundary", () => {
       .flatMap((file) => {
         const code = readFileSync(file, "utf8");
         const named = /@danarocha\/loupe\b/.test(code) ? [`${path.relative(pkg, file)} names Loupe`] : [];
-        const allowed = isTest(file) ? TEST_TOOLS : /^(vite|node:[\w/]+)$/;
+        // Its dev server's React Refresh (`vite.ts`) too: the workbench's alone, never the build's (build.test.ts).
+        const server = /^(vite|@vitejs\/plugin-react|node:[\w/]+)$/;
+        const allowed = isTest(file) ? { test: (specifier: string) => TEST_TOOLS.test(specifier) || server.test(specifier) } : server;
         return [
           ...named,
           ...specifiers(code)
@@ -120,6 +122,8 @@ describe("the package boundary", () => {
       // `@loupe/ui/workbench` (ADR 0012): for the packages' workbenches alone. Outside `src`, so
       // `entries()` never builds it and `dist` never holds it; Loupe's tsconfigs never map it.
       if (entry === "./workbench") expect(target).toBe("./workbench/shell/index.tsx");
+      // And its dev server's config, which `@loupe/patterns`' workbench takes too.
+      else if (entry === "./workbench/vite") expect(target).toBe("./workbench/vite.ts");
       else expect(target, entry).toMatch(/^\.\/src\//);
     }
   });

@@ -31,18 +31,19 @@ Nothing is drawn while no Instance has a box.
 
 | Attribute | Draws |
 | --- | --- |
-| `data-page-map` | The well: 108px tall, 12px from the head and 14px in, `hover` wash, a dotted grid every 12px in `map-dot`, a hairline ring, 12px corners. |
+| `data-page-map` | A stacking context of its own (`isolation: isolate`), so the blocks' ranks stay inside it. The well: 108px tall, 12px from the head and 14px in, `hover` wash, a dotted grid every 12px in `map-dot`, a hairline ring, 12px corners. |
 | `data-map-fit` | The page's own shape (`--ratio`), as large as the well allows 8px in, centred. |
-| `data-map-block`, `data-hue` | A block at its place: an 18% fill of its hue and a 1.5px edge at 75%, 4px corners, at least 5px. |
+| `data-map-block` (its Instance's id), `data-hue` | A block at its place: an 18% fill of its hue and a 1.5px edge at 75%, 4px corners, at least 5px. Drawn in reading order, each stacked (`z-index`) over every block larger than it, so a small block inside a large one stays on top to be pointed at. |
 | `data-page-map[data-lit]`, `data-map-block[data-lit]` | A component pointed at: every block fades to 22%, its own at full strength with a 30% fill and a 2px edge. Over 140ms. |
 | `data-map-name` | The block's name, visually hidden. |
 
 ## ARIA and keys
 
-- The well is a `toolbar` named "Page map". Its blocks are buttons, one Tab stop between them (a roving tabindex): the block last focused, the first in reading order until then.
+- The well is a `toolbar` named "Page map". Its blocks are buttons, in the DOM in reading order, as a virtual cursor reads them, and one Tab stop between them (a roving tabindex): the block last focused, the first in reading order until then.
 - Each block is named by its content, not an `aria-label`: Loupe's words ("Inspect Button 2 of 7, ") and then what the Instance shows on screen, with the app's `lang` and `dir="auto"`, or its call site where it shows nothing.
 - Right and Down go to the next block in the order a page reads (top, then left), Left and Up to the one before, Home and End to the ends. Nothing past an end; nothing with a modifier, which is the browser's.
 - Enter or Space inspects. Focus does what the pointer does: the component's row lights and the page outlines it.
+- A focused block keeps focus when the page's layout moves it to another place in reading order, and so in the DOM.
 
 ## Tests
 

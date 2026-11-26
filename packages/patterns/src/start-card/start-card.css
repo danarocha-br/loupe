@@ -9,8 +9,6 @@
 /* A plain card, its text 16px from its top, its parts set apart by their own margins. */
 [data-card][data-start] { gap: 0; padding-top: var(--space-hero); }
 [data-start] h2 { font: var(--font-hero); letter-spacing: var(--tracking-hero); color: var(--ink); text-wrap: balance; }
-/* Focus lands on the heading when the list opens: no ring, but an outline forced colours draw. */
-[data-start] h2:focus { outline: 2px solid transparent; }
 [data-start] > p { margin-top: var(--space-sheet); font: var(--font-paragraph); color: var(--muted); }
 
 /* The two select tools as tiles, side by side, 8px apart, 14px under the line. */

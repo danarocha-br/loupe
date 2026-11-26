@@ -23,7 +23,8 @@ import { DURATION } from "@loupe/ui/tokens";
 import { loadedPanel, loadPanel, preloadPanelWhenIdle, startToolbar } from "./start.js";
 import { SurfaceBoundary, useTheme, useToolbarSurface } from "./surface/index.js";
 import { createToolbarStore, ToolbarStoreContext } from "./toolbar-store.js";
-import { Announcer } from "@loupe/ui/announcer";
+import { Announcer, useAnnounce } from "@loupe/ui/announcer";
+import { PANEL_FAILED } from "./panel-view/chrome.js";
 
 export type { Theme } from "./surface/index.js";
 
@@ -193,9 +194,12 @@ function ToolbarBody({ host }: { host: HTMLElement }) {
   // Loaded already, it renders in the click; else through `lazy()`. Chosen as it opens, so it never remounts while open.
   const ToolbarOpen = useMemo(() => (hidden ? null : (loadedPanel()?.ToolbarOpen ?? lazyToolbarOpen())), [hidden]);
   // The panel failed to load or to render: the page gets its column back and the pill
-  // comes back, with focus if the panel had it. Open stays kept: a reload tries again.
+  // comes back, with focus if the panel had it, and the announcer says so, since nothing
+  // on screen does. Open stays kept: a reload tries again.
+  const announce = useAnnounce();
   const failed = (error: unknown) => {
     console.warn("[loupe] The panel couldn't open; click the Loupe pill to try again.", error);
+    announce(PANEL_FAILED, { politeness: "assertive" });
     // Not `||=`: React Compiler can't lower it, and would skip this component (ADR 0009).
     if (!focusSwap.current) focusSwap.current = focusIsHere();
     clearTimeout(tuckTimer.current);

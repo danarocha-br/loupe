@@ -28,7 +28,7 @@ The list's first card, with nothing selected (DESIGN.md "Start"): "What do you w
 
 ## ARIA and keys
 
-- The heading is the view's one `h2`, focusable from script (`tabIndex={-1}`); focused, it draws no ring but keeps a transparent outline forced colours draw.
+- The heading is the view's one `h2`, focusable from script (`tabIndex={-1}`). Focus that lands on it by keyboard draws the ground's `:focus-visible` ring, as the Inspector's heading does; a click that opens the list draws none.
 - The tiles are a radio group (ChipGroup) named "Start selecting", one Tab stop; the mode is the checked radio. Armed is a state of the page, said by the status strip, never on the radio.
 - The arrow keys move between the tiles, Space or Enter chooses (ChipGroup's manual activation), and pressing the checked tile chooses it again.
 - The preview is hidden: the name and hint say it.

@@ -17,6 +17,8 @@ import type { LoupeDebug } from "../runtime/debug.js";
 import { resetLoupe } from "../runtime/slot.js";
 import { OPEN_KEY } from "./launcher-place.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
+import { PANEL_FAILED } from "./panel-view/chrome.js";
+import { listen } from "@loupe/ui/listen";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -243,9 +245,10 @@ describe("a panel that can't load", () => {
     vi.restoreAllMocks();
   });
 
-  it("folds back to the pill on a click, gives the page its column back, and loads on the next click", async () => {
+  it("folds back to the pill on a click, says so, gives the page its column back, and loads on the next click", async () => {
     breakPanel();
     await mount();
+    const heard = listen(shadow());
     act(() => pill()?.focus());
     await click(pill() as HTMLButtonElement);
     await until(() => pill() !== null);
@@ -254,6 +257,8 @@ describe("a panel that can't load", () => {
     expect(shadow().activeElement).toBe(pill());
     expect(uncaught).toEqual([]);
     expect(console.warn).toHaveBeenCalled();
+    // Nothing on screen says why the panel didn't open: the announcer does, as a failure.
+    await until(() => heard.assertive.includes(PANEL_FAILED));
 
     vi.doUnmock("./open.js");
     await click(pill() as HTMLButtonElement);

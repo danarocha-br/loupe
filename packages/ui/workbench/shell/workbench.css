@@ -1,32 +1,25 @@
 /* The page around the surfaces: the nav, the frames' captions and each page's `.md`. Plain CSS,
    outside every shadow root, so none of it reaches a primitive or a pattern: what draws inside
    a frame is the package's stylesheet alone, its frame.css in the top layer. */
+/* Each colour light and dark at once (`light-dark()`): the page's `color-scheme` picks. The
+   system's, or the reader's Page theme, set on <html> as `data-wb-theme` (index.tsx). The
+   frames draw both themes whatever it is: their surfaces carry their own. */
 :root {
-  --page: #f4f4f2;
-  --panel: #ffffff;
-  --text: #1b2220;
-  --quiet: #5e5e5e;
-  --line: rgba(27, 34, 32, 0.12);
-  --code: rgba(27, 34, 32, 0.06);
-  --current: #1b2220;
-  --on-current: #ffffff;
+  --page: light-dark(#f4f4f2, #111413);
+  --panel: light-dark(#ffffff, #181c1b);
+  --text: light-dark(#1b2220, #ecedea);
+  --quiet: light-dark(#5e5e5e, #a4aaa7);
+  --line: light-dark(rgba(27, 34, 32, 0.12), rgba(255, 255, 255, 0.12));
+  --code: light-dark(rgba(27, 34, 32, 0.06), rgba(255, 255, 255, 0.08));
+  --current: light-dark(#1b2220, #ecedea);
+  --on-current: light-dark(#ffffff, #111413);
   color-scheme: light dark;
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--text);
   background: var(--page);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page: #111413;
-    --panel: #181c1b;
-    --text: #ecedea;
-    --quiet: #a4aaa7;
-    --line: rgba(255, 255, 255, 0.12);
-    --code: rgba(255, 255, 255, 0.08);
-    --current: #ecedea;
-    --on-current: #111413;
-  }
-}
+:root[data-wb-theme="light"] { color-scheme: light; }
+:root[data-wb-theme="dark"] { color-scheme: dark; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 a { color: inherit; }

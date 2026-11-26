@@ -7,7 +7,7 @@
 // decided, and reads neither the page nor the runtime: pointing and choosing go out
 // through its callbacks. See page-map.md.
 
-import { type CSSProperties, useRef, useState } from "react";
+import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from "react";
 import type { GroupItem, ListWords } from "../view.js";
 
 /** An Instance's box on the page, in the window's pixels. */
@@ -55,6 +55,22 @@ export function stepFrom(order: readonly string[], from: string, event: Pick<Key
 }
 
 /**
+ * The block focus is on as this render begins, by its Instance. Read while rendering, before
+ * React moves the blocks: a block whose place in the page's reading order changes is moved
+ * in the DOM, and a moved node loses focus. A hook of its own because it reads a ref in
+ * render, so React Compiler skips it rather than `PageMap`.
+ */
+function useFocusedBlock(nodes: RefObject<Map<string, HTMLButtonElement>>): RefObject<string | null> {
+  const focused = useRef<string | null>(null);
+  focused.current = null;
+  for (const [id, node] of nodes.current) {
+    const root = node.getRootNode() as Document | ShadowRoot;
+    if (root.activeElement === node) focused.current = id;
+  }
+  return focused;
+}
+
+/**
  * The blocks are one Tab stop (a roving tabindex, ADR 0006), not one each: the list below is
  * what Tab goes through, and the map is a shortcut into it. The arrow keys move between
  * blocks in the order a page reads, Home and End to the ends, and a block takes focus
@@ -65,6 +81,14 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
   // The block Tab lands on: the one last focused, or the first while that one is gone.
   const [current, setCurrent] = useState<string | null>(null);
   const nodes = useRef(new Map<string, HTMLButtonElement>());
+  const focused = useFocusedBlock(nodes);
+  // The focused block, moved to its new place in reading order, takes focus back, unless focus went elsewhere meanwhile.
+  useLayoutEffect(() => {
+    const node = focused.current === null ? undefined : nodes.current.get(focused.current);
+    if (!node) return;
+    const root = node.getRootNode() as Document | ShadowRoot;
+    if (root.activeElement !== node && (root.activeElement === null || root.activeElement === (root as Document).body)) node.focus({ preventScroll: true });
+  });
   const blocks = groups.flatMap((group) =>
     group.instances.flatMap((item) => {
       const box = boxes.get(item.id);
@@ -78,10 +102,14 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
   const minTop = Math.max(0, Math.min(...all.map((b) => b.top)));
   const pageWidth = Math.max(...all.map((b) => b.left + b.width)) + minLeft;
   const pageHeight = Math.max(...all.map((b) => b.top + b.height)) + minTop;
-  const order = [...blocks].sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left).map((b) => b.id);
+  // Above the blocks larger than it, so a small block inside a large one stays on top to be pointed at. The
+  // map is a stacking context of its own (page-map.css), so these ranks never reach what overlays it.
+  const stack = new Map([...blocks].sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height).map((b, at) => [b.id, at + 1]));
+  // Drawn in the order a page reads, as the arrow keys go: a screen reader's virtual cursor
+  // reads the blocks in the DOM's order, and the stacking is `z-index`'s.
+  blocks.sort((a, b) => a.box.top - b.box.top || a.box.left - b.box.left);
+  const order = blocks.map((b) => b.id);
   const tabStop = current !== null && order.includes(current) ? current : order[0];
-  // The largest first, so a small block inside a large one stays on top to be pointed at.
-  blocks.sort((a, b) => b.box.width * b.box.height - a.box.width * a.box.height);
   return (
     <div data-page-map="" role="toolbar" aria-label={words.onPage.map} data-lit={lit ? "" : undefined} onMouseLeave={() => onPoint(null)}>
       {/* The page's shape, fit into the well: blocks sit at their place in it. */}
@@ -94,10 +122,11 @@ export function PageMap({ groups, boxes, lit, words, nameLang, onPoint, onSelect
               if (node) nodes.current.set(b.id, node);
               else nodes.current.delete(b.id);
             }}
-            data-map-block=""
+            // The Instance it stands for: what a view finds it by again, its words being the app's, which change.
+            data-map-block={b.id}
             data-hue={b.group.hue}
             data-lit={lit === b.group.component ? "" : undefined}
-            style={{ left: `${(b.box.left / pageWidth) * 100}%`, top: `${(b.box.top / pageHeight) * 100}%`, width: `${(b.box.width / pageWidth) * 100}%`, height: `${(b.box.height / pageHeight) * 100}%` }}
+            style={{ left: `${(b.box.left / pageWidth) * 100}%`, top: `${(b.box.top / pageHeight) * 100}%`, width: `${(b.box.width / pageWidth) * 100}%`, height: `${(b.box.height / pageHeight) * 100}%`, zIndex: stack.get(b.id) }}
             title={b.group.mapTitle}
             tabIndex={b.id === tabStop ? 0 : -1}
             onMouseOver={() => onPoint(b.group)}

@@ -8,7 +8,7 @@ import { PRIMITIVES } from "./primitives.js";
 import { mountWorkbench } from "./shell/index.js";
 import { WORKBENCH_STYLESHEET } from "./stylesheet.js";
 
-mountWorkbench({
+const draw = mountWorkbench({
   title: "@loupe/ui",
   intro: "Every primitive in each of its states, light and dark, inside the real surface.",
   nav: "Primitives",
@@ -17,4 +17,9 @@ mountWorkbench({
   stylesheet: WORKBENCH_STYLESHEET,
   folder: "packages/ui/src/",
   storage: "loupe-ui-workbench",
+});
+
+// An edit of a primitive's states draws them again in place, the reader's settings and the page's state kept.
+import.meta.hot?.accept("./primitives.js", (next) => {
+  if (next) draw({ pages: next.PRIMITIVES as typeof PRIMITIVES });
 });
