@@ -112,7 +112,7 @@ async function main(): Promise<number> {
     const skipped = Object.keys(await record(BASE_TREE, baseDir, only, true));
     // A recording with skips isn't kept: a step that failed by chance would stay skipped until the base moved.
     if (!only && skipped.length === 0) writeFileSync(join(baseDir, "complete"), "");
-    else if (skipped.length) process.stdout.write(`  The base couldn't drive ${skipped.length} scene(s): this recording isn't kept, and the next run records the base again.\n`);
+    else if (!only && skipped.length) process.stdout.write(`  The base couldn't drive ${skipped.length} scene(s): this recording isn't kept, and the next run records the base again.\n`);
   }
 
   step("Head: building Loupe from the working tree");
