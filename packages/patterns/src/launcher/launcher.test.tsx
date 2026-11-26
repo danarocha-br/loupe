@@ -14,7 +14,7 @@ import CSS from "./launcher.css?inline";
 
 afterEach(cleanup);
 
-const PILL_WORDS = { label: WORDS.launcher.label, title: WORDS.launcher.title("⌘.") };
+const PILL_WORDS = { label: WORDS.launcher.label, title: WORDS.launcher.title("⌘."), keys: WORDS.launcher.keys };
 
 function draw(props: Partial<LauncherPillProps> = {}) {
   const onClick = vi.fn();
@@ -31,6 +31,14 @@ describe("LauncherPill", () => {
     expect(pill.getAttribute("aria-keyshortcuts")).toBe("Meta+Period");
     await user.click(pill);
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("is described by what its arrow keys do, which nothing on screen says", () => {
+    const { screen, pill } = draw();
+    expect(screen.getByRole("button", { name: "Show Loupe", description: WORDS.launcher.keys })).toBe(pill);
+    // Read by reference only: hidden, it draws nothing and isn't read again on its own.
+    const description = (pill.getRootNode() as ShadowRoot).getElementById(pill.getAttribute("aria-describedby") ?? "");
+    expect(description?.hidden).toBe(true);
   });
 
   it("is placed by translate, off layout, where the view puts it", () => {

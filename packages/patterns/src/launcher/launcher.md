@@ -10,7 +10,7 @@ The collapsed Toolbar (DESIGN.md "Collapsed"): a flat dark pill with Loupe's L, 
   leaving={leaving}
   at={{ x: centre.x - PILL.width / 2, y: centre.y - PILL.height / 2 }}
   gaps={gaps}
-  words={{ label: launcherWords.label, title: launcherWords.title(shortcutLabel()) }}
+  words={{ label: launcherWords.label, title: launcherWords.title(shortcutLabel()), keys: launcherWords.keys }}
   aria-keyshortcuts={SHORTCUT_ARIA}
   onPointerDown={down}
   onPointerMove={move}
@@ -28,7 +28,7 @@ The view (`launcher.tsx`) owns everything that moves it: the pointer and its cap
 - `dragging`, `settling`, `leaving`: held; travelling to its place after a drop, a dock or a key; tucking into its side as the panel opens.
 - `at`: its body's top left in the window, in px, set as `translate`, so its travel stays off layout.
 - `gaps`: how far each side's body stands off the window's edge: the pill's real gap to that side while it glues, 24px more once parked, past where they can join.
-- `words`: `panelView()`'s `LauncherWords`, with the shortcut filled into the tooltip.
+- `words`: `panelView()`'s `LauncherWords`: its name, the tooltip with the shortcut filled in, and `keys`, what its arrow keys do.
 - Any other button attribute or handler (`aria-keyshortcuts`, `tabIndex`, the pointer and key handlers, `onClick`) goes to the button.
 - `PILL` is the body's size (44 × 32), which the place maths lays out; `PILL_SIDES` the sides in the Goo's order.
 
@@ -50,5 +50,6 @@ Reduced motion keeps only a fade (`--duration-fade`): no travel, no tuck, no nec
 ## ARIA and keys
 
 - A `button` named "Show Loupe", its tooltip naming the shortcut that focuses it; `aria-keyshortcuts` says it too.
+- Described (`aria-describedby`) by a hidden line of its own, `keys`: what the arrow keys do, which nothing on screen says. Being a description, it replaces the tooltip as one: the tooltip's drag is for a pointer, and its shortcut is in `aria-keyshortcuts`. The view says where a key docked it (`LauncherWords.docked`), through the announcer.
 - The Goo and the L are decoration, hidden from assistive technology.
 - Enter and Space open the panel; the arrow keys dock it on the side they point at (the view's). While it tucks away it takes no focus (`tabIndex` −1) and no pointer.

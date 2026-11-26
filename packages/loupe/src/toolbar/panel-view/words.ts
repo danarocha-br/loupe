@@ -136,7 +136,7 @@ export const INSPECTOR_WORDS: InspectorWords = {
   serverRendered: "Server-rendered",
   leftOutUnmounted: "Left out, not mounted",
   legend: { shown: "Shows now", app: "App’s value", default: "Default" },
-  hold: { off: (prop) => `Hold ${prop}`, on: (prop) => `Holding ${prop} · Release` },
+  hold: (prop) => `Hold ${prop}`,
   resetInstance: "Reset this Instance",
 };
 
@@ -156,7 +156,7 @@ export const LIST_WORDS: ListWords = {
     },
   },
   onPage: { title: "On this page", rows: "Components on this page", map: "Page map" },
-  held: { title: "Held for review", discard: "Discard" },
+  held: { title: "Held for review", discard: "Discard", discardName: (label) => `Discard ${label}` },
   interaction: { title: "Appears on interaction", meta: "Not on screen yet", seen: TEXT.seenNotMounted },
   changes: { title: "Changes", meta: "numbered as in the Proposal" },
   change: INSPECTOR_WORDS.change,
@@ -168,6 +168,7 @@ export const COMMAND_WORDS: CommandWords = {
   copy: "Copy",
   copied: "Copied",
   failed: "Copy failed",
+  copiedText: (command) => `Copied${QUOTE.open}${command}${QUOTE.close}`,
   refused: "Couldn’t reach the clipboard. Select the command and copy it.",
 };
 
@@ -254,6 +255,9 @@ export const scopeTitle = (label: string | null) => (label ? label.replace(/ · 
 /** A scope option's label without what it can't change, which its tooltip keeps: "All on page · 7". */
 export const scopeMoveLabel = (label: string) => label.replace(/ \(.*\)$/, "");
 
+/** What a screen reader hears as the selection's scope moves: "Scope: All on page. Reaches 7 of 7.", "Scope: This instance." */
+export const scopeSaid = (name: string, reach: string | null) => (reach ? `Scope: ${name}. ${reach}.` : `Scope: ${name}.`);
+
 export const instancesText = (count: number) => plural(count, "Instance");
 export const reachCount = (included: number, total: number) => `${included} of ${total}`;
 
@@ -318,6 +322,18 @@ export function targetLabel(target: ScopeTarget): string {
       return `All from ${short(target.anchor)}`;
     case "page":
       return `${target.component} on ${target.route}`;
+  }
+}
+
+/** What a record names in full, its file's path included: two records' short names can be the same. */
+export function targetFullLabel(target: ScopeTarget): string {
+  switch (target.scope) {
+    case "instance":
+      return target.id;
+    case "group":
+      return `All from ${target.anchor}`;
+    case "page":
+      return targetLabel(target);
   }
 }
 
@@ -465,6 +481,15 @@ export const THIS_CALL_SITE = "this call site";
 
 export const RESET_TO: Record<Scope, string> = { instance: "Reset", group: "Reset to group value", page: "Reset to page value" };
 export const RESET = "Reset";
+/**
+ * A row's Reset as a screen reader hears it, the prop it resets after what the button
+ * shows, so the rows' Resets tell apart: "Reset variant", "Reset to group value for variant".
+ */
+export const RESET_NAME: Record<Scope, (prop: string) => string> = {
+  instance: (prop) => `Reset ${prop}`,
+  group: (prop) => `Reset to group value for ${prop}`,
+  page: (prop) => `Reset to page value for ${prop}`,
+};
 
 /** One line under a label-text row the call site writes in a way no field can change (PER-113). */
 export const EXPLAIN: Partial<Record<string, string>> = {

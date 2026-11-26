@@ -9,6 +9,8 @@ import type { LauncherWords, OutlineWords, SheetWords } from "@loupe/patterns";
 export const LAUNCHER_WORDS: LauncherWords = {
   label: "Show Loupe",
   title: (shortcut) => `Show Loupe (${shortcut} focuses it) · drag it anywhere, or to a side to keep it there`,
+  keys: "The arrow keys move it to the side of the window they point at.",
+  docked: { top: "Docked at the top", right: "Docked on the right", bottom: "Docked at the bottom", left: "Docked on the left" },
 };
 
 /**

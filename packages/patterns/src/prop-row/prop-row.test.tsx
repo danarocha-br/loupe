@@ -31,7 +31,9 @@ describe("PropRow", () => {
     expect([row.getAttribute("data-row"), row.hasAttribute("data-overridden")]).toEqual(["inset", true]);
     expect(row.querySelector("[data-row-glyph]")?.getAttribute("aria-hidden")).toBe("true");
     expect(screen.getByRole("img", { name: "Change 2" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Reset" })).toBeTruthy();
+    // It shows "Reset", and is named by the prop it resets, so the rows' Resets tell apart.
+    const reset = screen.getByRole("button", { name: "Reset variant" });
+    expect(reset.textContent).toBe("Reset");
     expect(screen.getByTestId("change").textContent).toBe('"ghost" → "outline"');
   });
 
@@ -60,7 +62,7 @@ describe("PropRow", () => {
   it("resets through its callback, and hands focus to the row's own control", async () => {
     const user = setup();
     const { screen, onReset } = draw(VARIANT);
-    await user.click(screen.getByRole("button", { name: "Reset" }));
+    await user.click(screen.getByRole("button", { name: "Reset variant" }));
     expect(onReset).toHaveBeenCalledWith(VARIANT.reset?.write);
     expect(screen.shadow.activeElement).toBe(screen.getByRole("radio", { checked: true }));
   });
@@ -108,7 +110,7 @@ describe("PropRow", () => {
     const held = screen.getByTestId("held");
     expect(held.textContent).toContain("Your Override holds this at true; the app tried to set false.");
     expect(held.querySelectorAll("code")).toHaveLength(2);
-    await user.click(screen.getByRole("button", { name: "Reset" }));
+    await user.click(screen.getByRole("button", { name: "Reset open" }));
     expect(onReset).toHaveBeenCalledWith(OPEN.reset?.write);
     expect(screen.getByTestId("current").textContent).toBe("App value: false");
   });

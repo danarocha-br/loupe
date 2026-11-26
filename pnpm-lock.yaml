@@ -90,6 +90,9 @@ importers:
       '@types/node':
         specifier: ^22.19.0
         version: 22.20.5
+      axe-core:
+        specifier: 4.14.1
+        version: 4.14.1
       playwright:
         specifier: 1.65.0
         version: 1.65.0

@@ -31,6 +31,7 @@ import {
   suspendedMeta,
   suspensionReason,
   TAGS,
+  targetFullLabel,
   targetLabel,
   timesText,
   unmountedTag,
@@ -106,6 +107,7 @@ export function listBody(page: Page, reads: Reads, keys: Keys): ListBody {
           {
             target: record.target,
             label: targetLabel(record.target),
+            full: targetFullLabel(record.target),
             why: suspensionReason(record.suspended),
             values: heldValues(record.values, record.target.scope === "instance" ? reads.lastSeen(record.target.id) : null),
           },

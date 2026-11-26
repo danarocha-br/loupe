@@ -153,6 +153,12 @@ export type InspectorBody = {
   /** Null while nothing here can be edited: on the server, with no Adapter, or with Overrides off. */
   editing: { resetInstanceEnabled: boolean; scopes: ScopeOption[] | null; noGroup: NoGroupView | null } | null;
   members: MembersView | null;
+  /**
+   * What a screen reader hears of the scope: its name, and as it moves, `text`, the name
+   * and how far it reaches ("Scope: All on page. Reaches 7 of 7."); `reach` alone when a
+   * box changes that ("Reaches 6 of 7"), null at This instance.
+   */
+  said: { scope: string; text: string; reach: string | null };
   /** Why nothing here can change, said once; `no-editable` is the Toolbar's own, for an adapted Instance with no Editable prop. */
   note: (InstanceNoteView & { kind: NoteKind | "no-editable" }) | null;
   coverage: {

@@ -16,7 +16,7 @@ import { resetLoupe } from "../runtime/slot.js";
 import { LINGER, tagPlace } from "./highlight.js";
 import Toolbar from "./index.js";
 import { OPEN_KEY } from "./launcher-place.js";
-import { ANA, BIA, Button, CONFIRM, DIALOG, members, MENU, Page, site } from "./members.fixture.js";
+import { ANA, BIA, Button, CONFIRM, DIALOG, GROUP, members, MENU, Page, site } from "./members.fixture.js";
 import { loadPanel } from "./start.js";
 import { HOST_ATTRIBUTE } from "./styles.js";
 import { type Heard, listen } from "@loupe/ui/listen";
@@ -78,6 +78,15 @@ async function saidTimes(text: string, politeness: "polite" | "assertive" = "pol
   const times = () => heard[politeness].filter((said) => said === text).length;
   for (let i = 0; i < 40 && times() === 0; i++) await settle();
   // A second saying would land within the announcer's delay: give it the time.
+  await settle();
+  await settle();
+  return times();
+}
+
+/** As `saidTimes`, counting the messages `text` is part of: what came in one commit is said as one (the announcer joins it). */
+async function saidWithin(text: string, politeness: "polite" | "assertive" = "polite"): Promise<number> {
+  const times = () => heard[politeness].filter((said) => said.includes(text)).length;
+  for (let i = 0; i < 40 && times() === 0; i++) await settle();
   await settle();
   await settle();
   return times();
@@ -521,10 +530,12 @@ describe("controls at This instance", () => {
     act(() => pageButton("Fechar").click());
     await settle();
     const notice = row("open").querySelector("[data-testid=held]") as HTMLElement;
-    expect(notice.textContent).toBe("Your Override holds this at true; the app tried to set false. Reset");
-    // The notice is for the eye; the announcer says it as the app pushes back, once.
-    expect(await saidTimes("Your Override holds this at true; the app tried to set false.")).toBe(1);
-    await clickInPanel([...notice.querySelectorAll("button")].find((button) => button.textContent === "Reset") as HTMLButtonElement);
+    // Its Reset is named by the prop it resets: "Reset open".
+    expect(notice.textContent).toBe("Your Override holds this at true; the app tried to set false. Reset open");
+    // The notice is for the eye; the announcer says it as the app pushes back, once (with the
+    // footer's count when that changes in the same moment: one message).
+    expect(await saidWithin("Your Override holds this at true; the app tried to set false.")).toBe(1);
+    await clickInPanel(within(notice).getByRole("button", { name: "Reset open" }));
     expect(container.querySelector("[role=dialog]")).toBeNull();
     expect(row("open").querySelector("[data-testid=held]")).toBeNull();
   });
@@ -558,6 +569,64 @@ describe("group and page scopes", () => {
     await select(ANA);
     expect(selectTool("Select multiple").getAttribute("aria-checked")).toBe("true");
     expect(member(BIA).checked).toBe(true);
+  });
+
+  it("says the selection's scope as it moves, with how far it reaches, and the reach as a box changes it", async () => {
+    await mount();
+    await select(BIA);
+    // A new selection says nothing of its scope: focus goes to its heading.
+    await settle();
+    expect(heard.polite.filter((said) => said.includes("Scope:"))).toEqual([]);
+
+    // Select multiple with an Instance in hand moves its scope to its call site: the radio reads only its own state.
+    await clickInPanel(selectTool("Select multiple"));
+    // Said with the strip, which the tool's arming changed in the same commit: one message.
+    expect(await saidWithin(`Scope: ${GROUP}. Reaches 4 of 4.`)).toBe(1);
+    // A box left out reads "not checked" itself; what it does to the scope is said.
+    await clickInPanel(member(BIA));
+    expect(await saidTimes("Reaches 3 of 4")).toBe(1);
+    await clickInPanel(member(BIA));
+    expect(await saidTimes("Reaches 4 of 4")).toBe(1);
+
+    // The next selection opens at its call site too: its heading names the Instance alone, so the scope is said.
+    await backToList();
+    await select(ANA);
+    expect(await saidWithin(`Scope: ${GROUP}. Reaches 4 of 4.`)).toBe(2);
+
+    await clickInPanel(selectTool("Select one"));
+    expect(await saidWithin("Scope: This instance.")).toBe(1);
+    // A new selection at This instance says nothing of its scope.
+    await backToList();
+    await select(BIA);
+    expect(await saidWithin("Scope: This instance.")).toBe(1);
+  });
+
+  it("holds a State prop open at a wider scope with a toggle of one name, its state in aria-pressed", async () => {
+    await mount();
+    await select(DIALOG);
+    await clickInPanel(selectTool("Select multiple"));
+    await escape();
+    const hold = screen().getByRole("button", { name: "Hold open", pressed: false });
+    await clickInPanel(hold);
+    expect(loupe.props(DIALOG).overrides).toEqual({ open: true });
+    // The same button, the same name: only its pressed state says it holds.
+    expect(screen().getByRole("button", { name: "Hold open", pressed: true })).toBe(hold);
+    expect(hold.textContent).toBe("Hold open");
+    await clickInPanel(hold);
+    expect(loupe.props(DIALOG).overrides).toEqual({});
+    expect(screen().getByRole("button", { name: "Hold open", pressed: false })).toBe(hold);
+  });
+
+  it("names each Reset by the prop it resets, and each Discard by the record it drops", async () => {
+    await mount();
+    await select(ANA);
+    await clickInPanel(pill("variant", '"default"'));
+    await type(textField(), "Ana");
+    // Each shows "Reset"; each is named apart.
+    expect(screen().getByRole("button", { name: "Reset variant" }).textContent).toBe("Reset");
+    expect(screen().getByRole("button", { name: "Reset Text" }).textContent).toBe("Reset");
+    await clickInPanel(screen().getByRole("button", { name: "Reset variant" }));
+    expect(loupe.props(ANA).overrides).toEqual({ children: "Ana" });
   });
 
   it("leaves one Instance out with its box, rings it dashed, and resetting the group keeps an Instance Override", async () => {
@@ -848,6 +917,8 @@ describe("leaving a selection, and hiding the marks", () => {
     expect(changeOutlines()).toBe(0);
     expect(selectedId()).toBe(BIA);
     expect(status()).toBe("Outlines are hidden on the page");
+    // The toggle reads its own "pressed": the strip it brings isn't said a second time.
+    expect(await saidWithin("Outlines are hidden on the page")).toBe(0);
 
     // What follows the pointer still shows: a hovered row of the Instances list, and a pick's preview.
     await hover(member(ANA).closest("li") as HTMLElement);
@@ -860,6 +931,8 @@ describe("leaving a selection, and hiding the marks", () => {
     await settle();
     expect(ringKinds()).toEqual(["pick"]);
     await escape();
+    // Back from a pick, which Hide marks didn't end, the strip's words are news: said once.
+    expect(await saidWithin("Outlines are hidden on the page")).toBe(1);
 
     // Select one re-scoped the selection to BIA alone.
     await clickInPanel(hideMarks());
@@ -1038,7 +1111,10 @@ describe("held for review", () => {
     const review = screen().getByRole("heading", { level: 3, name: "Held for review" }).closest("[data-card]") as HTMLElement;
     expect(review.textContent).toContain("Code changed here");
     const held = loupe.records();
-    await clickInPanel(within(review).getByRole("button", { name: "Discard" }));
+    // Named by the record it drops in full, its call site's path included, after the word it shows.
+    const discard = within(review).getByRole("button", { name: `Discard ${CONFIRM}` });
+    expect(discard.textContent).toBe("Discard");
+    await clickInPanel(discard);
     expect(loupe.records()).toEqual([]);
     expect(screen().queryByRole("heading", { level: 3, name: "Held for review" })).toBeNull();
 

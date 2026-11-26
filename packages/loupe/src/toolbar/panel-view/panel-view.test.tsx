@@ -249,6 +249,8 @@ describe("the list", () => {
       {
         target: { scope: "instance", id: CONFIRM },
         label: "Members › Button[3]",
+        // In full, for its Discard's name: the call site's path included.
+        full: CONFIRM,
         why: "Code changed here: this call site had 3 uses, now 4.",
         values: ['variant "default"'],
       },

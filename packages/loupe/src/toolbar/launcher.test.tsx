@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
+import { userEvent } from "@testing-library/user-event";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Launcher } from "./launcher.js";
 import { PLACE_KEY } from "./launcher-place.js";
+import { LAUNCHER_WORDS } from "./panel-view/chrome.js";
+import { axeViolations, cleanup, renderInSurface } from "./surface/render.fixture.js";
+import { listen } from "@loupe/ui/listen";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -166,5 +170,25 @@ describe("the collapsed Toolbar (2026-11-22)", () => {
     expect(pill().hasAttribute("data-leaving")).toBe(true);
     act(() => pill().click());
     expect(opened).not.toHaveBeenCalled();
+  });
+});
+
+describe("the collapsed Toolbar by keyboard, in its surface", () => {
+  afterEach(cleanup);
+
+  it("is described by what its arrow keys do, says where a key docked it, and passes axe", async () => {
+    const user = userEvent.setup({ document });
+    // In a surface, which the beforeEach's bare root isn't: its announcer is there to listen to.
+    const screen = renderInSurface(<Launcher onOpen={() => {}} />);
+    const heard = listen(screen.shadow);
+    const pill = screen.getByRole("button", { name: "Show Loupe", description: LAUNCHER_WORDS.keys });
+    act(() => pill.focus());
+    await user.keyboard("{ArrowLeft}");
+    await act(async () => await new Promise((resolve) => setTimeout(resolve, 200)));
+    await user.keyboard("{ArrowUp}");
+    await act(async () => await new Promise((resolve) => setTimeout(resolve, 200)));
+    expect(pill.dataset.edge).toBe("top");
+    expect(heard.polite).toEqual(["Docked on the left", "Docked at the top"]);
+    expect(await axeViolations(screen.host)).toEqual([]);
   });
 });

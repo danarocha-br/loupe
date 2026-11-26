@@ -95,6 +95,8 @@ export function PropRow({ item, words, look = "inset", onSet, onText, oneLine, o
       size="small"
       iconOnly={toggle !== null}
       title={toggle ? reset.label : undefined}
+      // Named by the prop it resets, after what it shows: every row's Reset would read the same.
+      aria-label={toggle ? undefined : reset.name}
       data-prop-reset=""
       onClick={(event) => {
         // Reset goes once there is nothing to reset: focus moves to the row's own control, not out of the panel.
@@ -106,7 +108,7 @@ export function PropRow({ item, words, look = "inset", onSet, onText, oneLine, o
       }}
     >
       <ResetIcon />
-      {toggle ? <span className="sr-only">{reset.label}</span> : reset.label}
+      {toggle ? <span className="sr-only">{reset.name}</span> : reset.label}
     </Button>
   );
   // At a scope a switch speaks for its members while they agree; the counts show only once they differ.

@@ -6,13 +6,14 @@
 //    the base's commit and a hash of this recorder, and reused until either changes.
 // 2. The working tree, uncommitted changes and all, is built and recorded.
 // 3. The two are diffed (`compare.ts`); `.visual/report.md` lists every difference, and the
-//    command fails if there is one.
+//    command fails if there is one, or if axe finds a violation in a Toolbar scene that the
+//    base's audit doesn't have.
 //
 // Both are recorded on this machine, with the same browser and the same system fonts, so a
 // difference is the code's. Nothing is committed: a baseline made on one OS would fail on
 // another, since the tokens draw in the system's sans.
 //
-// Options: `--base <ref>`, `--only <scene prefix>` (`ui/`, `ui/chip-group`, `patterns/`,
+// Options: `--base <ref>`, `--only <scene prefix>[,<prefix>…]` (`ui/`, `ui/chip-group`, `patterns/`,
 // `patterns/sheet`, `toolbar/dark`, `overlay/`), `--update` to record the base again (`pnpm visual:update`).
 
 import { spawnSync } from "node:child_process";
@@ -52,7 +53,7 @@ const step = (text: string) => process.stdout.write(`\n▸ ${text}\n`);
 /** What makes a recording: the recorder's source and Playwright's version. A change to either records the base again; the diff and this file don't. */
 function recorderHash(): string {
   const hash = createHash("sha256");
-  for (const file of ["files.ts", "record.ts", "servers.ts", "snapshot.ts"]) hash.update(file).update(readFileSync(join(HERE, file)));
+  for (const file of ["audit.ts", "files.ts", "record.ts", "servers.ts", "snapshot.ts"]) hash.update(file).update(readFileSync(join(HERE, file)));
   hash.update(readFileSync(join(HERE, "../package.json")));
   return hash.digest("hex").slice(0, 8);
 }
@@ -126,8 +127,11 @@ async function main(): Promise<number> {
     prepareBase(sha);
     step(`Recording the base into ${baseDir.slice(REPO.length + 1)}`);
     rmSync(baseDir, { recursive: true, force: true });
-    await record(BASE_TREE, baseDir, only);
-    if (!only) writeFileSync(join(baseDir, "complete"), "");
+    // Leniently: a scene the base can't drive (one it predates) is new to the diff, not a failure.
+    const skipped = Object.keys(await record(BASE_TREE, baseDir, only, true));
+    // A recording with skips isn't kept: a step that failed by chance would stay skipped until the base moved.
+    if (!only && skipped.length === 0) writeFileSync(join(baseDir, "complete"), "");
+    else if (!only && skipped.length) process.stdout.write(`  The base couldn't drive ${skipped.length} scene(s): this recording isn't kept, and the next run records the base again.\n`);
   }
 
   step("Head: building Loupe from the working tree");
@@ -152,16 +156,23 @@ async function main(): Promise<number> {
   }
   const failed = failures(report);
   if (!failed) {
-    process.stdout.write(`\n✓ No difference: ${report.compared} scenes, ${report.elements} elements and ${report.images} screenshots, identical to ${short}.\n`);
-    if (report.added.length) process.stdout.write(`  New scenes, not compared: ${report.added.join(", ")}\n`);
+    if (report.added.length) process.stdout.write(`\n  New scenes, not compared: ${report.added.join(", ")}\n`);
+    for (const [scene, reason] of Object.entries(report.skipped)) process.stdout.write(`  ${scene}: the base couldn't drive it (${reason})\n`);
+    process.stdout.write(`\n✓ No difference: ${report.compared} scenes, ${report.elements} elements and ${report.images} screenshots, identical to ${short}; axe found nothing new in ${report.audited}.\n`);
     return 0;
   }
-  process.stdout.write(`\n✗ ${failed} scene(s) differ from ${short}. Every difference: .visual/report.md; the pixels, red: .visual/diff/\n\n`);
+  const axe = report.axe.length ? `, ${report.axe.length} with an axe violation it doesn't have` : "";
+  const gone = report.removed.length ? `, ${report.removed.length} only in it` : "";
+  process.stdout.write(`\n✗ ${failed} scene(s) fail against ${short}: ${report.scenes.length} differ${axe}${gone}. Every difference: .visual/report.md; the pixels, red: .visual/diff/\n\n`);
   for (const s of report.scenes) {
     process.stdout.write(`  ${s.scene}\n`);
     for (const line of [...s.pixels, ...s.differences].slice(0, 8)) process.stdout.write(`    ${line}\n`);
     const more = s.pixels.length + s.differences.length - 8;
     if (more > 0) process.stdout.write(`    … and ${more} more\n`);
+  }
+  for (const s of report.axe) {
+    process.stdout.write(`  ${s.scene}: new axe violation(s)\n`);
+    for (const line of s.violations.slice(0, 8)) process.stdout.write(`    ${line}\n`);
   }
   for (const s of report.removed) process.stdout.write(`  ${s}: only in the base\n`);
   return 1;
