@@ -108,7 +108,7 @@ describe("withLoupe", () => {
     process.env.LOUPE = "0";
     const result = await withLoupe({ ...config, env: { HOST: "kept" } }, options)(PHASE_DEVELOPMENT_SERVER);
     // No loader for either bundler: the config as given, plus the flag the mount folds on.
-    expect(result).toEqual({ ...config, env: { HOST: "kept", LOUPE_TOOLBAR: "off" } });
+    expect(result).toEqual({ ...config, env: { HOST: "kept", LOUPE_SWITCH: "off" } });
     expect(result).not.toHaveProperty("webpack");
     expect(result.turbopack.rules).not.toHaveProperty("*.tsx");
   });
@@ -166,7 +166,7 @@ describe("withLoupe", () => {
 
   it("tells the mount the Toolbar is on, and hands its Server Action the paths it resolved", async () => {
     const result = (await withLoupe(config, options)(PHASE_DEVELOPMENT_SERVER)) as { env?: Record<string, string> };
-    expect(result.env).toEqual({ LOUPE_TOOLBAR: "on", LOUPE_ROOT: dir, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() });
+    expect(result.env).toEqual({ LOUPE_SWITCH: "on", LOUPE_ROOT: dir, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() });
   });
 
   it("fails at startup when the loader can't read another formatVersion, naming the command (PER-85)", async () => {

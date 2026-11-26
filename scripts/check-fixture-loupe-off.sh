@@ -6,6 +6,8 @@
 # needles: the same page has its anchors and the Toolbar's module.
 # Run after the package is built. Starts a dev server on a spare port and stops it,
 # once per run. Next locks a project's dev server, so stop the fixture's first.
+# Exits 0, 1 when Loupe isn't off (or the needles prove nothing), and 2 when the
+# check couldn't run: its port taken, or a script the page loads not served.
 set -euo pipefail
 # Job control gives the dev server its own process group, so the cleanup below
 # can stop the server it forks along with it.
@@ -58,7 +60,13 @@ serve() {
   fi
   : >"$chunks"
   grep -oE 'src="/_next/[^"]+\.js[^"]*"' "$html" | sed 's/^src="//; s/"$//' | sort -u |
-    while read -r src; do curl -s "http://127.0.0.1:$port$src" >>"$chunks"; done
+    while read -r src; do
+      # An error page is no evidence of what a chunk holds: stop as a check that couldn't run.
+      curl -fsS "http://127.0.0.1:$port$src" >>"$chunks" || {
+        echo "✗ next dev${1:+ with LOUPE=$1} didn't serve $src" >&2
+        exit 2
+      }
+    done
   stop
 }
 

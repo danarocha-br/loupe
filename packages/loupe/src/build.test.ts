@@ -162,11 +162,11 @@ describe("dist", () => {
   });
 
   // Invariant 3: the host's bundler folds the condition to the null stub, in a production
-  // build (PER-127) and under `LOUPE=0 next dev`, where `withLoupe` sets LOUPE_TOOLBAR "off".
-  it("leaves process.env.NODE_ENV and LOUPE_TOOLBAR around the toolbar's dynamic import in mount.js", () => {
+  // build (PER-127) and under `LOUPE=0 next dev`, where `withLoupe` sets LOUPE_SWITCH "off".
+  it("leaves process.env.NODE_ENV and LOUPE_SWITCH around the toolbar's dynamic import in mount.js", () => {
     const mount = read("mount.js");
     expect(mount).toMatch(
-      /process\.env\.NODE_ENV\s*===\s*"development"\s*&&\s*process\.env\.LOUPE_TOOLBAR\s*===\s*"on"\s*\?\s*devMount\(\s*lazy\(\s*\(\)\s*=>\s*import\(\s*"\.\/toolbar\/index\.js"\s*\)\s*\)\s*\)/,
+      /process\.env\.NODE_ENV\s*===\s*"development"\s*&&\s*process\.env\.LOUPE_SWITCH\s*===\s*"on"\s*\?\s*devMount\(\s*lazy\(\s*\(\)\s*=>\s*import\(\s*"\.\/toolbar\/index\.js"\s*\)\s*\)\s*\)/,
     );
     expect(mount).not.toMatch(/^\s*import\s[^(]*["']\.\/toolbar\//m);
     for (const file of jsFiles().filter(isBrowserSide)) {

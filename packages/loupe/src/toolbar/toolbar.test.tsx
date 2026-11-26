@@ -1281,13 +1281,13 @@ describe("onRegistryChange", () => {
 });
 
 describe("LoupeMount", () => {
-  it("is the null stub outside development, and loads the Toolbar from inside the NODE_ENV and LOUPE_TOOLBAR condition", async () => {
+  it("is the null stub outside development, and loads the Toolbar from inside the NODE_ENV and LOUPE_SWITCH condition", async () => {
     const { LoupeMount: stub } = await import("../mount.js");
     expect(stub()).toBeNull();
     const { readFileSync } = await import("node:fs");
     const source = readFileSync(`${process.cwd()}/src/mount.ts`, "utf8");
     // The bundler folds the condition; the import has to be inside it to be dropped with it.
-    expect(source).toMatch(/process\.env\.NODE_ENV === "development" && process\.env\.LOUPE_TOOLBAR === "on"\s*\?\s*devMount\(lazy\(\(\) => import\("\.\/toolbar\/index\.js"\)\)\)/);
+    expect(source).toMatch(/process\.env\.NODE_ENV === "development" && process\.env\.LOUPE_SWITCH === "on"\s*\?\s*devMount\(lazy\(\(\) => import\("\.\/toolbar\/index\.js"\)\)\)/);
     expect(source.match(/import\(/g)).toHaveLength(1);
   });
 });

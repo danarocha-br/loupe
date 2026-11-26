@@ -246,11 +246,12 @@ edits), `data-ds-source` (`path:line:col n/total`, a hint only) and
 or an expression, whether it spreads props, and its children kind `text`,
 `from-code`, `mixed`, `elements` or `none`), and swaps an import to its Adapter
 where `adapt-list.json` lists one, in client code only.
-`LOUPE=0 next dev` runs without any of Loupe: no loader, and `<LoupeMount />`
-loads no Toolbar, so the page has no `window.__loupe`. `withLoupe` is the one
-switch: under `next dev` it sets `LOUPE_TOOLBAR` in the config's `env`, `"on"`,
-or `"off"` under `LOUPE=0`, and the mount loads the Toolbar only when it is on.
-A layout that mounts `<LoupeMount />` without `withLoupe` gets no Toolbar either.
+`LOUPE=0 next dev` runs without any of Loupe: no loader, `<LoupeMount />` loads
+no Toolbar, an Adapter the app imports directly renders its component as it is,
+and the page has no `window.__loupe`. `withLoupe` is the one switch: under
+`next dev` it sets `LOUPE_SWITCH` in the config's `env`, `"on"`, or `"off"` under
+`LOUPE=0`, and the mount loads the Toolbar only when it is on. A layout that
+mounts `<LoupeMount />` without `withLoupe` gets no Toolbar either.
 
 ## Adapters and `window.__loupe`
 

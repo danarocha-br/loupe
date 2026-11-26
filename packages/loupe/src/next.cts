@@ -6,10 +6,11 @@
 // `.next/required-server-files.json` even when the rule's condition never fires.
 //
 // That phase check, with `LOUPE=0`, is the one place that decides whether Loupe runs.
-// Under `next dev`, `env` carries the decision to the mount as `LOUPE_TOOLBAR`, which
-// Next inlines into the bundles: `<LoupeMount />` loads the Toolbar only when it is
-// "on". `LOUPE=0 next dev` sets it "off" and nothing else, so it gets no loader, and the
-// mount folds to its stub: no Toolbar chunk, no `window.__loupe`. Left unset, the flag
+// Under `next dev`, `env` carries the decision as `LOUPE_SWITCH`, which Next inlines
+// into the bundles: `<LoupeMount />` loads the Toolbar only when it is "on".
+// `LOUPE=0 next dev` sets it "off" and nothing else, so it gets no loader, the mount
+// folds to its stub (no Toolbar chunk), and the runtime makes no `window.__loupe`: an
+// Adapter imported directly renders its component as it is. Left unset, the flag
 // would be read at runtime and the Toolbar's chunk still compiled.
 //
 // The loader is registered for both bundlers: a Turbopack rule, and a webpack rule
@@ -23,10 +24,10 @@ import path from "node:path";
 export const PHASE_DEVELOPMENT_SERVER = "phase-development-server";
 export const LOADER_RULE = "*.tsx";
 /**
- * The `env` key that tells the mount whether to load the Toolbar, "on" or "off".
- * `mount.ts` spells out `process.env.LOUPE_TOOLBAR`, as Next needs to inline it.
+ * The `env` key that tells the mount and the runtime whether Loupe runs, "on" or "off".
+ * They spell out `process.env.LOUPE_SWITCH`, as Next needs to inline it.
  */
-export const TOOLBAR_ENV = "LOUPE_TOOLBAR";
+export const SWITCH_ENV = "LOUPE_SWITCH";
 
 export type LoupeOptions = {
   /** Path of the Product layer's `adapt-list.json`, absolute or from the cwd. */
@@ -51,12 +52,12 @@ export function withLoupe<C extends Config>(
   return async (phase, context) => {
     const base = typeof config === "function" ? await config(phase, context) : config;
     if (phase !== PHASE_DEVELOPMENT_SERVER) return base;
-    if (process.env.LOUPE === "0") return { ...base, env: { ...base.env, [TOOLBAR_ENV]: "off" } };
+    if (process.env.LOUPE === "0") return { ...base, env: { ...base.env, [SWITCH_ENV]: "off" } };
 
     const adaptList = path.resolve(options.adaptList);
     const root = realpathSync(path.resolve(options.root ?? findWorkspaceRoot(path.dirname(adaptList))));
     // The Toolbar's notices read the Product layer through a Server Action (PER-133).
-    const env = { ...base.env, [TOOLBAR_ENV]: "on", LOUPE_ROOT: root, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() };
+    const env = { ...base.env, [SWITCH_ENV]: "on", LOUPE_ROOT: root, LOUPE_ADAPT_LIST: adaptList, LOUPE_APP: process.cwd() };
 
     const { formatOf, generateCommand, writeAgainCommand } = await import("./layer-status.js");
     const { formatNotice, missingLayerAdvice } = await import("./format-notice.js");

@@ -68,6 +68,10 @@ export function adaptedName(type: unknown): string | null {
 }
 
 export function createAdapter<C extends ElementType>(name: string, Original: C, options: AdapterOptions = {}): C {
+  // `LOUPE=0 next dev`: `withLoupe` turned Loupe off, so an Adapter the app imports
+  // directly is its component, with no registry and no `window.__loupe`. Only "off"
+  // counts: anywhere `withLoupe` didn't decide, a test included, the Adapter adapts.
+  if (process.env.LOUPE_SWITCH === "off") return Original;
   const meta = options.props ?? null;
   const stateProps = Object.freeze([
     ...(options.state ??
