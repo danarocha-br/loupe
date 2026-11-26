@@ -432,6 +432,19 @@ async function moreStates(r: Recorder, url: string, theme: "light" | "dark"): Pr
         await press(page, "Undo");
         // Copy Proposal stays disabled until the footer has counted Undo's change, which it does on a timer.
         await until(page, () => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("[data-copy]:not([disabled])") != null, "Copy Proposal enabled");
+        // The count Undo put back ("1 change") is said with it, and the announcer writes it
+        // 100ms later. A copy said within those 100ms joins it ("1 change. Copied …"), and
+        // whether it is hangs on how fast the clipboard answers. So the count is heard first,
+        // as a person who reads it before pressing Copy hears it.
+        await until(
+          page,
+          () => {
+            const root = document.querySelector("[data-loupe-toolbar]")?.shadowRoot;
+            const count = root?.querySelector("[data-footer-count] .sr-only")?.textContent?.trim();
+            return Boolean(count) && root?.querySelector('[data-announcer] [role="status"]')?.textContent === count;
+          },
+          "the count said",
+        );
         await press(page, "Copy Proposal");
         await until(page, () => Boolean(document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("[data-copy-toast]")), "the copy toast");
       },
