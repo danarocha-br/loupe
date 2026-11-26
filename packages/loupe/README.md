@@ -16,6 +16,12 @@ reference.
 > development, on Node 22 or Bun; a pnpm workspace; TypeScript; one design
 > system kept as a workspace package with its source (shadcn on Base UI).
 
+The package's peer ranges are what its code needs: `next` `^16.0.0` (the loader's
+Turbopack rule needs the `development` condition, new in Next 16.0) and `react`
+and `react-dom` `^19.0.0` (the React internals it reads are React 19's; it uses
+no API newer than 19.0). Under the App Router the React that runs is the one
+Next bundles.
+
 `loupe check` grades each part of a repo as supported, not tested yet (needs a
 yes) or not supported (nothing is installed). The
 [guide](https://github.com/danarocha-br/loupe#is-your-setup-supported) has the
@@ -240,7 +246,11 @@ edits), `data-ds-source` (`path:line:col n/total`, a hint only) and
 or an expression, whether it spreads props, and its children kind `text`,
 `from-code`, `mixed`, `elements` or `none`), and swaps an import to its Adapter
 where `adapt-list.json` lists one, in client code only.
-`LOUPE=0 next dev` runs without it.
+`LOUPE=0 next dev` runs without any of Loupe: no loader, and `<LoupeMount />`
+loads no Toolbar, so the page has no `window.__loupe`. `withLoupe` is the one
+switch: under `next dev` it sets `LOUPE_TOOLBAR` in the config's `env`, `"on"`,
+or `"off"` under `LOUPE=0`, and the mount loads the Toolbar only when it is on.
+A layout that mounts `<LoupeMount />` without `withLoupe` gets no Toolbar either.
 
 ## Adapters and `window.__loupe`
 
