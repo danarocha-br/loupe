@@ -5,13 +5,13 @@
 // them, as it fails `build.test.ts`: build again.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildOptions, changes, isNodeSideModule, loadConfigs, SWAP_MARK, SWAPPED, syncInto, viteSteps, watched, withSwap } from "../watch.js";
+import { buildOptions, changes, entriesKey, isNodeSideModule, loadConfigs, SWAP_MARK, SWAPPED, syncInto, viteSteps, watched, watchVite, withSwap, type ViteStep } from "../watch.js";
 
 const pkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(pkg, "dist");
@@ -63,7 +63,7 @@ describe("the stylesheet swap", () => {
     expect(swapped.startsWith(surface())).toBe(true);
     expect(swapped.slice(surface().length)).toContain(SWAP_MARK);
     expect(swapped.slice(surface().length)).toContain("adoptStylesheet as loupeWatchAdopt");
-    const step = watched({ name: "browser side", into: "", config: {} });
+    const step = watched({ name: "browser side", into: "", config: () => ({}) });
     expect(step.rewrite?.(surface(), SWAPPED)).toBe(swapped);
     expect(step.rewrite?.(surface(), "toolbar/index.js")).toBe(surface());
   });
@@ -71,6 +71,56 @@ describe("the stylesheet swap", () => {
   it("fails, rather than swap nothing, when the surface no longer imports what it uses", () => {
     const without = surface().replace(/\bHOST_ATTRIBUTE\b/g, "OTHER_ATTRIBUTE");
     expect(() => withSwap(without)).toThrow(/HOST_ATTRIBUTE/);
+  });
+});
+
+/** Waits until `check` holds, for up to 30 s. */
+async function until(check: () => boolean, what: string): Promise<void> {
+  const end = Date.now() + 30_000;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting until ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+describe("a watched step", () => {
+  // A package of three modules, each an entry, as the build makes every shipped module one.
+  const root = folder("package", { "src/index.ts": 'export { a } from "./a.js";\n', "src/a.ts": 'export const a = "a1";\n', "src/b.ts": 'export const b = "b";\n' });
+  const src = path.join(root, "src");
+  const config = () => ({
+    root,
+    build: {
+      emptyOutDir: false,
+      minify: false,
+      lib: { entry: Object.fromEntries(readdirSync(src).map((file) => [file.replace(/\.ts$/, ""), path.join(src, file)])), formats: ["es" as const] },
+      rolldownOptions: { output: { preserveModules: true, preserveModulesRoot: "src", entryFileNames: "[name].js" } },
+    },
+  });
+  const step: ViteStep = { name: "probe", into: "", config };
+  const dist = path.join(scratch, "package-dist");
+  const has = (file: string, text: string) => existsSync(path.join(dist, file)) && readFileSync(path.join(dist, file), "utf8").includes(text);
+
+  it("keys its entries, so a module added, removed or renamed changes the key", () => {
+    const before = entriesKey(config());
+    writeFileSync(path.join(src, "extra.ts"), "export const extra = 1;\n");
+    expect(entriesKey(config())).not.toBe(before);
+    rmSync(path.join(src, "extra.ts"));
+    expect(entriesKey(config())).toBe(before);
+  });
+
+  it("starts again with the new entries when a module is renamed, and goes on delivering edits", async () => {
+    mkdirSync(dist, { recursive: true });
+    let ready = false;
+    const watching = await watchVite(dist, step, path.join(scratch, "package-out"), () => (ready = true));
+    try {
+      await until(() => ready && has("a.js", "a1") && has("b.js", '"b"'), "the first round is in dist");
+      renameSync(path.join(src, "b.ts"), path.join(src, "c.ts"));
+      await until(() => has("c.js", '"b"'), "the renamed module is in dist");
+      writeFileSync(path.join(src, "a.ts"), 'export const a = "a2";\n');
+      await until(() => has("a.js", "a2"), "an edit after the rename is in dist");
+    } finally {
+      await watching.close();
+    }
   });
 });
 
@@ -93,7 +143,7 @@ describe("the watch's output", () => {
     expect(steps.map((step) => step.name)).toEqual(["@loupe/ui", "@loupe/patterns", "browser side"]);
     for (const step of steps) {
       const out = path.join(scratch, `vite-${step.into || "browser"}`);
-      await build({ ...buildOptions(step.config, out, false), logLevel: "silent" });
+      await build({ ...buildOptions(step.config(), out, false), logLevel: "silent" });
       expect([...changes(out, path.join(dist, step.into), step).keys()], `${step.name}'s files that differ from dist's`).toEqual([]);
     }
   });

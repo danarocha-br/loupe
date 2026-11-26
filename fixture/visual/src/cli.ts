@@ -85,11 +85,30 @@ function prepareBase(sha: string): void {
   run("pnpm", ["--filter", "@danarocha/loupe", "build"], BASE_TREE);
 }
 
+/**
+ * Throws when Loupe's watch (`pnpm --filter @danarocha/loupe watch`) runs on `root`: it writes
+ * into the `dist` the check builds, and the build's own test would only say so once `dist` is
+ * rewritten. Its pid file is `packages/loupe/watch.ts`' `PID_FILE`.
+ */
+function assertWatchStopped(root: string): void {
+  const file = join(root, "packages/loupe/node_modules/.cache/loupe-watch/pid");
+  if (!existsSync(file)) return;
+  const pid = Number(readFileSync(file, "utf8"));
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return; // A stale pid: that watch has stopped.
+  }
+  throw new Error(`Loupe's watch is running in ${root} (pid ${pid}). Stop it first: the check builds Loupe.`);
+}
+
 async function main(): Promise<number> {
   const only = values.only;
   const ref = baseRef();
-  // Before anything is built: a build of Loupe under a running `next dev` breaks it.
+  // Before anything is built: a build of Loupe under a running `next dev` breaks it, and
+  // Loupe's watch would write into the `dist` it builds.
   assertFixtureFree(REPO);
+  assertWatchStopped(REPO);
   if (existsSync(BASE_TREE)) assertFixtureFree(BASE_TREE);
   const sha = git(["merge-base", "HEAD", ref]);
   const short = sha.slice(0, 12);

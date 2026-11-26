@@ -27,7 +27,9 @@
 // (`SWAP`), as the workbenches swap theirs. The page's own surfaces take it already.
 //
 // React Compiler's caches need nothing: React empties a component's cache when Fast Refresh
-// gives it new code.
+// gives it new code. An edit to a primitive's `.css` or to a token remounts the Toolbar rather
+// than refreshing it: it runs `@loupe/ui`'s surface module again, whose `SurfaceBoundary` is a
+// class, and Fast Refresh always remounts a class.
 //
 // What it leaves to the build:
 // - `.d.ts`, which `next dev` never reads;
@@ -63,13 +65,27 @@ export const SWAP_MARK = "// Added by `pnpm watch` (watch.ts), never by the buil
 
 /**
  * The swap: when Fast Refresh runs the surface's module again, with the new `STYLESHEET`, the
- * Toolbar's root adopts it in place of the old one (`adoptStylesheet` replaces what it put
- * there). At the first run there is no root yet, and on the server no document.
+ * Toolbar's root adopts it in place of the old one. `adoptStylesheet` replaces the sheet it put
+ * there itself; a fresh copy of `@loupe/ui`'s surface module, which an edit to a primitive's
+ * `.css` or a token makes, knows none and adds its own. So the root keeps one of Loupe's sheets,
+ * known by the stylesheet's first rule, its layers: the one this adopt put there. At the first
+ * run there is no root yet, and on the server no document.
  */
 const SWAP = `
 ${SWAP_MARK} a stylesheet edit reaches the Toolbar's root.
 import { adoptStylesheet as loupeWatchAdopt } from "../../ui/surface/index.js";
-if (typeof document !== "undefined") for (const host of document.querySelectorAll(\`[\${HOST_ATTRIBUTE}]\`)) if (host.shadowRoot) loupeWatchAdopt(host.shadowRoot, STYLESHEET);
+if (typeof document !== "undefined") {
+  const layers = STYLESHEET.slice(0, STYLESHEET.indexOf(";") + 1);
+  const isLoupe = (sheet) => sheet.cssRules[0]?.cssText === layers;
+  for (const host of document.querySelectorAll(\`[\${HOST_ATTRIBUTE}]\`)) {
+    const root = host.shadowRoot;
+    if (!root) continue;
+    const before = new Set(root.adoptedStyleSheets);
+    loupeWatchAdopt(root, STYLESHEET);
+    const added = root.adoptedStyleSheets.find((sheet) => !before.has(sheet));
+    if (added) root.adoptedStyleSheets = root.adoptedStyleSheets.filter((sheet) => sheet === added || !isLoupe(sheet));
+  }
+}
 `;
 
 /** `toolbar/surface/index.js` with the swap. It throws if the module no longer imports what the swap uses. */
@@ -126,21 +142,24 @@ export const isBrowserSide = (file: string) => file === "mount.js" || /^(runtime
 /** What tsc6 writes that the watch takes into `dist`: the Node side's modules, no `.d.ts`. */
 export const isNodeSideModule = (file: string) => /\.c?js$/.test(file) && !isBrowserSide(file);
 
-/** One of the build's Vite steps: its config, and where and how its output goes in `dist`. */
-export type ViteStep = Delivery & { name: string; into: string; config: UserConfig };
+/**
+ * One of the build's Vite steps: its config, and where and how its output goes in `dist`. The
+ * config is made again each time it is asked for, with the entries as `src` has them then.
+ */
+export type ViteStep = Delivery & { name: string; into: string; config: () => UserConfig };
 
 /** The build's three Vite steps, each from its package's own config, as the build runs them. */
 export function viteSteps({ loupe, ui, patterns }: Configs): ViteStep[] {
   return [
-    { name: "@loupe/ui", into: "ui", config: ui.config(ui.entries(), "dist") },
+    { name: "@loupe/ui", into: "ui", config: () => ui.config(ui.entries(), "dist") },
     {
       name: "@loupe/patterns",
       into: "patterns",
-      config: patterns.config(patterns.entries(), "dist"),
+      config: () => patterns.config(patterns.entries(), "dist"),
       // `dist/patterns` imports `@loupe/ui` from `dist/ui`, as the build points it (`vendorWorkspace`).
       rewrite: (code, file) => (file.endsWith(".js") ? loupe.pointIntoDist(code, `patterns/${file}`) : code),
     },
-    { name: "browser side", into: "", config: loupe.browserConfig(loupe.browserEntries(), "dist") },
+    { name: "browser side", into: "", config: () => loupe.browserConfig(loupe.browserEntries(), "dist") },
   ];
 }
 
@@ -193,22 +212,58 @@ function report(name: string, moved: string[], ms: number) {
   log(`${time()} ${name}: ${moved.length} file${moved.length === 1 ? "" : "s"} in ${ms} ms (${shown})`);
 }
 
-/** A Vite step in watch mode; after each rebuild, its changed files move into `dist`. */
-async function watchVite(dist: string, step: ViteStep, ready: () => void): Promise<void> {
-  const out = join(WATCH_DIR, step.into || "browser");
-  let first = true;
-  let started = Date.now();
-  const watcher = (await build(buildOptions(step.config, out, true))) as Rolldown.RolldownWatcher;
-  watcher.on("event", (event) => {
-    if (event.code === "BUNDLE_START") started = Date.now();
-    if (event.code === "ERROR") log(`${time()} ${step.name}: ${event.error.message}`);
-    if (event.code !== "BUNDLE_END") return;
-    report(step.name, syncInto(out, join(dist, step.into), step), Date.now() - started);
-    if (first) {
-      first = false;
-      ready();
-    }
-  });
+/** A config's entries, as a key that changes when one is added, removed or renamed. */
+export function entriesKey(config: UserConfig): string {
+  const lib = config.build?.lib;
+  return JSON.stringify(lib && typeof lib.entry === "object" ? Object.entries(lib.entry).sort() : lib ? lib.entry : null);
+}
+
+/**
+ * A Vite step in watch mode; after each rebuild, its changed files move into `dist`. Its entries
+ * are every shipped module of its `src`, read as it starts: when they change (a module added,
+ * removed or renamed), a rebuild would still look for the old ones, and fail at each change
+ * from then on. So after each rebuild, or each failed one, it reads them again and, if they
+ * differ, starts again with the new ones. `dist` keeps what it had meanwhile.
+ */
+export async function watchVite(dist: string, step: ViteStep, out: string, ready: () => void): Promise<{ close(): Promise<void> }> {
+  let current: Rolldown.RolldownWatcher | null = null;
+  let closed = false;
+  const start = async (onReady: () => void): Promise<void> => {
+    const config = step.config();
+    const key = entriesKey(config);
+    let first = true;
+    let restarting = false;
+    let started = Date.now();
+    const watcher = (await build(buildOptions(config, out, true))) as Rolldown.RolldownWatcher;
+    if (closed) return void (await watcher.close());
+    current = watcher;
+    const restartIfMoved = () => {
+      if (closed || restarting || entriesKey(step.config()) === key) return false;
+      restarting = true;
+      log(`${time()} ${step.name}: a module was added, removed or renamed; starting again with the new ones`);
+      void watcher.close().then(() => (closed ? undefined : start(() => {})));
+      return true;
+    };
+    watcher.on("event", (event) => {
+      if (event.code === "BUNDLE_START") started = Date.now();
+      // Vite prints the error itself; `dist` keeps the last good build.
+      if (event.code === "ERROR" && !restartIfMoved()) log(`${time()} ${step.name}: the build failed (above); dist keeps the last one that built`);
+      if (event.code !== "BUNDLE_END") return;
+      report(step.name, syncInto(out, join(dist, step.into), step), Date.now() - started);
+      if (first) {
+        first = false;
+        onReady();
+      }
+      restartIfMoved();
+    });
+  };
+  await start(ready);
+  return {
+    async close() {
+      closed = true;
+      await current?.close();
+    },
+  };
 }
 
 /** tsc6 in watch mode, as the build runs it; after each emit, the Node side's changed modules move into `dist`. */
@@ -275,7 +330,7 @@ async function main() {
   const ready = () => {
     if (--pending === 0) log(`${time()} watching, ready in ${Date.now() - started} ms. Ctrl+C stops it.`);
   };
-  await Promise.all(viteSteps(configs).map((step) => watchVite(dist, watched(step), ready)));
+  await Promise.all(viteSteps(configs).map((step) => watchVite(dist, watched(step), join(WATCH_DIR, step.into || "browser"), ready)));
   watchTsc(dist, ready);
 }
 
