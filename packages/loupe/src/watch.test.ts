@@ -11,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildOptions, changes, entriesKey, isNodeSideModule, loadConfigs, SWAP_MARK, SWAPPED, syncInto, viteSteps, watched, watchVite, withSwap, type ViteStep } from "../watch.js";
+import { buildOptions, changes, DELIVERY_ORDER, entriesKey, Gate, isNodeSideModule, loadConfigs, SWAP_MARK, SWAPPED, syncInto, viteSteps, watched, watchVite, withSwap, type ViteStep } from "../watch.js";
 
 const pkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = path.join(pkg, "dist");
@@ -77,6 +77,41 @@ describe("the stylesheet swap", () => {
   it("fails, rather than swap nothing, when the surface no longer imports what it uses", () => {
     const without = surface().replace(/\bHOST_ATTRIBUTE\b/g, "OTHER_ATTRIBUTE");
     expect(() => withSwap(without)).toThrow(/HOST_ATTRIBUTE/);
+  });
+});
+
+describe("the gate", () => {
+  it("holds what a step built until none is building, then delivers in the steps' order", () => {
+    const gate = new Gate(["Node side", "@loupe/ui", "browser side"]);
+    const delivered: string[] = [];
+    gate.building("browser side");
+    gate.building("Node side");
+    // The browser side finishes first: its importer of a new Node-side helper must wait for it.
+    gate.done("browser side", () => delivered.push("browser side"));
+    expect(delivered).toEqual([]);
+    gate.done("Node side", () => delivered.push("Node side"));
+    expect(delivered).toEqual(["Node side", "browser side"]);
+    // Nothing is held twice.
+    gate.done("@loupe/ui");
+    expect(delivered).toEqual(["Node side", "browser side"]);
+  });
+
+  it("lets the others through when a step stops without building", () => {
+    const gate = new Gate(["@loupe/ui", "@loupe/patterns"]);
+    const delivered: string[] = [];
+    gate.building("@loupe/ui");
+    gate.building("@loupe/patterns");
+    gate.done("@loupe/patterns", () => delivered.push("@loupe/patterns"));
+    gate.done("@loupe/ui"); // A failed build, a restart or a stop: nothing to deliver.
+    expect(delivered).toEqual(["@loupe/patterns"]);
+  });
+
+  it("orders every step the watch runs, each after what it imports", async () => {
+    const names = viteSteps(await loadConfigs()).map((step) => step.name);
+    expect([...DELIVERY_ORDER].sort()).toEqual([...names, "Node side"].sort());
+    expect(DELIVERY_ORDER.indexOf("Node side")).toBeLessThan(DELIVERY_ORDER.indexOf("browser side"));
+    expect(DELIVERY_ORDER.indexOf("@loupe/ui")).toBeLessThan(DELIVERY_ORDER.indexOf("@loupe/patterns"));
+    expect(DELIVERY_ORDER.indexOf("@loupe/patterns")).toBeLessThan(DELIVERY_ORDER.indexOf("browser side"));
   });
 });
 

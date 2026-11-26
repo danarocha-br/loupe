@@ -217,6 +217,42 @@ function report(name: string, moved: string[], ms: number) {
   log(`${time()} ${name}: ${moved.length} file${moved.length === 1 ? "" : "s"} in ${ms} ms (${shown})`);
 }
 
+/**
+ * Holds what each step has built until no step is building, then moves it all into `dist` in
+ * the steps' order, each before the ones that import it: the Node side, `@loupe/ui`,
+ * `@loupe/patterns`, the browser side. One save can start several steps (a Toolbar edit, the
+ * browser side and tsc6; a primitive saved with the pattern that takes its new export, both
+ * packages), and each finishes on its own: without the gate, a module could land before the
+ * one it imports. A step that hasn't started building yet isn't waited for.
+ */
+export class Gate {
+  readonly #order: string[];
+  readonly #building = new Set<string>();
+  readonly #held = new Map<string, () => void>();
+  constructor(order: string[]) {
+    this.#order = order;
+  }
+
+  /** A step has started building. */
+  building(step: string): void {
+    this.#building.add(step);
+  }
+
+  /** A step has stopped building; `deliver`, if it built something, runs once none is building. */
+  done(step: string, deliver?: () => void): void {
+    this.#building.delete(step);
+    if (deliver) this.#held.set(step, deliver);
+    if (this.#building.size > 0) return;
+    const rank = (name: string) => (this.#order.includes(name) ? this.#order.indexOf(name) : this.#order.length);
+    const held = [...this.#held].sort(([a], [b]) => rank(a) - rank(b));
+    this.#held.clear();
+    for (const [, run] of held) run();
+  }
+}
+
+/** The steps, in the order the gate moves their output into `dist`. */
+export const DELIVERY_ORDER = ["Node side", "@loupe/ui", "@loupe/patterns", "browser side"];
+
 /** A config's entries, as a key that changes when one is added, removed or renamed. */
 export function entriesKey(config: UserConfig): string {
   const lib = config.build?.lib;
@@ -228,9 +264,10 @@ export function entriesKey(config: UserConfig): string {
  * are every shipped module of its `src`, read as it starts: when they change (a module added,
  * removed or renamed), a rebuild would still look for the old ones, and fail at each change
  * from then on. So after each rebuild, or each failed one, it reads them again and, if they
- * differ, starts again with the new ones. `dist` keeps what it had meanwhile.
+ * differ, starts again with the new ones. `dist` keeps what it had meanwhile. Its output waits
+ * at `gate` for the other steps.
  */
-export async function watchVite(dist: string, step: ViteStep, out: string, ready: () => void): Promise<{ close(): Promise<void> }> {
+export async function watchVite(dist: string, step: ViteStep, out: string, ready: () => void, gate = new Gate([step.name])): Promise<{ close(): Promise<void> }> {
   let current: Rolldown.RolldownWatcher | null = null;
   let sources: FSWatcher | null = null;
   let closed = false;
@@ -247,6 +284,7 @@ export async function watchVite(dist: string, step: ViteStep, out: string, ready
       if (closed || restarting || entriesKey(step.config()) === key) return false;
       restarting = true;
       sources?.close();
+      gate.done(step.name);
       log(`${time()} ${step.name}: a module was added, removed or renamed; starting again with the new ones`);
       void watcher.close().then(() => (closed ? undefined : start(() => {})));
       return true;
@@ -255,15 +293,24 @@ export async function watchVite(dist: string, step: ViteStep, out: string, ready
     // imported yet, starts no rebuild: the step's `src` is watched for it.
     sources = watch(join(config.root ?? root, "src"), { recursive: true }, () => restartIfMoved());
     watcher.on("event", (event) => {
-      if (event.code === "BUNDLE_START") started = Date.now();
-      // Vite prints the error itself; `dist` keeps the last good build.
-      if (event.code === "ERROR" && !restartIfMoved()) log(`${time()} ${step.name}: the build failed (above); dist keeps the last one that built`);
-      if (event.code !== "BUNDLE_END") return;
-      report(step.name, syncInto(out, join(dist, step.into), step), Date.now() - started);
-      if (first) {
-        first = false;
-        onReady();
+      if (event.code === "BUNDLE_START") {
+        started = Date.now();
+        gate.building(step.name);
       }
+      if (event.code === "ERROR") {
+        gate.done(step.name);
+        // Vite prints the error itself; `dist` keeps the last good build.
+        if (!restartIfMoved()) log(`${time()} ${step.name}: the build failed (above); dist keeps the last one that built`);
+      }
+      if (event.code !== "BUNDLE_END") return;
+      const ms = Date.now() - started;
+      gate.done(step.name, () => {
+        report(step.name, syncInto(out, join(dist, step.into), step), ms);
+        if (first) {
+          first = false;
+          onReady();
+        }
+      });
       restartIfMoved();
     });
   };
@@ -272,13 +319,14 @@ export async function watchVite(dist: string, step: ViteStep, out: string, ready
     async close() {
       closed = true;
       sources?.close();
+      gate.done(step.name);
       await current?.close();
     },
   };
 }
 
 /** tsc6 in watch mode, as the build runs it; after each emit, the Node side's changed modules move into `dist`. */
-function watchTsc(dist: string, ready: () => void): void {
+function watchTsc(dist: string, ready: () => void, gate: Gate): void {
   const out = join(WATCH_DIR, "node");
   const tsc = join(root, "node_modules", ".bin", "tsc6");
   const child = spawn(tsc, ["-p", "tsconfig.build.json", "--watch", "--preserveWatchOutput", "--outDir", out], { cwd: root, stdio: ["ignore", "pipe", "inherit"] });
@@ -291,14 +339,20 @@ function watchTsc(dist: string, ready: () => void): void {
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
     for (const line of lines) {
-      if (/File change detected|Starting compilation/.test(line)) started = Date.now();
+      if (/File change detected|Starting compilation/.test(line)) {
+        started = Date.now();
+        gate.building("Node side");
+      }
       if (/error TS\d+/.test(line)) log(`${time()} Node side: ${line.trim()}`);
       if (!/Found \d+ errors?\. Watching for file changes/.test(line)) continue;
-      report("Node side", syncInto(out, dist, { only: isNodeSideModule }), Date.now() - started);
-      if (first) {
-        first = false;
-        ready();
-      }
+      const ms = Date.now() - started;
+      gate.done("Node side", () => {
+        report("Node side", syncInto(out, dist, { only: isNodeSideModule }), ms);
+        if (first) {
+          first = false;
+          ready();
+        }
+      });
     }
   });
 }
@@ -341,8 +395,9 @@ async function main() {
   const ready = () => {
     if (--pending === 0) log(`${time()} watching, ready in ${Date.now() - started} ms. Ctrl+C stops it.`);
   };
-  await Promise.all(viteSteps(configs).map((step) => watchVite(dist, watched(step), join(WATCH_DIR, step.into || "browser"), ready)));
-  watchTsc(dist, ready);
+  const gate = new Gate(DELIVERY_ORDER);
+  await Promise.all(viteSteps(configs).map((step) => watchVite(dist, watched(step), join(WATCH_DIR, step.into || "browser"), ready, gate)));
+  watchTsc(dist, ready, gate);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
