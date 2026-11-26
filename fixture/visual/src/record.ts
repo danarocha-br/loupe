@@ -79,8 +79,8 @@ async function pause(page: Page): Promise<void> {
 }
 
 /**
- * Loads the fixture, waits for the pill, stops the clock, turns transitions and animations off
- * and rests the mouse. Off before anything opens: CSS animations run on the browser's own clock,
+ * Loads the fixture, waits for the pill, stops the clock, turns transitions and animations off,
+ * runs the clock past the panel's preload and rests the mouse. Off before anything opens: CSS animations run on the browser's own clock,
  * not the page's, and the sheet's opening scale, cut short at a moment that varies, leaves the
  * header's composited layer rastered at the scale it had then (858 pixels of the wordmark and
  * icons a little soft, in states/light/undo). The hand harness's flows capture the pill first,
@@ -91,6 +91,9 @@ async function load(page: Page, url: string): Promise<void> {
   await page.locator("[data-loupe-toolbar] [data-launcher]").first().waitFor();
   await pause(page);
   await page.evaluate(freeze);
+  // Past the panel's preload (start.ts: when idle, within 4s), as the pill's capture takes the hand harness's flows.
+  await page.clock.runFor(5000);
+  await page.waitForLoadState("networkidle");
   await rest(page);
 }
 
@@ -370,18 +373,21 @@ async function hasButton(page: Page, label: string): Promise<void> {
   throw new Error(`the Toolbar never drew a button "${label}"`);
 }
 
-/** Opens the sheet from the pill, as 02-list does. */
+/** Opens the sheet from the pill, as 02-list does; the stopped clock moves on until it shows, should its code still be loading. */
 async function openSheet(page: Page): Promise<void> {
   await rest(page);
   await click(inToolbar(page, "[data-launcher]"));
-  await inToolbar(page, "[data-sheet]").waitFor();
+  await until(page, () => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("[data-sheet]") != null, "the sheet open");
 }
 
 /** The Inspector on the first Button, as 06-inspector has it. */
 async function inspectFirst(page: Page): Promise<void> {
   await press(page, "Inspect Button 1 of 7");
-  await inToolbar(page, "[data-prop]").waitFor();
+  await inspector(page);
 }
+
+/** Waits for the Inspector's props, moving the stopped clock on for them. */
+const inspector = (page: Page) => until(page, () => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.querySelector("[data-prop]") != null, "the Inspector");
 
 /**
  * The states the hand harness had no step for: Undo after a reset, the Alt peek, the copy
@@ -440,7 +446,7 @@ async function moreStates(r: Recorder, url: string, theme: "light" | "dark"): Pr
         await rest(page);
         await hasButton(page, "Inspect DropdownMenuItem 1 of 2");
         await press(page, "Inspect DropdownMenuItem 1 of 2");
-        await inToolbar(page, "[data-prop]").waitFor();
+        await inspector(page);
         await page.keyboard.press("Escape");
         await until(page, () => document.querySelector('[role="menu"]') === null, "Ana's menu closed");
         await page.waitForFunction(() => document.querySelector("[data-loupe-toolbar]")?.shadowRoot?.textContent?.includes("Not on the page now"), undefined, { polling: 100 });
