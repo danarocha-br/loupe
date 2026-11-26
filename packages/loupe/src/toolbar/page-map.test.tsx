@@ -5,9 +5,11 @@
 // where its own Instance sits, and inspects that Instance.
 
 import { userEvent } from "@testing-library/user-event";
+import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LoupeDebug } from "../runtime/debug.js";
 import { PageMapView } from "./page-map.js";
+import { boxesOf, type PageSignal, PageSignalContext } from "./page-signal.js";
 import { MAP_GROUPS } from "@loupe/patterns/testing";
 import { cleanup, renderInSurface } from "./surface/render.fixture.js";
 
@@ -76,5 +78,33 @@ describe("the page map's view", () => {
     } finally {
       NODES["btn-3"] = [[0, 40, 100, 30]];
     }
+  });
+
+  it("doesn't read the page in the middle of a scroll, even its first read once opened: the tick that settles it does", async () => {
+    const debug = debugOf();
+    const layout = new Set<() => void>();
+    const signal = {
+      scrolling: true,
+      boxes: vi.fn((id: string) => boxesOf(debug.nodes(id))),
+      onLayout: (listener: () => void) => {
+        layout.add(listener);
+        return () => layout.delete(listener);
+      },
+    } as unknown as PageSignal & { scrolling: boolean; boxes: ReturnType<typeof vi.fn> };
+    renderInSurface(
+      <PageSignalContext value={signal}>
+        <PageMapView debug={debug} groups={[...MAP_GROUPS]} lit={null} onPoint={() => {}} onSelect={() => {}} />
+      </PageSignalContext>,
+    );
+    const drawnFirst = signal.boxes.mock.calls.length;
+    // Past the read once the column has opened: the page is still scrolling.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 450)));
+    expect(signal.boxes.mock.calls.length).toBe(drawnFirst);
+    signal.scrolling = false;
+    act(() => {
+      for (const listener of layout) listener();
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 150)));
+    expect(signal.boxes.mock.calls.length).toBeGreaterThan(drawnFirst);
   });
 });

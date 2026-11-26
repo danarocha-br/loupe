@@ -32,11 +32,13 @@ export type PageOutlineProps = {
   quiet: boolean;
   /** The size tag, on the selected Instance's largest box; null on any other. */
   tag: SizeTag | null;
+  /** The view moves the outline with a scroll from it, until it places the outline again. */
+  ref?: Ref<HTMLDivElement>;
 };
 
-export function PageOutline({ kind, box, quiet, tag }: PageOutlineProps) {
+export function PageOutline({ kind, box, quiet, tag, ref }: PageOutlineProps) {
   return (
-    <div data-ring={kind} data-quiet={quiet ? "" : undefined} style={box} aria-hidden="true">
+    <div ref={ref} data-ring={kind} data-quiet={quiet ? "" : undefined} style={box} aria-hidden="true">
       {tag && (
         <span data-ring-label="" data-below={tag.below ? "" : undefined} data-at-start={tag.start ? "" : undefined}>
           {tag.text}
@@ -51,10 +53,12 @@ export type ChangeOutlineProps = {
   keys: string;
   box: OutlineBox;
   quiet: boolean;
+  /** The view moves the outline with a scroll from it, until it places the outline again. */
+  ref?: Ref<HTMLDivElement>;
 };
 
-export function ChangeOutline({ keys, box, quiet }: ChangeOutlineProps) {
-  return <div data-mark={keys} data-quiet={quiet ? "" : undefined} style={box} aria-hidden="true" />;
+export function ChangeOutline({ keys, box, quiet, ref }: ChangeOutlineProps) {
+  return <div ref={ref} data-mark={keys} data-quiet={quiet ? "" : undefined} style={box} aria-hidden="true" />;
 }
 
 export type PickTagProps = {
@@ -67,7 +71,7 @@ export type PickTagProps = {
   /** Its top left in the window, which the view works out from the tag's own size. */
   place: { top: number; left: number };
   words: OutlineWords;
-  /** The view reads the tag's size from it. */
+  /** The view reads the tag's size from it, and moves the tag with a scroll. */
   ref?: Ref<HTMLDivElement>;
 };
 
