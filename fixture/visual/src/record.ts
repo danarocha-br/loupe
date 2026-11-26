@@ -78,11 +78,19 @@ async function pause(page: Page): Promise<void> {
   paused.add(page);
 }
 
-/** Loads the fixture, waits for the pill, stops the clock and rests the mouse. */
+/**
+ * Loads the fixture, waits for the pill, stops the clock, turns transitions and animations off
+ * and rests the mouse. Off before anything opens: CSS animations run on the browser's own clock,
+ * not the page's, and the sheet's opening scale, cut short at a moment that varies, leaves the
+ * header's composited layer rastered at the scale it had then (858 pixels of the wordmark and
+ * icons a little soft, in states/light/undo). The hand harness's flows capture the pill first,
+ * which turns them off before the sheet opens.
+ */
 async function load(page: Page, url: string): Promise<void> {
   await page.goto(url);
   await page.locator("[data-loupe-toolbar] [data-launcher]").first().waitFor();
   await pause(page);
+  await page.evaluate(freeze);
   await rest(page);
 }
 
