@@ -29,7 +29,7 @@ const PROBES: Record<string, unknown[][]> = {
   "footer.offer.discard": [[1], [3]],
   "copy.copiedText": [["Quieter menus"]],
   "command.copiedText": [["pnpm exec loupe generate"]],
-  "list.held.discardName": [["All from member-row-menu.tsx:37"]],
+  "list.held.discardName": [["All from app/billing/invite-form.tsx › InviteForm › Button[1]"]],
   "copy.notCopiedText": [
     ["The page isn’t focused.", true],
     ["The page isn’t focused.", false],

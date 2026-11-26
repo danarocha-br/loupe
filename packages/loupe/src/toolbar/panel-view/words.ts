@@ -325,6 +325,18 @@ export function targetLabel(target: ScopeTarget): string {
   }
 }
 
+/** What a record names in full, its file's path included: two records' short names can be the same. */
+export function targetFullLabel(target: ScopeTarget): string {
+  switch (target.scope) {
+    case "instance":
+      return target.id;
+    case "group":
+      return `All from ${target.anchor}`;
+    case "page":
+      return targetLabel(target);
+  }
+}
+
 /** Why a record is held, in the words of PER-95's decision. */
 export function suspensionReason(suspended: Suspension): string {
   return suspended.reason === "ambiguous"

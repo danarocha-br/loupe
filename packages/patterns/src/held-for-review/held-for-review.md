@@ -27,7 +27,7 @@ Under it, what it would set (Marks' `HeldValues`).
 
 ## ARIA and keys
 
-The title is a level-3 heading; the records are a list. Discard is a small Button that shows "Discard" and is named by the record it drops ("Discard All from member-row-menu.tsx:37"), so a list of them doesn't read as one name repeated; Tab reaches each, Enter or Space presses it.
+The title is a level-3 heading; the records are a list. Discard is a small Button that shows "Discard" and is named by the record it drops, in full, its file's path included (`item.full`: "Discard All from app/billing/invite-form.tsx › InviteForm › Button[1]"), since two records' short names can be the same, so a list of them doesn't read as one name repeated; Tab reaches each, Enter or Space presses it.
 
 ## Tests
 

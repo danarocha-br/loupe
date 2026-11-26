@@ -588,7 +588,16 @@ describe("group and page scopes", () => {
     await clickInPanel(member(BIA));
     expect(await saidTimes("Reaches 4 of 4")).toBe(1);
 
+    // The next selection opens at its call site too: its heading names the Instance alone, so the scope is said.
+    await backToList();
+    await select(ANA);
+    expect(await saidWithin(`Scope: ${GROUP}. Reaches 4 of 4.`)).toBe(2);
+
     await clickInPanel(selectTool("Select one"));
+    expect(await saidWithin("Scope: This instance.")).toBe(1);
+    // A new selection at This instance says nothing of its scope.
+    await backToList();
+    await select(BIA);
     expect(await saidWithin("Scope: This instance.")).toBe(1);
   });
 
@@ -1102,8 +1111,8 @@ describe("held for review", () => {
     const review = screen().getByRole("heading", { level: 3, name: "Held for review" }).closest("[data-card]") as HTMLElement;
     expect(review.textContent).toContain("Code changed here");
     const held = loupe.records();
-    // Named by the record it drops, after the word it shows.
-    const discard = within(review).getByRole("button", { name: /^Discard Members/ });
+    // Named by the record it drops in full, its call site's path included, after the word it shows.
+    const discard = within(review).getByRole("button", { name: `Discard ${CONFIRM}` });
     expect(discard.textContent).toBe("Discard");
     await clickInPanel(discard);
     expect(loupe.records()).toEqual([]);

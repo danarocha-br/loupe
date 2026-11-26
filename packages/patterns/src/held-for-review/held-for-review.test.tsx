@@ -38,14 +38,14 @@ describe("HeldForReview", () => {
   it("discards a record through its callback", async () => {
     const user = userEvent.setup({ document });
     const { screen, onDiscard } = draw();
-    await user.click(screen.getByRole("button", { name: `Discard ${HELD[1]?.label}` }));
+    await user.click(screen.getByRole("button", { name: `Discard ${HELD[1]?.full}` }));
     expect(onDiscard).toHaveBeenCalledWith(HELD[1]?.target);
   });
 
-  it("names each Discard by the record it drops, after the word it shows", () => {
+  it("names each Discard by the record it drops in full, its file's path included, after the word it shows", () => {
     const { screen } = draw();
     const discards = screen.getAllByRole("button", { name: /^Discard / });
-    expect(discards.map((button) => button.getAttribute("aria-label"))).toEqual(HELD.map((item) => `Discard ${item.label}`));
+    expect(discards.map((button) => button.getAttribute("aria-label"))).toEqual(HELD.map((item) => `Discard ${item.full}`));
     expect(discards.map((button) => button.textContent)).toEqual(["Discard", "Discard"]);
   });
 

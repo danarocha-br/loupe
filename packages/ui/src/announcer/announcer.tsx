@@ -63,18 +63,10 @@ export function Announcer({ children }: { children?: ReactNode }) {
   const assertive = useRef<HTMLDivElement>(null);
   const pending = useRef<Record<Politeness, Pending>>({ polite: { messages: [] }, assertive: { messages: [] } });
 
-  const say = useCallback<Say>((from, text, { politeness = "polite" } = {}) => {
+  // Writes a region's waiting messages, as one, a moment after the first came.
+  const schedule = useCallback((politeness: Politeness) => {
     const ref = politeness === "assertive" ? assertive : polite;
-    const said = text.replace(/\s+/g, " ").trim();
-    if (said === "") return;
     const waiting = pending.current[politeness];
-    // A newer message from the same place replaces its own that isn't written yet (a count
-    // that moved twice); one from another place joins it, so two views speaking in one
-    // commit are both heard.
-    const own = waiting.messages.findIndex((message) => message.from === from);
-    if (own === -1) waiting.messages.push({ from, text: said });
-    else waiting.messages[own] = { from, text: said };
-    if (waiting.write !== undefined) return;
     clearTimeout(waiting.clear);
     if (ref.current) ref.current.textContent = "";
     // The region is read when the message is written, not now: a child that fails as it
@@ -92,15 +84,39 @@ export function Announcer({ children }: { children?: ReactNode }) {
     }, WRITE_AFTER_MS);
   }, []);
 
-  useEffect(
-    () => () => {
-      for (const timers of Object.values(pending.current)) {
-        clearTimeout(timers.write);
-        clearTimeout(timers.clear);
-      }
+  const say = useCallback<Say>(
+    (from, text, { politeness = "polite" } = {}) => {
+      const said = text.replace(/\s+/g, " ").trim();
+      if (said === "") return;
+      const waiting = pending.current[politeness];
+      // A newer message from the same place replaces its own that isn't written yet (a count
+      // that moved twice); one from another place joins it, so two views speaking in one
+      // commit are both heard.
+      const own = waiting.messages.findIndex((message) => message.from === from);
+      if (own === -1) waiting.messages.push({ from, text: said });
+      else waiting.messages[own] = { from, text: said };
+      if (waiting.write === undefined) schedule(politeness);
     },
-    [],
+    [schedule],
   );
+
+  useEffect(() => {
+    // Set up again after Strict Mode's replay (or a child's message in the first commit, before
+    // this ran): what is still waiting is written. Nothing is lost, and the next message finds
+    // the region free.
+    for (const politeness of ["polite", "assertive"] as const) {
+      const waiting = pending.current[politeness];
+      if (waiting.messages.length > 0 && waiting.write === undefined) schedule(politeness);
+    }
+    return () => {
+      for (const waiting of Object.values(pending.current)) {
+        clearTimeout(waiting.write);
+        clearTimeout(waiting.clear);
+        waiting.write = undefined;
+        waiting.clear = undefined;
+      }
+    };
+  }, [schedule]);
 
   // The regions' text is written here, never rendered: React leaves an element with no children alone.
   return (

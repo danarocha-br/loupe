@@ -581,12 +581,14 @@ export const HELD: HeldItem[] = [
   {
     target: { scope: "group", anchor: "app/billing/invite-form.tsx › InviteForm › Button[1]" },
     label: "All from invite-form.tsx › InviteForm › Button[1]",
+    full: "All from app/billing/invite-form.tsx › InviteForm › Button[1]",
     why: "Code changed here: this call site had 2 uses, now 3.",
     values: ['variant "outline"'],
   },
   {
     target: { scope: "instance", id: "app/billing/members.tsx › Members › Badge[1]#ana" },
     label: "members.tsx › Members › Badge[1]#ana",
+    full: "app/billing/members.tsx › Members › Badge[1]#ana",
     why: "Matches more than one Instance (ana): discard it and set it again on the one you mean.",
     values: ['tone "danger" · Current "neutral" (last seen)', 'children "Owner" · Current "Admin" (last seen)'],
   },

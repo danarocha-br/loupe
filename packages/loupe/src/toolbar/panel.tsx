@@ -523,17 +523,22 @@ function Inspector({ debug, mode, view, body, notices, heading }: Part<Inspector
 /**
  * The selection's scope, said as it moves (Widen, Narrow, Select multiple's Widen to the
  * page) with how far it reaches, and how far it reaches as a box leaves an Instance out or
- * brings it back: the box reads its own state, not the scope's. A new selection says
- * nothing of it: focus goes to its heading, which reads it.
+ * brings it back: the box reads its own state, not the scope's. A new selection says its
+ * scope only when it is wider than the Instance (a call site's card, a pick with Select
+ * multiple): the heading focus goes to names the Instance alone.
  */
 function useScopeAnnouncement(id: string, said: InspectorBody["said"]): void {
   const announce = useAnnounce();
-  const last = useRef({ id, said });
+  // No selection seen yet: the Inspector mounts with the selection the list made, a new one.
+  const last = useRef<{ id: string | null; said: InspectorBody["said"] }>({ id: null, said });
   useEffect(() => {
     const seen = last.current;
     if (seen.id === id && seen.said === said) return;
     last.current = { id, said };
-    if (seen.id !== id) return;
+    if (seen.id !== id) {
+      if (said.reach !== null) announce(said.text);
+      return;
+    }
     if (seen.said.scope !== said.scope) announce(said.text);
     else if (said.reach !== null && seen.said.reach !== said.reach) announce(said.reach);
   });

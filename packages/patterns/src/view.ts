@@ -535,8 +535,12 @@ export type SheetWords = { label: string };
 /** The page's marks' words (DESIGN.md "On the page"): the selected Instance's size tag, and what leads the pick tag's detail. */
 export type OutlineWords = { size(name: string, width: number, height: number): string; detailLead: string };
 
-/** A record Suspended for review, as "Held for review" lists it: what it applies to, its name, why it is held, and what it holds. */
-export type HeldItem = { target: ScopeTarget; label: string; why: string; values: string[] };
+/**
+ * A record Suspended for review, as "Held for review" lists it: what it applies to, its name,
+ * what it names in full (its file's path included, for its Discard's name: two short names
+ * can be the same), why it is held, and what it holds.
+ */
+export type HeldItem = { target: ScopeTarget; label: string; full: string; why: string; values: string[] };
 
 /** Why nothing on an Instance can change here, said once: its title and its body. */
 export type InstanceNoteView = { title: string; body: string };
