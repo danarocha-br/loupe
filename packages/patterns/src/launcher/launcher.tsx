@@ -40,7 +40,9 @@ export type LauncherPillProps = Omit<ComponentPropsWithoutRef<"button">, "classN
 };
 
 export function LauncherPill({ edge, dragging, settling, leaving, at, gaps, words, ref, ...rest }: LauncherPillProps) {
-  const keys = `loupe-launcher-keys-${useId().replace(/[^\w-]/g, "")}`;
+  // One id for the pill's parts: its own, so two pills in one root (the workbench draws three) share none.
+  const id = useId().replace(/[^\w-]/g, "");
+  const keys = `loupe-launcher-keys-${id}`;
   return (
     <button
       {...rest}
@@ -60,7 +62,7 @@ export function LauncherPill({ edge, dragging, settling, leaving, at, gaps, word
       <span id={keys} hidden>
         {words.keys}
       </span>
-      <Goo gaps={gaps} />
+      <Goo gaps={gaps} filter={`loupe-goo-${id}`} />
       <span data-launcher-mark="">
         <LoupeL />
       </span>
@@ -101,9 +103,7 @@ const WALLS: Record<PillSide, { x: number; y: number; axis: "x" | "y"; sign: 1 |
  * stays put on the window's edge, even while the pill travels: both move by `translate` on
  * the same curve (launcher.css). Parked, the view draws them back past where they can join.
  */
-function Goo({ gaps }: { gaps: Record<PillSide, number> }) {
-  // Its own filter id: two pills in one root (the workbench draws three) must not share one.
-  const filter = `loupe-goo-${useId().replace(/[^\w-]/g, "")}`;
+function Goo({ gaps, filter }: { gaps: Record<PillSide, number>; filter: string }) {
   return (
     <svg data-launcher-goo="" width={GOO_W} height={GOO_H} viewBox={`0 0 ${GOO_W} ${GOO_H}`} aria-hidden="true" focusable="false">
       <defs>
