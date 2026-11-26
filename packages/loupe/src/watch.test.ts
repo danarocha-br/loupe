@@ -46,6 +46,12 @@ describe("syncInto", () => {
     expect(syncInto(from, to, { only: (file) => file.endsWith(".js") })).toEqual([]);
   });
 
+  it("moves a file dist doesn't have yet before a changed one, so an import never names a missing module", () => {
+    const from = folder("order-from", { "a-importer.js": 'import "./z-renamed.js";', "z-renamed.js": "renamed" });
+    const to = folder("order-to", { "a-importer.js": 'import "./old.js";' });
+    expect(syncInto(from, to)).toEqual(["z-renamed.js", "a-importer.js"]);
+  });
+
   it("compares what it would write, rewritten", () => {
     const from = folder("rewrite-from", { "a.js": "@loupe/ui" });
     const to = folder("rewrite-to", { "a.js": "../ui/index.js" });
@@ -118,6 +124,9 @@ describe("a watched step", () => {
       await until(() => has("c.js", '"b"'), "the renamed module is in dist");
       writeFileSync(path.join(src, "a.ts"), 'export const a = "a2";\n');
       await until(() => has("a.js", "a2"), "an edit after the rename is in dist");
+      // A module nothing imports, or one restored after a rename: in no graph, yet built.
+      writeFileSync(path.join(src, "d.ts"), 'export const d = "d";\n');
+      await until(() => has("d.js", '"d"'), "a module created outside the graph is in dist");
     } finally {
       await watching.close();
     }

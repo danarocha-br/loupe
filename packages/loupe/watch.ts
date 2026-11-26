@@ -44,7 +44,7 @@
 // watch output reaches a tarball.
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, type FSWatcher, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, type InlineConfig, runnerImport, type Rolldown, type UserConfig } from "vite";
@@ -80,8 +80,10 @@ if (typeof document !== "undefined") {
   for (const host of document.querySelectorAll(\`[\${HOST_ATTRIBUTE}]\`)) {
     const root = host.shadowRoot;
     if (!root) continue;
-    const before = new Set(root.adoptedStyleSheets);
+    const before = new Set(root.adoptedStyleSheets ?? []);
     loupeWatchAdopt(root, STYLESHEET);
+    // Where the browser constructs no sheet, it replaced its own \`<style>\`: nothing to drop.
+    if (!root.adoptedStyleSheets) continue;
     const added = root.adoptedStyleSheets.find((sheet) => !before.has(sheet));
     if (added) root.adoptedStyleSheets = root.adoptedStyleSheets.filter((sheet) => sheet === added || !isLoupe(sheet));
   }
@@ -124,17 +126,20 @@ export function changes(from: string, to: string, { rewrite = (code) => code, on
 
 /**
  * Moves into `to` each file of `from` whose bytes differ from `to`'s: written beside `from`'s,
- * then renamed over `to`'s, so a reader never sees half a file. Returns those files.
+ * then renamed over `to`'s, so a reader never sees half a file. The files `to` doesn't have
+ * yet go first: a module renamed or added is in place before the module that now imports it.
+ * Returns those files, in the order they moved.
  */
 export function syncInto(from: string, to: string, delivery: Delivery = {}): string[] {
-  const moved = changes(from, to, delivery);
+  const there = (file: string) => (existsSync(join(to, file)) ? 1 : 0);
+  const moved = [...changes(from, to, delivery)].sort(([a], [b]) => there(a) - there(b));
   for (const [file, code] of moved) {
     const staged = join(from, `${file}.loupe-watch`);
     writeFileSync(staged, code);
     mkdirSync(dirname(join(to, file)), { recursive: true });
     renameSync(staged, join(to, file));
   }
-  return [...moved.keys()];
+  return moved.map(([file]) => file);
 }
 
 /** The browser side's modules, as paths in `dist`: Vite's to write, never tsc6's. */
@@ -227,6 +232,7 @@ export function entriesKey(config: UserConfig): string {
  */
 export async function watchVite(dist: string, step: ViteStep, out: string, ready: () => void): Promise<{ close(): Promise<void> }> {
   let current: Rolldown.RolldownWatcher | null = null;
+  let sources: FSWatcher | null = null;
   let closed = false;
   const start = async (onReady: () => void): Promise<void> => {
     const config = step.config();
@@ -240,10 +246,14 @@ export async function watchVite(dist: string, step: ViteStep, out: string, ready
     const restartIfMoved = () => {
       if (closed || restarting || entriesKey(step.config()) === key) return false;
       restarting = true;
+      sources?.close();
       log(`${time()} ${step.name}: a module was added, removed or renamed; starting again with the new ones`);
       void watcher.close().then(() => (closed ? undefined : start(() => {})));
       return true;
     };
+    // A module created where the build's graph has nothing, one restored after a rename or not
+    // imported yet, starts no rebuild: the step's `src` is watched for it.
+    sources = watch(join(config.root ?? root, "src"), { recursive: true }, () => restartIfMoved());
     watcher.on("event", (event) => {
       if (event.code === "BUNDLE_START") started = Date.now();
       // Vite prints the error itself; `dist` keeps the last good build.
@@ -261,6 +271,7 @@ export async function watchVite(dist: string, step: ViteStep, out: string, ready
   return {
     async close() {
       closed = true;
+      sources?.close();
       await current?.close();
     },
   };
