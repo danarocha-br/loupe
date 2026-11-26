@@ -14,7 +14,8 @@ jobs:
   # @loupe/patterns workbenches and the Toolbar's states, recorded on both on this runner and
   # diffed (`pnpm visual`, AGENTS.md).
   # A change that is meant fails here until the PR carries the `visual-change` label (then
-  # re-run the job): the label waives a measured difference, never a check that couldn't run.
+  # re-run the job): the label waives a measured difference, never a check that couldn't run,
+  # nor an axe violation main doesn't have.
   visual:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -46,6 +47,11 @@ jobs:
           pnpm visual --base origin/main || status=$?
           # Exit 1 is a measured difference, 2 a check that couldn't run (`fixture/visual/src/cli.ts`).
           [ "$status" -eq 1 ] || exit "$status"
+          # A new axe violation is never waived: the label is for a layout that is meant to change.
+          if grep -qx "## New axe violations" .visual/report.md; then
+            echo "::error::axe finds violations in the Toolbar that main doesn't have: the report lists them. The visual-change label doesn't waive these."
+            exit 1
+          fi
           # The PR's labels now, not the event's: a re-run after labelling sees the label.
           if gh api "repos/$GITHUB_REPOSITORY/issues/$PR/labels" --jq '.[].name' | grep -qx visual-change; then
             echo "::notice::The layout differs from main, and the PR is labelled visual-change: the report lists what changed."

@@ -5,7 +5,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
-import { manifestFile, sceneFile, shotFile, shotName } from "./files.ts";
+import { newViolations } from "./audit.ts";
+import { manifestFile, sceneFile, selects, shotFile, shotName, skippedFile } from "./files.ts";
 import type { Recording } from "./record.ts";
 import type { Entry, Root } from "./snapshot.ts";
 
@@ -20,17 +21,37 @@ export const BOX_TOLERANCE = 0.05;
 export const CHANNEL_TOLERANCE = 3;
 
 export type SceneReport = { scene: string; differences: string[]; pixels: string[] };
-/** `compared` is how many scenes both sides have; `scenes` lists those that differ. */
-export type Report = { compared: number; scenes: SceneReport[]; added: string[]; removed: string[]; elements: number; images: number };
+/** A scene whose axe audit, in the head, finds a violation the base's doesn't. */
+export type AxeReport = { scene: string; violations: string[] };
+/**
+ * `compared` is how many scenes both sides have; `scenes` lists those that differ. `added`
+ * are the head's alone, and `skipped` says why, for those the base couldn't drive. `audited`
+ * counts the head's scenes axe ran on, and `axe` lists those with a violation that is new.
+ */
+export type Report = {
+  compared: number;
+  scenes: SceneReport[];
+  added: string[];
+  skipped: Record<string, string>;
+  removed: string[];
+  elements: number;
+  images: number;
+  audited: number;
+  axe: AxeReport[];
+};
 
-/** The verdict: the scenes that differ, and those the head no longer has. */
-export const failures = (report: Report) => report.scenes.length + report.removed.length;
+/** The verdict: the scenes that differ or have a new axe violation, and those the head no longer has. */
+export const failures = (report: Report) => new Set([...report.scenes.map((s) => s.scene), ...report.axe.map((s) => s.scene), ...report.removed]).size;
 
-/** Nothing was compared: the check couldn't run, which is neither a pass nor a difference. */
-export const empty = (report: Report) => report.compared === 0 && report.removed.length === 0;
+/**
+ * Nothing was recorded on either side to judge: the check couldn't run, which is neither a pass
+ * nor a difference. A scene the head alone has still counts: it isn't compared, but axe audits it.
+ */
+export const empty = (report: Report) => report.compared === 0 && report.removed.length === 0 && report.added.length === 0;
 
 const readScenes = (dir: string): string[] => (existsSync(manifestFile(dir)) ? JSON.parse(readFileSync(manifestFile(dir), "utf8")) : []);
 const readScene = (dir: string, scene: string): Recording => JSON.parse(readFileSync(sceneFile(dir, scene), "utf8"));
+const readSkipped = (dir: string): Record<string, string> => (existsSync(skippedFile(dir)) ? JSON.parse(readFileSync(skippedFile(dir), "utf8")) : {});
 
 function diffValues(label: string, names: string[], a: string[] | undefined, b: string[] | undefined, out: string[]): void {
   if (!a && !b) return;
@@ -123,20 +144,33 @@ async function pixels(page: Page, a: Buffer, b: Buffer): Promise<{ size: string;
   );
 }
 
-/** Compares `base` with `head`; `only` keeps the scenes whose name starts with it. Diff images go to `diffDir`. */
+/** Compares `base` with `head`; `only` keeps the scenes whose name starts with one of its prefixes. Diff images go to `diffDir`. */
 export async function compare(baseDir: string, headDir: string, diffDir: string, only?: string): Promise<Report> {
-  const wanted = (scene: string) => !only || scene.startsWith(only);
+  const wanted = (scene: string) => selects(only, scene);
   const baseScenes = readScenes(baseDir).filter(wanted);
   const headScenes = readScenes(headDir).filter(wanted);
   const both = baseScenes.filter((s) => headScenes.includes(s));
+  const added = headScenes.filter((s) => !baseScenes.includes(s));
+  const skipped = readSkipped(baseDir);
   const report: Report = {
     compared: both.length,
     scenes: [],
-    added: headScenes.filter((s) => !baseScenes.includes(s)),
+    added,
+    skipped: Object.fromEntries(added.filter((s) => skipped[s]).map((s) => [s, skipped[s]!])),
     removed: baseScenes.filter((s) => !headScenes.includes(s)),
     elements: 0,
     images: 0,
+    audited: 0,
+    axe: [],
   };
+  // A new violation, in a scene both sides have or in one the head alone has.
+  for (const scene of headScenes) {
+    const head = readScene(headDir, scene);
+    if (!head.axe) continue;
+    report.audited++;
+    const violations = newViolations(baseScenes.includes(scene) ? readScene(baseDir, scene).axe : undefined, head.axe);
+    if (violations.length) report.axe.push({ scene, violations });
+  }
   const browser = await chromium.launch();
   const page = await browser.newPage();
   try {
@@ -177,10 +211,17 @@ export async function compare(baseDir: string, headDir: string, diffDir: string,
 export function markdown(report: Report, title: string): string {
   const lines = [`# ${title}`, ""];
   const failed = failures(report);
-  lines.push(empty(report) ? "**Nothing was compared: the check couldn't run.**" : failed ? `**${failed} scene(s) differ.**` : "**No difference.**", "");
-  lines.push(`Compared ${report.compared} scenes: ${report.elements} elements and ${report.images} screenshots.`, "");
+  lines.push(empty(report) ? "**Nothing was compared: the check couldn't run.**" : failed ? `**${failed} scene(s) differ from the base, or have an axe violation it doesn't.**` : "**No difference.**", "");
+  lines.push(`Compared ${report.compared} scenes: ${report.elements} elements and ${report.images} screenshots. axe ran on ${report.audited} of the head's scenes.`, "");
   if (report.removed.length) lines.push("## Scenes only in the base", "", ...report.removed.map((s) => `- ${s}`), "");
-  if (report.added.length) lines.push("## Scenes only in the head (new, not compared)", "", ...report.added.map((s) => `- ${s}`), "");
+  if (report.added.length) {
+    const why = (s: string) => (report.skipped[s] ? `: the base couldn't drive it (${report.skipped[s]})` : "");
+    lines.push("## Scenes only in the head (new, not compared)", "", ...report.added.map((s) => `- ${s}${why(s)}`), "");
+  }
+  if (report.axe.length) {
+    lines.push("## New axe violations", "", "axe-core in Chromium, colour contrast included, on the scene's Loupe roots: what the head has that the base doesn't.", "");
+    for (const s of report.axe) lines.push(`### ${s.scene}`, "", ...s.violations.map((v) => (v.startsWith("  ") ? `  - ${v.trim()}` : `- ${v}`)), "");
+  }
   for (const s of report.scenes) {
     lines.push(`## ${s.scene}`, "");
     for (const p of s.pixels) lines.push(`- pixels: ${p}`);
