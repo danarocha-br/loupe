@@ -1,0 +1,201 @@
+// The watch (`watch.ts`, `pnpm --filter @danarocha/loupe watch`): the build's steps in watch
+// mode, their changed files moved into `dist` one rename at a time. These tests hold it to the
+// build: each step, built once as the watch builds it, writes the bytes `dist` has, so they
+// run after a build, as `src/build.test.ts` does. A `dist` the watch has written into fails
+// them, as it fails `build.test.ts`: build again.
+
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "vite";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildOptions, changes, DELIVERY_ORDER, entriesKey, Gate, isNodeSideModule, loadConfigs, SWAP_MARK, SWAPPED, syncInto, viteSteps, watched, watchVite, withSwap, type ViteStep } from "../watch.js";
+
+const pkg = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const dist = path.join(pkg, "dist");
+const scratch = mkdtempSync(path.join(tmpdir(), "loupe-watch-"));
+afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+
+/** A folder of files, written from `files`. */
+function folder(name: string, files: Record<string, string>): string {
+  const dir = path.join(scratch, name);
+  for (const [file, code] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), code);
+  }
+  return dir;
+}
+
+describe("syncInto", () => {
+  it("moves only the files whose bytes changed, by a rename over the old file, and leaves nothing behind", () => {
+    const from = folder("sync-from", { "same.js": "same", "changed.js": "new", "added/deep.js": "added", "skipped.d.ts": "types" });
+    const to = folder("sync-to", { "same.js": "same", "changed.js": "old", "kept.js": "kept" });
+    const before = { same: statSync(path.join(to, "same.js")).ino, changed: statSync(path.join(to, "changed.js")).ino };
+    const moved = syncInto(from, to, { only: (file) => file.endsWith(".js") });
+    expect(moved.sort()).toEqual(["added/deep.js", "changed.js"]);
+    expect(readFileSync(path.join(to, "changed.js"), "utf8")).toBe("new");
+    expect(readFileSync(path.join(to, "added/deep.js"), "utf8")).toBe("added");
+    // A file left alone keeps its inode; a changed one is a new file renamed over it, never written in place.
+    expect(statSync(path.join(to, "same.js")).ino).toBe(before.same);
+    expect(statSync(path.join(to, "changed.js")).ino).not.toBe(before.changed);
+    expect(existsSync(path.join(to, "skipped.d.ts"))).toBe(false);
+    expect(readFileSync(path.join(to, "kept.js"), "utf8")).toBe("kept");
+    expect(readdirSync(from, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".loupe-watch"))).toEqual([]);
+    expect(syncInto(from, to, { only: (file) => file.endsWith(".js") })).toEqual([]);
+  });
+
+  it("moves a file dist doesn't have yet before a changed one, so an import never names a missing module", () => {
+    const from = folder("order-from", { "a-importer.js": 'import "./z-renamed.js";', "z-renamed.js": "renamed" });
+    const to = folder("order-to", { "a-importer.js": 'import "./old.js";' });
+    expect(syncInto(from, to)).toEqual(["z-renamed.js", "a-importer.js"]);
+  });
+
+  it("compares what it would write, rewritten", () => {
+    const from = folder("rewrite-from", { "a.js": "@loupe/ui" });
+    const to = folder("rewrite-to", { "a.js": "../ui/index.js" });
+    expect([...changes(from, to, { rewrite: (code) => code.replace("@loupe/ui", "../ui/index.js") }).keys()]).toEqual([]);
+    expect([...changes(from, to).keys()]).toEqual(["a.js"]);
+  });
+});
+
+describe("the stylesheet swap", () => {
+  // The surface's module as the build writes it.
+  const surface = () => readFileSync(path.join(dist, SWAPPED), "utf8");
+
+  it("is added to the surface's module alone, after it, marked", () => {
+    const swapped = withSwap(surface());
+    expect(swapped.startsWith(surface())).toBe(true);
+    expect(swapped.slice(surface().length)).toContain(SWAP_MARK);
+    expect(swapped.slice(surface().length)).toContain("adoptStylesheet as loupeWatchAdopt");
+    const step = watched({ name: "browser side", into: "", config: () => ({}) });
+    expect(step.rewrite?.(surface(), SWAPPED)).toBe(swapped);
+    expect(step.rewrite?.(surface(), "toolbar/index.js")).toBe(surface());
+  });
+
+  it("fails, rather than swap nothing, when the surface no longer imports what it uses", () => {
+    const without = surface().replace(/\bHOST_ATTRIBUTE\b/g, "OTHER_ATTRIBUTE");
+    expect(() => withSwap(without)).toThrow(/HOST_ATTRIBUTE/);
+  });
+});
+
+describe("the gate", () => {
+  it("holds what a step built until none is building, then delivers in the steps' order", () => {
+    const gate = new Gate(["Node side", "@loupe/ui", "browser side"]);
+    const delivered: string[] = [];
+    gate.building("browser side");
+    gate.building("Node side");
+    // The browser side finishes first: its importer of a new Node-side helper must wait for it.
+    gate.done("browser side", () => delivered.push("browser side"));
+    expect(delivered).toEqual([]);
+    gate.done("Node side", () => delivered.push("Node side"));
+    expect(delivered).toEqual(["Node side", "browser side"]);
+    // Nothing is held twice.
+    gate.done("@loupe/ui");
+    expect(delivered).toEqual(["Node side", "browser side"]);
+  });
+
+  it("lets the others through when a step stops without building", () => {
+    const gate = new Gate(["@loupe/ui", "@loupe/patterns"]);
+    const delivered: string[] = [];
+    gate.building("@loupe/ui");
+    gate.building("@loupe/patterns");
+    gate.done("@loupe/patterns", () => delivered.push("@loupe/patterns"));
+    gate.done("@loupe/ui"); // A failed build, a restart or a stop: nothing to deliver.
+    expect(delivered).toEqual(["@loupe/patterns"]);
+  });
+
+  it("orders every step the watch runs, each after what it imports", async () => {
+    const names = viteSteps(await loadConfigs()).map((step) => step.name);
+    expect([...DELIVERY_ORDER].sort()).toEqual([...names, "Node side"].sort());
+    expect(DELIVERY_ORDER.indexOf("Node side")).toBeLessThan(DELIVERY_ORDER.indexOf("browser side"));
+    expect(DELIVERY_ORDER.indexOf("@loupe/ui")).toBeLessThan(DELIVERY_ORDER.indexOf("@loupe/patterns"));
+    expect(DELIVERY_ORDER.indexOf("@loupe/patterns")).toBeLessThan(DELIVERY_ORDER.indexOf("browser side"));
+  });
+});
+
+/** Waits until `check` holds, for up to 30 s. */
+async function until(check: () => boolean, what: string): Promise<void> {
+  const end = Date.now() + 30_000;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting until ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+describe("a watched step", () => {
+  // A package of three modules, each an entry, as the build makes every shipped module one.
+  const root = folder("package", { "src/index.ts": 'export { a } from "./a.js";\n', "src/a.ts": 'export const a = "a1";\n', "src/b.ts": 'export const b = "b";\n' });
+  const src = path.join(root, "src");
+  const config = () => ({
+    root,
+    build: {
+      emptyOutDir: false,
+      minify: false,
+      lib: { entry: Object.fromEntries(readdirSync(src).map((file) => [file.replace(/\.ts$/, ""), path.join(src, file)])), formats: ["es" as const] },
+      rolldownOptions: { output: { preserveModules: true, preserveModulesRoot: "src", entryFileNames: "[name].js" } },
+    },
+  });
+  const step: ViteStep = { name: "probe", into: "", config };
+  const dist = path.join(scratch, "package-dist");
+  const has = (file: string, text: string) => existsSync(path.join(dist, file)) && readFileSync(path.join(dist, file), "utf8").includes(text);
+
+  it("keys its entries, so a module added, removed or renamed changes the key", () => {
+    const before = entriesKey(config());
+    writeFileSync(path.join(src, "extra.ts"), "export const extra = 1;\n");
+    expect(entriesKey(config())).not.toBe(before);
+    rmSync(path.join(src, "extra.ts"));
+    expect(entriesKey(config())).toBe(before);
+  });
+
+  it("starts again with the new entries when a module is renamed, and goes on delivering edits", async () => {
+    mkdirSync(dist, { recursive: true });
+    let ready = false;
+    const watching = await watchVite(dist, step, path.join(scratch, "package-out"), () => (ready = true));
+    try {
+      await until(() => ready && has("a.js", "a1") && has("b.js", '"b"'), "the first round is in dist");
+      renameSync(path.join(src, "b.ts"), path.join(src, "c.ts"));
+      await until(() => has("c.js", '"b"'), "the renamed module is in dist");
+      writeFileSync(path.join(src, "a.ts"), 'export const a = "a2";\n');
+      await until(() => has("a.js", "a2"), "an edit after the rename is in dist");
+      // A module nothing imports, or one restored after a rename: in no graph, yet built.
+      writeFileSync(path.join(src, "d.ts"), 'export const d = "d";\n');
+      await until(() => has("d.js", '"d"'), "a module created outside the graph is in dist");
+    } finally {
+      await watching.close();
+    }
+  });
+});
+
+describe("the watch's output", () => {
+  let nodeEnv: string | undefined;
+  beforeAll(() => {
+    if (!existsSync(path.join(dist, "toolbar", "index.js"))) {
+      throw new Error("No dist/toolbar/index.js: run `pnpm --filter @danarocha/loupe build` first.");
+    }
+    // As the watch builds, and as `vite build` does.
+    nodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+  });
+  afterAll(() => {
+    process.env.NODE_ENV = nodeEnv;
+  });
+
+  it("is the build's: each Vite step, built as the watch builds it, writes the bytes dist has", async () => {
+    const steps = viteSteps(await loadConfigs());
+    expect(steps.map((step) => step.name)).toEqual(["@loupe/ui", "@loupe/patterns", "browser side"]);
+    for (const step of steps) {
+      const out = path.join(scratch, `vite-${step.into || "browser"}`);
+      await build({ ...buildOptions(step.config(), out, false), logLevel: "silent" });
+      expect([...changes(out, path.join(dist, step.into), step).keys()], `${step.name}'s files that differ from dist's`).toEqual([]);
+    }
+  });
+
+  it("is the build's on the Node side: tsc6, built as the watch builds it, writes the modules dist has", () => {
+    const out = path.join(scratch, "tsc");
+    const tsc = spawnSync(path.join(pkg, "node_modules", ".bin", "tsc6"), ["-p", "tsconfig.build.json", "--outDir", out], { cwd: pkg, encoding: "utf8" });
+    expect(tsc.status, tsc.stdout).toBe(0);
+    expect([...changes(out, dist, { only: isNodeSideModule }).keys()]).toEqual([]);
+  });
+});

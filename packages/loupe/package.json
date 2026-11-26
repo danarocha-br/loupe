@@ -41,6 +41,7 @@
   },
   "scripts": {
     "build": "pnpm --dir ../patterns build && rm -rf dist && tsc6 -p tsconfig.build.json && vite build && vitest run src/build.test.ts",
+    "watch": "node --experimental-strip-types --disable-warning=ExperimentalWarning watch.ts",
     "prepack": "pnpm run build",
     "test": "vitest run",
     "typecheck": "tsc6 --noEmit"
