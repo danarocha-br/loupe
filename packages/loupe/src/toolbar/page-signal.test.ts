@@ -245,7 +245,7 @@ describe("the page signal, awake", () => {
     sleep();
   });
 
-  it("looks for the page's animations once a scroll settles, not on each of its frames", async () => {
+  it("looks for the page's animations as a scroll starts and once it settles, not on each of its frames", async () => {
     const sleep = wake();
     const getAnimations = vi.fn((): Animation[] => []);
     (document as { getAnimations?: () => Animation[] }).getAnimations = getAnimations;
@@ -255,13 +255,53 @@ describe("the page signal, awake", () => {
       window.dispatchEvent(new Event("scroll"));
       await nextFrame();
     }
-    expect(getAnimations).not.toHaveBeenCalled();
+    expect(getAnimations).toHaveBeenCalledTimes(1);
     document.dispatchEvent(new Event("scrollend"));
     await afterSettling();
-    expect(getAnimations).toHaveBeenCalledTimes(1);
+    expect(getAnimations).toHaveBeenCalledTimes(2);
     delete (document as { getAnimations?: () => Animation[] }).getAnimations;
     stopLayout();
     stopScroll();
+    sleep();
+  });
+
+  it("ticks layout on every frame of a scroll whose start started an animation of the page's, with no event to say so", async () => {
+    const sleep = wake();
+    const running = { playState: "running", effect: { target: container } } as unknown as Animation;
+    (document as { getAnimations?: () => Animation[] }).getAnimations = () => [running];
+    const layout = vi.fn();
+    const stopLayout = signal.onLayout(layout);
+    const stopScroll = signal.onScroll(() => {});
+    for (let step = 0; step < 3; step++) {
+      window.dispatchEvent(new Event("scroll"));
+      await nextFrame();
+    }
+    expect(layout.mock.calls.length).toBeGreaterThanOrEqual(2);
+    delete (document as { getAnimations?: () => Animation[] }).getAnimations;
+    await nextFrame();
+    stopLayout();
+    stopScroll();
+    sleep();
+  });
+
+  it("says a scroll runs until the tick that settles it, and settles none that started again before that tick", async () => {
+    const sleep = wake();
+    const layout = vi.fn(() => signal.scrolling);
+    const stop = signal.onLayout(layout);
+    signal.onScroll(() => {});
+    expect(signal.scrolling).toBe(false);
+    window.dispatchEvent(new Event("scroll"));
+    document.dispatchEvent(new Event("scrollend"));
+    expect(signal.scrolling).toBe(true);
+    // The scroll starts again just as its timer settles it, before the frame it would tick in.
+    setTimeout(() => window.dispatchEvent(new Event("scroll")), SCROLL_SETTLE.endMs);
+    await afterSettling();
+    expect(layout).not.toHaveBeenCalled();
+    expect(signal.scrolling).toBe(true);
+    await act(() => new Promise((resolve) => setTimeout(resolve, SCROLL_SETTLE.quietMs + 40)));
+    // The one tick, which no longer counts as mid-scroll.
+    expect(layout.mock.results.map((result) => result.value)).toEqual([false]);
+    stop();
     sleep();
   });
 

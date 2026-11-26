@@ -16,7 +16,8 @@
 //   scrollers that moved: a view that follows the scroll (`highlight.tsx`) moves what
 //   it drew by their offsets, and measures again on the layout tick that ends it. A
 //   view that only settles (`page-map.tsx`) hears the one tick, and the page's
-//   animations aren't looked for on every frame of it.
+//   animations are looked for as the scroll starts and once it settles, not on every
+//   frame of it: a script can start one as a scroll begins, with no event to say so.
 // - It is dormant until a view wakes it (the open panel) and again once none holds
 //   it: no observer, no listener, nothing read. Collapsed, the Toolbar costs the
 //   page only what the runtime must do on each commit (`runtime/registry.ts`).
@@ -48,6 +49,8 @@ export type PageSignal = {
    * `onLayout` follows once the scroll settles.
    */
   onScroll(listener: (scrollers: ReadonlySet<Element>) => void): () => void;
+  /** Whether a scroll runs: from its first event until the layout tick that settles it. */
+  readonly scrolling: boolean;
   /**
    * The boxes worth outlining among an Instance's nodes, largest first, measured
    * once per task however many views ask. While awake, its nodes are watched for
@@ -84,8 +87,12 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
   let scrollFrame = 0;
   /** The scrollers that moved since the last scroll tick. */
   const scrolled = new Set<Element>();
-  /** While a scroll runs, the timer that settles it. */
+  /** While a scroll runs, the timer that settles it, then the frame it settles in. */
   let settle: ReturnType<typeof setTimeout> | undefined;
+  let settleFrame = 0;
+  let scrolling = false;
+  /** Whether the scroll's first tick is still to come. */
+  let starting = false;
 
   const frame = (callback: () => void): number =>
     view?.requestAnimationFrame ? view.requestAnimationFrame(callback) : (setTimeout(callback, 16) as unknown as number);
@@ -148,11 +155,23 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
     const scrollers: ReadonlySet<Element> = new Set(scrolled);
     scrolled.clear();
     for (const listener of [...scrollListeners]) listener(scrollers);
+    if (!starting) return;
+    starting = false;
+    // A script can start an animation as the scroll begins: then every frame is a layout tick, as on any.
+    if (animating()) requestLayout();
   };
   const settled = () => {
     settle = undefined;
+    settleFrame = frame(endScroll);
+  };
+  /** The scroll has settled, unless another started since its timer ran: one layout tick, in this frame. */
+  const endScroll = () => {
+    settleFrame = 0;
+    scrolling = starting = false;
     scrolled.clear();
-    requestLayout();
+    if (layoutListeners.size === 0) return;
+    cancel(layoutFrame);
+    runLayout();
   };
   /** A scroll of the page: a tick for those that follow it, and its end held off until it settles. */
   const onScrollEvent = (event: Event) => {
@@ -160,6 +179,9 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
     const target = event.target as Node | null;
     const scroller = target?.nodeType === 1 ? (target as Element) : (doc.scrollingElement ?? doc.documentElement);
     if (own(scroller)) return;
+    cancel(settleFrame);
+    settleFrame = 0;
+    if (!scrolling) scrolling = starting = true;
     clearTimeout(settle);
     settle = setTimeout(settled, SCROLL_SETTLE.quietMs);
     if (scrollListeners.size === 0) return;
@@ -245,6 +267,9 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
       view?.removeEventListener("scrollend", onScrollEnd, { capture: true });
       clearTimeout(settle);
       settle = undefined;
+      cancel(settleFrame);
+      settleFrame = 0;
+      scrolling = starting = false;
       scrolled.clear();
       cancel(versionFrame);
       cancel(layoutFrame);
@@ -314,6 +339,9 @@ export function createPageSignal({ doc, debug, host = () => null }: PageSignalOp
     },
     get awake() {
       return sleep !== null;
+    },
+    get scrolling() {
+      return scrolling;
     },
   };
   return signal;

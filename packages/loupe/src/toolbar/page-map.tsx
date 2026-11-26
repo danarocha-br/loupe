@@ -28,9 +28,9 @@ function readBoxes(signal: PageSignal | null, debug: LoupeDebug, ids: readonly s
 /**
  * The boxes the map draws: read when it opens, and again once the page has stayed
  * still for a moment after the Instances change or the page signal says a box may
- * have moved (a resize, a scroll, an animation). The map is an overview: it
- * doesn't follow a menu's animation frame by frame, nor read every box on every
- * version of the page. They are state, not read in render: React Compiler keeps
+ * have moved (a resize, a scroll once it settles, an animation), never in the
+ * middle of a scroll. The map is an overview: it doesn't follow a menu's animation
+ * frame by frame, nor read every box on every version of the page. They are state, not read in render: React Compiler keeps
  * what a render computed until an input changes, and a box moving isn't one.
  */
 function useSettledBoxes(signal: PageSignal | null, debug: LoupeDebug, ids: readonly string[]): ReadonlyMap<string, MapBox> {
@@ -38,7 +38,11 @@ function useSettledBoxes(signal: PageSignal | null, debug: LoupeDebug, ids: read
   const [boxes, setBoxes] = useState(() => readBoxes(signal, debug, ids));
   const opened = useRef(false);
   useEffect(() => {
-    const read = () => setBoxes(readBoxes(signal, debug, key === "" ? [] : key.split("\n")));
+    const read = () => {
+      // Mid-scroll: the layout tick that settles it brings a read.
+      if (signal?.scrolling) return;
+      setBoxes(readBoxes(signal, debug, key === "" ? [] : key.split("\n")));
+    };
     let timer = setTimeout(read, opened.current ? SETTLE_MS : OPENED_MS);
     opened.current = true;
     const stop = signal?.onLayout(() => {
